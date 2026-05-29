@@ -10,7 +10,16 @@
     "dev": "tsx watch src/index.ts",
     "prisma:studio": "npx prisma studio",
     "prisma:migrate": "npx prisma migrate dev",
-    "prisma:generate": "npx prisma generate"
+    "prisma:generate": "npx prisma generate",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
   },
   "keywords": [],
   "author": "",
@@ -23,7 +32,6 @@
     "@fastify/swagger-ui": "^5.2.6",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
-    "prisma": "^7.8.0",
     "@types/busboy": "^1.5.4",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.4.2",
@@ -31,6 +39,7 @@
     "fastify-metrics": "^13.2.0",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.20.0",
+    "prisma": "^7.8.0",
     "prom-client": "^15.1.3",
     "sharp": "^0.34.5",
     "tsx": "^4.21.0",
@@ -41,6 +50,10 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.6.2",
     "@types/pg": "^8.20.0",
-    "typescript": "^6.0.3"
+    "@vitest/coverage-v8": "4.1.7",
+    "eslint": "10.4.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "8.60.0",
+    "vitest": "4.1.7"
   }
 }
