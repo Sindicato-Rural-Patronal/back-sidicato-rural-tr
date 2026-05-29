@@ -1,5 +1,20 @@
 node_modules
-# Keep environment variables out of version control
-.env
+dist
 
+# Environment
+.env
+.env.*
+!.env.example
+
+# Prisma generated client
 /src/generated/prisma
+
+# Storage
+minio_data
+
+# Claude Code agent skills (ferramentas locais)
+.agents/
+
+# Logs
+*.log
+npm-debug.log*
