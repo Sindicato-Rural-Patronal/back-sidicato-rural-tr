@@ -1,6 +1,6 @@
-import { RuleRepository } from '../ports/external/rule-repository.js';
-import { UserAdminRepository } from '../ports/external/user-admin-repository.js';
-import { RuleModel } from '../generated/prisma/models/Rule.js';
+import type { RuleRepository } from '../ports/external/rule-repository.js';
+import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { RuleModel } from '../generated/prisma/models/Rule.js';
 import { verifyPermission } from '../lib/verify-permission.js';
 
 type ListRulesResponse = {

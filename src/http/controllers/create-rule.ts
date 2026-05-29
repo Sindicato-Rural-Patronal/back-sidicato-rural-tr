@@ -1,6 +1,6 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { CreateRuleUseCase } from '../../usecase/create-rule.js';
-import { permitions } from '../../generated/prisma/enums.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { CreateRuleUseCase } from '../../usecase/create-rule.js';
+import type { permitions } from '../../generated/prisma/enums.js';
 
 export class CreateRuleController {
     constructor(private createRuleUseCase: CreateRuleUseCase) {}

@@ -1,7 +1,7 @@
 import { z } from 'zod/v4';
-import { CourseRepository } from '../ports/external/course-repository.js';
-import { UserDataRepository } from '../ports/external/user-data-repository.js';
-import { RegistrationRepository } from '../ports/external/registration-repository.js';
+import type { CourseRepository } from '../ports/external/course-repository.js';
+import type { UserDataRepository } from '../ports/external/user-data-repository.js';
+import type { RegistrationRepository } from '../ports/external/registration-repository.js';
 
 const schema = z.object({
     courseId: z.string().min(1),

@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { DeleteNewsUseCase } from '../../usecase/delete-news.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { DeleteNewsUseCase } from '../../usecase/delete-news.js';
 
 export class DeleteNewsController {
     constructor(private deleteNewsUseCase: DeleteNewsUseCase) {}

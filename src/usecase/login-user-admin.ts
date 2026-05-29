@@ -1,5 +1,4 @@
-import { UserAdminRepository } from "../ports/external/user-admin-repository";
-import { UserDataRepository } from "../ports/external/user-data-repository";
+import type { UserAdminRepository } from "../ports/external/user-admin-repository";
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 

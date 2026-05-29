@@ -1,8 +1,8 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { ListNewsUseCase } from '../../usecase/list-news.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { ListNewsUseCase } from '../../usecase/list-news.js';
 import { verifyPermission } from '../../lib/verify-permission.js';
-import { UserAdminRepository } from '../../ports/external/user-admin-repository.js';
-import { RuleRepository } from '../../ports/external/rule-repository.js';
+import type { UserAdminRepository } from '../../ports/external/user-admin-repository.js';
+import type { RuleRepository } from '../../ports/external/rule-repository.js';
 
 export class ListAllNewsController {
     constructor(

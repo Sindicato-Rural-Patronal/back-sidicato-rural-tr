@@ -1,7 +1,7 @@
-import { NewsRepository } from '../ports/external/news-repository.js';
-import { StorageRepository } from '../ports/external/storage-repository.js';
-import { UserAdminRepository } from '../ports/external/user-admin-repository.js';
-import { RuleRepository } from '../ports/external/rule-repository.js';
+import type { NewsRepository } from '../ports/external/news-repository.js';
+import type { StorageRepository } from '../ports/external/storage-repository.js';
+import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { RuleRepository } from '../ports/external/rule-repository.js';
 import { verifyPermission } from '../lib/verify-permission.js';
 
 const NEWS_BANNER_BUCKET = process.env.NEWS_BANNER_BUCKET || 'news-banners';

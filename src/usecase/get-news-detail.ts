@@ -1,4 +1,4 @@
-import { NewsRepository, NewsModel } from '../ports/external/news-repository.js';
+import type { NewsRepository, NewsModel } from '../ports/external/news-repository.js';
 
 type GetNewsDetailResponse = {
     success: boolean;

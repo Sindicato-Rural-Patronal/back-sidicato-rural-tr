@@ -1,4 +1,4 @@
-import {UserDataModel, UserDataUncheckedCreateInput} from "../../generated/prisma/models/UserData.js"
+import type {UserDataModel, UserDataUncheckedCreateInput} from "../../generated/prisma/models/UserData.js"
 export interface  UserDataRepository {
     create(data: UserDataUncheckedCreateInput): Promise<UserDataModel  | null>;
     findByEmailOurPhone(email: string, phone: string): Promise<UserDataModel | null>;

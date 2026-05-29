@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client.js";
-import { Env } from "../config/env.js";
+import type { Env } from "../config/env.js";
 
 
 export function createPrismaClient(env: Env): PrismaClient {

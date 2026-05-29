@@ -15,7 +15,7 @@ import { newsRouter } from './http/router/news-router.js'
 
 import { loadEnv } from './config/env.js';
 import { createPrismaClient } from './lib/prisma.js';
-import { permitions } from './generated/prisma/enums.js';
+import type { permitions } from './generated/prisma/enums.js';
 import { CreateRuleUseCase } from './usecase/create-rule.js';
 import { RuleAdapter } from './adapter/database/rule-adapter.js';
 import { hash } from 'bcrypt'

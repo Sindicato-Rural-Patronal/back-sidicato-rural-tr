@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { ListAllCoursesUseCase } from '../../usecase/list-all-courses.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { ListAllCoursesUseCase } from '../../usecase/list-all-courses.js';
 
 export class ListAllCoursesController {
     constructor(private readonly useCase: ListAllCoursesUseCase) {}

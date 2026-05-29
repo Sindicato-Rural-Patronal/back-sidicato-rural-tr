@@ -1,6 +1,6 @@
-import { CourseRepository } from '../ports/external/course-repository.js';
-import { UserAdminRepository } from '../ports/external/user-admin-repository.js';
-import { RuleRepository } from '../ports/external/rule-repository.js';
+import type { CourseRepository } from '../ports/external/course-repository.js';
+import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { RuleRepository } from '../ports/external/rule-repository.js';
 import { verifyPermission } from '../lib/verify-permission.js';
 
 type DeleteCourseResponse = { success: boolean; statusCode?: number; error?: Error };

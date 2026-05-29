@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { CancelRegistrationUseCase } from '../../usecase/cancel-registration.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { CancelRegistrationUseCase } from '../../usecase/cancel-registration.js';
 
 type Params = { registrationId: string };
 

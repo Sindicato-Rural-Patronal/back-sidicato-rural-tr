@@ -1,4 +1,4 @@
-import { courseModel, CoursePhotoModel } from '../../generated/prisma/models.js';
+import type { courseModel, CoursePhotoModel } from '../../generated/prisma/models.js';
 import { CourseStatus } from '../../generated/prisma/enums.js';
 
 export { CourseStatus };

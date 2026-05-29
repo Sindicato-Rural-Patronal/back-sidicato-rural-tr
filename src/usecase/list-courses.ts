@@ -1,5 +1,7 @@
-import { CourseRepository, CourseStatus } from '../ports/external/course-repository.js';
-import { CourseFrontendDetail, mapToFrontend } from './get-course-detail.js';
+import type { CourseRepository} from '../ports/external/course-repository.js';
+import { CourseStatus } from '../ports/external/course-repository.js';
+import type { CourseFrontendDetail} from './get-course-detail.js';
+import { mapToFrontend } from './get-course-detail.js';
 
 type ListCoursesResponse = {
     success: boolean;

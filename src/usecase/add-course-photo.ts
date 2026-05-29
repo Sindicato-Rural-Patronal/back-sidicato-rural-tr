@@ -1,7 +1,7 @@
-import { CourseRepository } from '../ports/external/course-repository.js';
-import { UserAdminRepository } from '../ports/external/user-admin-repository.js';
-import { RuleRepository } from '../ports/external/rule-repository.js';
-import { StorageRepository, UploadParams } from '../ports/external/storage-repository.js';
+import type { CourseRepository } from '../ports/external/course-repository.js';
+import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { RuleRepository } from '../ports/external/rule-repository.js';
+import type { StorageRepository, UploadParams } from '../ports/external/storage-repository.js';
 import { verifyPermission } from '../lib/verify-permission.js';
 
 const BANNER_BUCKET = process.env.BANNER_BUCKET || 'course-banners';

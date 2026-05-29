@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { DeleteCourseUseCase } from '../../usecase/delete-course.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { DeleteCourseUseCase } from '../../usecase/delete-course.js';
 
 export class DeleteCourseController {
     constructor(private readonly useCase: DeleteCourseUseCase) {}

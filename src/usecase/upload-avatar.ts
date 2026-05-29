@@ -1,6 +1,6 @@
 // core/usecases/upload-avatar.usecase.ts
-import { Env } from "../config/env";
-import { StorageRepository, UploadParams } from "../ports/external/storage-repository";
+import type { Env } from "../config/env";
+import type { StorageRepository, UploadParams } from "../ports/external/storage-repository";
 
 
 export interface UploadAvatarInput {

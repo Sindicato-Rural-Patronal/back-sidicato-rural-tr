@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client/extension';
-import { CourseRepository, CourseWithDetails, CourseCreateData, CourseUpdateData, CourseStatus } from '../../ports/external/course-repository.js';
-import { courseModel } from '../../generated/prisma/models/course.js';
-import { CoursePhotoModel } from '../../generated/prisma/models.js';
+import type { PrismaClient } from '@prisma/client/extension';
+import type { CourseRepository, CourseWithDetails, CourseCreateData, CourseUpdateData, CourseStatus } from '../../ports/external/course-repository.js';
+import type { courseModel } from '../../generated/prisma/models/course.js';
+import type { CoursePhotoModel } from '../../generated/prisma/models.js';
 
 export function createCourseAdapter(prisma: PrismaClient): CourseRepository {
     return new CourseAdapter(prisma);

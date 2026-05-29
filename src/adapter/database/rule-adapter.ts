@@ -1,7 +1,7 @@
-import { PrismaClient } from "@prisma/client/extension";
-import { RuleRepository } from "../../ports/external/rule-repository";
-import { permitions } from "../../generated/prisma/enums";
-import { RuleModel } from "../../generated/prisma/models";
+import type { PrismaClient } from "@prisma/client/extension";
+import type { RuleRepository } from "../../ports/external/rule-repository";
+import type { permitions } from "../../generated/prisma/enums";
+import type { RuleModel } from "../../generated/prisma/models";
 
 export function createRuleAdapter(prisma: PrismaClient): RuleRepository {
     return new RuleAdapter(prisma);

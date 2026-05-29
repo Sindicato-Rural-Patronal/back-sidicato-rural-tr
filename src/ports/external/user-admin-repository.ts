@@ -1,4 +1,4 @@
-import {UserAdminModel,UserAdminUncheckedCreateInput} from "../../generated/prisma/models/UserAdmin.js"
+import type {UserAdminModel,UserAdminUncheckedCreateInput} from "../../generated/prisma/models/UserAdmin.js"
 
 export type UserAdminWithDetails = UserAdminModel & {
     userData: { name: string; email: string; cpf: string | null };

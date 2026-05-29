@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { CreateCourseUseCase } from '../../usecase/create-course.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { CreateCourseUseCase } from '../../usecase/create-course.js';
 
 type CreateCourseBody = {
     name: string;

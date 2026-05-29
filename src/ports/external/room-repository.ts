@@ -1,4 +1,4 @@
-import { roomModel } from '../../generated/prisma/models/room.js';
+import type { roomModel } from '../../generated/prisma/models/room.js';
 
 export type { roomModel };
 

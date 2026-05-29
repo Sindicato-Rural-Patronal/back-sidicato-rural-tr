@@ -1,4 +1,4 @@
-import { CourseRepository, CourseWithDetails, CourseStatus } from "../ports/external/course-repository.js";
+import type { CourseRepository, CourseWithDetails, CourseStatus } from "../ports/external/course-repository.js";
 
 export type CourseFrontendDetail = {
     id: string;

@@ -1,6 +1,6 @@
 import z from "zod";
-import { RuleRepository } from "../ports/external/rule-repository.js";
-import { UserAdminRepository } from "../ports/external/user-admin-repository.js";
+import type { RuleRepository } from "../ports/external/rule-repository.js";
+import type { UserAdminRepository } from "../ports/external/user-admin-repository.js";
 import { permitions } from "../generated/prisma/browser.js";
 import { verifyPermission } from "../lib/verify-permission.js";
 

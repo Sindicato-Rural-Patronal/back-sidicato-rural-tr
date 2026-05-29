@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { GetNewsDetailUseCase } from '../../usecase/get-news-detail.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { GetNewsDetailUseCase } from '../../usecase/get-news-detail.js';
 
 export class GetNewsDetailController {
     constructor(private getNewsDetailUseCase: GetNewsDetailUseCase) {}

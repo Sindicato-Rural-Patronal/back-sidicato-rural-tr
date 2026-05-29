@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { LoginUserAdminUseCase } from '../../usecase/login-user-admin.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { LoginUserAdminUseCase } from '../../usecase/login-user-admin.js';
 
 export class LoginUserAdminController {
     constructor(private loginUseCase: LoginUserAdminUseCase) {}

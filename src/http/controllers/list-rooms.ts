@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { ListRoomsUseCase } from '../../usecase/list-rooms.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { ListRoomsUseCase } from '../../usecase/list-rooms.js';
 
 export class ListRoomsController {
     constructor(private readonly useCase: ListRoomsUseCase) {}

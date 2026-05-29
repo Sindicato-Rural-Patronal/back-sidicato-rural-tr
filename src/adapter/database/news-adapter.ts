@@ -1,5 +1,5 @@
-import { PrismaClient } from '@prisma/client/extension';
-import { NewsRepository, NewsModel, NewsCreateData, NewsUpdateData, NewsStatus } from '../../ports/external/news-repository.js';
+import type { PrismaClient } from '@prisma/client/extension';
+import type { NewsRepository, NewsModel, NewsCreateData, NewsUpdateData, NewsStatus } from '../../ports/external/news-repository.js';
 
 export function createNewsAdapter(prisma: PrismaClient): NewsRepository {
     return new NewsAdapter(prisma);

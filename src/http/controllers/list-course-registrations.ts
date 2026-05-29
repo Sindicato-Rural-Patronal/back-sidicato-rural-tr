@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { ListCourseRegistrationsUseCase } from '../../usecase/list-course-registrations.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { ListCourseRegistrationsUseCase } from '../../usecase/list-course-registrations.js';
 
 type Params = { courseId: string };
 

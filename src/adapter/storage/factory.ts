@@ -1,4 +1,4 @@
-import { StorageRepository } from "../../ports/external/storage-repository";
+import type { StorageRepository } from "../../ports/external/storage-repository";
 import { MinioStorageAdapter } from "./minio-storage-dev";
 import { S3StorageAdapter } from "./s3-storage";
 

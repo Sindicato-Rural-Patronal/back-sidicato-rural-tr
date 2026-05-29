@@ -1,7 +1,7 @@
-import { UserDataRepository } from '../ports/external/user-data-repository.js';
-import { UserAdminRepository } from '../ports/external/user-admin-repository.js';
-import { RuleRepository } from '../ports/external/rule-repository.js';
-import { UserDataModel } from '../generated/prisma/models/UserData.js';
+import type { UserDataRepository } from '../ports/external/user-data-repository.js';
+import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { RuleRepository } from '../ports/external/rule-repository.js';
+import type { UserDataModel } from '../generated/prisma/models/UserData.js';
 import { verifyPermission } from '../lib/verify-permission.js';
 
 type ListUsersResponse = {

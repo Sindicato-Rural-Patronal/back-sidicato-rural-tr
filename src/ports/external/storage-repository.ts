@@ -1,4 +1,4 @@
-import { Readable } from "stream";
+import type { Readable } from "stream";
 
 export interface StorageRepository {
   uploadFile(params: UploadParams): Promise<UploadResult>;

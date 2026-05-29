@@ -1,5 +1,5 @@
-import { permitions } from "../../generated/prisma/enums";
-import { RuleModel } from "../../generated/prisma/models";
+import type { permitions } from "../../generated/prisma/enums";
+import type { RuleModel } from "../../generated/prisma/models";
 
 export interface RuleRepository {
     findById(id: string): Promise<RuleModel | null>;

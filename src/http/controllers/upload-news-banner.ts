@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { UploadNewsBannerUseCase } from '../../usecase/upload-news-banner.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { UploadNewsBannerUseCase } from '../../usecase/upload-news-banner.js';
 
 export class UploadNewsBannerController {
     constructor(private uploadNewsBannerUseCase: UploadNewsBannerUseCase) {}

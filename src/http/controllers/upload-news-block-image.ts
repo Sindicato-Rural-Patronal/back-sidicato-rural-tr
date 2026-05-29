@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { UploadNewsBlockImageUseCase } from '../../usecase/upload-news-block-image.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { UploadNewsBlockImageUseCase } from '../../usecase/upload-news-block-image.js';
 
 export class UploadNewsBlockImageController {
     constructor(private useCase: UploadNewsBlockImageUseCase) {}

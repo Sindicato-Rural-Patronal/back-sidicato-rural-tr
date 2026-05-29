@@ -1,5 +1,5 @@
-import { courseUserRegistrationModel } from '../../generated/prisma/models/courseUserRegistration.js';
-import { UserDataModel } from '../../generated/prisma/models/UserData.js';
+import type { courseUserRegistrationModel } from '../../generated/prisma/models/courseUserRegistration.js';
+import type { UserDataModel } from '../../generated/prisma/models/UserData.js';
 
 export type RegistrationWithUserData = courseUserRegistrationModel & {
     userData: Pick<UserDataModel, 'id' | 'name' | 'email' | 'phone' | 'cpf' | 'cnpj' | 'avatar'>;

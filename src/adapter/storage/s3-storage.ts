@@ -7,8 +7,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl as getSignedUrlS3 } from "@aws-sdk/s3-request-presigner";
 
-import { Readable } from "stream";
-import { StorageRepository, UploadParams, UploadResult } from "../../ports/external/storage-repository";
+import type { Readable } from "stream";
+import type { StorageRepository, UploadParams, UploadResult } from "../../ports/external/storage-repository";
 
 export class S3StorageAdapter implements StorageRepository {
   private client: S3Client;

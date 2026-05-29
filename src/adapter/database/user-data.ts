@@ -1,6 +1,6 @@
-import { PrismaClient } from "@prisma/client/extension";
-import { UserDataUncheckedCreateInput, UserDataModel } from "../../generated/prisma/models";
-import { UserDataRepository } from "../../ports/external/user-data-repository";
+import type { PrismaClient } from "@prisma/client/extension";
+import type { UserDataUncheckedCreateInput, UserDataModel } from "../../generated/prisma/models";
+import type { UserDataRepository } from "../../ports/external/user-data-repository";
 
 export function createUserDataAdapter(prisma: PrismaClient): UserDataRepository {
     return new UserDataAdapter(prisma);

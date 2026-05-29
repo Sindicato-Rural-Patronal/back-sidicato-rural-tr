@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client/extension';
-import { RoomRepository } from '../../ports/external/room-repository.js';
-import { roomModel } from '../../generated/prisma/models/room.js';
+import type { PrismaClient } from '@prisma/client/extension';
+import type { RoomRepository } from '../../ports/external/room-repository.js';
+import type { roomModel } from '../../generated/prisma/models/room.js';
 
 export function createRoomAdapter(prisma: PrismaClient): RoomRepository {
     return new RoomAdapter(prisma);

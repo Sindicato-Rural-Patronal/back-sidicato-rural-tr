@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
-import { UserAdminRepository } from '../ports/external/user-admin-repository.js';
-import { RuleRepository } from '../ports/external/rule-repository.js';
+import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { RuleRepository } from '../ports/external/rule-repository.js';
 
 export async function verifyPermission(
     token: string,

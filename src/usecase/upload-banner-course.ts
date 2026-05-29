@@ -1,6 +1,6 @@
 import sharp from 'sharp';
-import { StorageRepository, UploadParams } from '../ports/external/storage-repository.js';
-import { CourseRepository } from '../ports/external/course-repository.js';
+import type { StorageRepository, UploadParams } from '../ports/external/storage-repository.js';
+import type { CourseRepository } from '../ports/external/course-repository.js';
 
 const FULL_HD_WIDTH = 1920;
 const FULL_HD_HEIGHT = 1080;

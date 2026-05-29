@@ -1,6 +1,6 @@
-import { PrismaClient } from "@prisma/client/extension";
-import { UserAdminRepository, UserAdminWithDetails } from "../../ports/external/user-admin-repository.js";
-import { UserAdminModel, UserAdminUncheckedCreateInput } from "../../generated/prisma/models/UserAdmin.js";
+import type { PrismaClient } from "@prisma/client/extension";
+import type { UserAdminRepository, UserAdminWithDetails } from "../../ports/external/user-admin-repository.js";
+import type { UserAdminModel, UserAdminUncheckedCreateInput } from "../../generated/prisma/models/UserAdmin.js";
 
 export function createUserAdminAdapter(prisma: PrismaClient): UserAdminRepository {
     return new UserAdminAdapter(prisma);

@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { UpdateNewsUseCase } from '../../usecase/update-news.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { UpdateNewsUseCase } from '../../usecase/update-news.js';
 
 type UpdateNewsBody = {
     title?: string;

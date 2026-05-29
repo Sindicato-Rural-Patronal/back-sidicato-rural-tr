@@ -1,7 +1,7 @@
 import { verifyPermission } from '../lib/verify-permission.js';
-import { UserAdminRepository } from '../ports/external/user-admin-repository.js';
-import { RuleRepository } from '../ports/external/rule-repository.js';
-import { RegistrationRepository, RegistrationWithUserData } from '../ports/external/registration-repository.js';
+import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { RuleRepository } from '../ports/external/rule-repository.js';
+import type { RegistrationRepository, RegistrationWithUserData } from '../ports/external/registration-repository.js';
 
 type Request = { token: string; courseId: string };
 type Response = { success: boolean; statusCode?: number; error?: Error; registrations?: RegistrationWithUserData[] };

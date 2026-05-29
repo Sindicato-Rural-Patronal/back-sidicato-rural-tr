@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { CreateUserAdminUseCase } from '../../usecase/create-user-admin.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { CreateUserAdminUseCase } from '../../usecase/create-user-admin.js';
 
 export class CreateUserAdminController {
     constructor(private createUserAdminUseCase: CreateUserAdminUseCase) {}

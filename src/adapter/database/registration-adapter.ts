@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client/extension';
-import { courseUserRegistrationModel } from '../../generated/prisma/models/courseUserRegistration.js';
-import { RegistrationRepository, RegistrationWithUserData } from '../../ports/external/registration-repository.js';
+import type { PrismaClient } from '@prisma/client/extension';
+import type { courseUserRegistrationModel } from '../../generated/prisma/models/courseUserRegistration.js';
+import type { RegistrationRepository, RegistrationWithUserData } from '../../ports/external/registration-repository.js';
 
 const userDataSelect = {
     id: true,

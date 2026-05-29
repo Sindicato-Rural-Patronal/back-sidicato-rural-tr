@@ -1,5 +1,5 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { PrismaClient } from '@prisma/client/extension';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { PrismaClient } from '@prisma/client/extension';
 import { CreateCourseController } from '../controllers/create-course.js';
 import { CreateCourseUseCase } from '../../usecase/create-course.js';
 import { createCourseAdapter } from '../../adapter/database/course-adapter.js';

@@ -1,5 +1,5 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { PrismaClient } from "@prisma/client/extension";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { PrismaClient } from "@prisma/client/extension";
 import { CreateUserAdminController } from "../controllers/create-user-admin.js";
 import { CreateUserAdminUseCase } from "../../usecase/create-user-admin.js";
 import { createUserAdminAdapter } from "../../adapter/database/user-admin-adapter.js";

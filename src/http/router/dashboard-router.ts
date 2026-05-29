@@ -1,5 +1,5 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { PrismaClient } from '@prisma/client/extension';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { PrismaClient } from '@prisma/client/extension';
 import { DashboardStatsController } from '../controllers/dashboard-stats.js';
 import { DashboardStatsUseCase } from '../../usecase/dashboard-stats.js';
 import { createCourseAdapter } from '../../adapter/database/course-adapter.js';

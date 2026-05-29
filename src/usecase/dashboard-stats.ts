@@ -1,7 +1,8 @@
-import { CourseRepository, CourseStatus } from '../ports/external/course-repository.js';
-import { UserDataRepository } from '../ports/external/user-data-repository.js';
-import { UserAdminRepository } from '../ports/external/user-admin-repository.js';
-import { RuleRepository } from '../ports/external/rule-repository.js';
+import type { CourseRepository} from '../ports/external/course-repository.js';
+import { CourseStatus } from '../ports/external/course-repository.js';
+import type { UserDataRepository } from '../ports/external/user-data-repository.js';
+import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { RuleRepository } from '../ports/external/rule-repository.js';
 import { verifyPermission } from '../lib/verify-permission.js';
 
 export type DashboardStats = {

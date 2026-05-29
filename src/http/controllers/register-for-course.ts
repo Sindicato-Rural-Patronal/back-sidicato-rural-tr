@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { RegisterForCourseUseCase } from '../../usecase/register-for-course.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { RegisterForCourseUseCase } from '../../usecase/register-for-course.js';
 
 type Body = { name: string; phone: string; email: string; cpf: string };
 type Params = { courseId: string };

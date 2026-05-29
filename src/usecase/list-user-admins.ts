@@ -1,5 +1,5 @@
-import { UserAdminRepository, UserAdminWithDetails } from '../ports/external/user-admin-repository.js';
-import { RuleRepository } from '../ports/external/rule-repository.js';
+import type { UserAdminRepository, UserAdminWithDetails } from '../ports/external/user-admin-repository.js';
+import type { RuleRepository } from '../ports/external/rule-repository.js';
 import { verifyPermission } from '../lib/verify-permission.js';
 
 type ListUserAdminsResponse = {

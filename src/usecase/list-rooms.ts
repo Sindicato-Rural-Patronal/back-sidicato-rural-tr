@@ -1,4 +1,4 @@
-import { RoomRepository, roomModel } from '../ports/external/room-repository.js';
+import type { RoomRepository, roomModel } from '../ports/external/room-repository.js';
 
 type ListRoomsResponse = {
     success: boolean;

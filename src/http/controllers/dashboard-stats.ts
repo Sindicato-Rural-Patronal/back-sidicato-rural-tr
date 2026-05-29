@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { DashboardStatsUseCase } from '../../usecase/dashboard-stats.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { DashboardStatsUseCase } from '../../usecase/dashboard-stats.js';
 
 export class DashboardStatsController {
     constructor(private readonly useCase: DashboardStatsUseCase) {}
