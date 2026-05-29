@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "course" ADD COLUMN     "eventNumber" TEXT,
+ADD COLUMN     "minStudents" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "preEnrolled" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "waitlist" INTEGER NOT NULL DEFAULT 0;

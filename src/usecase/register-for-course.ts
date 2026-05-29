@@ -1,0 +1,62 @@
+import { z } from 'zod/v4';
+import { CourseRepository } from '../ports/external/course-repository.js';
+import { UserDataRepository } from '../ports/external/user-data-repository.js';
+import { RegistrationRepository } from '../ports/external/registration-repository.js';
+
+const schema = z.object({
+    courseId: z.string().min(1),
+    name: z.string().min(1),
+    phone: z.string().min(1),
+    email: z.email(),
+    cpf: z.string().min(1),
+});
+
+type Request = z.infer<typeof schema>;
+type Response = { success: boolean; error?: Error; registrationId?: string; userDataId?: string };
+
+export class RegisterForCourseUseCase {
+    constructor(
+        private readonly courseRepository: CourseRepository,
+        private readonly userDataRepository: UserDataRepository,
+        private readonly registrationRepository: RegistrationRepository,
+    ) {}
+
+    async execute(request: Request): Promise<Response> {
+        const parsed = schema.safeParse(request);
+        if (!parsed.success) {
+            return { success: false, error: new Error(parsed.error.issues[0]?.message ?? 'Invalid data') };
+        }
+
+        const { courseId, name, phone, email, cpf } = parsed.data;
+
+        const course = await this.courseRepository.findById(courseId);
+        if (!course) {
+            return { success: false, error: new Error('Course not found') };
+        }
+        if (course.status === 'NAO_PUBLICADO') {
+            return { success: false, error: new Error('Registrations unavailable for this course') };
+        }
+
+        let userData = await this.userDataRepository.findByEmailOrCpf(email, cpf);
+
+        if (!userData) {
+            userData = await this.userDataRepository.create({
+                name,
+                phone,
+                email,
+                cpf,
+            });
+            if (!userData) {
+                return { success: false, error: new Error('Failed to create user record') };
+            }
+        }
+
+        const existing = await this.registrationRepository.findByUserDataAndCourse(userData.id, courseId);
+        if (existing) {
+            return { success: false, error: new Error('User already registered for this course') };
+        }
+
+        const registration = await this.registrationRepository.create(courseId, userData.id);
+        return { success: true, registrationId: registration.id, userDataId: userData.id };
+    }
+}

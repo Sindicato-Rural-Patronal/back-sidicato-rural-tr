@@ -1,0 +1,173 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model UserAdmin {
+  id           String @id @default(uuid())
+  username     String @unique
+  passwordHash String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userData   UserData @relation(fields: [userDataId], references: [id])
+  userDataId String   @unique
+
+  rules   Rule   @relation(fields: [rulesId], references: [id])
+  rulesId String
+}
+
+model UserData {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String   @unique
+  avatar    String?
+  cpf       String?
+  cnpj      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  courseUserRegistration courseUserRegistration[]
+  userAdmin              UserAdmin?
+
+  userInstructor UserIstructor?
+}
+
+model UserIstructor {
+  id String @id @default(uuid())
+
+
+  course course[] 
+  userData   UserData @relation(fields: [userDataId], references: [id])
+  userDataId String @unique
+}
+
+model Rule {
+  id          String @id @default(uuid())
+  name        String
+  description String
+
+  permitions permitions[]
+
+  userAdmin UserAdmin[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model course {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  startTime   DateTime
+  endTime     DateTime
+
+  status               CourseStatus @default(NAO_PUBLICADO)
+  bannerUrl            String?
+  price                Float        @default(0)
+  workloadHours        Int          @default(0)
+  registrationDeadline DateTime?
+  observations         String?
+  eventNumber          String?
+  minStudents          Int          @default(0)
+  preEnrolled          Int          @default(0)
+  waitlist             Int          @default(0)
+
+  room    room   @relation(fields: [roomId], references: [id])
+  roomId  String
+
+  photos                 CoursePhoto[]
+  courseUserRegistration courseUserRegistration[]
+  Instructors            UserIstructor[]
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model CoursePhoto {
+  id        String   @id @default(uuid())
+  url       String
+  caption   String?
+  course    course   @relation(fields: [courseId], references: [id])
+  courseId  String
+  createdAt DateTime @default(now())
+}
+
+model room {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  maxCapacity Int
+  courses     course[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+model News {
+  id          String     @id @default(uuid())
+  title       String
+  content     String
+  summary     String?
+  bannerUrl   String?
+  status      NewsStatus @default(NAO_PUBLICADO)
+  publishedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model courseUserRegistration {
+  id         String   @id @default(uuid())
+  course     course   @relation(fields: [courseId], references: [id])
+  courseId   String
+  userData   UserData @relation(fields: [userDataId], references: [id])
+  userDataId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum CourseStatus {
+  PUBLICO
+  PRIVADO
+  NAO_PUBLICADO
+}
+
+enum NewsStatus {
+  PUBLICADO
+  NAO_PUBLICADO
+}
+
+enum permitions {
+  CREATE_USER
+  UPDATE_USER
+  DELETE_USER
+  READ_USER
+
+  CREATE_COURSE
+  UPDATE_COURSE
+  DELETE_COURSE
+  READ_COURSE
+
+  CREATE_RULE
+  UPDATE_RULE
+  DELETE_RULE
+  READ_RULE
+
+  CREATE_USER_ADMIN
+  UPDATE_USER_ADMIN
+  DELETE_USER_ADMIN
+  READ_USER_ADMIN
+
+  CREATE_NEWS
+  UPDATE_NEWS
+  DELETE_NEWS
+  READ_NEWS
+}

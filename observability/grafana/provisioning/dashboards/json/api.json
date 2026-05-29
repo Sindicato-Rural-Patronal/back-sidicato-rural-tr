@@ -1,0 +1,151 @@
+{
+  "title": "Sindicato Rural API",
+  "uid": "sindicato-rural-api",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Requisições por segundo",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_request_duration_seconds_count[1m])) by (method, route)",
+          "legendFormat": "{{method}} {{route}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "lineWidth": 2 } }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Latência p95 por rota (segundos)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route, method))",
+          "legendFormat": "p95 {{method}} {{route}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "lineWidth": 2 } }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Taxa de erros 4xx/5xx",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_request_duration_seconds_count{status_code=~\"4..|5..\"}[1m])) by (status_code, route)",
+          "legendFormat": "{{status_code}} {{route}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 2 } }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Latência p50 / p95 / p99 geral",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "lineWidth": 2 } }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Total de requisições (últimas 24h)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 16, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(increase(http_request_duration_seconds_count[24h]))",
+          "legendFormat": "Total",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 6,
+      "title": "Erros (últimas 24h)",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 16, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(increase(http_request_duration_seconds_count{status_code=~\"5..\"}[24h]))",
+          "legendFormat": "Erros 5xx",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Latência média geral",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 16, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_request_duration_seconds_sum[5m])) / sum(rate(http_request_duration_seconds_count[5m]))",
+          "legendFormat": "Média",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 8,
+      "title": "RPS atual",
+      "type": "stat",
+      "gridPos": { "x": 18, "y": 16, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(http_request_duration_seconds_count[1m]))",
+          "legendFormat": "RPS",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" }
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "hide": 2
+      }
+    ]
+  }
+}

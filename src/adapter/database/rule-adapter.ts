@@ -1,0 +1,35 @@
+import { PrismaClient } from "@prisma/client/extension";
+import { RuleRepository } from "../../ports/external/rule-repository";
+import { permitions } from "../../generated/prisma/enums";
+import { RuleModel } from "../../generated/prisma/models";
+
+export function createRuleAdapter(prisma: PrismaClient): RuleRepository {
+    return new RuleAdapter(prisma);
+}
+export class RuleAdapter implements RuleRepository {
+    constructor(private prisma: PrismaClient) {}
+    findById(id: string): Promise<RuleModel | null> {
+        return this.prisma.rule.findUnique({
+            where: { id }
+        });
+    }
+    create(data: { name: string; permitions: permitions[]; }): Promise<RuleModel> {
+        return this.prisma.rule.create({
+            data
+        });
+    }
+    update(id: string, data: { name?: string; permitions?: permitions[]; }): Promise<RuleModel | null> {
+        return this.prisma.rule.update({
+            where: { id },
+            data
+        });
+    }
+    delete(id: string): Promise<void> {
+        return this.prisma.rule.delete({
+            where: { id }
+        });
+    }
+    findAll(): Promise<RuleModel[]> {
+        return this.prisma.rule.findMany();
+    }
+}

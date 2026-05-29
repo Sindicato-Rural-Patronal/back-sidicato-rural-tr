@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sindicato_rural_db
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: sindicato_rural_tr_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d sindicato_rural_tr_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio
+    container_name: sindicato_minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - ./minio_data:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: sindicato_api
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://dev:dev@postgres:5432/sindicato_rural_tr_dev
+      JWT_SECRET: ${JWT_SECRET:-dev_secret_32_chars_minimum_here}
+      PORT: 3000
+      NODE_ENV: production
+      STORAGE_TYPE: minio
+      STORAGE_BUCKET: avatars
+      BANNER_BUCKET: course-banners
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: sindicato_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: sindicato_grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
