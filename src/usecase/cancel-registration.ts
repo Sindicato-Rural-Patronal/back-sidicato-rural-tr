@@ -1,7 +1,7 @@
 import { verifyPermission } from '../lib/verify-permission.js';
-import { UserAdminRepository } from '../ports/external/user-admin-repository.js';
-import { RuleRepository } from '../ports/external/rule-repository.js';
-import { RegistrationRepository } from '../ports/external/registration-repository.js';
+import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { RuleRepository } from '../ports/external/rule-repository.js';
+import type { RegistrationRepository } from '../ports/external/registration-repository.js';
 
 type Request = { token: string; registrationId: string };
 type Response = { success: boolean; statusCode?: number; error?: Error };
@@ -16,7 +16,7 @@ export class CancelRegistrationUseCase {
     async execute(request: Request): Promise<Response> {
         const auth = await verifyPermission(
             request.token,
-            'DELETE_COURSE',
+            'UPDATE_COURSE',
             this.userAdminRepository,
             this.ruleRepository,
         );

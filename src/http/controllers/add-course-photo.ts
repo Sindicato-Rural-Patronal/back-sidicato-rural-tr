@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { AddCoursePhotoUseCase } from '../../usecase/add-course-photo.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { AddCoursePhotoUseCase } from '../../usecase/add-course-photo.js';
 
 export class AddCoursePhotoController {
     constructor(private readonly useCase: AddCoursePhotoUseCase) {}
@@ -15,7 +15,8 @@ export class AddCoursePhotoController {
         for await (const chunk of data.file) chunks.push(chunk);
         const fileBuffer = Buffer.concat(chunks);
 
-        const caption = (data.fields as any)?.caption?.value as string | undefined;
+        const captionField = (data.fields as Record<string, { value?: string } | undefined>)?.caption;
+        const caption = captionField?.value;
         const response = await this.useCase.execute(token, courseId, fileBuffer, data.filename, caption);
 
         if (!response.success) {

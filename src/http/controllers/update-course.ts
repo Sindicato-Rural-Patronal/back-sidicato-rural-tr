@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { UpdateCourseUseCase } from '../../usecase/update-course.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { UpdateCourseUseCase, UpdateCourseRequest } from '../../usecase/update-course.js';
 
 export class UpdateCourseController {
     constructor(private readonly useCase: UpdateCourseUseCase) {}
@@ -8,7 +8,7 @@ export class UpdateCourseController {
         const token = request.headers['authorization']?.replace('Bearer ', '') ?? '';
         const { courseId } = request.params;
         const body = request.body as Record<string, unknown>;
-        const response = await this.useCase.execute({ ...body, courseId, token } as any);
+        const response = await this.useCase.execute({ ...body, courseId, token } as UpdateCourseRequest);
         if (!response.success) {
             return reply.status(response.statusCode ?? 400).send({ error: response.error?.message });
         }

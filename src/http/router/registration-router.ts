@@ -1,5 +1,5 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { PrismaClient } from '@prisma/client/extension';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { PrismaClient } from '@prisma/client/extension';
 import { createRegistrationAdapter } from '../../adapter/database/registration-adapter.js';
 import { createUserDataAdapter } from '../../adapter/database/user-data.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
@@ -60,7 +60,7 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
                 400: { type: 'object', properties: { error: { type: 'string' } } },
             },
         },
-    }, (req: FastifyRequest<{ Params: { courseId: string }; Body: any }>, res: FastifyReply) =>
+    }, (req: FastifyRequest<{ Params: { courseId: string }; Body: { name: string; phone: string; email: string; cpf: string } }>, res: FastifyReply) =>
         registerController.handle(req, res),
     );
 

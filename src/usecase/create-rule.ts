@@ -1,7 +1,6 @@
 import z from "zod";
-import { RuleRepository } from "../ports/external/rule-repository";
+import type { RuleRepository } from "../ports/external/rule-repository";
 import { permitions } from "../generated/prisma/browser";
-import { describe } from "zod/v4/core";
 
 
 export const createRuleRequestSchema = z.object({

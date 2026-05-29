@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { UploadCourseBannerUseCase } from '../../usecase/upload-banner-course.js';
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { UploadCourseBannerUseCase } from '../../usecase/upload-banner-course.js';
 
 export class UploadBannerCourseController {
     constructor(private uploadBannerUseCase: UploadCourseBannerUseCase) {}
@@ -18,8 +18,9 @@ export class UploadBannerCourseController {
         try {
             const url = await this.uploadBannerUseCase.execute(courseId, fileBuffer);
             return reply.status(200).send({ url });
-        } catch (err: any) {
-            return reply.status(500).send({ error: err.message });
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return reply.status(500).send({ error: msg });
         }
     }
 }

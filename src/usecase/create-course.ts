@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { CourseRepository, CourseStatus } from '../ports/external/course-repository.js';
-import { RoomRepository } from '../ports/external/room-repository.js';
+import type { CourseRepository, CourseStatus } from '../ports/external/course-repository.js';
+import type { RoomRepository } from '../ports/external/room-repository.js';
 
 const createCourseRequestSchema = z.object({
     name: z.string().min(1, 'Course name is required'),
@@ -15,7 +15,7 @@ const createCourseRequestSchema = z.object({
     observations: z.string().optional(),
 });
 
-type CreateCourseRequest = z.infer<typeof createCourseRequestSchema>;
+type CreateCourseRequest = z.input<typeof createCourseRequestSchema>;
 
 type CreateCourseResponse = {
     success: boolean;

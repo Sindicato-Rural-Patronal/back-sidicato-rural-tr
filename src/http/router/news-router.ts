@@ -1,5 +1,5 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { PrismaClient } from '@prisma/client/extension';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { PrismaClient } from '@prisma/client/extension';
 import { createNewsAdapter } from '../../adapter/database/news-adapter.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
 import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
@@ -39,9 +39,7 @@ export async function newsRouter(fastify: FastifyInstance, prisma: PrismaClient)
     const storage = createStorageAdapter();
 
     const createNewsController = new CreateNewsController(
-        new CreateNewsUseCase(newsRepository),
-        userAdminRepository,
-        ruleRepository,
+        new CreateNewsUseCase(newsRepository, userAdminRepository, ruleRepository),
     );
     const listNewsController = new ListNewsController(new ListNewsUseCase(newsRepository));
     const listAllNewsController = new ListAllNewsController(

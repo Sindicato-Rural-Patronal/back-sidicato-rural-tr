@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { CourseRepository, CourseStatus } from '../ports/external/course-repository.js';
-import { RoomRepository } from '../ports/external/room-repository.js';
-import { UserAdminRepository } from '../ports/external/user-admin-repository.js';
-import { RuleRepository } from '../ports/external/rule-repository.js';
+import type { CourseRepository, CourseStatus } from '../ports/external/course-repository.js';
+import type { RoomRepository } from '../ports/external/room-repository.js';
+import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { RuleRepository } from '../ports/external/rule-repository.js';
 import { verifyPermission } from '../lib/verify-permission.js';
 
 const updateCourseBodySchema = z.object({
@@ -22,7 +22,7 @@ const updateCourseBodySchema = z.object({
     waitlist: z.number().int().min(0).optional(),
 });
 
-type UpdateCourseRequest = z.infer<typeof updateCourseBodySchema> & { courseId: string; token: string };
+export type UpdateCourseRequest = z.infer<typeof updateCourseBodySchema> & { courseId: string; token: string };
 
 type UpdateCourseResponse = { success: boolean; statusCode?: number; error?: Error };
 
@@ -38,7 +38,7 @@ export class UpdateCourseUseCase {
         const auth = await verifyPermission(request.token, 'UPDATE_COURSE', this.userAdminRepository, this.ruleRepository);
         if (!auth.authorized) return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
 
-        const { courseId, token, ...body } = request;
+        const { courseId, token: _token, ...body } = request;
         const validation = updateCourseBodySchema.safeParse(body);
         if (!validation.success) {
             return { success: false, error: new Error(validation.error.issues.map(e => e.message).join(', ')) };

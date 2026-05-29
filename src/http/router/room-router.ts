@@ -1,6 +1,8 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { PrismaClient } from '@prisma/client/extension';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { PrismaClient } from '@prisma/client/extension';
 import { createRoomAdapter } from '../../adapter/database/room-adapter.js';
+import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
+import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { CreateRoomController } from '../controllers/create-room.js';
 import { CreateRoomUseCase } from '../../usecase/create-room.js';
 import { ListRoomsController } from '../controllers/list-rooms.js';
@@ -17,8 +19,12 @@ const roomProperties = {
 
 export async function roomRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const roomRepository = createRoomAdapter(prisma);
+    const userAdminRepository = createUserAdminAdapter(prisma);
+    const ruleRepository = createRuleAdapter(prisma);
 
-    const createRoomController = new CreateRoomController(new CreateRoomUseCase(roomRepository));
+    const createRoomController = new CreateRoomController(
+        new CreateRoomUseCase(roomRepository, userAdminRepository, ruleRepository),
+    );
     const listRoomsController = new ListRoomsController(new ListRoomsUseCase(roomRepository));
 
     fastify.get('/rooms', {
@@ -63,6 +69,7 @@ export async function roomRouter(fastify: FastifyInstance, prisma: PrismaClient)
             response: {
                 201: { type: 'object', properties: { id: { type: 'string' } } },
                 400: { type: 'object', properties: { error: { type: 'string' } } },
+                403: { type: 'object', properties: { error: { type: 'string' } } },
             },
         },
     }, (req: FastifyRequest, res: FastifyReply) => createRoomController.handle(req, res));

@@ -1,6 +1,6 @@
-import { UserAdminRepository } from "../ports/external/user-admin-repository";
-import { UserDataRepository } from "../ports/external/user-data-repository";
-import { RuleRepository } from "../ports/external/rule-repository";
+import type { UserAdminRepository } from "../ports/external/user-admin-repository";
+import type { UserDataRepository } from "../ports/external/user-data-repository";
+import type { RuleRepository } from "../ports/external/rule-repository";
 import { hash } from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
@@ -44,7 +44,7 @@ export class CreateUserAdminUseCase {
             return { success: false, error: new Error('Creator permission rule not found') };
         }
 
-        const canCreateUser = creatorRule.permitions.some(p => p === 'CREATE_USER');
+        const canCreateUser = creatorRule.permitions.some(p => p === 'CREATE_USER_ADMIN');
         if (!canCreateUser) {
             return { success: false, error: new Error('Permission denied: cannot create admin users') };
         }
@@ -79,8 +79,9 @@ export class CreateUserAdminUseCase {
                 rulesId: request.userRole,
             });
             return { success: true, userAdminId: newAdmin.id };
-        } catch (err: any) {
-            return { success: false, error: new Error(`Failed to create admin: ${err.message}`) };
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return { success: false, error: new Error(`Failed to create admin: ${msg}`) };
         }
     }
 }

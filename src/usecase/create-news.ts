@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { NewsRepository } from '../ports/external/news-repository.js';
+import type { NewsRepository } from '../ports/external/news-repository.js';
+import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { RuleRepository } from '../ports/external/rule-repository.js';
+import { verifyPermission } from '../lib/verify-permission.js';
 
 const createNewsRequestSchema = z.object({
     title: z.string().min(1, 'Title is required'),
@@ -9,18 +12,26 @@ const createNewsRequestSchema = z.object({
     publishedAt: z.iso.datetime().optional(),
 });
 
-type CreateNewsRequest = z.infer<typeof createNewsRequestSchema>;
+type CreateNewsRequest = z.input<typeof createNewsRequestSchema>;
 
 type CreateNewsResponse = {
     success: boolean;
+    statusCode?: number;
     error?: Error;
     newsId?: string;
 };
 
 export class CreateNewsUseCase {
-    constructor(private readonly newsRepository: NewsRepository) {}
+    constructor(
+        private readonly newsRepository: NewsRepository,
+        private readonly userAdminRepository: UserAdminRepository,
+        private readonly ruleRepository: RuleRepository,
+    ) {}
 
-    async execute(request: CreateNewsRequest): Promise<CreateNewsResponse> {
+    async execute(request: CreateNewsRequest, token: string): Promise<CreateNewsResponse> {
+        const auth = await verifyPermission(token, 'CREATE_NEWS', this.userAdminRepository, this.ruleRepository);
+        if (!auth.authorized) return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+
         const validation = createNewsRequestSchema.safeParse(request);
         if (!validation.success) {
             return { success: false, error: new Error(validation.error.issues.map(e => e.message).join(', ')) };
