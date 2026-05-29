@@ -44,7 +44,7 @@ export class CreateUserAdminUseCase {
             return { success: false, error: new Error('Creator permission rule not found') };
         }
 
-        const canCreateUser = creatorRule.permitions.some(p => p === 'CREATE_USER_ADMIN');
+        const canCreateUser = creatorRule.permitions.some((p: string) => p === 'CREATE_USER_ADMIN');
         if (!canCreateUser) {
             return { success: false, error: new Error('Permission denied: cannot create admin users') };
         }

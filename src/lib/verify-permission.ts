@@ -24,7 +24,7 @@ export async function verifyPermission(
     const rule = await ruleRepository.findById(admin.rulesId);
     if (!rule) return { authorized: false, statusCode: 403, error: 'Permission rule not found' };
 
-    if (!rule.permitions.some(p => p === permission)) {
+    if (!rule.permitions.some((p: string) => p === permission)) {
         return { authorized: false, statusCode: 403, error: `Permission denied: ${permission} is required` };
     }
 
