@@ -7,6 +7,12 @@ import { createUserDataAdapter } from "../../adapter/database/user-data.js";
 import { createRuleAdapter } from "../../adapter/database/rule-adapter.js";
 import { ListUserAdminsController } from "../controllers/list-user-admins.js";
 import { ListUserAdminsUseCase } from "../../usecase/list-user-admins.js";
+import { UpdateUserAdminController } from "../controllers/update-user-admin.js";
+import { UpdateUserAdminUseCase } from "../../usecase/update-user-admin.js";
+import { DeleteUserAdminController } from "../controllers/delete-user-admin.js";
+import { DeleteUserAdminUseCase } from "../../usecase/delete-user-admin.js";
+import { GetCurrentAdminController } from "../controllers/get-current-admin.js";
+import { GetCurrentAdminUseCase } from "../../usecase/get-current-admin.js";
 
 export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userAdminRepository = createUserAdminAdapter(prisma);
@@ -17,46 +23,63 @@ export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaCl
         new CreateUserAdminUseCase(userAdminRepository, userDataRepository, ruleRepository)
     );
     const listUserAdminsController = new ListUserAdminsController(new ListUserAdminsUseCase(userAdminRepository, ruleRepository));
+    const updateUserAdminController = new UpdateUserAdminController(new UpdateUserAdminUseCase(userAdminRepository, ruleRepository));
+    const deleteUserAdminController = new DeleteUserAdminController(new DeleteUserAdminUseCase(userAdminRepository, ruleRepository));
+    const getCurrentAdminController = new GetCurrentAdminController(new GetCurrentAdminUseCase(userAdminRepository, ruleRepository));
+
+    fastify.get('/admin/me', {
+        schema: {
+            tags: ['Admin — Auth'],
+            summary: 'Get current admin profile and permissions',
+            description: `Returns the authenticated admin's profile and full permissions list. Use this to conditionally render UI elements based on what the current user can do.`,
+            security: [{ bearerAuth: [] }],
+            response: {
+                200: {
+                    type: 'object',
+                    properties: {
+                        userId: { type: 'string' },
+                        username: { type: 'string' },
+                        rulesId: { type: 'string' },
+                        ruleName: { type: 'string' },
+                        permitions: { type: 'array', items: { type: 'string' } },
+                    },
+                },
+                401: { type: 'object', properties: { error: { type: 'string' } } },
+                403: { type: 'object', properties: { error: { type: 'string' } } },
+            },
+        },
+    }, (req: FastifyRequest, res: FastifyReply) => getCurrentAdminController.handle(req, res));
 
     fastify.get('/admin/users/admins', {
         schema: {
             tags: ['Admin — Users'],
             summary: 'List admin users (internal)',
-            description: `Returns all UserAdmin records with worker data and associated rule. Requires JWT token with \`READ_USER_ADMIN\` permission.
-
-**Business rules:**
-- Returns the \`passwordHash\` field — **do not display on frontend**; filter client-side if needed
-- Each item includes \`userData\` (name, email, CPF) and \`rules\` (name, permission list)
-- Use to manage who has admin access and what permissions each one holds`,
             security: [{ bearerAuth: [] }],
+            querystring: {
+                type: 'object',
+                properties: {
+                    page: { type: 'integer', minimum: 1, default: 1 },
+                    limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+                },
+            },
             response: {
                 200: {
-                    type: 'array',
-                    items: {
-                        type: 'object',
-                        properties: {
+                    type: 'object',
+                    properties: {
+                        data: { type: 'array', items: { type: 'object', properties: {
                             id: { type: 'string' },
                             username: { type: 'string' },
                             userDataId: { type: 'string' },
                             rulesId: { type: 'string' },
                             createdAt: { type: 'string' },
                             updatedAt: { type: 'string' },
-                            userData: {
-                                type: 'object',
-                                properties: {
-                                    name: { type: 'string' },
-                                    email: { type: 'string' },
-                                    cpf: { type: 'string', nullable: true },
-                                },
-                            },
-                            rules: {
-                                type: 'object',
-                                properties: {
-                                    name: { type: 'string' },
-                                    permitions: { type: 'array', items: { type: 'string' } },
-                                },
-                            },
-                        },
+                            userData: { type: 'object', properties: { name: { type: 'string' }, email: { type: 'string' }, cpf: { type: 'string', nullable: true } } },
+                            rules: { type: 'object', properties: { name: { type: 'string' }, permitions: { type: 'array', items: { type: 'string' } } } },
+                        }}},
+                        total: { type: 'integer' },
+                        page: { type: 'integer' },
+                        limit: { type: 'integer' },
+                        totalPages: { type: 'integer' },
                     },
                 },
                 403: { type: 'object', properties: { error: { type: 'string' } } },
@@ -119,4 +142,52 @@ export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaCl
             },
         },
     }, (req: FastifyRequest, res: FastifyReply) => createUserAdminController.handle(req, res));
+
+    fastify.patch('/admin/users/:id', {
+        schema: {
+            tags: ['Admin — Users'],
+            summary: 'Update admin user',
+            security: [{ bearerAuth: [] }],
+            params: {
+                type: 'object',
+                properties: { id: { type: 'string' } },
+                required: ['id'],
+            },
+            body: {
+                type: 'object',
+                properties: {
+                    username: { type: 'string' },
+                    password: { type: 'string', description: 'Leave empty to keep current password' },
+                    rulesId: { type: 'string', description: 'ID of the Rule to assign' },
+                },
+            },
+            response: {
+                200: { type: 'object', properties: { message: { type: 'string' } } },
+                400: { type: 'object', properties: { error: { type: 'string' } } },
+                401: { type: 'object', properties: { error: { type: 'string' } } },
+                403: { type: 'object', properties: { error: { type: 'string' } } },
+                404: { type: 'object', properties: { error: { type: 'string' } } },
+                409: { type: 'object', properties: { error: { type: 'string' } } },
+            },
+        },
+    }, (req: FastifyRequest, res: FastifyReply) => updateUserAdminController.handle(req as Parameters<typeof updateUserAdminController.handle>[0], res));
+
+    fastify.delete('/admin/users/:id', {
+        schema: {
+            tags: ['Admin — Users'],
+            summary: 'Delete admin user',
+            security: [{ bearerAuth: [] }],
+            params: {
+                type: 'object',
+                properties: { id: { type: 'string' } },
+                required: ['id'],
+            },
+            response: {
+                204: { type: 'null' },
+                401: { type: 'object', properties: { error: { type: 'string' } } },
+                403: { type: 'object', properties: { error: { type: 'string' } } },
+                404: { type: 'object', properties: { error: { type: 'string' } } },
+            },
+        },
+    }, (req: FastifyRequest, res: FastifyReply) => deleteUserAdminController.handle(req as Parameters<typeof deleteUserAdminController.handle>[0], res));
 }

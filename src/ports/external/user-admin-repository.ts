@@ -5,10 +5,19 @@ export type UserAdminWithDetails = UserAdminModel & {
     rules: { name: string; permitions: string[] };
 };
 
+export type UserAdminUpdateInput = Partial<{
+    username: string;
+    passwordHash: string;
+    rulesId: string;
+}>;
+
 export interface UserAdminRepository {
     findByUsername(username: string): Promise<UserAdminModel | null>;
     findByUserDataId(userDataId: string): Promise<UserAdminModel | null>;
     create(userAdmin: UserAdminUncheckedCreateInput): Promise<UserAdminModel>;
     findById(id: string): Promise<UserAdminModel | null>;
-    findAll(): Promise<UserAdminWithDetails[]>;
+    findAll(skip?: number, take?: number): Promise<UserAdminWithDetails[]>;
+    count(): Promise<number>;
+    update(id: string, data: UserAdminUpdateInput): Promise<UserAdminModel | null>;
+    delete(id: string): Promise<void>;
 }

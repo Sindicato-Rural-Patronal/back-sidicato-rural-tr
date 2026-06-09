@@ -7,6 +7,10 @@ import { ListUsersController } from "../controllers/list-users.js";
 import { ListUsersUseCase } from "../../usecase/list-users.js";
 import { createUserAdminAdapter } from "../../adapter/database/user-admin-adapter.js";
 import { createRuleAdapter } from "../../adapter/database/rule-adapter.js";
+import { UpdateUserController } from "../controllers/update-user.js";
+import { UpdateUserDataUseCase } from "../../usecase/update-user-data.js";
+import { DeleteUserController } from "../controllers/delete-user.js";
+import { DeleteUserDataUseCase } from "../../usecase/delete-user-data.js";
 
 export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userRepository = createUserDataAdapter(prisma);
@@ -14,24 +18,26 @@ export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaCli
     const ruleRepository = createRuleAdapter(prisma);
     const createUserController = new CreateUserController(new CreateUserUseCase(userRepository));
     const listUsersController = new ListUsersController(new ListUsersUseCase(userRepository, userAdminRepository, ruleRepository));
+    const updateUserController = new UpdateUserController(new UpdateUserDataUseCase(userRepository, userAdminRepository, ruleRepository));
+    const deleteUserController = new DeleteUserController(new DeleteUserDataUseCase(userRepository, userAdminRepository, ruleRepository));
 
     fastify.get('/admin/users', {
         schema: {
             tags: ['Admin — Users'],
             summary: 'List workers (internal)',
-            description: `Returns all registered UserData. Requires JWT token with \`READ_USER\` permission.
-
-**Business rules:**
-- Returns all rural workers — use in the member management panel
-- Includes sensitive fields (CPF, CNPJ) — do not expose publicly
-- Does not include passwords or admin access data`,
             security: [{ bearerAuth: [] }],
+            querystring: {
+                type: 'object',
+                properties: {
+                    page: { type: 'integer', minimum: 1, default: 1 },
+                    limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+                },
+            },
             response: {
                 200: {
-                    type: 'array',
-                    items: {
-                        type: 'object',
-                        properties: {
+                    type: 'object',
+                    properties: {
+                        data: { type: 'array', items: { type: 'object', properties: {
                             id: { type: 'string' },
                             name: { type: 'string' },
                             email: { type: 'string' },
@@ -41,7 +47,11 @@ export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaCli
                             avatar: { type: 'string', nullable: true },
                             createdAt: { type: 'string' },
                             updatedAt: { type: 'string' },
-                        },
+                        }}},
+                        total: { type: 'integer' },
+                        page: { type: 'integer' },
+                        limit: { type: 'integer' },
+                        totalPages: { type: 'integer' },
                     },
                 },
                 403: { type: 'object', properties: { error: { type: 'string' } } },
@@ -95,4 +105,54 @@ export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaCli
             },
         },
     }, (req: FastifyRequest, res: FastifyReply) => createUserController.handle(req, res));
+
+    fastify.patch('/users/:id', {
+        schema: {
+            tags: ['Users'],
+            summary: 'Update worker user',
+            security: [{ bearerAuth: [] }],
+            params: {
+                type: 'object',
+                properties: { id: { type: 'string' } },
+                required: ['id'],
+            },
+            body: {
+                type: 'object',
+                properties: {
+                    name: { type: 'string' },
+                    email: { type: 'string', format: 'email' },
+                    phone: { type: 'string' },
+                    cpf: { type: 'string', nullable: true },
+                    cnpj: { type: 'string', nullable: true },
+                },
+            },
+            response: {
+                200: { type: 'object', properties: { message: { type: 'string' } } },
+                400: { type: 'object', properties: { error: { type: 'string' } } },
+                401: { type: 'object', properties: { error: { type: 'string' } } },
+                403: { type: 'object', properties: { error: { type: 'string' } } },
+                404: { type: 'object', properties: { error: { type: 'string' } } },
+                409: { type: 'object', properties: { error: { type: 'string' } } },
+            },
+        },
+    }, (req: FastifyRequest, res: FastifyReply) => updateUserController.handle(req as Parameters<typeof updateUserController.handle>[0], res));
+
+    fastify.delete('/users/:id', {
+        schema: {
+            tags: ['Users'],
+            summary: 'Delete worker user',
+            security: [{ bearerAuth: [] }],
+            params: {
+                type: 'object',
+                properties: { id: { type: 'string' } },
+                required: ['id'],
+            },
+            response: {
+                204: { type: 'null' },
+                401: { type: 'object', properties: { error: { type: 'string' } } },
+                403: { type: 'object', properties: { error: { type: 'string' } } },
+                404: { type: 'object', properties: { error: { type: 'string' } } },
+            },
+        },
+    }, (req: FastifyRequest, res: FastifyReply) => deleteUserController.handle(req as Parameters<typeof deleteUserController.handle>[0], res));
 }

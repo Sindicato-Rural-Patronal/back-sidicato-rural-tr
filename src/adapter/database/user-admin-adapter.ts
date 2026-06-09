@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client/extension";
-import type { UserAdminRepository, UserAdminWithDetails } from "../../ports/external/user-admin-repository.js";
+import type { UserAdminRepository, UserAdminWithDetails, UserAdminUpdateInput } from "../../ports/external/user-admin-repository.js";
 import type { UserAdminModel, UserAdminUncheckedCreateInput } from "../../generated/prisma/models/UserAdmin.js";
 
 export function createUserAdminAdapter(prisma: PrismaClient): UserAdminRepository {
@@ -25,13 +25,27 @@ export class UserAdminAdapter implements UserAdminRepository {
         return this.prisma.userAdmin.create({ data });
     }
 
-    findAll(): Promise<UserAdminWithDetails[]> {
+    findAll(skip?: number, take?: number): Promise<UserAdminWithDetails[]> {
         return this.prisma.userAdmin.findMany({
             include: {
                 userData: { select: { name: true, email: true, cpf: true } },
                 rules: { select: { name: true, permitions: true } },
             },
             orderBy: { userData: { name: 'asc' } },
+            skip,
+            take,
         }) as Promise<UserAdminWithDetails[]>;
+    }
+
+    count(): Promise<number> {
+        return this.prisma.userAdmin.count();
+    }
+
+    update(id: string, data: UserAdminUpdateInput): Promise<UserAdminModel | null> {
+        return this.prisma.userAdmin.update({ where: { id }, data });
+    }
+
+    async delete(id: string): Promise<void> {
+        await this.prisma.userAdmin.delete({ where: { id } });
     }
 }

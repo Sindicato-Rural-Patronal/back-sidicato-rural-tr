@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client/extension";
 import type { UserDataUncheckedCreateInput, UserDataModel } from "../../generated/prisma/models";
-import type { UserDataRepository } from "../../ports/external/user-data-repository";
+import type { UserDataRepository, UserDataUpdateInput } from "../../ports/external/user-data-repository.js";
 
 export function createUserDataAdapter(prisma: PrismaClient): UserDataRepository {
     return new UserDataAdapter(prisma);
@@ -26,8 +26,12 @@ export class UserDataAdapter implements UserDataRepository {
         return this.prisma.userData.findUnique({ where: { id } });
     }
 
-    findAll(): Promise<UserDataModel[]> {
-        return this.prisma.userData.findMany({ orderBy: { name: 'asc' } });
+    findAll(skip?: number, take?: number): Promise<UserDataModel[]> {
+        return this.prisma.userData.findMany({ orderBy: { name: 'asc' }, skip, take });
+    }
+
+    count(): Promise<number> {
+        return this.prisma.userData.count();
     }
 
     findByEmailOrCpf(email: string, cpf: string): Promise<UserDataModel | null> {
@@ -37,4 +41,12 @@ export class UserDataAdapter implements UserDataRepository {
             },
         });
     }
-}   
+
+    update(id: string, data: UserDataUpdateInput): Promise<UserDataModel | null> {
+        return this.prisma.userData.update({ where: { id }, data });
+    }
+
+    async delete(id: string): Promise<void> {
+        await this.prisma.userData.delete({ where: { id } });
+    }
+}
