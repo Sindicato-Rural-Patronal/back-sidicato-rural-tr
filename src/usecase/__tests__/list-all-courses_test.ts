@@ -14,6 +14,7 @@ const mockCourseRepo = {
     create: vi.fn(),
     findById: vi.fn(),
     findAll: vi.fn(),
+    count: vi.fn().mockResolvedValue(0),
     update: vi.fn(),
     delete: vi.fn(),
     isRoomAvailable: vi.fn(),
@@ -43,7 +44,7 @@ describe('ListAllCoursesUseCase', () => {
             vi.mocked(mockCourseRepo.findAll).mockResolvedValue([]);
             const uc = new ListAllCoursesUseCase(mockCourseRepo, mockUserAdminRepo, mockRuleRepo);
             await uc.execute('valid-token');
-            expect(mockCourseRepo.findAll).toHaveBeenCalledWith();
+            expect(mockCourseRepo.findAll).toHaveBeenCalledWith(undefined, 0, 20);
         });
 
         it('retorna lista vazia quando não há cursos', async () => {
@@ -52,7 +53,7 @@ describe('ListAllCoursesUseCase', () => {
             const uc = new ListAllCoursesUseCase(mockCourseRepo, mockUserAdminRepo, mockRuleRepo);
             const result = await uc.execute('valid-token');
             expect(result.success).toBe(true);
-            expect(result.courses).toHaveLength(0);
+            expect(result.result?.data).toHaveLength(0);
         });
     });
 });

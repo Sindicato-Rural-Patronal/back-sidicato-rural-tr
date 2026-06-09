@@ -16,11 +16,19 @@ export class NewsAdapter implements NewsRepository {
         return this.prisma.news.findUnique({ where: { id } }) as Promise<NewsModel | null>;
     }
 
-    findAll(statusFilter?: NewsStatus): Promise<NewsModel[]> {
+    findAll(statusFilter?: NewsStatus, skip?: number, take?: number): Promise<NewsModel[]> {
         return this.prisma.news.findMany({
             where: statusFilter ? { status: statusFilter } : undefined,
             orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+            skip,
+            take,
         }) as Promise<NewsModel[]>;
+    }
+
+    count(statusFilter?: NewsStatus): Promise<number> {
+        return this.prisma.news.count({
+            where: statusFilter ? { status: statusFilter } : undefined,
+        });
     }
 
     async update(id: string, data: NewsUpdateData): Promise<NewsModel | null> {

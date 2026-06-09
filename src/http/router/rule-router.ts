@@ -20,7 +20,7 @@ const PERMITIONS_ENUM = [
 export async function ruleRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const ruleRepository = createRuleAdapter(prisma);
     const userAdminRepository = createUserAdminAdapter(prisma);
-    const createRuleController = new CreateRuleController(new CreateRuleUseCase(ruleRepository));
+    const createRuleController = new CreateRuleController(new CreateRuleUseCase(ruleRepository, userAdminRepository));
     const updateRuleController = new UpdateRuleController(new UpdateRuleUseCase(ruleRepository, userAdminRepository));
     const listRulesController = new ListRulesController(new ListRulesUseCase(ruleRepository, userAdminRepository));
 
@@ -29,19 +29,29 @@ export async function ruleRouter(fastify: FastifyInstance, prisma: PrismaClient)
             tags: ['Admin — Rules'],
             summary: 'List permission rules (internal)',
             security: [{ bearerAuth: [] }],
+            querystring: {
+                type: 'object',
+                properties: {
+                    page: { type: 'integer', minimum: 1, default: 1 },
+                    limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+                },
+            },
             response: {
                 200: {
-                    type: 'array',
-                    items: {
-                        type: 'object',
-                        properties: {
+                    type: 'object',
+                    properties: {
+                        data: { type: 'array', items: { type: 'object', properties: {
                             id: { type: 'string' },
                             name: { type: 'string' },
                             description: { type: 'string' },
                             permitions: { type: 'array', items: { type: 'string' } },
                             createdAt: { type: 'string' },
                             updatedAt: { type: 'string' },
-                        },
+                        }}},
+                        total: { type: 'integer' },
+                        page: { type: 'integer' },
+                        limit: { type: 'integer' },
+                        totalPages: { type: 'integer' },
                     },
                 },
                 403: { type: 'object', properties: { error: { type: 'string' } } },

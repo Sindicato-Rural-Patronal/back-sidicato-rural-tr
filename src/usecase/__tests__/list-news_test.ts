@@ -6,6 +6,7 @@ const mockNewsRepo = {
     create: vi.fn(),
     findById: vi.fn(),
     findAll: vi.fn(),
+    count: vi.fn().mockResolvedValue(0),
     update: vi.fn(),
     delete: vi.fn(),
     updateBanner: vi.fn(),
@@ -19,14 +20,14 @@ describe('ListNewsUseCase', () => {
             vi.mocked(mockNewsRepo.findAll).mockResolvedValue([]);
             const uc = new ListNewsUseCase(mockNewsRepo);
             await uc.execute('PUBLICADO');
-            expect(mockNewsRepo.findAll).toHaveBeenCalledWith('PUBLICADO');
+            expect(mockNewsRepo.findAll).toHaveBeenCalledWith('PUBLICADO', 0, 20);
         });
 
         it('busca todas as notícias quando filtro não informado', async () => {
             vi.mocked(mockNewsRepo.findAll).mockResolvedValue([]);
             const uc = new ListNewsUseCase(mockNewsRepo);
             await uc.execute();
-            expect(mockNewsRepo.findAll).toHaveBeenCalledWith(undefined);
+            expect(mockNewsRepo.findAll).toHaveBeenCalledWith(undefined, 0, 20);
         });
 
         it('retorna lista de notícias', async () => {
@@ -35,7 +36,7 @@ describe('ListNewsUseCase', () => {
             const uc = new ListNewsUseCase(mockNewsRepo);
             const result = await uc.execute();
             expect(result.success).toBe(true);
-            expect(result.news).toHaveLength(2);
+            expect(result.result?.data).toHaveLength(2);
         });
     });
 });

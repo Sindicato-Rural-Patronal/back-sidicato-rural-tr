@@ -13,6 +13,7 @@ const mockRuleRepo = {
     create: vi.fn(),
     findById: vi.fn(),
     findAll: vi.fn(),
+    count: vi.fn().mockResolvedValue(0),
     update: vi.fn(),
 } as unknown as RuleRepository;
 
@@ -39,7 +40,7 @@ describe('ListRulesUseCase', () => {
             const uc = new ListRulesUseCase(mockRuleRepo, mockUserAdminRepo);
             const result = await uc.execute('valid-token');
             expect(result.success).toBe(true);
-            expect(result.rules).toHaveLength(2);
+            expect(result.result?.data).toHaveLength(2);
         });
     });
 });

@@ -32,7 +32,8 @@ export type NewsModel = {
 export interface NewsRepository {
     create(data: NewsCreateData): Promise<NewsModel>;
     findById(id: string): Promise<NewsModel | null>;
-    findAll(statusFilter?: NewsStatus): Promise<NewsModel[]>;
+    findAll(statusFilter?: NewsStatus, skip?: number, take?: number): Promise<NewsModel[]>;
+    count(statusFilter?: NewsStatus): Promise<number>;
     update(id: string, data: NewsUpdateData): Promise<NewsModel | null>;
     delete(id: string): Promise<boolean>;
     updateBanner(id: string, bannerUrl: string): Promise<NewsModel | null>;

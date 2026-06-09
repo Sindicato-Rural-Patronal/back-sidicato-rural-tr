@@ -6,5 +6,6 @@ export interface RuleRepository {
     create(data: { name: string; permitions: permitions[]; description?: string }): Promise<RuleModel>;
     update(id: string, data: { name?: string; permitions?: permitions[]; description?: string }): Promise<RuleModel | null>;
     delete(id: string): Promise<void>;
-    findAll(): Promise<RuleModel[]>;
+    findAll(skip?: number, take?: number): Promise<RuleModel[]>;
+    count(): Promise<number>;
 }

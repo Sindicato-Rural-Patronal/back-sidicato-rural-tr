@@ -16,6 +16,7 @@ const mockUserDataRepo = {
     findByEmailOurPhone: vi.fn(),
     findByEmailOrCpf: vi.fn(),
     findAll: vi.fn(),
+    count: vi.fn().mockResolvedValue(0),
 } as unknown as UserDataRepository;
 
 const mockUserAdminRepo = {} as unknown as UserAdminRepository;
@@ -42,7 +43,7 @@ describe('ListUsersUseCase', () => {
             const uc = new ListUsersUseCase(mockUserDataRepo, mockUserAdminRepo, mockRuleRepo);
             const result = await uc.execute('valid-token');
             expect(result.success).toBe(true);
-            expect(result.users).toHaveLength(2);
+            expect(result.result?.data).toHaveLength(2);
         });
     });
 });

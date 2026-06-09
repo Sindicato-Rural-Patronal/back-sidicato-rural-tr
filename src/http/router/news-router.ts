@@ -67,9 +67,22 @@ export async function newsRouter(fastify: FastifyInstance, prisma: PrismaClient)
         schema: {
             tags: ['News'],
             summary: 'List published news',
-            description: 'Returns all published news ordered by most recent first.',
+            description: 'Returns published news ordered by most recent first.',
+            querystring: {
+                type: 'object',
+                properties: {
+                    page: { type: 'integer', minimum: 1, default: 1 },
+                    limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+                },
+            },
             response: {
-                200: { type: 'array', items: { type: 'object', properties: newsProperties } },
+                200: { type: 'object', properties: {
+                    data: { type: 'array', items: { type: 'object', properties: newsProperties } },
+                    total: { type: 'integer' },
+                    page: { type: 'integer' },
+                    limit: { type: 'integer' },
+                    totalPages: { type: 'integer' },
+                }},
             },
         },
     }, (req: FastifyRequest, res: FastifyReply) => listNewsController.handle(req, res));
@@ -100,8 +113,21 @@ export async function newsRouter(fastify: FastifyInstance, prisma: PrismaClient)
             summary: 'List all news (internal)',
             description: 'Returns all news regardless of status. Requires READ_NEWS permission.',
             security: [{ bearerAuth: [] }],
+            querystring: {
+                type: 'object',
+                properties: {
+                    page: { type: 'integer', minimum: 1, default: 1 },
+                    limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+                },
+            },
             response: {
-                200: { type: 'array', items: { type: 'object', properties: newsProperties } },
+                200: { type: 'object', properties: {
+                    data: { type: 'array', items: { type: 'object', properties: newsProperties } },
+                    total: { type: 'integer' },
+                    page: { type: 'integer' },
+                    limit: { type: 'integer' },
+                    totalPages: { type: 'integer' },
+                }},
                 403: { type: 'object', properties: { error: { type: 'string' } } },
             },
         },

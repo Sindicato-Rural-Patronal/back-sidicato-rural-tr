@@ -29,7 +29,11 @@ export class RuleAdapter implements RuleRepository {
             where: { id }
         });
     }
-    findAll(): Promise<RuleModel[]> {
-        return this.prisma.rule.findMany();
+    findAll(skip?: number, take?: number): Promise<RuleModel[]> {
+        return this.prisma.rule.findMany({ skip, take });
+    }
+
+    count(): Promise<number> {
+        return this.prisma.rule.count();
     }
 }

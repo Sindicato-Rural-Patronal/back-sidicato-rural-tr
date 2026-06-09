@@ -7,6 +7,7 @@ const mockCourseRepo = {
     create: vi.fn(),
     findById: vi.fn(),
     findAll: vi.fn(),
+    count: vi.fn().mockResolvedValue(0),
     update: vi.fn(),
     delete: vi.fn(),
     isRoomAvailable: vi.fn(),
@@ -44,14 +45,14 @@ describe('ListCoursesUseCase', () => {
             vi.mocked(mockCourseRepo.findAll).mockResolvedValue([baseCourse as any]);
             const uc = new ListCoursesUseCase(mockCourseRepo);
             await uc.execute();
-            expect(mockCourseRepo.findAll).toHaveBeenCalledWith(CourseStatus.PUBLICO);
+            expect(mockCourseRepo.findAll).toHaveBeenCalledWith(CourseStatus.PUBLICO, 0, 20);
         });
 
         it('busca todos os cursos quando onlyPublic=false', async () => {
             vi.mocked(mockCourseRepo.findAll).mockResolvedValue([baseCourse as any]);
             const uc = new ListCoursesUseCase(mockCourseRepo);
             await uc.execute(false);
-            expect(mockCourseRepo.findAll).toHaveBeenCalledWith(undefined);
+            expect(mockCourseRepo.findAll).toHaveBeenCalledWith(undefined, 0, 20);
         });
 
         it('retorna lista mapeada para formato frontend', async () => {
@@ -59,15 +60,15 @@ describe('ListCoursesUseCase', () => {
             const uc = new ListCoursesUseCase(mockCourseRepo);
             const result = await uc.execute();
             expect(result.success).toBe(true);
-            expect(result.courses).toHaveLength(1);
-            expect(result.courses?.[0].title).toBe('Curso Teste');
+            expect(result.result?.data).toHaveLength(1);
+            expect(result.result?.data?.[0].title).toBe('Curso Teste');
         });
 
         it('retorna lista vazia quando não há cursos', async () => {
             vi.mocked(mockCourseRepo.findAll).mockResolvedValue([]);
             const uc = new ListCoursesUseCase(mockCourseRepo);
             const result = await uc.execute();
-            expect(result.courses).toHaveLength(0);
+            expect(result.result?.data).toHaveLength(0);
         });
     });
 });

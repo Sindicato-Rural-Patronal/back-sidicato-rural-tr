@@ -15,6 +15,7 @@ const mockUserAdminRepo = {
     findByUsername: vi.fn(),
     findByUserDataId: vi.fn(),
     findAll: vi.fn(),
+    count: vi.fn().mockResolvedValue(0),
 } as unknown as UserAdminRepository;
 
 const mockRuleRepo = {} as unknown as RuleRepository;
@@ -40,7 +41,7 @@ describe('ListUserAdminsUseCase', () => {
             const uc = new ListUserAdminsUseCase(mockUserAdminRepo, mockRuleRepo);
             const result = await uc.execute('valid-token');
             expect(result.success).toBe(true);
-            expect(result.admins).toHaveLength(2);
+            expect(result.result?.data).toHaveLength(2);
         });
     });
 });
