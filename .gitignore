@@ -18,3 +18,4 @@ minio_data
 # Logs
 *.log
 npm-debug.log*
+/docs
