@@ -31,12 +31,20 @@ export class CourseAdapter implements CourseRepository {
         }) as Promise<CourseWithDetails | null>;
     }
 
-    findAll(statusFilter?: CourseStatus): Promise<CourseWithDetails[]> {
+    findAll(statusFilter?: CourseStatus, skip?: number, take?: number): Promise<CourseWithDetails[]> {
         return this.prisma.course.findMany({
             where: statusFilter ? { status: statusFilter } : undefined,
             include: courseIncludes,
             orderBy: { startTime: 'asc' },
+            skip,
+            take,
         }) as Promise<CourseWithDetails[]>;
+    }
+
+    count(statusFilter?: CourseStatus): Promise<number> {
+        return this.prisma.course.count({
+            where: statusFilter ? { status: statusFilter } : undefined,
+        });
     }
 
     async update(id: string, data: CourseUpdateData): Promise<courseModel | null> {

@@ -44,7 +44,8 @@ export type CourseWithDetails = courseModel & {
 export interface CourseRepository {
     create(course: CourseCreateData): Promise<courseModel>;
     findById(id: string): Promise<CourseWithDetails | null>;
-    findAll(statusFilter?: CourseStatus): Promise<CourseWithDetails[]>;
+    findAll(statusFilter?: CourseStatus, skip?: number, take?: number): Promise<CourseWithDetails[]>;
+    count(statusFilter?: CourseStatus): Promise<number>;
     update(id: string, data: CourseUpdateData): Promise<courseModel | null>;
     delete(id: string): Promise<boolean>;
     isRoomAvailable(roomId: string, startTime: Date, endTime: Date, excludeCourseId?: string): Promise<boolean>;

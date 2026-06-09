@@ -23,6 +23,27 @@ import { AddCoursePhotoController } from '../controllers/add-course-photo.js';
 import { AddCoursePhotoUseCase } from '../../usecase/add-course-photo.js';
 import { DeleteCoursePhotoController } from '../controllers/delete-course-photo.js';
 import { DeleteCoursePhotoUseCase } from '../../usecase/delete-course-photo.js';
+import { GetAdminCourseDetailController } from '../controllers/get-admin-course-detail.js';
+import { GetAdminCourseDetailUseCase } from '../../usecase/get-admin-course-detail.js';
+
+const paginationQuerySchema = {
+    type: 'object',
+    properties: {
+        page: { type: 'integer', minimum: 1, default: 1 },
+        limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+    },
+} as const;
+
+const pagedResponseSchema = (itemSchema: object) => ({
+    type: 'object',
+    properties: {
+        data: { type: 'array', items: itemSchema },
+        total: { type: 'integer' },
+        page: { type: 'integer' },
+        limit: { type: 'integer' },
+        totalPages: { type: 'integer' },
+    },
+});
 
 const courseDetailProperties = {
     id: { type: 'string' },
@@ -76,44 +97,64 @@ export async function courseRouter(fastify: FastifyInstance, prisma: PrismaClien
     const deleteCourseController = new DeleteCourseController(new DeleteCourseUseCase(courseRepository, userAdminRepository, ruleRepository));
     const addCoursePhotoController = new AddCoursePhotoController(new AddCoursePhotoUseCase(courseRepository, storage, userAdminRepository, ruleRepository));
     const deleteCoursePhotoController = new DeleteCoursePhotoController(new DeleteCoursePhotoUseCase(courseRepository, userAdminRepository, ruleRepository));
+    const getAdminCourseDetailController = new GetAdminCourseDetailController(new GetAdminCourseDetailUseCase(courseRepository, userAdminRepository, ruleRepository));
 
     fastify.get('/admin/courses', {
         schema: {
             tags: ['Admin — Courses'],
-            summary: 'List all courses (internal)',
-            description: `Returns **all** courses regardless of status. Requires JWT token with \`READ_COURSE\` permission.
-
-**Business rules:**
-- Includes courses with status \`PUBLICO\`, \`PRIVADO\`, and \`NAO_PUBLICADO\`
-- Use this route in the admin panel to manage the full catalog
-- The public route \`GET /courses\` returns only \`PUBLICO\` courses`,
+            summary: 'List all courses (card listing)',
+            description: `Returns **all** courses with minimal card data. Requires JWT token with \`READ_COURSE\` permission. Use \`GET /admin/courses/:courseId\` for full detail.`,
             security: [{ bearerAuth: [] }],
+            querystring: paginationQuerySchema,
             response: {
-                200: {
-                    type: 'array',
-                    items: { type: 'object', properties: courseDetailProperties },
-                },
+                200: pagedResponseSchema({ type: 'object', properties: {
+                    id: { type: 'string' },
+                    status: { type: 'string', enum: ['PUBLICO', 'PRIVADO', 'NAO_PUBLICADO'] },
+                    title: { type: 'string' },
+                    eventNumber: { type: 'string', nullable: true },
+                    startDate: { type: 'string' },
+                    enrolled: { type: 'integer' },
+                    maxStudents: { type: 'integer' },
+                    price: { type: 'number' },
+                    coverImage: { type: 'string', nullable: true },
+                    photoCount: { type: 'integer' },
+                }}),
+                401: { type: 'object', properties: { error: { type: 'string' } } },
                 403: { type: 'object', properties: { error: { type: 'string' } } },
             },
         },
     }, (req: FastifyRequest, res: FastifyReply) => listAllCoursesController.handle(req, res));
 
+    fastify.get('/admin/courses/:courseId', {
+        schema: {
+            tags: ['Admin — Courses'],
+            summary: 'Get course full detail (admin)',
+            description: `Returns all fields of a course. Requires JWT token with \`READ_COURSE\` permission. Use this when opening the edit/view dialog.`,
+            security: [{ bearerAuth: [] }],
+            params: {
+                type: 'object',
+                required: ['courseId'],
+                properties: { courseId: { type: 'string' } },
+            },
+            response: {
+                200: { type: 'object', properties: courseDetailProperties },
+                401: { type: 'object', properties: { error: { type: 'string' } } },
+                403: { type: 'object', properties: { error: { type: 'string' } } },
+                404: { type: 'object', properties: { error: { type: 'string' } } },
+            },
+        },
+    }, (req: FastifyRequest<{ Params: { courseId: string } }>, res: FastifyReply) =>
+        getAdminCourseDetailController.handle(req, res)
+    );
+
     fastify.get('/courses', {
         schema: {
             tags: ['Courses'],
             summary: 'List courses',
-            description: `Returns all **public** courses with full data.
-
-**Business rules:**
-- Returns only courses with \`status = PUBLICO\` — private or unpublished courses are excluded
-- To access a private or unpublished course, use \`GET /courses/:courseId\` directly with the ID
-- Ordered by start date (nearest first)
-- The \`maxStudents\` field reflects the \`maxCapacity\` of the room associated with the course`,
+            description: `Returns all **public** courses. Ordered by start date (nearest first).`,
+            querystring: paginationQuerySchema,
             response: {
-                200: {
-                    type: 'array',
-                    items: { type: 'object', properties: courseDetailProperties },
-                },
+                200: pagedResponseSchema({ type: 'object', properties: courseDetailProperties }),
             },
         },
     }, (req: FastifyRequest, res: FastifyReply) => listCoursesController.handle(req, res));
