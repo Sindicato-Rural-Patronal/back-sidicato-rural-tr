@@ -22,8 +22,12 @@ export class UploadNewsBlockImageUseCase {
     ) {}
 
     async execute(newsId: string, token: string, file: Buffer, mimeType: string): Promise<UploadNewsBlockImageResponse> {
+        console.log(`[UploadNewsBlockImage] newsId="${newsId}" mimeType="${mimeType}"`);
         const auth = await verifyPermission(token, 'UPDATE_NEWS', this.userAdminRepository, this.ruleRepository);
-        if (!auth.authorized) return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        if (!auth.authorized) {
+            console.log(`[UploadNewsBlockImage] denied: ${auth.error}`);
+            return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        }
 
         const news = await this.newsRepository.findById(newsId);
         if (!news) return { success: false, error: new Error('News not found') };
@@ -39,6 +43,7 @@ export class UploadNewsBlockImageUseCase {
         });
 
         const url = this.storage.getPublicUrl(NEWS_BANNER_BUCKET, key);
+        console.log(`[UploadNewsBlockImage] success url="${url}"`);
         return { success: true, url };
     }
 }

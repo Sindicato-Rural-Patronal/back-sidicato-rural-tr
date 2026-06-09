@@ -26,25 +26,32 @@ export class CreateUserAdminUseCase {
     ) {}
 
     async execute(request: CreateUserAdminRequest): Promise<CreateUserAdminResponse> {
+        console.log(`[CreateUserAdmin] username="${request.username}" userDataId="${request.userDataId}" userRole="${request.userRole}"`);
         let creatorId: string;
         try {
             const decoded = jwt.verify(request.creatorToken, process.env.JWT_SECRET!) as { userId: string };
             creatorId = decoded.userId;
+            console.log(`[CreateUserAdmin] creatorId="${creatorId}"`);
         } catch {
+            console.log(`[CreateUserAdmin] invalid token`);
             return { success: false, error: new Error('Invalid or expired token') };
         }
 
         const creatorAdmin = await this.userAdminRepository.findById(creatorId);
         if (!creatorAdmin) {
+            console.log(`[CreateUserAdmin] creator admin not found: ${creatorId}`);
             return { success: false, error: new Error('Creator admin not found') };
         }
 
         const creatorRule = await this.ruleRepository.findById(creatorAdmin.rulesId);
         if (!creatorRule) {
+            console.log(`[CreateUserAdmin] creator rule not found: rulesId="${creatorAdmin.rulesId}"`);
             return { success: false, error: new Error('Creator permission rule not found') };
         }
+        console.log(`[CreateUserAdmin] creator rule: name="${creatorRule.name}" permitions=${JSON.stringify(creatorRule.permitions)}`);
 
         const canCreateUser = creatorRule.permitions.some((p: string) => p === 'CREATE_USER_ADMIN');
+        console.log(`[CreateUserAdmin] has CREATE_USER_ADMIN? ${canCreateUser}`);
         if (!canCreateUser) {
             return { success: false, error: new Error('Permission denied: cannot create admin users') };
         }
@@ -78,6 +85,7 @@ export class CreateUserAdminUseCase {
                 userDataId: request.userDataId,
                 rulesId: request.userRole,
             });
+            console.log(`[CreateUserAdmin] success userAdminId="${newAdmin.id}"`);
             return { success: true, userAdminId: newAdmin.id };
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);

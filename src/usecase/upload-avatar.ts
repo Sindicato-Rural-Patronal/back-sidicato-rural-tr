@@ -14,6 +14,7 @@ export class UploadAvatarUseCase {
   constructor(private readonly storage: StorageRepository, private readonly env: Env) {}
 
   async execute(input: UploadAvatarInput): Promise<string> {
+    console.log(`[UploadAvatar] userId="${input.userId}" file="${input.originalName}" mimeType="${input.mimeType}"`);
     const bucket = this.env.STORAGE_BUCKET || "avatars";
     const key = `users/${input.userId}/${Date.now()}-${input.originalName}`;
 
@@ -26,8 +27,8 @@ export class UploadAvatarUseCase {
 
     await this.storage.uploadFile(uploadParams);
 
-    // Gera URL assinada (válida por 1 hora)
     const signedUrl = await this.storage.getSignedUrl(bucket, key, 3600);
+    console.log(`[UploadAvatar] success key="${key}"`);
     return signedUrl;
   }
 }

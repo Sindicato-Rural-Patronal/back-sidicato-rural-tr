@@ -17,15 +17,23 @@ export class DeleteNewsUseCase {
     ) {}
 
     async execute(newsId: string, token: string): Promise<DeleteNewsResponse> {
+        console.log(`[DeleteNews] newsId="${newsId}"`);
         const auth = await verifyPermission(token, 'DELETE_NEWS', this.userAdminRepository, this.ruleRepository);
-        if (!auth.authorized) return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        if (!auth.authorized) {
+            console.log(`[DeleteNews] denied: ${auth.error}`);
+            return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        }
 
         const existing = await this.newsRepository.findById(newsId);
-        if (!existing) return { success: false, error: new Error('News not found') };
+        if (!existing) {
+            console.log(`[DeleteNews] news not found: ${newsId}`);
+            return { success: false, error: new Error('News not found') };
+        }
 
         const deleted = await this.newsRepository.delete(newsId);
         if (!deleted) return { success: false, error: new Error('Failed to delete news') };
 
+        console.log(`[DeleteNews] success`);
         return { success: true };
     }
 }

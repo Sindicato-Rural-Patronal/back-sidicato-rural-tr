@@ -22,8 +22,10 @@ export class CreateUserUseCase {
         constructor(private userDataRepository: UserDataRepository) {}
 
         async execute(request: CreateUserRequest): Promise<CreateUserResponse> {
+            console.log(`[CreateUser] email="${request.email}" phone="${request.phone}"`);
             const existingUser = await this.userDataRepository.findByEmailOurPhone(request.email, request.phone);
             if (existingUser) {
+                console.log(`[CreateUser] conflict: user already exists email="${request.email}"`);
               return{
                 id: "", 
                 name: "",   
@@ -51,6 +53,7 @@ export class CreateUserUseCase {
                     Error: new Error('Failed to create user')
                 }
             }
+            console.log(`[CreateUser] success userId="${newUser.id}"`);
             return {
                 id: newUser.id,
                 name: newUser.name,

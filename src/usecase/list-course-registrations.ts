@@ -14,6 +14,7 @@ export class ListCourseRegistrationsUseCase {
     ) {}
 
     async execute(request: Request): Promise<Response> {
+        console.log(`[ListCourseRegistrations] courseId="${request.courseId}"`);
         const auth = await verifyPermission(
             request.token,
             'READ_COURSE',
@@ -21,10 +22,12 @@ export class ListCourseRegistrationsUseCase {
             this.ruleRepository,
         );
         if (!auth.authorized) {
+            console.log(`[ListCourseRegistrations] denied: ${auth.error}`);
             return { success: false, statusCode: auth.statusCode, error: new Error(auth.error ?? 'Não autorizado') };
         }
 
         const registrations = await this.registrationRepository.findByCourseId(request.courseId);
+        console.log(`[ListCourseRegistrations] returning ${registrations.length} registrations`);
         return { success: true, registrations };
     }
 }

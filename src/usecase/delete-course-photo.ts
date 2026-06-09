@@ -13,12 +13,20 @@ export class DeleteCoursePhotoUseCase {
     ) {}
 
     async execute(token: string, photoId: string): Promise<DeleteCoursePhotoResponse> {
+        console.log(`[DeleteCoursePhoto] photoId="${photoId}"`);
         const auth = await verifyPermission(token, 'UPDATE_COURSE', this.userAdminRepository, this.ruleRepository);
-        if (!auth.authorized) return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        if (!auth.authorized) {
+            console.log(`[DeleteCoursePhoto] denied: ${auth.error}`);
+            return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        }
 
         const deleted = await this.courseRepository.deletePhoto(photoId);
-        if (!deleted) return { success: false, error: new Error('Photo not found') };
+        if (!deleted) {
+            console.log(`[DeleteCoursePhoto] photo not found: ${photoId}`);
+            return { success: false, error: new Error('Photo not found') };
+        }
 
+        console.log(`[DeleteCoursePhoto] success`);
         return { success: true };
     }
 }

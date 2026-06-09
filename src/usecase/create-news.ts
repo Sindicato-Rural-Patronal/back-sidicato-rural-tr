@@ -29,8 +29,12 @@ export class CreateNewsUseCase {
     ) {}
 
     async execute(request: CreateNewsRequest, token: string): Promise<CreateNewsResponse> {
+        console.log(`[CreateNews] title="${request.title}" status="${(request as any).status ?? 'default'}"`);
         const auth = await verifyPermission(token, 'CREATE_NEWS', this.userAdminRepository, this.ruleRepository);
-        if (!auth.authorized) return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        if (!auth.authorized) {
+            console.log(`[CreateNews] denied: ${auth.error}`);
+            return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        }
 
         const validation = createNewsRequestSchema.safeParse(request);
         if (!validation.success) {
@@ -47,6 +51,7 @@ export class CreateNewsUseCase {
             publishedAt: publishedAt ? new Date(publishedAt) : status === 'PUBLICADO' ? new Date() : undefined,
         });
 
+        console.log(`[CreateNews] success newsId="${news.id}"`);
         return { success: true, newsId: news.id };
     }
 }

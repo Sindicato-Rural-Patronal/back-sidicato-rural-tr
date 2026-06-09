@@ -63,10 +63,13 @@ export class GetCourseDetailUseCase {
     constructor(private readonly courseRepository: CourseRepository) {}
 
     async execute(id: string): Promise<GetCourseDetailResponse> {
+        console.log(`[GetCourseDetail] id="${id}"`);
         const course = await this.courseRepository.findById(id);
         if (!course) {
+            console.log(`[GetCourseDetail] not found: ${id}`);
             return { success: false, error: new Error('Course not found') };
         }
+        console.log(`[GetCourseDetail] found: name="${course.name}" status="${course.status}"`);
         return { success: true, course: mapToFrontend(course) };
     }
 }

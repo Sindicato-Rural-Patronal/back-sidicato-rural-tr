@@ -27,15 +27,21 @@ export class CreateRoomUseCase {
     ) {}
 
     async execute(request: CreateRoomRequest, token: string): Promise<CreateRoomResponse> {
+        console.log(`[CreateRoom] name="${request.name}" maxCapacity=${request.maxCapacity}`);
         const auth = await verifyPermission(token, 'CREATE_COURSE', this.userAdminRepository, this.ruleRepository);
-        if (!auth.authorized) return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        if (!auth.authorized) {
+            console.log(`[CreateRoom] denied: ${auth.error}`);
+            return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        }
 
         const validation = createRoomRequestSchema.safeParse(request);
         if (!validation.success) {
+            console.log(`[CreateRoom] validation failed: ${validation.error.issues.map(e => e.message).join(', ')}`);
             return { success: false, error: new Error(validation.error.issues.map(e => e.message).join(', ')) };
         }
 
         const room = await this.roomRepository.create(validation.data);
+        console.log(`[CreateRoom] success roomId="${room.id}"`);
         return { success: true, roomId: room.id };
     }
 }

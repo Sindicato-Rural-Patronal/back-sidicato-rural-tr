@@ -22,7 +22,7 @@
     "npm": ">=10.0.0"
   },
   "keywords": [],
-  "author": "",
+  "author": "eduardo nakai",
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1048.0",

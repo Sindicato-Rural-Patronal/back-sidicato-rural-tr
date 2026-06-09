@@ -13,6 +13,7 @@ export class UploadCourseBannerUseCase {
     ) {}
 
     async execute(courseId: string, fileBuffer: Buffer): Promise<string> {
+        console.log(`[UploadCourseBanner] courseId="${courseId}" bufferSize=${fileBuffer.length}`);
         const processedBuffer = await sharp(fileBuffer)
             .resize(FULL_HD_WIDTH, FULL_HD_HEIGHT, { fit: 'cover', position: 'center' })
             .jpeg({ quality: 85 })
@@ -32,6 +33,7 @@ export class UploadCourseBannerUseCase {
         const urlWithBust = `${publicUrl}?t=${Date.now()}`;
 
         await this.courseRepository.update(courseId, { bannerUrl: urlWithBust });
+        console.log(`[UploadCourseBanner] success url="${urlWithBust}"`);
 
         return urlWithBust;
     }

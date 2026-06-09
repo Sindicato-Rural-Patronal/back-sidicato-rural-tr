@@ -30,8 +30,10 @@ export class CreateCourseUseCase {
     ) {}
 
     async execute(request: CreateCourseRequest): Promise<CreateCourseResponse> {
+        console.log(`[CreateCourse] name="${request.name}" roomId="${request.roomId}"`);
         const validation = createCourseRequestSchema.safeParse(request);
         if (!validation.success) {
+            console.log(`[CreateCourse] validation failed: ${validation.error.issues.map(e => e.message).join(', ')}`);
             return { success: false, error: new Error(validation.error.issues.map(e => e.message).join(', ')) };
         }
 
@@ -67,6 +69,7 @@ export class CreateCourseUseCase {
             return { success: false, error: new Error('Failed to create course') };
         }
 
+        console.log(`[CreateCourse] success courseId="${course.id}"`);
         return { success: true, courseId: course.id };
     }
 }

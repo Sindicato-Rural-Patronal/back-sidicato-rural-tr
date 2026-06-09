@@ -28,8 +28,12 @@ export class DashboardStatsUseCase {
     ) {}
 
     async execute(token: string): Promise<DashboardStatsResponse> {
+        console.log(`[DashboardStats] fetching stats`);
         const auth = await verifyPermission(token, 'READ_COURSE', this.userAdminRepository, this.ruleRepository);
-        if (!auth.authorized) return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        if (!auth.authorized) {
+            console.log(`[DashboardStats] denied: ${auth.error}`);
+            return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        }
 
         const [allUsers, allAdmins, allCourses] = await Promise.all([
             this.userDataRepository.findAll(),
@@ -42,6 +46,7 @@ export class DashboardStatsUseCase {
         const unpublishedCount = allCourses.filter(c => c.status === CourseStatus.NAO_PUBLICADO).length;
         const totalRegistrations = allCourses.reduce((sum, c) => sum + c._count.courseUserRegistration, 0);
 
+        console.log(`[DashboardStats] users=${allUsers.length} admins=${allAdmins.length} courses=${allCourses.length} registrations=${totalRegistrations}`);
         return {
             success: true,
             stats: {

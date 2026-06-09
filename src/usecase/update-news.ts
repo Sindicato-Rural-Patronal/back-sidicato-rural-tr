@@ -30,15 +30,21 @@ export class UpdateNewsUseCase {
     ) {}
 
     async execute(request: UpdateNewsRequest): Promise<UpdateNewsResponse> {
+        console.log(`[UpdateNews] newsId="${request.newsId}"`);
         const validation = updateNewsRequestSchema.safeParse(request);
         if (!validation.success) {
+            console.log(`[UpdateNews] validation failed: ${validation.error.issues.map(e => e.message).join(', ')}`);
             return { success: false, error: new Error(validation.error.issues.map(e => e.message).join(', ')) };
         }
 
         const { newsId, token, publishedAt, ...updateData } = validation.data;
+        console.log(`[UpdateNews] fields to update: ${JSON.stringify(Object.keys(updateData))}`);
 
         const auth = await verifyPermission(token, 'UPDATE_NEWS', this.userAdminRepository, this.ruleRepository);
-        if (!auth.authorized) return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        if (!auth.authorized) {
+            console.log(`[UpdateNews] denied: ${auth.error}`);
+            return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        }
 
         const existing = await this.newsRepository.findById(newsId);
         if (!existing) return { success: false, error: new Error('News not found') };
@@ -54,6 +60,7 @@ export class UpdateNewsUseCase {
 
         if (!updated) return { success: false, error: new Error('Failed to update news') };
 
+        console.log(`[UpdateNews] success newsId="${newsId}"`);
         return { success: true };
     }
 }

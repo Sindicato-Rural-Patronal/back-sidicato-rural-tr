@@ -22,8 +22,10 @@ export class RegisterForCourseUseCase {
     ) {}
 
     async execute(request: Request): Promise<Response> {
+        console.log(`[RegisterForCourse] courseId="${request.courseId}" email="${request.email}" cpf="${request.cpf}"`);
         const parsed = schema.safeParse(request);
         if (!parsed.success) {
+            console.log(`[RegisterForCourse] validation failed: ${parsed.error.issues[0]?.message}`);
             return { success: false, error: new Error(parsed.error.issues[0]?.message ?? 'Invalid data') };
         }
 
@@ -57,6 +59,7 @@ export class RegisterForCourseUseCase {
         }
 
         const registration = await this.registrationRepository.create(courseId, userData.id);
+        console.log(`[RegisterForCourse] success registrationId="${registration.id}" userDataId="${userData.id}"`);
         return { success: true, registrationId: registration.id, userDataId: userData.id };
     }
 }

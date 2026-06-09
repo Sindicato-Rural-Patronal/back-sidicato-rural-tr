@@ -35,8 +35,12 @@ export class UpdateCourseUseCase {
     ) {}
 
     async execute(request: UpdateCourseRequest): Promise<UpdateCourseResponse> {
+        console.log(`[UpdateCourse] courseId="${request.courseId}"`);
         const auth = await verifyPermission(request.token, 'UPDATE_COURSE', this.userAdminRepository, this.ruleRepository);
-        if (!auth.authorized) return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        if (!auth.authorized) {
+            console.log(`[UpdateCourse] denied: ${auth.error}`);
+            return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
+        }
 
         const { courseId, token: _token, ...body } = request;
         const validation = updateCourseBodySchema.safeParse(body);
@@ -76,6 +80,7 @@ export class UpdateCourseUseCase {
         const updated = await this.courseRepository.update(courseId, updatePayload);
         if (!updated) return { success: false, error: new Error('Failed to update course') };
 
+        console.log(`[UpdateCourse] success courseId="${courseId}"`);
         return { success: true };
     }
 }

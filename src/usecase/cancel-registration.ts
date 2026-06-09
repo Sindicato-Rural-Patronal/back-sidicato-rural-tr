@@ -14,6 +14,7 @@ export class CancelRegistrationUseCase {
     ) {}
 
     async execute(request: Request): Promise<Response> {
+        console.log(`[CancelRegistration] registrationId="${request.registrationId}"`);
         const auth = await verifyPermission(
             request.token,
             'UPDATE_COURSE',
@@ -21,11 +22,13 @@ export class CancelRegistrationUseCase {
             this.ruleRepository,
         );
         if (!auth.authorized) {
+            console.log(`[CancelRegistration] denied: ${auth.error}`);
             return { success: false, statusCode: auth.statusCode, error: new Error(auth.error ?? 'Unauthorized') };
         }
 
         const registration = await this.registrationRepository.findById(request.registrationId);
         if (!registration) {
+            console.log(`[CancelRegistration] registration not found: ${request.registrationId}`);
             return { success: false, error: new Error('Registration not found') };
         }
 
@@ -34,6 +37,7 @@ export class CancelRegistrationUseCase {
             return { success: false, error: new Error('Failed to cancel registration') };
         }
 
+        console.log(`[CancelRegistration] success`);
         return { success: true };
     }
 }
