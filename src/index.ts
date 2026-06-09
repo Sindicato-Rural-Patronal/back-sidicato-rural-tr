@@ -16,8 +16,6 @@ import { newsRouter } from './http/router/news-router.js'
 import { loadEnv } from './config/env.js';
 import { createPrismaClient } from './lib/prisma.js';
 import type { permitions } from './generated/prisma/enums.js';
-import { CreateRuleUseCase } from './usecase/create-rule.js';
-import { RuleAdapter } from './adapter/database/rule-adapter.js';
 import { hash } from 'bcrypt'
 
 const server = fastify({ logger: true })
@@ -67,6 +65,18 @@ server.register(swaggerUi, {
     deepLinking: true,
   },
 })
+
+server.addContentTypeParser('application/json', { parseAs: 'string' }, function (_req, body, done) {
+  if (body === '' || body === null || body === undefined) {
+    done(null, {});
+    return;
+  }
+  try {
+    done(null, JSON.parse(body as string));
+  } catch (err) {
+    done(err as Error, undefined);
+  }
+});
 
 server.register(multipart)
 
@@ -119,17 +129,13 @@ async function firstInitialize() {
       console.log('SUPER_RULE already exists and is up to date');
     }
   } else {
-    const createRuleUseCase = new CreateRuleUseCase(new RuleAdapter(prisma));
-    const result = await createRuleUseCase.execute({
-      name: 'SUPER_RULE',
-      permitions: ALL_PERMITIONS,
-      description: 'Rule with all permissions for super admin users',
+    superRule = await prisma.rule.create({
+      data: {
+        name: 'SUPER_RULE',
+        permitions: ALL_PERMITIONS,
+        description: 'Rule with all permissions for super admin users',
+      },
     });
-    if (!result.success || !result.rule) {
-      console.error('Failed to create SUPER_RULE:', result.error?.message);
-      return;
-    }
-    superRule = result.rule as NonNullable<typeof superRule>;
     console.log('SUPER_RULE created successfully');
   }
 
