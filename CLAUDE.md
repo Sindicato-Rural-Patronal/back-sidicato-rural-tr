@@ -1,6 +1,6 @@
 # CLAUDE.md — back-sindicato-rural-tr
 
-Backend de um **Sindicato Rural** para gerenciar usuários trabalhadores, administradores, regras de permissão e cursos.
+Backend de um **Sindicato Rural** para gerenciar usuários trabalhadores, administradores, regras de permissão, cursos e notícias.
 
 ## Stack
 
@@ -33,10 +33,20 @@ BANNER_BUCKET=course-banners
 src/
   index.ts                    — entry point, registra plugins e inicializa dados
   config/env.ts               — valida e exporta variáveis de ambiente com Zod
-  lib/prisma.ts               — factory do PrismaClient com adapter PrismaPg
+  lib/
+    prisma.ts                 — factory do PrismaClient com adapter PrismaPg
+    auth.ts                   — decodeToken (jwt.verify wrapper)
+  errors/
+    auth.ts                   — AuthError (base) + InvalidCredentialsError
+    business-rule.ts          — BusinessRuleError (base) + RoomAlreadyBookedError, RegistrationsUnavailableError
+    conflict.ts               — ConflictError (base) + 6 erros específicos de conflito
+    not-found.ts              — NotFoundError (base) + 11 erros específicos de not found
+    validation.ts             — ValidationError (aceita msg do Zod — único com parâmetro)
   http/
     controllers/              — recebem FastifyRequest/Reply, delegam ao use case
     router/                   — registram rotas como plugins Fastify
+    lib/
+      require-permission.ts   — requirePermission, requireAuth, errorToStatus
   usecase/                    — lógica de negócio pura (sem Fastify, sem Prisma direto)
   ports/external/             — interfaces TypeScript dos repositórios
   adapter/
@@ -47,31 +57,111 @@ src/
 
 ## Modelos de dados
 
-| Modelo                   | Campos principais                                              |
-|--------------------------|----------------------------------------------------------------|
-| `UserData`               | id, name, email, phone, cpf, cnpj, avatar                     |
-| `UserAdmin`              | id, username, passwordHash, userDataId (FK), rulesId (FK)     |
-| `Rule`                   | id, name, description, permitions (String[])                  |
-| `course`                 | id, name, description, maxRegistrations                       |
-| `courseUserRegistration` | id, courseId (FK), userDataId (FK)                            |
+| Modelo                   | Campos principais                                                                                          |
+|--------------------------|------------------------------------------------------------------------------------------------------------|
+| `UserData`               | id, name, email, phone, cpf, cnpj, avatar                                                                  |
+| `UserAdmin`              | id, username, passwordHash, userDataId (FK), rulesId (FK)                                                  |
+| `Rule`                   | id, name, description, permitions (String[])                                                               |
+| `Course`                 | id, name, description, roomId (FK), startTime, endTime, status, price, workloadHours, coverImage, eventNumber, minStudents, preEnrolled, waitlist, registrationDeadline, observations |
+| `Room`                   | id, name, description, maxCapacity                                                                         |
+| `News`                   | id, title, content, summary, bannerUrl, status, publishedAt                                                |
+| `CoursePhoto`            | id, courseId (FK), url, caption                                                                            |
+| `CourseUserRegistration` | id, courseId (FK), userDataId (FK)                                                                         |
 
 ## Permissões disponíveis (em `Rule.permitions`)
 
-`CREATE_USER`, `UPDATE_USER`, `DELETE_USER`, `READ_USER`
-`CREATE_COURSE`, `UPDATE_COURSE`, `DELETE_COURSE`, `READ_COURSE`
-`CREATE_RULE`, `UPDATE_RULE`, `DELETE_RULE`, `READ_RULE`
-`CREATE_USER_ADMIN`, `UPDATE_USER_ADMIN`, `DELETE_USER_ADMIN`, `READ_USER_ADMIN`
+```
+CREATE_USER    UPDATE_USER    DELETE_USER    READ_USER
+CREATE_COURSE  UPDATE_COURSE  DELETE_COURSE  READ_COURSE
+CREATE_RULE    UPDATE_RULE    DELETE_RULE    READ_RULE
+CREATE_USER_ADMIN  UPDATE_USER_ADMIN  DELETE_USER_ADMIN  READ_USER_ADMIN
+CREATE_NEWS    UPDATE_NEWS    DELETE_NEWS    READ_NEWS
+```
 
 ## Rotas HTTP
 
+### Auth
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `POST` | `/auth/login` | `LoginUserAdminUseCase` | Pública |
+
+### Usuários (UserData)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
 | `POST` | `/users` | `CreateUserUseCase` | Pública |
-| `POST` | `/auth/login` | `LoginUserAdminUseCase` | Pública |
-| `POST` | `/admin/users` | `CreateUserAdminUseCase` | Bearer token + permissão `CREATE_USER_ADMIN` |
-| `POST` | `/courses` | `CreateCourseUseCase` | Bearer token + permissão `CREATE_COURSE` |
-| `POST` | `/courses/:courseId/banner` | `UploadCourseBannerUseCase` | Bearer token + permissão `UPDATE_COURSE` |
-| `POST` | `/rules` | `CreateRuleUseCase` | Bearer token + permissão `CREATE_RULE` |
+| `GET` | `/admin/users` | `ListUsersUseCase` | `READ_USER` |
+| `PATCH` | `/users/:id` | `UpdateUserDataUseCase` | `UPDATE_USER` |
+| `DELETE` | `/users/:id` | `DeleteUserDataUseCase` | `DELETE_USER` |
+
+### Administradores (UserAdmin)
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/admin/me` | `GetCurrentAdminUseCase` | JWT (qualquer admin) |
+| `GET` | `/admin/users/admins` | `ListUserAdminsUseCase` | `READ_USER_ADMIN` |
+| `POST` | `/admin/users` | `CreateUserAdminUseCase` | `CREATE_USER_ADMIN` |
+| `PATCH` | `/admin/users/:id` | `UpdateUserAdminUseCase` | `UPDATE_USER_ADMIN` |
+| `DELETE` | `/admin/users/:id` | `DeleteUserAdminUseCase` | `DELETE_USER_ADMIN` |
+
+### Cursos
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/courses` | `ListCoursesUseCase` | Pública |
+| `GET` | `/courses/:courseId` | `GetCourseDetailUseCase` | Pública |
+| `POST` | `/courses` | `CreateCourseUseCase` | `CREATE_COURSE` |
+| `PATCH` | `/courses/:courseId` | `UpdateCourseUseCase` | `UPDATE_COURSE` |
+| `DELETE` | `/courses/:courseId` | `DeleteCourseUseCase` | `DELETE_COURSE` |
+| `POST` | `/courses/:courseId/banner` | `UploadCourseBannerUseCase` | `UPDATE_COURSE` |
+| `POST` | `/courses/:courseId/gallery` | `AddCoursePhotoUseCase` | `UPDATE_COURSE` |
+| `DELETE` | `/courses/:courseId/gallery/:photoId` | `DeleteCoursePhotoUseCase` | `UPDATE_COURSE` |
+| `GET` | `/admin/courses` | `ListAllCoursesUseCase` | `READ_COURSE` |
+| `GET` | `/admin/courses/:courseId` | `GetAdminCourseDetailUseCase` | `READ_COURSE` |
+
+### Salas
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/rooms` | `ListRoomsUseCase` | Pública |
+| `POST` | `/rooms` | `CreateRoomUseCase` | `CREATE_COURSE` |
+
+### Inscrições
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `POST` | `/courses/:courseId/register` | `RegisterForCourseUseCase` | Pública |
+| `GET` | `/admin/courses/:courseId/registrations` | `ListCourseRegistrationsUseCase` | `READ_COURSE` |
+| `DELETE` | `/admin/registrations/:registrationId` | `CancelRegistrationUseCase` | `UPDATE_COURSE` |
+
+### Notícias
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/news` | `ListNewsUseCase` | Pública |
+| `GET` | `/news/:newsId` | `GetNewsDetailUseCase` | Pública |
+| `POST` | `/news` | `CreateNewsUseCase` | `CREATE_NEWS` |
+| `PATCH` | `/news/:newsId` | `UpdateNewsUseCase` | `UPDATE_NEWS` |
+| `DELETE` | `/news/:newsId` | `DeleteNewsUseCase` | `DELETE_NEWS` |
+| `POST` | `/news/:newsId/banner` | `UploadNewsBannerUseCase` | `UPDATE_NEWS` |
+| `POST` | `/news/:newsId/image` | `UploadNewsBlockImageUseCase` | `UPDATE_NEWS` |
+| `GET` | `/admin/news` | `ListNewsUseCase` | `READ_NEWS` |
+
+### Regras
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/admin/rules` | `ListRulesUseCase` | `READ_RULE` |
+| `POST` | `/rules` | `CreateRuleUseCase` | `CREATE_RULE` |
+| `PATCH` | `/rules/:ruleId` | `UpdateRuleUseCase` | `UPDATE_RULE` |
+
+### Dashboard
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/admin/dashboard/stats` | `DashboardStatsUseCase` | `READ_COURSE` |
+
+## Paginação
+
+Rotas de listagem aceitam `?page=1&limit=20`. Resposta padrão:
+
+```json
+{ "data": [...], "total": 100, "page": 1, "limit": 20, "totalPages": 5 }
+```
+
+Rotas sem paginação: `GET /rooms`, `GET /admin/courses/:courseId/registrations`.
 
 ## Adaptadores de banco disponíveis
 
@@ -81,6 +171,10 @@ src/
 | `createUserAdminAdapter` | `adapter/database/user-admin-adapter.ts` | `UserAdminRepository` |
 | `createCourseAdapter` | `adapter/database/course-adapter.ts` | `CourseRepository` |
 | `createRuleAdapter` | `adapter/database/rule-adapter.ts` | `RuleRepository` |
+| `createNewsAdapter` | `adapter/database/news-adapter.ts` | `NewsRepository` |
+| `createRoomAdapter` | `adapter/database/room-adapter.ts` | `RoomRepository` |
+| `createRegistrationAdapter` | `adapter/database/registration-adapter.ts` | `RegistrationRepository` |
+| `createStorageAdapter` | `adapter/storage/factory.ts` | `StorageRepository` |
 
 ## Padrão de implementação
 
@@ -146,19 +240,41 @@ export async function fooRouter(fastify: FastifyInstance, prisma: PrismaClient) 
 server.register(fooRouter, prisma);
 ```
 
-## Padrão de error handling
+## Sistema de erros tipados
 
-Use cases usam dois estilos — prefira o padrão com `success` flag:
+Os erros de domínio vivem em `src/errors/` divididos por categoria:
+
+| Arquivo | Classe base | Subclasses específicas |
+|---------|-------------|------------------------|
+| `auth.ts` | `AuthError` | `InvalidCredentialsError` |
+| `business-rule.ts` | `BusinessRuleError` | `RoomAlreadyBookedError`, `RegistrationsUnavailableError` |
+| `conflict.ts` | `ConflictError` | `UserAlreadyExistsError`, `UsernameAlreadyExistsError`, `UsernameAlreadyInUseError`, `AdminAccountAlreadyExistsError`, `EmailOrCpfAlreadyInUseError`, `CourseRegistrationAlreadyExistsError` |
+| `not-found.ts` | `NotFoundError` | `CourseNotFoundError`, `UserNotFoundError`, `UserDataNotFoundError`, `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError` |
+| `validation.ts` | `ValidationError` | — (único com parâmetro de mensagem, para erros dinâmicos do Zod) |
+
+Use cases lançam a subclasse específica. Controllers usam `errorToStatus(response.error)` de `http/lib/require-permission.ts` para mapear para HTTP status:
 
 ```ts
-// Preferido (padrão B — create-rule, create-course)
-type Response = { success: boolean; error?: Error; result?: ... }
-
-// Legado (padrão A — create-user-data)
-type Response = { id: string; ...; Error?: Error }
+// errorToStatus mapping
+NotFoundError  → 404
+ConflictError  → 409
+AuthError      → 401
+default        → 400
 ```
 
-No controller, **sempre verificar o erro ANTES de chamar `reply.send()`** — chamar `send()` e depois tentar outro `send()` causa erro de dupla resposta.
+### Padrão de error handling nos use cases
+
+```ts
+// Padrão padrão — success flag
+type Response = { success: boolean; error?: Error; result?: ... }
+
+// No controller — verificar erro ANTES de send()
+if (!response.success) {
+    return reply.status(errorToStatus(response.error)).send({ error: response.error?.message });
+}
+```
+
+Nunca chamar `reply.send()` duas vezes — causa erro de dupla resposta no Fastify.
 
 ## Upload de arquivos (multipart)
 
