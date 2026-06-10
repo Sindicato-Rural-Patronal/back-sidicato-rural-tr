@@ -31,7 +31,8 @@ const baseCourse = {
     registrationDeadline: null,
     observations: null,
     eventNumber: null,
-    room: { name: 'Sala A', maxCapacity: 20 },
+    room: { name: 'Sala A',
+maxCapacity: 20 },
     photos: [],
     _count: { courseUserRegistration: 0 },
     Instructors: [],
@@ -59,7 +60,7 @@ describe('ListCoursesUseCase', () => {
             vi.mocked(mockCourseRepo.findAll).mockResolvedValue([baseCourse as any]);
             const uc = new ListCoursesUseCase(mockCourseRepo);
             const result = await uc.execute();
-            expect(result.success).toBe(true);
+            expect(result.error).toBeUndefined();
             expect(result.result?.data).toHaveLength(1);
             expect(result.result?.data?.[0].title).toBe('Curso Teste');
         });

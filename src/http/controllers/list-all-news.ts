@@ -1,21 +1,20 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { ListNewsUseCase } from '../../usecase/list-news.js';
-import { verifyPermission } from '../../lib/verify-permission.js';
-import type { UserAdminRepository } from '../../ports/external/user-admin-repository.js';
-import type { RuleRepository } from '../../ports/external/rule-repository.js';
+import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
+import { requirePermission } from '../lib/require-permission.js';
 
 export class ListAllNewsController {
     constructor(
-        private listNewsUseCase: ListNewsUseCase,
-        private userAdminRepository: UserAdminRepository,
-        private ruleRepository: RuleRepository,
+        private readonly listNewsUseCase: ListNewsUseCase,
+        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(request: FastifyRequest, reply: FastifyReply) {
-        const token = (request.headers.authorization ?? '').replace('Bearer ', '');
-        const { authorized, statusCode, error: permError } = await verifyPermission(token, 'READ_NEWS', this.userAdminRepository, this.ruleRepository);
-        if (!authorized) return reply.status(statusCode).send({ error: permError });
-
+        if (
+            (await requirePermission(request, reply, 'READ_NEWS', this.getAdminPermissions)) ===
+            null
+        )
+            return;
         const q = request.query as Record<string, string>;
         const page = Math.max(1, Number(q.page) || 1);
         const limit = Math.min(100, Math.max(1, Number(q.limit) || 20));

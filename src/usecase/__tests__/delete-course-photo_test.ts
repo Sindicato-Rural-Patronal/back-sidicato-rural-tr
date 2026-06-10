@@ -1,14 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DeleteCoursePhotoUseCase } from '../delete-course-photo.js';
 import type { CourseRepository } from '../../ports/external/course-repository.js';
-import type { UserAdminRepository } from '../../ports/external/user-admin-repository.js';
-import type { RuleRepository } from '../../ports/external/rule-repository.js';
-
-vi.mock('../../lib/verify-permission.js', () => ({
-    verifyPermission: vi.fn(),
-}));
-
-import { verifyPermission } from '../../lib/verify-permission.js';
 
 const mockCourseRepo = {
     create: vi.fn(),
@@ -21,43 +13,25 @@ const mockCourseRepo = {
     deletePhoto: vi.fn(),
 } as unknown as CourseRepository;
 
-const mockUserAdminRepo = {} as unknown as UserAdminRepository;
-const mockRuleRepo = {} as unknown as RuleRepository;
-
 describe('DeleteCoursePhotoUseCase', () => {
     beforeEach(() => vi.clearAllMocks());
 
-    describe('autenticação e permissão', () => {
-        it('falha se sem permissão UPDATE_COURSE', async () => {
-            vi.mocked(verifyPermission).mockResolvedValue({ authorized: false, statusCode: 403, error: 'Permission denied' });
-            const uc = new DeleteCoursePhotoUseCase(mockCourseRepo, mockUserAdminRepo, mockRuleRepo);
-            const result = await uc.execute('bad-token', 'photo-001');
-            expect(result.success).toBe(false);
-            expect(result.statusCode).toBe(403);
-        });
-    });
-
     describe('verificação da foto', () => {
-        beforeEach(() => {
-            vi.mocked(verifyPermission).mockResolvedValue({ authorized: true, statusCode: 200 });
-        });
-
         it('falha se foto não existir', async () => {
             vi.mocked(mockCourseRepo.deletePhoto).mockResolvedValue(false);
-            const uc = new DeleteCoursePhotoUseCase(mockCourseRepo, mockUserAdminRepo, mockRuleRepo);
-            const result = await uc.execute('valid-token', 'photo-inexistente');
-            expect(result.success).toBe(false);
+            const uc = new DeleteCoursePhotoUseCase(mockCourseRepo);
+            const result = await uc.execute('photo-inexistente');
+            expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('Photo not found');
         });
     });
 
     describe('deleção bem-sucedida', () => {
         it('retorna success true ao deletar foto válida', async () => {
-            vi.mocked(verifyPermission).mockResolvedValue({ authorized: true, statusCode: 200 });
             vi.mocked(mockCourseRepo.deletePhoto).mockResolvedValue(true);
-            const uc = new DeleteCoursePhotoUseCase(mockCourseRepo, mockUserAdminRepo, mockRuleRepo);
-            const result = await uc.execute('valid-token', 'photo-001');
-            expect(result.success).toBe(true);
+            const uc = new DeleteCoursePhotoUseCase(mockCourseRepo);
+            const result = await uc.execute('photo-001');
+            expect(result.error).toBeUndefined();
         });
     });
 });

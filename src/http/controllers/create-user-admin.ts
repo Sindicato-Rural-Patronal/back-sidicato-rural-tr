@@ -1,41 +1,41 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CreateUserAdminUseCase } from '../../usecase/create-user-admin.js';
+import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
+import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 
 export class CreateUserAdminController {
-    constructor(private createUserAdminUseCase: CreateUserAdminUseCase) {}
+    constructor(
+        private readonly createUserAdminUseCase: CreateUserAdminUseCase,
+        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
+    ) {}
 
     async handle(request: FastifyRequest, reply: FastifyReply) {
+        if (
+            (await requirePermission(
+                request,
+                reply,
+                'CREATE_USER_ADMIN',
+                this.getAdminPermissions,
+            )) === null
+        )
+            return;
         const { username, password, userDataId, userRole } = request.body as {
             username: string;
             password: string;
             userDataId: string;
             userRole: string;
         };
-        const authHeader = request.headers['authorization'];
-        const creatorToken = authHeader?.replace('Bearer ', '') ?? '';
-
         const response = await this.createUserAdminUseCase.execute({
             username,
             password,
             userDataId,
             userRole,
-            creatorToken,
         });
-
-        if (!response.success) {
-            const msg = response.error?.message ?? 'Failed to create admin';
-            if (msg.includes('Invalid or expired token')) {
-                return reply.status(401).send({ error: msg });
-            }
-            if (msg.includes('Permission denied')) {
-                return reply.status(403).send({ error: msg });
-            }
-            if (msg.includes('already exists') || msg.includes('already has an admin')) {
-                return reply.status(409).send({ error: msg });
-            }
-            return reply.status(400).send({ error: msg });
+        if (response.error) {
+            return reply
+                .status(errorToStatus(response.error))
+                .send({ error: response.error?.message });
         }
-
         return reply.status(201).send({ userAdminId: response.userAdminId });
     }
 }

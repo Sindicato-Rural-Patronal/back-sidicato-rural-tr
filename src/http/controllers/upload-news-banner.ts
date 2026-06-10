@@ -1,22 +1,26 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { UploadNewsBannerUseCase } from '../../usecase/upload-news-banner.js';
+import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
+import { requirePermission } from '../lib/require-permission.js';
 
 export class UploadNewsBannerController {
-    constructor(private uploadNewsBannerUseCase: UploadNewsBannerUseCase) {}
+    constructor(
+        private readonly uploadNewsBannerUseCase: UploadNewsBannerUseCase,
+        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
+    ) {}
 
     async handle(request: FastifyRequest<{ Params: { newsId: string } }>, reply: FastifyReply) {
-        const token = (request.headers.authorization ?? '').replace('Bearer ', '');
+        if (
+            (await requirePermission(request, reply, 'UPDATE_NEWS', this.getAdminPermissions)) ===
+            null
+        )
+            return;
         const { newsId } = request.params;
-
         const data = await request.file();
         if (!data) return reply.status(400).send({ error: 'No file provided' });
-
         const buffer = await data.toBuffer();
-        const response = await this.uploadNewsBannerUseCase.execute(newsId, token, buffer, data.mimetype);
-
-        if (!response.success) {
-            return reply.status(response.statusCode ?? 400).send({ error: response.error?.message });
-        }
+        const response = await this.uploadNewsBannerUseCase.execute(newsId, buffer, data.mimetype);
+        if (response.error) return reply.status(400).send({ error: response.error?.message });
         return reply.status(200).send({ url: response.url });
     }
 }

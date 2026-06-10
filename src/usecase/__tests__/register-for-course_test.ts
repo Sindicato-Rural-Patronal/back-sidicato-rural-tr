@@ -39,41 +39,61 @@ const validInput = {
     cpf: '12345678901',
 };
 
-const publishedCourse = { id: validInput.courseId, status: 'PUBLICO' };
-const unpublishedCourse = { id: validInput.courseId, status: 'NAO_PUBLICADO' };
+const publishedCourse = { id: validInput.courseId,
+status: 'PUBLICO' };
+const unpublishedCourse = { id: validInput.courseId,
+status: 'NAO_PUBLICADO' };
 
 describe('RegisterForCourseUseCase', () => {
     beforeEach(() => vi.clearAllMocks());
 
     describe('validação de input', () => {
         it('falha se email for inválido', async () => {
-            const uc = new RegisterForCourseUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo);
-            const result = await uc.execute({ ...validInput, email: 'nao-e-email' });
-            expect(result.success).toBe(false);
+            const uc = new RegisterForCourseUseCase(
+                mockCourseRepo,
+                mockUserDataRepo,
+                mockRegistrationRepo,
+            );
+            const result = await uc.execute({ ...validInput,
+email: 'nao-e-email' });
+            expect(result.error).toBeDefined();
             expect(result.error).toBeDefined();
         });
 
         it('falha se courseId estiver vazio', async () => {
-            const uc = new RegisterForCourseUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo);
-            const result = await uc.execute({ ...validInput, courseId: '' });
-            expect(result.success).toBe(false);
+            const uc = new RegisterForCourseUseCase(
+                mockCourseRepo,
+                mockUserDataRepo,
+                mockRegistrationRepo,
+            );
+            const result = await uc.execute({ ...validInput,
+courseId: '' });
+            expect(result.error).toBeDefined();
         });
     });
 
     describe('verificação do curso', () => {
         it('falha se curso não existir', async () => {
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(null);
-            const uc = new RegisterForCourseUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo);
+            const uc = new RegisterForCourseUseCase(
+                mockCourseRepo,
+                mockUserDataRepo,
+                mockRegistrationRepo,
+            );
             const result = await uc.execute(validInput);
-            expect(result.success).toBe(false);
+            expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('Course not found');
         });
 
         it('falha se curso estiver NAO_PUBLICADO', async () => {
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(unpublishedCourse as any);
-            const uc = new RegisterForCourseUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo);
+            const uc = new RegisterForCourseUseCase(
+                mockCourseRepo,
+                mockUserDataRepo,
+                mockRegistrationRepo,
+            );
             const result = await uc.execute(validInput);
-            expect(result.success).toBe(false);
+            expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('Registrations unavailable for this course');
         });
     });
@@ -81,10 +101,16 @@ describe('RegisterForCourseUseCase', () => {
     describe('gerenciamento de userData', () => {
         it('reutiliza userData existente se email/cpf já cadastrado', async () => {
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(publishedCourse as any);
-            vi.mocked(mockUserDataRepo.findByEmailOrCpf).mockResolvedValue({ id: 'ud-existing' } as any);
+            vi.mocked(mockUserDataRepo.findByEmailOrCpf).mockResolvedValue({
+                id: 'ud-existing',
+            } as any);
             vi.mocked(mockRegistrationRepo.findByUserDataAndCourse).mockResolvedValue(null);
             vi.mocked(mockRegistrationRepo.create).mockResolvedValue({ id: 'reg-001' } as any);
-            const uc = new RegisterForCourseUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo);
+            const uc = new RegisterForCourseUseCase(
+                mockCourseRepo,
+                mockUserDataRepo,
+                mockRegistrationRepo,
+            );
             await uc.execute(validInput);
             expect(mockUserDataRepo.create).not.toHaveBeenCalled();
         });
@@ -95,7 +121,11 @@ describe('RegisterForCourseUseCase', () => {
             vi.mocked(mockUserDataRepo.create).mockResolvedValue({ id: 'ud-new' } as any);
             vi.mocked(mockRegistrationRepo.findByUserDataAndCourse).mockResolvedValue(null);
             vi.mocked(mockRegistrationRepo.create).mockResolvedValue({ id: 'reg-002' } as any);
-            const uc = new RegisterForCourseUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo);
+            const uc = new RegisterForCourseUseCase(
+                mockCourseRepo,
+                mockUserDataRepo,
+                mockRegistrationRepo,
+            );
             await uc.execute(validInput);
             expect(mockUserDataRepo.create).toHaveBeenCalledOnce();
         });
@@ -104,9 +134,13 @@ describe('RegisterForCourseUseCase', () => {
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(publishedCourse as any);
             vi.mocked(mockUserDataRepo.findByEmailOrCpf).mockResolvedValue(null);
             vi.mocked(mockUserDataRepo.create).mockResolvedValue(null);
-            const uc = new RegisterForCourseUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo);
+            const uc = new RegisterForCourseUseCase(
+                mockCourseRepo,
+                mockUserDataRepo,
+                mockRegistrationRepo,
+            );
             const result = await uc.execute(validInput);
-            expect(result.success).toBe(false);
+            expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('Failed to create user record');
         });
     });
@@ -114,11 +148,19 @@ describe('RegisterForCourseUseCase', () => {
     describe('verificação de duplicidade', () => {
         it('falha se usuário já estiver inscrito no curso', async () => {
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(publishedCourse as any);
-            vi.mocked(mockUserDataRepo.findByEmailOrCpf).mockResolvedValue({ id: 'ud-existing' } as any);
-            vi.mocked(mockRegistrationRepo.findByUserDataAndCourse).mockResolvedValue({ id: 'reg-dup' } as any);
-            const uc = new RegisterForCourseUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo);
+            vi.mocked(mockUserDataRepo.findByEmailOrCpf).mockResolvedValue({
+                id: 'ud-existing',
+            } as any);
+            vi.mocked(mockRegistrationRepo.findByUserDataAndCourse).mockResolvedValue({
+                id: 'reg-dup',
+            } as any);
+            const uc = new RegisterForCourseUseCase(
+                mockCourseRepo,
+                mockUserDataRepo,
+                mockRegistrationRepo,
+            );
             const result = await uc.execute(validInput);
-            expect(result.success).toBe(false);
+            expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('User already registered for this course');
         });
     });
@@ -129,9 +171,13 @@ describe('RegisterForCourseUseCase', () => {
             vi.mocked(mockUserDataRepo.findByEmailOrCpf).mockResolvedValue({ id: 'ud-001' } as any);
             vi.mocked(mockRegistrationRepo.findByUserDataAndCourse).mockResolvedValue(null);
             vi.mocked(mockRegistrationRepo.create).mockResolvedValue({ id: 'reg-001' } as any);
-            const uc = new RegisterForCourseUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo);
+            const uc = new RegisterForCourseUseCase(
+                mockCourseRepo,
+                mockUserDataRepo,
+                mockRegistrationRepo,
+            );
             const result = await uc.execute(validInput);
-            expect(result.success).toBe(true);
+            expect(result.error).toBeUndefined();
             expect(result.registrationId).toBe('reg-001');
             expect(result.userDataId).toBe('ud-001');
         });

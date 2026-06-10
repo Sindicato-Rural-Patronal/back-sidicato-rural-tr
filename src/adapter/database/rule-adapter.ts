@@ -1,7 +1,7 @@
-import type { PrismaClient } from "@prisma/client/extension";
-import type { RuleRepository } from "../../ports/external/rule-repository";
-import type { permitions } from "../../generated/prisma/enums";
-import type { RuleModel } from "../../generated/prisma/models";
+import type { PrismaClient } from '@prisma/client/extension';
+import type { RuleRepository } from '../../ports/external/rule-repository';
+import type { permitions } from '../../generated/prisma/enums';
+import type { RuleModel } from '../../generated/prisma/models';
 
 export function createRuleAdapter(prisma: PrismaClient): RuleRepository {
     return new RuleAdapter(prisma);
@@ -10,27 +10,37 @@ export class RuleAdapter implements RuleRepository {
     constructor(private prisma: PrismaClient) {}
     findById(id: string): Promise<RuleModel | null> {
         return this.prisma.rule.findUnique({
-            where: { id }
+            where: { id },
         });
     }
-    create(data: { name: string; permitions: permitions[]; }): Promise<RuleModel> {
+    create(data: {
+ name: string;
+permitions: permitions[] 
+}): Promise<RuleModel> {
         return this.prisma.rule.create({
-            data
+            data,
         });
     }
-    update(id: string, data: { name?: string; permitions?: permitions[]; }): Promise<RuleModel | null> {
+    update(
+        id: string,
+        data: {
+            name?: string;
+            permitions?: permitions[];
+        },
+    ): Promise<RuleModel | null> {
         return this.prisma.rule.update({
             where: { id },
-            data
+            data,
         });
     }
     delete(id: string): Promise<void> {
         return this.prisma.rule.delete({
-            where: { id }
+            where: { id },
         });
     }
     findAll(skip?: number, take?: number): Promise<RuleModel[]> {
-        return this.prisma.rule.findMany({ skip, take });
+        return this.prisma.rule.findMany({ skip,
+take });
     }
 
     count(): Promise<number> {

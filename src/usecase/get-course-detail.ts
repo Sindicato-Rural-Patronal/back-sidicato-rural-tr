@@ -1,4 +1,9 @@
-import type { CourseRepository, CourseWithDetails, CourseStatus } from "../ports/external/course-repository.js";
+import type {
+    CourseRepository,
+    CourseWithDetails,
+    CourseStatus,
+} from '../ports/external/course-repository.js';
+import { CourseNotFoundError } from '../errors/not-found.js';
 
 export type CourseFrontendDetail = {
     id: string;
@@ -22,7 +27,11 @@ export type CourseFrontendDetail = {
     registrationDeadline: string | null;
     observations: string | null;
     eventNumber: string | null;
-    photoGallery: { id: string; url: string; caption: string }[];
+    photoGallery: {
+        id: string;
+        url: string;
+        caption: string;
+    }[];
 };
 
 export function mapToFrontend(course: CourseWithDetails): CourseFrontendDetail {
@@ -49,12 +58,21 @@ export function mapToFrontend(course: CourseWithDetails): CourseFrontendDetail {
         registrationDeadline: course.registrationDeadline?.toISOString().split('T')[0] ?? null,
         observations: course.observations ?? null,
         eventNumber: course.eventNumber ?? null,
-        photoGallery: course.photos.map((p: { id: string; url: string; caption: string | null }) => ({ id: p.id, url: p.url, caption: p.caption ?? '' })),
+        photoGallery: course.photos.map(
+            (p: {
+ id: string;
+url: string;
+caption: string | null 
+}) => ({
+                id: p.id,
+                url: p.url,
+                caption: p.caption ?? '',
+            }),
+        ),
     };
 }
 
 type GetCourseDetailResponse = {
-    success: boolean;
     error?: Error;
     course?: CourseFrontendDetail;
 };
@@ -67,9 +85,9 @@ export class GetCourseDetailUseCase {
         const course = await this.courseRepository.findById(id);
         if (!course) {
             console.log(`[GetCourseDetail] not found: ${id}`);
-            return { success: false, error: new Error('Course not found') };
+            return { error: new CourseNotFoundError() };
         }
         console.log(`[GetCourseDetail] found: name="${course.name}" status="${course.status}"`);
-        return { success: true, course: mapToFrontend(course) };
+        return { course: mapToFrontend(course) };
     }
 }

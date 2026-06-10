@@ -35,35 +35,42 @@ describe('LoginUserAdminUseCase', () => {
             vi.mocked(mockUserAdminRepo.findByUsername).mockResolvedValue(null);
             const uc = new LoginUserAdminUseCase(mockUserAdminRepo);
             const result = await uc.execute('nao-existe', 'qualquer');
-            expect(result.token).toBe('');
-            expect(result.Error?.message).toBe('Invalid username or password');
+            expect(result.error).toBeDefined();
+            expect(result.error?.message).toBe('Invalid username or password');
         });
 
         it('falha se senha incorreta', async () => {
-            vi.mocked(mockUserAdminRepo.findByUsername).mockResolvedValue(await makeAdmin() as any);
+            vi.mocked(mockUserAdminRepo.findByUsername).mockResolvedValue(
+                (await makeAdmin()) as any,
+            );
             const uc = new LoginUserAdminUseCase(mockUserAdminRepo);
             const result = await uc.execute('admin', 'senha-errada');
-            expect(result.token).toBe('');
-            expect(result.Error?.message).toBe('Invalid username or password');
+            expect(result.error).toBeDefined();
+            expect(result.error?.message).toBe('Invalid username or password');
         });
 
         it('não expõe qual campo está errado (usuário vs senha)', async () => {
             vi.mocked(mockUserAdminRepo.findByUsername).mockResolvedValue(null);
             const uc = new LoginUserAdminUseCase(mockUserAdminRepo);
             const resultNoUser = await uc.execute('ghost', 'any');
-            vi.mocked(mockUserAdminRepo.findByUsername).mockResolvedValue(await makeAdmin() as any);
+            vi.mocked(mockUserAdminRepo.findByUsername).mockResolvedValue(
+                (await makeAdmin()) as any,
+            );
             const resultWrongPwd = await uc.execute('admin', 'wrong');
-            expect(resultNoUser.Error?.message).toBe(resultWrongPwd.Error?.message);
+            expect(resultNoUser.error?.message).toBe(resultWrongPwd.error?.message);
         });
     });
 
     describe('geração de JWT', () => {
         it('retorna token válido com credenciais corretas', async () => {
-            vi.mocked(mockUserAdminRepo.findByUsername).mockResolvedValue(await makeAdmin() as any);
+            vi.mocked(mockUserAdminRepo.findByUsername).mockResolvedValue(
+                (await makeAdmin()) as any,
+            );
             const uc = new LoginUserAdminUseCase(mockUserAdminRepo);
             const result = await uc.execute('admin', PASSWORD_PLAIN);
+            expect(result.error).toBeUndefined();
             expect(result.token).not.toBe('');
-            expect(result.Error).toBeUndefined();
+            expect(result.error).toBeUndefined();
         });
 
         it('token contém userId, username e role no payload', async () => {
@@ -72,7 +79,7 @@ describe('LoginUserAdminUseCase', () => {
             const uc = new LoginUserAdminUseCase(mockUserAdminRepo);
             const result = await uc.execute('admin', PASSWORD_PLAIN);
             const secret = process.env.JWT_SECRET ?? 'fallback_secret_change_me';
-            const payload = jwt.verify(result.token, secret) as Record<string, unknown>;
+            const payload = jwt.verify(result.token!, secret) as Record<string, unknown>;
             expect(payload.userId).toBe(admin.id);
             expect(payload.username).toBe(admin.username);
             expect(payload.role).toBe(admin.rulesId);

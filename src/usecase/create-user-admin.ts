@@ -1,79 +1,53 @@
-import type { UserAdminRepository } from "../ports/external/user-admin-repository";
-import type { UserDataRepository } from "../ports/external/user-data-repository";
-import type { RuleRepository } from "../ports/external/rule-repository";
+import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { UserDataRepository } from '../ports/external/user-data-repository.js';
+import type { RuleRepository } from '../ports/external/rule-repository.js';
 import { hash } from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import { UsernameAlreadyExistsError, AdminAccountAlreadyExistsError } from '../errors/conflict.js';
+import { UserDataNotFoundError, RoleNotFoundError } from '../errors/not-found.js';
 
 type CreateUserAdminRequest = {
     username: string;
     password: string;
     userDataId: string;
-    userRole: string;   
-    creatorToken: string; 
-}
+    userRole: string;
+};
 
 type CreateUserAdminResponse = {
-    success: boolean;
     error?: Error;
     userAdminId?: string;
-}
+};
 
 export class CreateUserAdminUseCase {
     constructor(
         private userAdminRepository: UserAdminRepository,
         private userDataRepository: UserDataRepository,
-        private ruleRepository: RuleRepository 
+        private ruleRepository: RuleRepository,
     ) {}
 
     async execute(request: CreateUserAdminRequest): Promise<CreateUserAdminResponse> {
-        console.log(`[CreateUserAdmin] username="${request.username}" userDataId="${request.userDataId}" userRole="${request.userRole}"`);
-        let creatorId: string;
-        try {
-            const decoded = jwt.verify(request.creatorToken, process.env.JWT_SECRET!) as { userId: string };
-            creatorId = decoded.userId;
-            console.log(`[CreateUserAdmin] creatorId="${creatorId}"`);
-        } catch {
-            console.log(`[CreateUserAdmin] invalid token`);
-            return { success: false, error: new Error('Invalid or expired token') };
-        }
-
-        const creatorAdmin = await this.userAdminRepository.findById(creatorId);
-        if (!creatorAdmin) {
-            console.log(`[CreateUserAdmin] creator admin not found: ${creatorId}`);
-            return { success: false, error: new Error('Creator admin not found') };
-        }
-
-        const creatorRule = await this.ruleRepository.findById(creatorAdmin.rulesId);
-        if (!creatorRule) {
-            console.log(`[CreateUserAdmin] creator rule not found: rulesId="${creatorAdmin.rulesId}"`);
-            return { success: false, error: new Error('Creator permission rule not found') };
-        }
-        console.log(`[CreateUserAdmin] creator rule: name="${creatorRule.name}" permitions=${JSON.stringify(creatorRule.permitions)}`);
-
-        const canCreateUser = creatorRule.permitions.some((p: string) => p === 'CREATE_USER_ADMIN');
-        console.log(`[CreateUserAdmin] has CREATE_USER_ADMIN? ${canCreateUser}`);
-        if (!canCreateUser) {
-            return { success: false, error: new Error('Permission denied: cannot create admin users') };
-        }
-
+        console.log(
+            `[CreateUserAdmin] username="${request.username}" userDataId="${request.userDataId}" userRole="${request.userRole}"`,
+        );
         const existingAdmin = await this.userAdminRepository.findByUsername(request.username);
         if (existingAdmin) {
-            return { success: false, error: new Error('Username already exists') };
+            return { error: new UsernameAlreadyExistsError() };
         }
 
         const userData = await this.userDataRepository.findById(request.userDataId);
         if (!userData) {
-            return { success: false, error: new Error('Invalid userDataId: user not found') };
+            return { error: new UserDataNotFoundError() };
         }
 
-        const existingAdminForUserData = await this.userAdminRepository.findByUserDataId(request.userDataId);
+        const existingAdminForUserData = await this.userAdminRepository.findByUserDataId(
+            request.userDataId,
+        );
         if (existingAdminForUserData) {
-            return { success: false, error: new Error('This user already has an admin account') };
+            return { error: new AdminAccountAlreadyExistsError() };
         }
 
         const roleToAssign = await this.ruleRepository.findById(request.userRole);
         if (!roleToAssign) {
-            return { success: false, error: new Error('Invalid role: permission rule not found') };
+            return { error: new RoleNotFoundError() };
         }
 
         const hashedPassword = await hash(request.password, 10);
@@ -86,10 +60,10 @@ export class CreateUserAdminUseCase {
                 rulesId: request.userRole,
             });
             console.log(`[CreateUserAdmin] success userAdminId="${newAdmin.id}"`);
-            return { success: true, userAdminId: newAdmin.id };
+            return { userAdminId: newAdmin.id };
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
-            return { success: false, error: new Error(`Failed to create admin: ${msg}`) };
+            return { error: new Error(`Failed to create admin: ${msg}`) };
         }
     }
 }

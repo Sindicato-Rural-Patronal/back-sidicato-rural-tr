@@ -2,6 +2,10 @@ import { z } from 'zod/v4';
 import type { CourseRepository } from '../ports/external/course-repository.js';
 import type { UserDataRepository } from '../ports/external/user-data-repository.js';
 import type { RegistrationRepository } from '../ports/external/registration-repository.js';
+import { ValidationError } from '../errors/validation.js';
+import { CourseNotFoundError } from '../errors/not-found.js';
+import { CourseRegistrationAlreadyExistsError } from '../errors/conflict.js';
+import { RegistrationsUnavailableError } from '../errors/business-rule.js';
 
 const schema = z.object({
     courseId: z.string().min(1),
@@ -12,7 +16,11 @@ const schema = z.object({
 });
 
 type Request = z.infer<typeof schema>;
-type Response = { success: boolean; error?: Error; registrationId?: string; userDataId?: string };
+type Response = {
+    error?: Error;
+    registrationId?: string;
+    userDataId?: string;
+};
 
 export class RegisterForCourseUseCase {
     constructor(
@@ -22,21 +30,27 @@ export class RegisterForCourseUseCase {
     ) {}
 
     async execute(request: Request): Promise<Response> {
-        console.log(`[RegisterForCourse] courseId="${request.courseId}" email="${request.email}" cpf="${request.cpf}"`);
+        console.log(
+            `[RegisterForCourse] courseId="${request.courseId}" email="${request.email}" cpf="${request.cpf}"`,
+        );
         const parsed = schema.safeParse(request);
         if (!parsed.success) {
-            console.log(`[RegisterForCourse] validation failed: ${parsed.error.issues[0]?.message}`);
-            return { success: false, error: new Error(parsed.error.issues[0]?.message ?? 'Invalid data') };
+            console.log(
+                `[RegisterForCourse] validation failed: ${parsed.error.issues[0]?.message}`,
+            );
+            return {
+                error: new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid data'),
+            };
         }
 
         const { courseId, name, phone, email, cpf } = parsed.data;
 
         const course = await this.courseRepository.findById(courseId);
         if (!course) {
-            return { success: false, error: new Error('Course not found') };
+            return { error: new CourseNotFoundError() };
         }
         if (course.status === 'NAO_PUBLICADO') {
-            return { success: false, error: new Error('Registrations unavailable for this course') };
+            return { error: new RegistrationsUnavailableError() };
         }
 
         let userData = await this.userDataRepository.findByEmailOrCpf(email, cpf);
@@ -49,17 +63,23 @@ export class RegisterForCourseUseCase {
                 cpf,
             });
             if (!userData) {
-                return { success: false, error: new Error('Failed to create user record') };
+                return { error: new Error('Failed to create user record') };
             }
         }
 
-        const existing = await this.registrationRepository.findByUserDataAndCourse(userData.id, courseId);
+        const existing = await this.registrationRepository.findByUserDataAndCourse(
+            userData.id,
+            courseId,
+        );
         if (existing) {
-            return { success: false, error: new Error('User already registered for this course') };
+            return { error: new CourseRegistrationAlreadyExistsError() };
         }
 
         const registration = await this.registrationRepository.create(courseId, userData.id);
-        console.log(`[RegisterForCourse] success registrationId="${registration.id}" userDataId="${userData.id}"`);
-        return { success: true, registrationId: registration.id, userDataId: userData.id };
+        console.log(
+            `[RegisterForCourse] success registrationId="${registration.id}" userDataId="${userData.id}"`,
+        );
+        return { registrationId: registration.id,
+userDataId: userData.id };
     }
 }

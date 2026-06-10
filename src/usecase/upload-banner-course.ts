@@ -15,7 +15,8 @@ export class UploadCourseBannerUseCase {
     async execute(courseId: string, fileBuffer: Buffer): Promise<string> {
         console.log(`[UploadCourseBanner] courseId="${courseId}" bufferSize=${fileBuffer.length}`);
         const processedBuffer = await sharp(fileBuffer)
-            .resize(FULL_HD_WIDTH, FULL_HD_HEIGHT, { fit: 'cover', position: 'center' })
+            .resize(FULL_HD_WIDTH, FULL_HD_HEIGHT, { fit: 'cover',
+position: 'center' })
             .jpeg({ quality: 85 })
             .toBuffer();
 

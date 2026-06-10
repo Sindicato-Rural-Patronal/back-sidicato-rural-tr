@@ -35,15 +35,17 @@ describe('CreateCourseUseCase', () => {
     describe('validação de input', () => {
         it('falha se nome estiver vazio', async () => {
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
-            const result = await uc.execute({ ...validInput, name: '' });
-            expect(result.success).toBe(false);
+            const result = await uc.execute({ ...validInput,
+name: '' });
+            expect(result.error).toBeDefined();
             expect(result.error?.message).toContain('Course name is required');
         });
 
         it('falha se roomId não for UUID válido', async () => {
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
-            const result = await uc.execute({ ...validInput, roomId: 'nao-e-uuid' });
-            expect(result.success).toBe(false);
+            const result = await uc.execute({ ...validInput,
+roomId: 'nao-e-uuid' });
+            expect(result.error).toBeDefined();
             expect(result.error).toBeDefined();
         });
     });
@@ -53,7 +55,7 @@ describe('CreateCourseUseCase', () => {
             vi.mocked(mockRoomRepo.findById).mockResolvedValue(null);
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
             const result = await uc.execute(validInput);
-            expect(result.success).toBe(false);
+            expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('Room not found');
         });
 
@@ -62,7 +64,7 @@ describe('CreateCourseUseCase', () => {
             vi.mocked(mockCourseRepo.isRoomAvailable).mockResolvedValue(false);
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
             const result = await uc.execute(validInput);
-            expect(result.success).toBe(false);
+            expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('Room is already booked for this period');
         });
     });
@@ -74,7 +76,7 @@ describe('CreateCourseUseCase', () => {
             vi.mocked(mockCourseRepo.create).mockResolvedValue({ id: 'course-abc' } as any);
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
             const result = await uc.execute(validInput);
-            expect(result.success).toBe(true);
+            expect(result.error).toBeUndefined();
             expect(result.courseId).toBe('course-abc');
         });
 
@@ -84,7 +86,7 @@ describe('CreateCourseUseCase', () => {
             vi.mocked(mockCourseRepo.create).mockResolvedValue(null as any);
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
             const result = await uc.execute(validInput);
-            expect(result.success).toBe(false);
+            expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('Failed to create course');
         });
     });

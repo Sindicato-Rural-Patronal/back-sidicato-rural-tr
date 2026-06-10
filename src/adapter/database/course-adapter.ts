@@ -1,5 +1,11 @@
 import type { PrismaClient } from '@prisma/client/extension';
-import type { CourseRepository, CourseWithDetails, CourseCreateData, CourseUpdateData, CourseStatus } from '../../ports/external/course-repository.js';
+import type {
+    CourseRepository,
+    CourseWithDetails,
+    CourseCreateData,
+    CourseUpdateData,
+    CourseStatus,
+} from '../../ports/external/course-repository.js';
 import type { courseModel } from '../../generated/prisma/models/course.js';
 import type { CoursePhotoModel } from '../../generated/prisma/models.js';
 
@@ -8,7 +14,8 @@ export function createCourseAdapter(prisma: PrismaClient): CourseRepository {
 }
 
 const courseIncludes = {
-    room: { select: { name: true, maxCapacity: true } },
+    room: { select: { name: true,
+maxCapacity: true } },
     photos: true,
     _count: { select: { courseUserRegistration: true } },
     Instructors: { include: { userData: { select: { name: true } } } },
@@ -20,7 +27,8 @@ export class CourseAdapter implements CourseRepository {
     create(data: CourseCreateData): Promise<courseModel> {
         const { roomId, ...rest } = data;
         return this.prisma.course.create({
-            data: { ...rest, room: { connect: { id: roomId } } },
+            data: { ...rest,
+room: { connect: { id: roomId } } },
         });
     }
 
@@ -31,7 +39,11 @@ export class CourseAdapter implements CourseRepository {
         }) as Promise<CourseWithDetails | null>;
     }
 
-    findAll(statusFilter?: CourseStatus, skip?: number, take?: number): Promise<CourseWithDetails[]> {
+    findAll(
+        statusFilter?: CourseStatus,
+        skip?: number,
+        take?: number,
+    ): Promise<CourseWithDetails[]> {
         return this.prisma.course.findMany({
             where: statusFilter ? { status: statusFilter } : undefined,
             include: courseIncludes,
@@ -50,8 +62,10 @@ export class CourseAdapter implements CourseRepository {
     async update(id: string, data: CourseUpdateData): Promise<courseModel | null> {
         try {
             const { roomId, ...rest } = data;
-            const updateData = roomId ? { ...rest, room: { connect: { id: roomId } } } : rest;
-            return await this.prisma.course.update({ where: { id }, data: updateData });
+            const updateData = roomId ? { ...rest,
+room: { connect: { id: roomId } } } : rest;
+            return await this.prisma.course.update({ where: { id },
+data: updateData });
         } catch {
             return null;
         }
@@ -70,7 +84,9 @@ export class CourseAdapter implements CourseRepository {
 
     async addPhoto(courseId: string, url: string, caption?: string): Promise<CoursePhotoModel> {
         return this.prisma.coursePhoto.create({
-            data: { courseId, url, caption },
+            data: { courseId,
+url,
+caption },
         }) as Promise<CoursePhotoModel>;
     }
 
@@ -83,15 +99,17 @@ export class CourseAdapter implements CourseRepository {
         }
     }
 
-    async isRoomAvailable(roomId: string, startTime: Date, endTime: Date, excludeCourseId?: string): Promise<boolean> {
+    async isRoomAvailable(
+        roomId: string,
+        startTime: Date,
+        endTime: Date,
+        excludeCourseId?: string,
+    ): Promise<boolean> {
         const overlap = await this.prisma.course.count({
             where: {
                 roomId,
                 id: excludeCourseId ? { not: excludeCourseId } : undefined,
-                NOT: [
-                    { endTime: { lte: startTime } },
-                    { startTime: { gte: endTime } },
-                ],
+                NOT: [{ endTime: { lte: startTime } }, { startTime: { gte: endTime } }],
             },
         });
         return overlap === 0;

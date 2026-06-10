@@ -1,7 +1,8 @@
-import type { CourseRepository, CourseWithDetails, CourseStatus } from '../ports/external/course-repository.js';
-import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
-import type { RuleRepository } from '../ports/external/rule-repository.js';
-import { verifyPermission } from '../lib/verify-permission.js';
+import type {
+    CourseRepository,
+    CourseWithDetails,
+    CourseStatus,
+} from '../ports/external/course-repository.js';
 
 export type CourseCardItem = {
     id: string;
@@ -31,29 +32,37 @@ export function mapToCard(course: CourseWithDetails): CourseCardItem {
     };
 }
 
-type PagedResult<T> = { data: T[]; total: number; page: number; limit: number; totalPages: number };
-type ListAllCoursesResponse = { success: boolean; statusCode?: number; error?: Error; result?: PagedResult<CourseCardItem> };
+type PagedResult<T> = {
+    data: T[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+};
+type ListAllCoursesResponse = {
+    error?: Error;
+    result?: PagedResult<CourseCardItem>;
+};
 
 export class ListAllCoursesUseCase {
-    constructor(
-        private courseRepository: CourseRepository,
-        private userAdminRepository: UserAdminRepository,
-        private ruleRepository: RuleRepository
-    ) {}
+    constructor(private courseRepository: CourseRepository) {}
 
-    async execute(token: string, page = 1, limit = 20): Promise<ListAllCoursesResponse> {
+    async execute(page = 1, limit = 20): Promise<ListAllCoursesResponse> {
         console.log(`[ListAllCourses] page=${page} limit=${limit}`);
-        const auth = await verifyPermission(token, 'READ_COURSE', this.userAdminRepository, this.ruleRepository);
-        if (!auth.authorized) {
-            console.log(`[ListAllCourses] denied: ${auth.error}`);
-            return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
-        }
         const skip = (page - 1) * limit;
         const [courses, total] = await Promise.all([
             this.courseRepository.findAll(undefined, skip, limit),
             this.courseRepository.count(),
         ]);
         console.log(`[ListAllCourses] total=${total}`);
-        return { success: true, result: { data: courses.map(mapToCard), total, page, limit, totalPages: Math.ceil(total / limit) } };
+        return {
+            result: {
+                data: courses.map(mapToCard),
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
     }
 }

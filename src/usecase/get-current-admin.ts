@@ -1,10 +1,8 @@
-import jwt from 'jsonwebtoken';
 import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
 import type { RuleRepository } from '../ports/external/rule-repository.js';
+import { AdminNotFoundError, PermissionRuleNotFoundError } from '../errors/not-found.js';
 
 export type CurrentAdminResponse = {
-    success: boolean;
-    statusCode?: number;
     error?: Error;
     data?: {
         userId: string;
@@ -21,25 +19,14 @@ export class GetCurrentAdminUseCase {
         private readonly ruleRepository: RuleRepository,
     ) {}
 
-    async execute(token: string): Promise<CurrentAdminResponse> {
-        if (!token) return { success: false, statusCode: 401, error: new Error('Token required') };
-
-        let userId: string;
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
-            userId = decoded.userId;
-        } catch {
-            return { success: false, statusCode: 401, error: new Error('Invalid or expired token') };
-        }
-
+    async execute(userId: string): Promise<CurrentAdminResponse> {
         const admin = await this.userAdminRepository.findById(userId);
-        if (!admin) return { success: false, statusCode: 401, error: new Error('Admin not found') };
+        if (!admin) return { error: new AdminNotFoundError() };
 
         const rule = await this.ruleRepository.findById(admin.rulesId);
-        if (!rule) return { success: false, statusCode: 403, error: new Error('Permission rule not found') };
+        if (!rule) return { error: new PermissionRuleNotFoundError() };
 
         return {
-            success: true,
             data: {
                 userId: admin.id,
                 username: admin.username,

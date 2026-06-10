@@ -31,11 +31,16 @@ describe('ListNewsUseCase', () => {
         });
 
         it('retorna lista de notícias', async () => {
-            const fakeNews = [{ id: 'n1', title: 'Notícia 1' }, { id: 'n2', title: 'Notícia 2' }];
+            const fakeNews = [
+                { id: 'n1',
+title: 'Notícia 1' },
+                { id: 'n2',
+title: 'Notícia 2' },
+            ];
             vi.mocked(mockNewsRepo.findAll).mockResolvedValue(fakeNews as any);
             const uc = new ListNewsUseCase(mockNewsRepo);
             const result = await uc.execute();
-            expect(result.success).toBe(true);
+            expect(result.error).toBeUndefined();
             expect(result.result?.data).toHaveLength(2);
         });
     });

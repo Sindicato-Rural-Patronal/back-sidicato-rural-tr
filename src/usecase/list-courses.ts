@@ -1,10 +1,19 @@
-import type { CourseRepository} from '../ports/external/course-repository.js';
+import type { CourseRepository } from '../ports/external/course-repository.js';
 import { CourseStatus } from '../ports/external/course-repository.js';
-import type { CourseFrontendDetail} from './get-course-detail.js';
+import type { CourseFrontendDetail } from './get-course-detail.js';
 import { mapToFrontend } from './get-course-detail.js';
 
-type PagedResult<T> = { data: T[]; total: number; page: number; limit: number; totalPages: number };
-type ListCoursesResponse = { success: boolean; error?: Error; result?: PagedResult<CourseFrontendDetail> };
+type PagedResult<T> = {
+    data: T[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+};
+type ListCoursesResponse = {
+    error?: Error;
+    result?: PagedResult<CourseFrontendDetail>;
+};
 
 export class ListCoursesUseCase {
     constructor(private readonly courseRepository: CourseRepository) {}
@@ -17,6 +26,14 @@ export class ListCoursesUseCase {
             this.courseRepository.findAll(statusFilter, skip, limit),
             this.courseRepository.count(statusFilter),
         ]);
-        return { success: true, result: { data: courses.map(mapToFrontend), total, page, limit, totalPages: Math.ceil(total / limit) } };
+        return {
+            result: {
+                data: courses.map(mapToFrontend),
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
     }
 }

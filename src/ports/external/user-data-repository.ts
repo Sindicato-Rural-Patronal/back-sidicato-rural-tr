@@ -1,4 +1,7 @@
-import type {UserDataModel, UserDataUncheckedCreateInput} from "../../generated/prisma/models/UserData.js"
+import type {
+    UserDataModel,
+    UserDataUncheckedCreateInput,
+} from '../../generated/prisma/models/UserData.js';
 
 export type UserDataUpdateInput = Partial<{
     name: string;
@@ -8,8 +11,8 @@ export type UserDataUpdateInput = Partial<{
     cnpj: string | null;
 }>;
 
-export interface  UserDataRepository {
-    create(data: UserDataUncheckedCreateInput): Promise<UserDataModel  | null>;
+export interface UserDataRepository {
+    create(data: UserDataUncheckedCreateInput): Promise<UserDataModel | null>;
     findByEmailOurPhone(email: string, phone: string): Promise<UserDataModel | null>;
     findById(id: string): Promise<UserDataModel | null>;
     findAll(skip?: number, take?: number): Promise<UserDataModel[]>;

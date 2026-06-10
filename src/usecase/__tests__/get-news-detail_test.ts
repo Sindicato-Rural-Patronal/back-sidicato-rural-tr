@@ -19,16 +19,18 @@ describe('GetNewsDetailUseCase', () => {
             vi.mocked(mockNewsRepo.findById).mockResolvedValue(null);
             const uc = new GetNewsDetailUseCase(mockNewsRepo);
             const result = await uc.execute('news-inexistente');
-            expect(result.success).toBe(false);
+            expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('News not found');
         });
 
         it('retorna notícia ao encontrar', async () => {
-            const fakeNews = { id: 'news-001', title: 'Assembleia', content: 'Conteúdo' };
+            const fakeNews = { id: 'news-001',
+title: 'Assembleia',
+content: 'Conteúdo' };
             vi.mocked(mockNewsRepo.findById).mockResolvedValue(fakeNews as any);
             const uc = new GetNewsDetailUseCase(mockNewsRepo);
             const result = await uc.execute('news-001');
-            expect(result.success).toBe(true);
+            expect(result.error).toBeUndefined();
             expect(result.news?.id).toBe('news-001');
             expect(result.news?.title).toBe('Assembleia');
         });

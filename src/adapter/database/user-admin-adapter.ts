@@ -1,6 +1,13 @@
-import type { PrismaClient } from "@prisma/client/extension";
-import type { UserAdminRepository, UserAdminWithDetails, UserAdminUpdateInput } from "../../ports/external/user-admin-repository.js";
-import type { UserAdminModel, UserAdminUncheckedCreateInput } from "../../generated/prisma/models/UserAdmin.js";
+import type { PrismaClient } from '@prisma/client/extension';
+import type {
+    UserAdminRepository,
+    UserAdminWithDetails,
+    UserAdminUpdateInput,
+} from '../../ports/external/user-admin-repository.js';
+import type {
+    UserAdminModel,
+    UserAdminUncheckedCreateInput,
+} from '../../generated/prisma/models/UserAdmin.js';
 
 export function createUserAdminAdapter(prisma: PrismaClient): UserAdminRepository {
     return new UserAdminAdapter(prisma);
@@ -28,8 +35,11 @@ export class UserAdminAdapter implements UserAdminRepository {
     findAll(skip?: number, take?: number): Promise<UserAdminWithDetails[]> {
         return this.prisma.userAdmin.findMany({
             include: {
-                userData: { select: { name: true, email: true, cpf: true } },
-                rules: { select: { name: true, permitions: true } },
+                userData: { select: { name: true,
+email: true,
+cpf: true } },
+                rules: { select: { name: true,
+permitions: true } },
             },
             orderBy: { userData: { name: 'asc' } },
             skip,
@@ -42,7 +52,8 @@ export class UserAdminAdapter implements UserAdminRepository {
     }
 
     update(id: string, data: UserAdminUpdateInput): Promise<UserAdminModel | null> {
-        return this.prisma.userAdmin.update({ where: { id }, data });
+        return this.prisma.userAdmin.update({ where: { id },
+data });
     }
 
     async delete(id: string): Promise<void> {

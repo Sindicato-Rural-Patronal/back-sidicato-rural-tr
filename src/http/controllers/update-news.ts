@@ -1,5 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { UpdateNewsUseCase } from '../../usecase/update-news.js';
+import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
+import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 
 type UpdateNewsBody = {
     title?: string;
@@ -10,16 +12,25 @@ type UpdateNewsBody = {
 };
 
 export class UpdateNewsController {
-    constructor(private updateNewsUseCase: UpdateNewsUseCase) {}
+    constructor(
+        private readonly updateNewsUseCase: UpdateNewsUseCase,
+        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
+    ) {}
 
     async handle(request: FastifyRequest<{ Params: { newsId: string } }>, reply: FastifyReply) {
-        const token = (request.headers.authorization ?? '').replace('Bearer ', '');
+        if (
+            (await requirePermission(request, reply, 'UPDATE_NEWS', this.getAdminPermissions)) ===
+            null
+        )
+            return;
         const { newsId } = request.params;
         const body = request.body as UpdateNewsBody;
-
-        const response = await this.updateNewsUseCase.execute({ newsId, token, ...body });
-        if (!response.success) {
-            return reply.status(response.statusCode ?? 400).send({ error: response.error?.message });
+        const response = await this.updateNewsUseCase.execute({ newsId,
+...body });
+        if (response.error) {
+            return reply
+                .status(errorToStatus(response.error))
+                .send({ error: response.error?.message });
         }
         return reply.status(200).send({ message: 'News updated successfully' });
     }

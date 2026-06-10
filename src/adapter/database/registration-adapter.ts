@@ -1,6 +1,9 @@
 import type { PrismaClient } from '@prisma/client/extension';
 import type { courseUserRegistrationModel } from '../../generated/prisma/models/courseUserRegistration.js';
-import type { RegistrationRepository, RegistrationWithUserData } from '../../ports/external/registration-repository.js';
+import type {
+    RegistrationRepository,
+    RegistrationWithUserData,
+} from '../../ports/external/registration-repository.js';
 
 const userDataSelect = {
     id: true,
@@ -21,7 +24,8 @@ class RegistrationAdapter implements RegistrationRepository {
 
     create(courseId: string, userDataId: string): Promise<courseUserRegistrationModel> {
         return this.prisma.courseUserRegistration.create({
-            data: { courseId, userDataId },
+            data: { courseId,
+userDataId },
         });
     }
 
@@ -40,9 +44,13 @@ class RegistrationAdapter implements RegistrationRepository {
         });
     }
 
-    findByUserDataAndCourse(userDataId: string, courseId: string): Promise<courseUserRegistrationModel | null> {
+    findByUserDataAndCourse(
+        userDataId: string,
+        courseId: string,
+    ): Promise<courseUserRegistrationModel | null> {
         return this.prisma.courseUserRegistration.findFirst({
-            where: { userDataId, courseId },
+            where: { userDataId,
+courseId },
         });
     }
 

@@ -1,9 +1,6 @@
 import type { RoomRepository, roomModel } from '../ports/external/room-repository.js';
 
-type ListRoomsResponse = {
-    success: boolean;
-    rooms?: roomModel[];
-};
+type ListRoomsResponse = {rooms?: roomModel[];};
 
 export class ListRoomsUseCase {
     constructor(private readonly roomRepository: RoomRepository) {}
@@ -12,6 +9,6 @@ export class ListRoomsUseCase {
         console.log(`[ListRooms] fetching all rooms`);
         const rooms = await this.roomRepository.findAll();
         console.log(`[ListRooms] returning ${rooms.length} rooms`);
-        return { success: true, rooms };
+        return { rooms };
     }
 }

@@ -29,7 +29,8 @@ const fakeCourse = {
     registrationDeadline: null,
     observations: null,
     eventNumber: null,
-    room: { name: 'Sala A', maxCapacity: 30 },
+    room: { name: 'Sala A',
+maxCapacity: 30 },
     photos: [],
     _count: { courseUserRegistration: 10 },
     Instructors: [{ userData: { name: 'Prof. João' } }],
@@ -43,7 +44,7 @@ describe('GetCourseDetailUseCase', () => {
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(null);
             const uc = new GetCourseDetailUseCase(mockCourseRepo);
             const result = await uc.execute('course-inexistente');
-            expect(result.success).toBe(false);
+            expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('Course not found');
         });
     });
@@ -53,7 +54,7 @@ describe('GetCourseDetailUseCase', () => {
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(fakeCourse as any);
             const uc = new GetCourseDetailUseCase(mockCourseRepo);
             const result = await uc.execute('course-001');
-            expect(result.success).toBe(true);
+            expect(result.error).toBeUndefined();
             expect(result.course?.title).toBe('Curso de NR-10');
             expect(result.course?.location).toBe('Sala A');
             expect(result.course?.maxStudents).toBe(30);
@@ -61,7 +62,8 @@ describe('GetCourseDetailUseCase', () => {
         });
 
         it('retorna instructor vazio se curso não tiver instrutor', async () => {
-            const noInstructor = { ...fakeCourse, Instructors: [] };
+            const noInstructor = { ...fakeCourse,
+Instructors: [] };
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(noInstructor as any);
             const uc = new GetCourseDetailUseCase(mockCourseRepo);
             const result = await uc.execute('course-001');
@@ -71,7 +73,9 @@ describe('GetCourseDetailUseCase', () => {
         it('mapeia galeria de fotos corretamente', async () => {
             const withPhoto = {
                 ...fakeCourse,
-                photos: [{ id: 'p1', url: 'http://img.com/1.jpg', caption: 'Foto 1' }],
+                photos: [{ id: 'p1',
+url: 'http://img.com/1.jpg',
+caption: 'Foto 1' }],
             };
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(withPhoto as any);
             const uc = new GetCourseDetailUseCase(mockCourseRepo);
@@ -83,7 +87,9 @@ describe('GetCourseDetailUseCase', () => {
         it('usa string vazia como caption quando foto não tem legenda', async () => {
             const withPhoto = {
                 ...fakeCourse,
-                photos: [{ id: 'p2', url: 'http://img.com/2.jpg', caption: null }],
+                photos: [{ id: 'p2',
+url: 'http://img.com/2.jpg',
+caption: null }],
             };
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(withPhoto as any);
             const uc = new GetCourseDetailUseCase(mockCourseRepo);

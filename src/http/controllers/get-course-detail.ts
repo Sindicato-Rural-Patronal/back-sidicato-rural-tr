@@ -1,5 +1,5 @@
-import type { FastifyRequest, FastifyReply } from "fastify";
-import type { GetCourseDetailUseCase } from "../../usecase/get-course-detail.js";
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { GetCourseDetailUseCase } from '../../usecase/get-course-detail.js';
 
 export class GetCourseDetailController {
     constructor(private readonly useCase: GetCourseDetailUseCase) {}
@@ -7,7 +7,7 @@ export class GetCourseDetailController {
     async handle(request: FastifyRequest<{ Params: { courseId: string } }>, reply: FastifyReply) {
         const { courseId } = request.params;
         const response = await this.useCase.execute(courseId);
-        if (!response.success) {
+        if (response.error) {
             return reply.status(404).send({ error: response.error?.message });
         }
         return reply.status(200).send(response.course);

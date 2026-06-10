@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import type { CourseRepository, CourseStatus } from '../ports/external/course-repository.js';
 import type { RoomRepository } from '../ports/external/room-repository.js';
+import { ValidationError } from '../errors/validation.js';
+import { RoomNotFoundError } from '../errors/not-found.js';
+import { RoomAlreadyBookedError } from '../errors/business-rule.js';
 
 const createCourseRequestSchema = z.object({
     name: z.string().min(1, 'Course name is required'),
@@ -18,7 +21,6 @@ const createCourseRequestSchema = z.object({
 type CreateCourseRequest = z.input<typeof createCourseRequestSchema>;
 
 type CreateCourseResponse = {
-    success: boolean;
     error?: Error;
     courseId?: string;
 };
@@ -33,15 +35,30 @@ export class CreateCourseUseCase {
         console.log(`[CreateCourse] name="${request.name}" roomId="${request.roomId}"`);
         const validation = createCourseRequestSchema.safeParse(request);
         if (!validation.success) {
-            console.log(`[CreateCourse] validation failed: ${validation.error.issues.map(e => e.message).join(', ')}`);
-            return { success: false, error: new Error(validation.error.issues.map(e => e.message).join(', ')) };
+            console.log(
+                `[CreateCourse] validation failed: ${validation.error.issues.map(e => e.message).join(', ')}`,
+            );
+            return {
+                error: new ValidationError(validation.error.issues.map(e => e.message).join(', ')),
+            };
         }
 
-        const { name, description, roomId, startTime, endTime, status, price, workloadHours, registrationDeadline, observations } = validation.data;
+        const {
+            name,
+            description,
+            roomId,
+            startTime,
+            endTime,
+            status,
+            price,
+            workloadHours,
+            registrationDeadline,
+            observations,
+        } = validation.data;
 
         const room = await this.roomRepository.findById(roomId);
         if (!room) {
-            return { success: false, error: new Error('Room not found') };
+            return { error: new RoomNotFoundError() };
         }
 
         const start = new Date(startTime);
@@ -49,7 +66,7 @@ export class CreateCourseUseCase {
 
         const available = await this.courseRepository.isRoomAvailable(roomId, start, end);
         if (!available) {
-            return { success: false, error: new Error('Room is already booked for this period') };
+            return { error: new RoomAlreadyBookedError() };
         }
 
         const course = await this.courseRepository.create({
@@ -66,10 +83,10 @@ export class CreateCourseUseCase {
         });
 
         if (!course) {
-            return { success: false, error: new Error('Failed to create course') };
+            return { error: new Error('Failed to create course') };
         }
 
         console.log(`[CreateCourse] success courseId="${course.id}"`);
-        return { success: true, courseId: course.id };
+        return { courseId: course.id };
     }
 }

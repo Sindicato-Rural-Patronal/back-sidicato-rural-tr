@@ -35,7 +35,10 @@ export type CourseUpdateData = {
 };
 
 export type CourseWithDetails = courseModel & {
-    room: { name: string; maxCapacity: number };
+    room: {
+        name: string;
+        maxCapacity: number;
+    };
     photos: CoursePhotoModel[];
     _count: { courseUserRegistration: number };
     Instructors: { userData: { name: string } }[];
@@ -44,11 +47,20 @@ export type CourseWithDetails = courseModel & {
 export interface CourseRepository {
     create(course: CourseCreateData): Promise<courseModel>;
     findById(id: string): Promise<CourseWithDetails | null>;
-    findAll(statusFilter?: CourseStatus, skip?: number, take?: number): Promise<CourseWithDetails[]>;
+    findAll(
+        statusFilter?: CourseStatus,
+        skip?: number,
+        take?: number,
+    ): Promise<CourseWithDetails[]>;
     count(statusFilter?: CourseStatus): Promise<number>;
     update(id: string, data: CourseUpdateData): Promise<courseModel | null>;
     delete(id: string): Promise<boolean>;
-    isRoomAvailable(roomId: string, startTime: Date, endTime: Date, excludeCourseId?: string): Promise<boolean>;
+    isRoomAvailable(
+        roomId: string,
+        startTime: Date,
+        endTime: Date,
+        excludeCourseId?: string,
+    ): Promise<boolean>;
     addPhoto(courseId: string, url: string, caption?: string): Promise<CoursePhotoModel>;
     deletePhoto(photoId: string): Promise<boolean>;
 }

@@ -1,14 +1,10 @@
 import type { NewsRepository } from '../ports/external/news-repository.js';
 import type { StorageRepository } from '../ports/external/storage-repository.js';
-import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
-import type { RuleRepository } from '../ports/external/rule-repository.js';
-import { verifyPermission } from '../lib/verify-permission.js';
+import { NewsNotFoundError } from '../errors/not-found.js';
 
 const NEWS_BANNER_BUCKET = process.env.NEWS_BANNER_BUCKET || 'news-banners';
 
 type UploadNewsBlockImageResponse = {
-    success: boolean;
-    statusCode?: number;
     error?: Error;
     url?: string;
 };
@@ -17,20 +13,16 @@ export class UploadNewsBlockImageUseCase {
     constructor(
         private readonly storage: StorageRepository,
         private readonly newsRepository: NewsRepository,
-        private readonly userAdminRepository: UserAdminRepository,
-        private readonly ruleRepository: RuleRepository,
     ) {}
 
-    async execute(newsId: string, token: string, file: Buffer, mimeType: string): Promise<UploadNewsBlockImageResponse> {
+    async execute(
+        newsId: string,
+        file: Buffer,
+        mimeType: string,
+    ): Promise<UploadNewsBlockImageResponse> {
         console.log(`[UploadNewsBlockImage] newsId="${newsId}" mimeType="${mimeType}"`);
-        const auth = await verifyPermission(token, 'UPDATE_NEWS', this.userAdminRepository, this.ruleRepository);
-        if (!auth.authorized) {
-            console.log(`[UploadNewsBlockImage] denied: ${auth.error}`);
-            return { success: false, statusCode: auth.statusCode, error: new Error(auth.error) };
-        }
-
         const news = await this.newsRepository.findById(newsId);
-        if (!news) return { success: false, error: new Error('News not found') };
+        if (!news) return { error: new NewsNotFoundError() };
 
         const timestamp = Date.now();
         const key = `news/${newsId}/blocks/${timestamp}.jpg`;
@@ -44,6 +36,6 @@ export class UploadNewsBlockImageUseCase {
 
         const url = this.storage.getPublicUrl(NEWS_BANNER_BUCKET, key);
         console.log(`[UploadNewsBlockImage] success url="${url}"`);
-        return { success: true, url };
+        return { url };
     }
 }

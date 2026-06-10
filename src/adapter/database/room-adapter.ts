@@ -9,7 +9,11 @@ export function createRoomAdapter(prisma: PrismaClient): RoomRepository {
 export class RoomAdapter implements RoomRepository {
     constructor(private prisma: PrismaClient) {}
 
-    create(data: { name: string; description: string; maxCapacity: number }): Promise<roomModel> {
+    create(data: {
+ name: string;
+description: string;
+maxCapacity: number 
+}): Promise<roomModel> {
         return this.prisma.room.create({ data });
     }
 

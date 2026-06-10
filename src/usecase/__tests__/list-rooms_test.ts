@@ -14,11 +14,15 @@ describe('ListRoomsUseCase', () => {
 
     describe('listagem de salas', () => {
         it('retorna todas as salas disponíveis', async () => {
-            const fakeRooms = [{ id: 'r1', name: 'Sala A' }, { id: 'r2', name: 'Sala B' }];
+            const fakeRooms = [
+                { id: 'r1',
+name: 'Sala A' },
+                { id: 'r2',
+name: 'Sala B' },
+            ];
             vi.mocked(mockRoomRepo.findAll).mockResolvedValue(fakeRooms as any);
             const uc = new ListRoomsUseCase(mockRoomRepo);
             const result = await uc.execute();
-            expect(result.success).toBe(true);
             expect(result.rooms).toHaveLength(2);
         });
 

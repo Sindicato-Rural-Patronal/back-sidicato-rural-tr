@@ -1,5 +1,11 @@
 import type { PrismaClient } from '@prisma/client/extension';
-import type { NewsRepository, NewsModel, NewsCreateData, NewsUpdateData, NewsStatus } from '../../ports/external/news-repository.js';
+import type {
+    NewsRepository,
+    NewsModel,
+    NewsCreateData,
+    NewsUpdateData,
+    NewsStatus,
+} from '../../ports/external/news-repository.js';
 
 export function createNewsAdapter(prisma: PrismaClient): NewsRepository {
     return new NewsAdapter(prisma);
@@ -33,7 +39,8 @@ export class NewsAdapter implements NewsRepository {
 
     async update(id: string, data: NewsUpdateData): Promise<NewsModel | null> {
         try {
-            return await this.prisma.news.update({ where: { id }, data }) as NewsModel;
+            return (await this.prisma.news.update({ where: { id },
+data })) as NewsModel;
         } catch {
             return null;
         }
@@ -50,7 +57,10 @@ export class NewsAdapter implements NewsRepository {
 
     async updateBanner(id: string, bannerUrl: string): Promise<NewsModel | null> {
         try {
-            return await this.prisma.news.update({ where: { id }, data: { bannerUrl } }) as NewsModel;
+            return (await this.prisma.news.update({
+                where: { id },
+                data: { bannerUrl },
+            })) as NewsModel;
         } catch {
             return null;
         }

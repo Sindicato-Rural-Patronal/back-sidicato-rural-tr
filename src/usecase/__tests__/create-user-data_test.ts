@@ -37,8 +37,8 @@ describe('CreateUserUseCase', () => {
             vi.mocked(mockUserRepo.findByEmailOurPhone).mockResolvedValue(fakeUser as any);
             const uc = new CreateUserUseCase(mockUserRepo);
             const result = await uc.execute(validInput);
-            expect(result.Error?.message).toBe('User already exists');
-            expect(result.id).toBe('');
+            expect(result.error).toBeDefined();
+            expect(result.error?.message).toBe('User already exists');
         });
 
         it('não cria usuário se duplicata encontrada', async () => {
@@ -55,9 +55,10 @@ describe('CreateUserUseCase', () => {
             vi.mocked(mockUserRepo.create).mockResolvedValue(fakeUser as any);
             const uc = new CreateUserUseCase(mockUserRepo);
             const result = await uc.execute(validInput);
-            expect(result.id).toBe('user-123');
-            expect(result.email).toBe(validInput.email);
-            expect(result.Error).toBeUndefined();
+            expect(result.error).toBeUndefined();
+            expect(result.data?.id).toBe('user-123');
+            expect(result.data?.email).toBe(validInput.email);
+            expect(result.error).toBeUndefined();
         });
     });
 
@@ -67,8 +68,8 @@ describe('CreateUserUseCase', () => {
             vi.mocked(mockUserRepo.create).mockResolvedValue(null);
             const uc = new CreateUserUseCase(mockUserRepo);
             const result = await uc.execute(validInput);
-            expect(result.Error?.message).toBe('Failed to create user');
-            expect(result.id).toBe('');
+            expect(result.error).toBeDefined();
+            expect(result.error?.message).toBe('Failed to create user');
         });
     });
 });

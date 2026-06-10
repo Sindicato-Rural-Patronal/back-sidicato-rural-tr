@@ -1,15 +1,19 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { GetCurrentAdminUseCase } from '../../usecase/get-current-admin.js';
+import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
+import { requireAuth } from '../lib/require-permission.js';
 
 export class GetCurrentAdminController {
-    constructor(private readonly useCase: GetCurrentAdminUseCase) {}
+    constructor(
+        private readonly useCase: GetCurrentAdminUseCase,
+        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
+    ) {}
 
     async handle(request: FastifyRequest, reply: FastifyReply) {
-        const token = request.headers['authorization']?.replace('Bearer ', '') ?? '';
-        const result = await this.useCase.execute(token);
-        if (!result.success) {
-            return reply.status(result.statusCode ?? 401).send({ error: result.error?.message });
-        }
+        const userId = await requireAuth(request, reply, this.getAdminPermissions);
+        if (userId === null) return;
+        const result = await this.useCase.execute(userId);
+        if (result.error) return reply.status(400).send({ error: result.error?.message });
         return reply.status(200).send(result.data);
     }
 }
