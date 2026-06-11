@@ -76,3 +76,17 @@ export class PhotoNotFoundError extends NotFoundError {
         this.name = 'PhotoNotFoundError';
     }
 }
+
+export class UserRelationNotFoundError extends NotFoundError {
+    constructor() {
+        super('User relation not found');
+        this.name = 'UserRelationNotFoundError';
+    }
+}
+
+export class PropertyNotFoundError extends NotFoundError {
+    constructor() {
+        super('Property not found');
+        this.name = 'PropertyNotFoundError';
+    }
+}

@@ -3,6 +3,7 @@ import type { UserDataUncheckedCreateInput, UserDataModel } from '../../generate
 import type {
     UserDataRepository,
     UserDataUpdateInput,
+    UserDataWithRelations,
 } from '../../ports/external/user-data-repository.js';
 
 export function createUserDataAdapter(prisma: PrismaClient): UserDataRepository {
@@ -24,6 +25,29 @@ export class UserDataAdapter implements UserDataRepository {
     }
     findById(id: string): Promise<UserDataModel | null> {
         return this.prisma.userData.findUnique({ where: { id } });
+    }
+
+    findByIdWithRelations(id: string): Promise<UserDataWithRelations | null> {
+        return this.prisma.userData.findUnique({
+            where: { id },
+            include: {
+                address: true,
+                relations: {
+                    include: {
+                        target: {
+                            select: { id: true,
+name: true,
+cpf: true },
+                        },
+                    },
+                },
+                properties: {
+                    include: {
+                        address: true,
+                    },
+                },
+            },
+        }) as Promise<UserDataWithRelations | null>;
     }
 
     findAll(skip?: number, take?: number): Promise<UserDataModel[]> {

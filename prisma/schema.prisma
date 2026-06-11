@@ -38,10 +38,58 @@ model UserData {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Identity
+  nickname         String?
+  maritalStatus    MaritalStatus?
+  phone2           String?
+  phone3           String?
+
+  // Documents
+  rg               String?
+  rgIssuer         String?
+  rgIssuedAt       DateTime?
+  birthDate        DateTime?
+  driverLicense    String?
+  driverLicenseCategory String?
+
+  // Origin
+  birthPlace       String?
+  nationality      String?
+
+  // Profile
+  gender           Gender?
+  ethnicity        Ethnicity?
+  educationLevel   EducationLevel?
+  functionalCategory String?
+  specialNeeds     Boolean        @default(false)
+
+  // Membership
+  memberClassification String?
+  cadPro           String?
+  familyIncome     String?
+  memberType       String?
+  boardPosition    String?
+  boardMember      Boolean        @default(false)
+  memberStatus     MemberStatus?
+  memberSince      DateTime?
+  memberNotes      String?
+  memberNotesNumber String?
+
+  // Address relation
+  addressId        String?
+  address          Address?       @relation(fields: [addressId], references: [id])
+
   courseUserRegistration courseUserRegistration[]
   userAdmin              UserAdmin?
 
   userInstructor UserInstructor?
+
+  // Relations to other UserData
+  relations        UserRelation[] @relation("RelationSource")
+  relatedBy        UserRelation[] @relation("RelationTarget")
+
+  // Properties owned
+  properties       Property[]
 }
 
 model UserInstructor {
@@ -109,6 +157,9 @@ model room {
   courses     course[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  addressId  String?
+  address    Address? @relation(fields: [addressId], references: [id])
 }
 
 model News {
@@ -170,4 +221,101 @@ enum Permission {
   UPDATE_NEWS
   DELETE_NEWS
   READ_NEWS
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+  DOMESTIC_PARTNERSHIP
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum Ethnicity {
+  WHITE
+  BLACK
+  MIXED
+  ASIAN
+  INDIGENOUS
+}
+
+enum EducationLevel {
+  NO_FORMAL_EDUCATION
+  INCOMPLETE_PRIMARY
+  COMPLETE_PRIMARY
+  INCOMPLETE_SECONDARY
+  COMPLETE_SECONDARY
+  INCOMPLETE_HIGHER
+  COMPLETE_HIGHER
+  POSTGRADUATE
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AddressType {
+  URBAN
+  RURAL
+}
+
+model Address {
+  id          String      @id @default(uuid())
+  type        AddressType @default(URBAN)
+
+  // Shared
+  city        String?
+  state       String?
+  zipCode     String?
+  complement  String?
+  notes       String?
+
+  // Urban
+  street      String?
+  number      String?
+  neighborhood String?
+
+  // Rural
+  localityName String?
+  road         String?
+  km           String?
+  lot          String?
+  section      String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userData     UserData[]
+  properties   Property[]
+  rooms        room[]
+}
+
+model Property {
+  id            String    @id @default(uuid())
+  userDataId    String
+  name          String
+  registration  String?
+  addressId     String?
+  createdAt     DateTime  @default(now())
+
+  userData  UserData @relation(fields: [userDataId], references: [id], onDelete: Cascade)
+  address   Address? @relation(fields: [addressId], references: [id])
+}
+
+model UserRelation {
+  id        String   @id @default(uuid())
+  sourceId  String
+  targetId  String
+  label     String?
+  createdAt DateTime @default(now())
+
+  source    UserData @relation("RelationSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target    UserData @relation("RelationTarget", fields: [targetId], references: [id], onDelete: Cascade)
 }
