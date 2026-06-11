@@ -8,12 +8,12 @@ const updateNewsRequestSchema = z.object({
     title: z.string().min(1).optional(),
     content: z.string().min(1).optional(),
     summary: z.string().optional().nullable(),
-    status: z.enum(['PUBLICADO', 'NAO_PUBLICADO'] as const).optional(),
+    status: z.enum(['PUBLISHED', 'UNPUBLISHED'] as const).optional(),
     publishedAt: z.iso.datetime().optional().nullable(),
 });
 
 type UpdateNewsRequest = z.infer<typeof updateNewsRequestSchema>;
-type UpdateNewsResponse = {error?: Error;};
+type UpdateNewsResponse = { error?: Error };
 
 export class UpdateNewsUseCase {
     constructor(private readonly newsRepository: NewsRepository) {}
@@ -43,7 +43,7 @@ export class UpdateNewsUseCase {
                     ? publishedAt
                         ? new Date(publishedAt)
                         : null
-                    : updateData.status === 'PUBLICADO' && !existing.publishedAt
+                    : updateData.status === 'PUBLISHED' && !existing.publishedAt
                       ? new Date()
                       : undefined,
         });

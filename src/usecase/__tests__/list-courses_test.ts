@@ -19,7 +19,7 @@ const baseCourse = {
     id: 'c1',
     name: 'Curso Teste',
     description: 'Desc',
-    status: CourseStatus.PUBLICO,
+    status: CourseStatus.PUBLIC,
     price: 0,
     workloadHours: 0,
     bannerUrl: null,
@@ -35,18 +35,18 @@ const baseCourse = {
 maxCapacity: 20 },
     photos: [],
     _count: { courseUserRegistration: 0 },
-    Instructors: [],
+    instructors: [],
 };
 
 describe('ListCoursesUseCase', () => {
     beforeEach(() => vi.clearAllMocks());
 
     describe('filtro de visibilidade', () => {
-        it('filtra apenas cursos PUBLICO por padrão', async () => {
+        it('filters only PUBLIC courses by default', async () => {
             vi.mocked(mockCourseRepo.findAll).mockResolvedValue([baseCourse as any]);
             const uc = new ListCoursesUseCase(mockCourseRepo);
             await uc.execute();
-            expect(mockCourseRepo.findAll).toHaveBeenCalledWith(CourseStatus.PUBLICO, 0, 20);
+            expect(mockCourseRepo.findAll).toHaveBeenCalledWith(CourseStatus.PUBLIC, 0, 20);
         });
 
         it('busca todos os cursos quando onlyPublic=false', async () => {

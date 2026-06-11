@@ -9,7 +9,7 @@ type CreateCourseBody = {
     roomId: string;
     startTime: string;
     endTime: string;
-    status?: 'PUBLICO' | 'PRIVADO' | 'NAO_PUBLICADO';
+    status?: 'PUBLIC' | 'PRIVATE' | 'UNPUBLISHED';
     price?: number;
     workloadHours?: number;
     registrationDeadline?: string;
@@ -31,7 +31,7 @@ export class CreateCourseController {
         const body = request.body as CreateCourseBody;
         const response = await this.createCourseUseCase.execute({
             ...body,
-            status: body.status ?? 'NAO_PUBLICADO',
+            status: body.status ?? 'UNPUBLISHED',
             price: body.price ?? 0,
             workloadHours: body.workloadHours ?? 0,
         });

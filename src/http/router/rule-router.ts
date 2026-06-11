@@ -10,7 +10,7 @@ import { ListRulesUseCase } from '../../usecase/list-rules.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 
-const PERMITIONS_ENUM = [
+const PERMISSIONS_ENUM = [
     'CREATE_USER',
     'UPDATE_USER',
     'DELETE_USER',
@@ -82,7 +82,7 @@ default: 20 },
                                         id: { type: 'string' },
                                         name: { type: 'string' },
                                         description: { type: 'string' },
-                                        permitions: { type: 'array',
+                                        permissions: { type: 'array',
 items: { type: 'string' } },
                                         createdAt: { type: 'string' },
                                         updatedAt: { type: 'string' },
@@ -112,15 +112,15 @@ properties: { error: { type: 'string' } } },
                 security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
-                    required: ['name', 'permitions'],
+                    required: ['name', 'permissions'],
                     properties: {
                         name: { type: 'string' },
                         description: { type: 'string' },
-                        permitions: {
+                        permissions: {
                             type: 'array',
                             minItems: 1,
                             items: { type: 'string',
-enum: PERMITIONS_ENUM },
+enum: PERMISSIONS_ENUM },
                         },
                     },
                 },
@@ -131,7 +131,7 @@ enum: PERMITIONS_ENUM },
                             id: { type: 'string' },
                             name: { type: 'string' },
                             description: { type: 'string' },
-                            permitions: { type: 'array',
+                            permissions: { type: 'array',
 items: { type: 'string' } },
                             createdAt: { type: 'string',
 format: 'date-time' },
@@ -164,11 +164,11 @@ properties: { error: { type: 'string' } } },
                     properties: {
                         name: { type: 'string' },
                         description: { type: 'string' },
-                        permitions: {
+                        permissions: {
                             type: 'array',
                             minItems: 1,
                             items: { type: 'string',
-enum: PERMITIONS_ENUM },
+enum: PERMISSIONS_ENUM },
                         },
                     },
                 },

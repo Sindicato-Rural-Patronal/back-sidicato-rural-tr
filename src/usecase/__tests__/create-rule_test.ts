@@ -11,7 +11,7 @@ const mockRuleRepo = {
 
 const validInput = {
     name: 'EDITOR',
-    permitions: ['CREATE_COURSE', 'UPDATE_COURSE'] as any[],
+    permissions: ['CREATE_COURSE', 'UPDATE_COURSE'] as any[],
 };
 
 describe('CreateRuleUseCase', () => {
@@ -29,7 +29,7 @@ name: '' });
         it('falha se array de permissões estiver vazio', async () => {
             const uc = new CreateRuleUseCase(mockRuleRepo);
             const result = await uc.execute({ ...validInput,
-permitions: [] });
+permissions: [] });
             expect(result.error).toBeDefined();
             expect(result.error?.message).toContain('At least one permission is required');
         });
@@ -38,7 +38,7 @@ permitions: [] });
             const uc = new CreateRuleUseCase(mockRuleRepo);
             const result = await uc.execute({
                 ...validInput,
-                permitions: ['PERMISSAO_INVALIDA'] as any,
+                permissions: ['PERMISSAO_INVALIDA'] as any,
             });
             expect(result.error).toBeDefined();
             expect(result.error).toBeDefined();
@@ -50,7 +50,7 @@ permitions: [] });
             const fakeRule = {
                 id: 'rule-001',
                 name: 'EDITOR',
-                permitions: ['CREATE_COURSE'],
+                permissions: ['CREATE_COURSE'],
                 description: '',
                 createdAt: new Date(),
                 updatedAt: new Date(),
@@ -66,15 +66,17 @@ permitions: [] });
             const fakeRule = {
                 id: 'rule-002',
                 name: 'LEITOR',
-                permitions: ['READ_COURSE'],
+                permissions: ['READ_COURSE'],
                 description: '',
                 createdAt: new Date(),
                 updatedAt: new Date(),
             };
             vi.mocked(mockRuleRepo.create).mockResolvedValue(fakeRule as any);
             const uc = new CreateRuleUseCase(mockRuleRepo);
-            const result = await uc.execute({ name: 'LEITOR',
-permitions: ['READ_COURSE'] as any });
+            const result = await uc.execute({
+                name: 'LEITOR',
+                permissions: ['READ_COURSE'] as any,
+            });
             expect(result.error).toBeUndefined();
         });
     });

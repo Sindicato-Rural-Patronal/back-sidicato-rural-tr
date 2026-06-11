@@ -12,7 +12,7 @@ const mockRuleRepo = {
 const validInput = {
     ruleId: 'rule-001',
     name: 'NOVO_NOME',
-    permitions: ['READ_COURSE'] as any[],
+    permissions: ['READ_COURSE'] as any[],
 };
 
 describe('UpdateRuleUseCase', () => {
@@ -30,7 +30,7 @@ ruleId: '' });
             const uc = new UpdateRuleUseCase(mockRuleRepo);
             const result = await uc.execute({
                 ...validInput,
-                permitions: ['PERMISSAO_INVALIDA'] as any,
+                permissions: ['PERMISSAO_INVALIDA'] as any,
             });
             expect(result.error).toBeDefined();
         });

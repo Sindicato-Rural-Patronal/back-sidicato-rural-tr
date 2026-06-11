@@ -1,4 +1,4 @@
-export type NewsStatus = 'PUBLICADO' | 'NAO_PUBLICADO';
+export type NewsStatus = 'PUBLISHED' | 'UNPUBLISHED';
 
 export type NewsCreateData = {
     title: string;

@@ -15,7 +15,7 @@ import { newsRouter } from './http/router/news-router.js';
 
 import { loadEnv } from './config/env.js';
 import { createPrismaClient } from './lib/prisma.js';
-import type { permitions } from './generated/prisma/enums.js';
+import type { Permission } from './generated/prisma/enums.js';
 import { hash } from 'bcrypt';
 
 const server = fastify({ logger: true });
@@ -109,7 +109,7 @@ async function firstInitialize() {
 
     let superRule = await prisma.rule.findFirst({ where: { name: 'SUPER_RULE' } });
 
-    const ALL_PERMITIONS = [
+    const ALL_PERMISSIONS = [
         'CREATE_USER',
         'UPDATE_USER',
         'DELETE_USER',
@@ -130,16 +130,16 @@ async function firstInitialize() {
         'UPDATE_NEWS',
         'DELETE_NEWS',
         'READ_NEWS',
-    ] as permitions[];
+    ] as Permission[];
 
     if (superRule) {
-        const missingPerms = ALL_PERMITIONS.filter(
-            (p: string) => !(superRule!.permitions as string[]).includes(p),
+        const missingPerms = ALL_PERMISSIONS.filter(
+            (p: string) => !(superRule!.permissions as string[]).includes(p),
         );
         if (missingPerms.length > 0) {
             await prisma.rule.update({
                 where: { id: superRule.id },
-                data: { permitions: ALL_PERMITIONS },
+                data: { permissions: ALL_PERMISSIONS },
             });
             superRule = await prisma.rule.findFirst({ where: { name: 'SUPER_RULE' } });
             console.log('SUPER_RULE updated with new permissions:', missingPerms);
@@ -150,7 +150,7 @@ async function firstInitialize() {
         superRule = await prisma.rule.create({
             data: {
                 name: 'SUPER_RULE',
-                permitions: ALL_PERMITIONS,
+                permissions: ALL_PERMISSIONS,
                 description: 'Rule with all permissions for super admin users',
             },
         });

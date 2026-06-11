@@ -7,7 +7,7 @@ type CreateNewsBody = {
     title: string;
     content: string;
     summary?: string;
-    status?: 'PUBLICADO' | 'NAO_PUBLICADO';
+    status?: 'PUBLISHED' | 'UNPUBLISHED';
     publishedAt?: string;
 };
 
@@ -26,7 +26,7 @@ export class CreateNewsController {
         const body = request.body as CreateNewsBody;
         const response = await this.createNewsUseCase.execute({
             ...body,
-            status: body.status ?? 'NAO_PUBLICADO',
+            status: body.status ?? 'UNPUBLISHED',
         });
         if (response.error) return reply.status(400).send({ error: response.error?.message });
         return reply.status(201).send({ id: response.newsId });

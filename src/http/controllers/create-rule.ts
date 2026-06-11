@@ -1,7 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CreateRuleUseCase } from '../../usecase/create-rule.js';
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import type { permitions } from '../../generated/prisma/enums.js';
+import type { Permission } from '../../generated/prisma/enums.js';
 import { requirePermission } from '../lib/require-permission.js';
 
 export class CreateRuleController {
@@ -18,16 +18,16 @@ export class CreateRuleController {
             return;
         const {
             name,
-            permitions: perms,
+            permissions: perms,
             description,
         } = request.body as {
             name: string;
-            permitions: permitions[];
+            permissions: Permission[];
             description?: string;
         };
         const response = await this.createRuleUseCase.execute({
             name,
-            permitions: perms,
+            permissions: perms,
             description,
         });
         if (response.error) return reply.status(400).send({ error: response.error?.message });

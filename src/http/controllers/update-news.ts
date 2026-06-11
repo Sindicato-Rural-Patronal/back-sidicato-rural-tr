@@ -7,7 +7,7 @@ type UpdateNewsBody = {
     title?: string;
     content?: string;
     summary?: string | null;
-    status?: 'PUBLICADO' | 'NAO_PUBLICADO';
+    status?: 'PUBLISHED' | 'UNPUBLISHED';
     publishedAt?: string | null;
 };
 

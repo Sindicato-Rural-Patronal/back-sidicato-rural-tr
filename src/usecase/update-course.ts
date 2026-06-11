@@ -11,7 +11,7 @@ const updateCourseBodySchema = z.object({
     roomId: z.uuid().optional(),
     startTime: z.iso.datetime().optional(),
     endTime: z.iso.datetime().optional(),
-    status: z.enum(['PUBLICO', 'PRIVADO', 'NAO_PUBLICADO'] as const).optional(),
+    status: z.enum(['PUBLIC', 'PRIVATE', 'UNPUBLISHED'] as const).optional(),
     price: z.number().min(0).optional(),
     workloadHours: z.number().int().min(0).optional(),
     registrationDeadline: z.iso.datetime().nullable().optional(),
@@ -24,7 +24,7 @@ const updateCourseBodySchema = z.object({
 
 export type UpdateCourseRequest = z.infer<typeof updateCourseBodySchema> & { courseId: string };
 
-type UpdateCourseResponse = {error?: Error;};
+type UpdateCourseResponse = { error?: Error };
 
 export class UpdateCourseUseCase {
     constructor(

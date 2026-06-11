@@ -1,7 +1,7 @@
 import type { NewsRepository } from '../ports/external/news-repository.js';
 import { NewsNotFoundError } from '../errors/not-found.js';
 
-type DeleteNewsResponse = {error?: Error;};
+type DeleteNewsResponse = { error?: Error };
 
 export class DeleteNewsUseCase {
     constructor(private readonly newsRepository: NewsRepository) {}

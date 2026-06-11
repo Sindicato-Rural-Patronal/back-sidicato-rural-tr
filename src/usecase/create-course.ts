@@ -11,7 +11,7 @@ const createCourseRequestSchema = z.object({
     roomId: z.uuid('Room ID must be a valid UUID'),
     startTime: z.iso.datetime(),
     endTime: z.iso.datetime(),
-    status: z.enum(['PUBLICO', 'PRIVADO', 'NAO_PUBLICADO'] as const).default('NAO_PUBLICADO'),
+    status: z.enum(['PUBLIC', 'PRIVATE', 'UNPUBLISHED'] as const).default('UNPUBLISHED'),
     price: z.number().min(0).default(0),
     workloadHours: z.number().int().min(0).default(0),
     registrationDeadline: z.iso.datetime().optional(),

@@ -17,7 +17,7 @@ const fakeCourse = {
     id: 'course-001',
     name: 'Curso de NR-10',
     description: 'Segurança elétrica',
-    status: 'PUBLICO',
+    status: 'PUBLIC',
     price: 100,
     workloadHours: 40,
     bannerUrl: null,
@@ -33,7 +33,7 @@ const fakeCourse = {
 maxCapacity: 30 },
     photos: [],
     _count: { courseUserRegistration: 10 },
-    Instructors: [{ userData: { name: 'Prof. João' } }],
+    instructors: [{ userData: { name: 'Prof. João' } }],
 };
 
 describe('GetCourseDetailUseCase', () => {
@@ -63,7 +63,7 @@ describe('GetCourseDetailUseCase', () => {
 
         it('retorna instructor vazio se curso não tiver instrutor', async () => {
             const noInstructor = { ...fakeCourse,
-Instructors: [] };
+instructors: [] };
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(noInstructor as any);
             const uc = new GetCourseDetailUseCase(mockCourseRepo);
             const result = await uc.execute('course-001');

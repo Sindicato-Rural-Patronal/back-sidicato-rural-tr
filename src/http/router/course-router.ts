@@ -55,7 +55,7 @@ items: itemSchema },
 const courseDetailProperties = {
     id: { type: 'string' },
     status: { type: 'string',
-enum: ['PUBLICO', 'PRIVADO', 'NAO_PUBLICADO'] },
+enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED'] },
     title: { type: 'string' },
     description: { type: 'string' },
     maxStudents: { type: 'integer' },
@@ -155,7 +155,7 @@ export async function courseRouter(fastify: FastifyInstance, prisma: PrismaClien
                             id: { type: 'string' },
                             status: {
                                 type: 'string',
-                                enum: ['PUBLICO', 'PRIVADO', 'NAO_PUBLICADO'],
+                                enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED'],
                             },
                             title: { type: 'string' },
                             eventNumber: { type: 'string',
@@ -236,8 +236,8 @@ properties: { error: { type: 'string' } } },
                 description: `Returns the full detail of a course by its ID.
 
 **Business rules:**
-- Returns **any** status (\`PUBLICO\`, \`PRIVADO\`, \`NAO_PUBLICADO\`) — ideal for detail pages with direct links
-- The \`status\` field indicates visibility: \`PUBLICO\` appears in listings, others only via direct URL
+- Returns **any** status (\`PUBLIC\`, \`PRIVATE\`, \`UNPUBLISHED\`) — ideal for detail pages with direct links
+- The \`status\` field indicates visibility: \`PUBLIC\` appears in listings, others only via direct URL
 - \`maxStudents\` = room capacity; \`enrolled\` = current number of registrations
 - Returns 404 if the course does not exist`,
                 params: {
@@ -270,9 +270,9 @@ properties: { error: { type: 'string' } } },
 - **Maximum enrollment capacity** is automatically inherited from \`room.maxCapacity\`; it is not set on the course
 - **Scheduling conflict:** if the room already has another course whose period overlaps (\`startTime\`–\`endTime\`), creation is rejected with 400
 - \`status\` controls visibility:
-  - \`NAO_PUBLICADO\` (default) — draft, does not appear in listings
-  - \`PRIVADO\` — accessible via direct link, not in the public listing
-  - \`PUBLICO\` — appears in \`GET /courses\`
+  - \`UNPUBLISHED\` (default) — draft, does not appear in listings
+  - \`PRIVATE\` — accessible via direct link, not in the public listing
+  - \`PUBLIC\` — appears in \`GET /courses\`
 - \`startTime\` and \`endTime\` are ISO 8601 with timezone (e.g. \`2025-08-10T09:00:00-03:00\`)
 - \`registrationDeadline\` optional — enrollment cutoff date (also ISO 8601)
 - \`price\` in BRL (float); \`workloadHours\` in whole hours`,
@@ -286,7 +286,7 @@ properties: { error: { type: 'string' } } },
                         roomId: { type: 'string',
 format: 'uuid' },
                         status: { type: 'string',
-enum: ['PUBLICO', 'PRIVADO', 'NAO_PUBLICADO'] },
+enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED'] },
                         startTime: { type: 'string',
 format: 'date-time' },
                         endTime: { type: 'string',
@@ -373,7 +373,7 @@ properties: { error: { type: 'string' } } },
                         roomId: { type: 'string',
 format: 'uuid' },
                         status: { type: 'string',
-enum: ['PUBLICO', 'PRIVADO', 'NAO_PUBLICADO'] },
+enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED'] },
                         startTime: { type: 'string',
 format: 'date-time' },
                         endTime: { type: 'string',

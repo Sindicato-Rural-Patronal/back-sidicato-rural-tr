@@ -32,9 +32,9 @@ export async function dashboardRouter(fastify: FastifyInstance, prisma: PrismaCl
 - \`totalUsers\` — total registered workers (UserData)
 - \`totalAdmins\` — total registered admins (UserAdmin)
 - \`courses.total\` — total courses
-- \`courses.public\` — courses with status \`PUBLICO\`
-- \`courses.private\` — courses with status \`PRIVADO\`
-- \`courses.unpublished\` — courses with status \`NAO_PUBLICADO\`
+- \`courses.public\` — courses with status \`PUBLIC\`
+- \`courses.private\` — courses with status \`PRIVATE\`
+- \`courses.unpublished\` — courses with status \`UNPUBLISHED\`
 - \`totalRegistrations\` — total course registrations`,
                 security: [{ bearerAuth: [] }],
                 response: {

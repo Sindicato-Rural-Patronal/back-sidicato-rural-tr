@@ -35,7 +35,7 @@ export type CourseFrontendDetail = {
 };
 
 export function mapToFrontend(course: CourseWithDetails): CourseFrontendDetail {
-    const instructorName = course.Instructors[0]?.userData?.name ?? '';
+    const instructorName = course.instructors[0]?.userData?.name ?? '';
     return {
         id: course.id,
         status: course.status,

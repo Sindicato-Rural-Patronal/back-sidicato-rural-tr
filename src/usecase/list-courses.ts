@@ -19,7 +19,7 @@ export class ListCoursesUseCase {
     constructor(private readonly courseRepository: CourseRepository) {}
 
     async execute(onlyPublic = true, page = 1, limit = 20): Promise<ListCoursesResponse> {
-        const statusFilter = onlyPublic ? CourseStatus.PUBLICO : undefined;
+        const statusFilter = onlyPublic ? CourseStatus.PUBLIC : undefined;
         const skip = (page - 1) * limit;
         console.log(`[ListCourses] onlyPublic=${onlyPublic} page=${page} limit=${limit}`);
         const [courses, total] = await Promise.all([

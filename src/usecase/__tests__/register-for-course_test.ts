@@ -40,9 +40,9 @@ const validInput = {
 };
 
 const publishedCourse = { id: validInput.courseId,
-status: 'PUBLICO' };
+status: 'PUBLIC' };
 const unpublishedCourse = { id: validInput.courseId,
-status: 'NAO_PUBLICADO' };
+status: 'UNPUBLISHED' };
 
 describe('RegisterForCourseUseCase', () => {
     beforeEach(() => vi.clearAllMocks());
@@ -85,7 +85,7 @@ courseId: '' });
             expect(result.error?.message).toBe('Course not found');
         });
 
-        it('falha se curso estiver NAO_PUBLICADO', async () => {
+        it('fails if course is UNPUBLISHED', async () => {
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(unpublishedCourse as any);
             const uc = new RegisterForCourseUseCase(
                 mockCourseRepo,

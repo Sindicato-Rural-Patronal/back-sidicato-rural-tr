@@ -41,7 +41,7 @@ export type CourseWithDetails = courseModel & {
     };
     photos: CoursePhotoModel[];
     _count: { courseUserRegistration: number };
-    Instructors: { userData: { name: string } }[];
+    instructors: { userData: { name: string } }[];
 };
 
 export interface CourseRepository {

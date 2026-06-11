@@ -6,7 +6,7 @@ const createNewsRequestSchema = z.object({
     title: z.string().min(1, 'Title is required'),
     content: z.string().min(1, 'Content is required'),
     summary: z.string().optional(),
-    status: z.enum(['PUBLICADO', 'NAO_PUBLICADO'] as const).default('NAO_PUBLICADO'),
+    status: z.enum(['PUBLISHED', 'UNPUBLISHED'] as const).default('UNPUBLISHED'),
     publishedAt: z.iso.datetime().optional(),
 });
 
@@ -39,7 +39,7 @@ export class CreateNewsUseCase {
             status,
             publishedAt: publishedAt
                 ? new Date(publishedAt)
-                : status === 'PUBLICADO'
+                : status === 'PUBLISHED'
                   ? new Date()
                   : undefined,
         });

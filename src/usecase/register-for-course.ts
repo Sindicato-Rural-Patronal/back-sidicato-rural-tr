@@ -49,7 +49,7 @@ export class RegisterForCourseUseCase {
         if (!course) {
             return { error: new CourseNotFoundError() };
         }
-        if (course.status === 'NAO_PUBLICADO') {
+        if (course.status === 'UNPUBLISHED') {
             return { error: new RegistrationsUnavailableError() };
         }
 

@@ -35,10 +35,10 @@ export class DashboardStatsUseCase {
             this.courseRepository.findAll(),
         ]);
 
-        const publicCount = allCourses.filter(c => c.status === CourseStatus.PUBLICO).length;
-        const privateCount = allCourses.filter(c => c.status === CourseStatus.PRIVADO).length;
+        const publicCount = allCourses.filter(c => c.status === CourseStatus.PUBLIC).length;
+        const privateCount = allCourses.filter(c => c.status === CourseStatus.PRIVATE).length;
         const unpublishedCount = allCourses.filter(
-            c => c.status === CourseStatus.NAO_PUBLICADO,
+            c => c.status === CourseStatus.UNPUBLISHED,
         ).length;
         const totalRegistrations = allCourses.reduce(
             (sum, c) => sum + c._count.courseUserRegistration,

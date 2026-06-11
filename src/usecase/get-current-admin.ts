@@ -9,7 +9,7 @@ export type CurrentAdminResponse = {
         username: string;
         rulesId: string;
         ruleName: string;
-        permitions: string[];
+        permissions: string[];
     };
 };
 
@@ -32,7 +32,7 @@ export class GetCurrentAdminUseCase {
                 username: admin.username,
                 rulesId: admin.rulesId,
                 ruleName: rule.name,
-                permitions: rule.permitions,
+                permissions: rule.permissions,
             },
         };
     }

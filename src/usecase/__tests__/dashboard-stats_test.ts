@@ -40,7 +40,7 @@ function makeCourse(status: CourseStatus, registrations: number) {
         room: { name: 'Sala',
 maxCapacity: 30 },
         photos: [],
-        Instructors: [],
+        instructors: [],
         name: 'X',
         description: 'X',
         price: 0,
@@ -81,10 +81,10 @@ describe('DashboardStatsUseCase', () => {
 
         it('agrupa cursos por status corretamente', async () => {
             const courses = [
-                makeCourse(CourseStatus.PUBLICO, 5),
-                makeCourse(CourseStatus.PUBLICO, 3),
-                makeCourse(CourseStatus.PRIVADO, 2),
-                makeCourse(CourseStatus.NAO_PUBLICADO, 0),
+                makeCourse(CourseStatus.PUBLIC, 5),
+                makeCourse(CourseStatus.PUBLIC, 3),
+                makeCourse(CourseStatus.PRIVATE, 2),
+                makeCourse(CourseStatus.UNPUBLISHED, 0),
             ];
             vi.mocked(mockUserDataRepo.findAll).mockResolvedValue([]);
             vi.mocked(mockUserAdminRepo.findAll).mockResolvedValue([]);
@@ -103,9 +103,9 @@ describe('DashboardStatsUseCase', () => {
 
         it('soma total de inscrições em todos os cursos', async () => {
             const courses = [
-                makeCourse(CourseStatus.PUBLICO, 10),
-                makeCourse(CourseStatus.PUBLICO, 7),
-                makeCourse(CourseStatus.PRIVADO, 3),
+                makeCourse(CourseStatus.PUBLIC, 10),
+                makeCourse(CourseStatus.PUBLIC, 7),
+                makeCourse(CourseStatus.PRIVATE, 3),
             ];
             vi.mocked(mockUserDataRepo.findAll).mockResolvedValue([]);
             vi.mocked(mockUserAdminRepo.findAll).mockResolvedValue([]);

@@ -18,7 +18,7 @@ const courseIncludes = {
 maxCapacity: true } },
     photos: true,
     _count: { select: { courseUserRegistration: true } },
-    Instructors: { include: { userData: { select: { name: true } } } },
+    instructors: { include: { userData: { select: { name: true } } } },
 } as const;
 
 export class CourseAdapter implements CourseRepository {

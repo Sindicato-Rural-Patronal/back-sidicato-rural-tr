@@ -58,7 +58,7 @@ export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaCl
                             username: { type: 'string' },
                             rulesId: { type: 'string' },
                             ruleName: { type: 'string' },
-                            permitions: { type: 'array',
+                            permissions: { type: 'array',
 items: { type: 'string' } },
                         },
                     },
@@ -119,7 +119,7 @@ nullable: true },
                                             type: 'object',
                                             properties: {
                                                 name: { type: 'string' },
-                                                permitions: {
+                                                permissions: {
                                                     type: 'array',
                                                     items: { type: 'string' },
                                                 },

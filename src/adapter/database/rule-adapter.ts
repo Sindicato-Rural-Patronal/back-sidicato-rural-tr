@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client/extension';
 import type { RuleRepository } from '../../ports/external/rule-repository';
-import type { permitions } from '../../generated/prisma/enums';
+import type { Permission } from '../../generated/prisma/enums';
 import type { RuleModel } from '../../generated/prisma/models';
 
 export function createRuleAdapter(prisma: PrismaClient): RuleRepository {
@@ -15,7 +15,7 @@ export class RuleAdapter implements RuleRepository {
     }
     create(data: {
  name: string;
-permitions: permitions[] 
+permissions: Permission[] 
 }): Promise<RuleModel> {
         return this.prisma.rule.create({
             data,
@@ -25,7 +25,7 @@ permitions: permitions[]
         id: string,
         data: {
             name?: string;
-            permitions?: permitions[];
+            permissions?: Permission[];
         },
     ): Promise<RuleModel | null> {
         return this.prisma.rule.update({

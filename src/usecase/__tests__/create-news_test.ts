@@ -38,20 +38,20 @@ content: '' });
     });
 
     describe('regra de publishedAt automático', () => {
-        it('define publishedAt automaticamente quando status é PUBLICADO sem data explícita', async () => {
+        it('sets publishedAt automatically when status is PUBLISHED without explicit date', async () => {
             vi.mocked(mockNewsRepo.create).mockResolvedValue({ id: 'news-001' } as any);
             const uc = new CreateNewsUseCase(mockNewsRepo);
             await uc.execute({ ...validInput,
-status: 'PUBLICADO' });
+status: 'PUBLISHED' });
             const createCall = vi.mocked(mockNewsRepo.create).mock.calls[0][0];
             expect(createCall.publishedAt).toBeInstanceOf(Date);
         });
 
-        it('não define publishedAt quando status é NAO_PUBLICADO', async () => {
+        it('does not set publishedAt when status is UNPUBLISHED', async () => {
             vi.mocked(mockNewsRepo.create).mockResolvedValue({ id: 'news-002' } as any);
             const uc = new CreateNewsUseCase(mockNewsRepo);
             await uc.execute({ ...validInput,
-status: 'NAO_PUBLICADO' });
+status: 'UNPUBLISHED' });
             const createCall = vi.mocked(mockNewsRepo.create).mock.calls[0][0];
             expect(createCall.publishedAt).toBeUndefined();
         });
@@ -61,19 +61,19 @@ status: 'NAO_PUBLICADO' });
             const uc = new CreateNewsUseCase(mockNewsRepo);
             await uc.execute({
                 ...validInput,
-                status: 'PUBLICADO',
+                status: 'PUBLISHED',
                 publishedAt: '2026-01-01T10:00:00.000Z',
             });
             const createCall = vi.mocked(mockNewsRepo.create).mock.calls[0][0];
             expect(createCall.publishedAt?.toISOString()).toBe('2026-01-01T10:00:00.000Z');
         });
 
-        it('status padrão é NAO_PUBLICADO quando não informado', async () => {
+        it('default status is UNPUBLISHED when not provided', async () => {
             vi.mocked(mockNewsRepo.create).mockResolvedValue({ id: 'news-004' } as any);
             const uc = new CreateNewsUseCase(mockNewsRepo);
             await uc.execute(validInput);
             const createCall = vi.mocked(mockNewsRepo.create).mock.calls[0][0];
-            expect(createCall.status).toBe('NAO_PUBLICADO');
+            expect(createCall.status).toBe('UNPUBLISHED');
         });
     });
 

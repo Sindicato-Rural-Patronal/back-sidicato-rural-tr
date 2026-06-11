@@ -47,7 +47,7 @@ newsId: 'nao-e-uuid' });
             vi.mocked(mockNewsRepo.update).mockResolvedValue({ id: validInput.newsId } as any);
             const uc = new UpdateNewsUseCase(mockNewsRepo);
             await uc.execute({ ...validInput,
-status: 'PUBLICADO' });
+status: 'PUBLISHED' });
             const updateCall = vi.mocked(mockNewsRepo.update).mock.calls[0][1];
             expect(updateCall.publishedAt).toBeInstanceOf(Date);
         });
@@ -61,7 +61,7 @@ status: 'PUBLICADO' });
             vi.mocked(mockNewsRepo.update).mockResolvedValue({ id: validInput.newsId } as any);
             const uc = new UpdateNewsUseCase(mockNewsRepo);
             await uc.execute({ ...validInput,
-status: 'PUBLICADO' });
+status: 'PUBLISHED' });
             const updateCall = vi.mocked(mockNewsRepo.update).mock.calls[0][1];
             expect(updateCall.publishedAt).toBeUndefined();
         });

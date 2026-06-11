@@ -1,6 +1,6 @@
 import type { RoomRepository, roomModel } from '../ports/external/room-repository.js';
 
-type ListRoomsResponse = {rooms?: roomModel[];};
+type ListRoomsResponse = { rooms?: roomModel[] };
 
 export class ListRoomsUseCase {
     constructor(private readonly roomRepository: RoomRepository) {}

@@ -1,7 +1,7 @@
 import type { CourseRepository } from '../ports/external/course-repository.js';
 import { CourseNotFoundError } from '../errors/not-found.js';
 
-type DeleteCourseResponse = {error?: Error;};
+type DeleteCourseResponse = { error?: Error };
 
 export class DeleteCourseUseCase {
     constructor(private readonly courseRepository: CourseRepository) {}

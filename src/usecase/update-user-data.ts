@@ -14,7 +14,7 @@ const updateUserDataSchema = z.object({
 
 export type UpdateUserDataRequest = z.infer<typeof updateUserDataSchema> & { userId: string };
 
-type UpdateUserDataResponse = {error?: Error;};
+type UpdateUserDataResponse = { error?: Error };
 
 export class UpdateUserDataUseCase {
     constructor(private readonly userDataRepository: UserDataRepository) {}

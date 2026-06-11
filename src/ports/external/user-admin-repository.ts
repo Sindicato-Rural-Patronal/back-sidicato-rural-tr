@@ -11,7 +11,7 @@ export type UserAdminWithDetails = UserAdminModel & {
     };
     rules: {
         name: string;
-        permitions: string[];
+        permissions: string[];
     };
 };
 

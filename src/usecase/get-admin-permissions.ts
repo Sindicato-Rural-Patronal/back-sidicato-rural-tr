@@ -11,6 +11,6 @@ export class GetAdminPermissionsUseCase {
         const admin = await this.userAdminRepository.findById(userId);
         if (!admin) return null;
         const rule = await this.ruleRepository.findById(admin.rulesId);
-        return rule?.permitions ?? null;
+        return rule?.permissions ?? null;
     }
 }

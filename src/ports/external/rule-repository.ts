@@ -1,18 +1,18 @@
-import type { permitions } from '../../generated/prisma/enums';
+import type { Permission } from '../../generated/prisma/enums';
 import type { RuleModel } from '../../generated/prisma/models';
 
 export interface RuleRepository {
     findById(id: string): Promise<RuleModel | null>;
     create(data: {
         name: string;
-        permitions: permitions[];
+        permissions: Permission[];
         description?: string;
     }): Promise<RuleModel>;
     update(
         id: string,
         data: {
             name?: string;
-            permitions?: permitions[];
+            permissions?: Permission[];
             description?: string;
         },
     ): Promise<RuleModel | null>;

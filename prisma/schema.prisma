@@ -41,16 +41,15 @@ model UserData {
   courseUserRegistration courseUserRegistration[]
   userAdmin              UserAdmin?
 
-  userInstructor UserIstructor?
+  userInstructor UserInstructor?
 }
 
-model UserIstructor {
+model UserInstructor {
   id String @id @default(uuid())
 
-
-  course course[] 
+  course course[]
   userData   UserData @relation(fields: [userDataId], references: [id])
-  userDataId String @unique
+  userDataId String   @unique
 }
 
 model Rule {
@@ -58,7 +57,7 @@ model Rule {
   name        String
   description String
 
-  permitions permitions[]
+  permissions Permission[]
 
   userAdmin UserAdmin[]
   createdAt DateTime    @default(now())
@@ -72,7 +71,7 @@ model course {
   startTime   DateTime
   endTime     DateTime
 
-  status               CourseStatus @default(NAO_PUBLICADO)
+  status               CourseStatus @default(UNPUBLISHED)
   bannerUrl            String?
   price                Float        @default(0)
   workloadHours        Int          @default(0)
@@ -88,7 +87,7 @@ model course {
 
   photos                 CoursePhoto[]
   courseUserRegistration courseUserRegistration[]
-  Instructors            UserIstructor[]
+  instructors            UserInstructor[]
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 }
@@ -111,13 +110,14 @@ model room {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
 model News {
   id          String     @id @default(uuid())
   title       String
   content     String
   summary     String?
   bannerUrl   String?
-  status      NewsStatus @default(NAO_PUBLICADO)
+  status      NewsStatus @default(UNPUBLISHED)
   publishedAt DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -135,17 +135,17 @@ model courseUserRegistration {
 }
 
 enum CourseStatus {
-  PUBLICO
-  PRIVADO
-  NAO_PUBLICADO
+  PUBLIC
+  PRIVATE
+  UNPUBLISHED
 }
 
 enum NewsStatus {
-  PUBLICADO
-  NAO_PUBLICADO
+  PUBLISHED
+  UNPUBLISHED
 }
 
-enum permitions {
+enum Permission {
   CREATE_USER
   UPDATE_USER
   DELETE_USER

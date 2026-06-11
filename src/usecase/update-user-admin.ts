@@ -14,7 +14,7 @@ const updateUserAdminSchema = z.object({
 
 export type UpdateUserAdminRequest = z.infer<typeof updateUserAdminSchema> & {targetAdminId: string;};
 
-type UpdateUserAdminResponse = {error?: Error;};
+type UpdateUserAdminResponse = { error?: Error };
 
 export class UpdateUserAdminUseCase {
     constructor(
@@ -51,7 +51,7 @@ export class UpdateUserAdminUseCase {
             const rule = await this.ruleRepository.findById(data.rulesId);
             if (!rule) return { error: new RuleNotFoundError() };
             console.log(
-                `[UpdateUserAdmin] new rule found: id="${rule.id}" name="${rule.name}" permitions=${JSON.stringify(rule.permitions)}`,
+                `[UpdateUserAdmin] new rule found: id="${rule.id}" name="${rule.name}" permissions=${JSON.stringify(rule.permissions)}`,
             );
         } else {
             console.log(`[UpdateUserAdmin] rulesId NOT in request — rule will NOT be changed`);

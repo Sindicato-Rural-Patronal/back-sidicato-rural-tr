@@ -1,7 +1,7 @@
 import type { RegistrationRepository } from '../ports/external/registration-repository.js';
 import { RegistrationNotFoundError } from '../errors/not-found.js';
 
-type Response = {error?: Error;};
+type Response = { error?: Error };
 
 export class CancelRegistrationUseCase {
     constructor(private readonly registrationRepository: RegistrationRepository) {}

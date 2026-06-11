@@ -39,7 +39,7 @@ export class UserAdminAdapter implements UserAdminRepository {
 email: true,
 cpf: true } },
                 rules: { select: { name: true,
-permitions: true } },
+permissions: true } },
             },
             orderBy: { userData: { name: 'asc' } },
             skip,

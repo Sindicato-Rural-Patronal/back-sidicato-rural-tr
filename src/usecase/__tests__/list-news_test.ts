@@ -16,11 +16,11 @@ describe('ListNewsUseCase', () => {
     beforeEach(() => vi.clearAllMocks());
 
     describe('filtro de status', () => {
-        it('passa filtro PUBLICADO ao repositório quando informado', async () => {
+        it('passes PUBLISHED filter to repository when provided', async () => {
             vi.mocked(mockNewsRepo.findAll).mockResolvedValue([]);
             const uc = new ListNewsUseCase(mockNewsRepo);
-            await uc.execute('PUBLICADO');
-            expect(mockNewsRepo.findAll).toHaveBeenCalledWith('PUBLICADO', 0, 20);
+            await uc.execute('PUBLISHED');
+            expect(mockNewsRepo.findAll).toHaveBeenCalledWith('PUBLISHED', 0, 20);
         });
 
         it('busca todas as notícias quando filtro não informado', async () => {
