@@ -95,7 +95,9 @@ export async function seedSuperAdmin(prisma: PrismaClient) {
         },
     });
 
-    return { rule, userData, userAdmin };
+    return { rule,
+userData,
+userAdmin };
 }
 
 export async function loginAndGetToken(
@@ -106,7 +108,8 @@ export async function loginAndGetToken(
     const res = await app.inject({
         method: 'POST',
         url: '/auth/login',
-        payload: { username, password },
+        payload: { username,
+password },
     });
     if (res.statusCode !== 200) {
         throw new Error(`E2E login failed (${res.statusCode}): ${res.body}`);

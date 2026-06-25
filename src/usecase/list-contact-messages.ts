@@ -21,11 +21,16 @@ export class ListContactMessagesUseCase {
 
     async execute({ page = 1, limit = 20, read, search }: Input = {}): Promise<Response> {
         const skip = (page - 1) * limit;
-        const filters: ContactMessageFilters = { read, search: search?.trim() || undefined };
+        const filters: ContactMessageFilters = { read,
+search: search?.trim() || undefined };
         const [data, total] = await Promise.all([
             this.repo.findAll(skip, limit, filters),
             this.repo.count(filters),
         ]);
-        return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+        return { data,
+total,
+page,
+limit,
+totalPages: Math.ceil(total / limit) };
     }
 }

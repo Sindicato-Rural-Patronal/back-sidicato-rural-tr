@@ -69,6 +69,7 @@ export class RegisterForCourseByCpfUseCase {
         console.log(
             `[RegisterForCourseByCpf] success registrationId="${registration.id}" userDataId="${userData.id}"`,
         );
-        return { registrationId: registration.id, userDataId: userData.id };
+        return { registrationId: registration.id,
+userDataId: userData.id };
     }
 }

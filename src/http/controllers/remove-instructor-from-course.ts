@@ -10,7 +10,12 @@ export class RemoveInstructorFromCourseController {
     ) {}
 
     async handle(
-        request: FastifyRequest<{ Params: { courseId: string; assignmentId: string } }>,
+        request: FastifyRequest<{
+ Params: {
+ courseId: string;
+assignmentId: string 
+} 
+}>,
         reply: FastifyReply,
     ) {
         if (

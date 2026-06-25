@@ -7,7 +7,10 @@ const BANNER_BUCKET = process.env.BANNER_BUCKET || 'course-banners';
 const BANNER_WIDTH = 1440;
 const BANNER_HEIGHT = 600;
 
-type Response = { error?: Error; imageUrl?: string };
+type Response = {
+ error?: Error;
+imageUrl?: string 
+};
 
 export class UploadBannerImageUseCase {
     constructor(
@@ -20,7 +23,8 @@ export class UploadBannerImageUseCase {
         if (!banner) return { error: new BannerNotFoundError() };
 
         const processed = await sharp(fileBuffer)
-            .resize(BANNER_WIDTH, BANNER_HEIGHT, { fit: 'cover', position: 'center' })
+            .resize(BANNER_WIDTH, BANNER_HEIGHT, { fit: 'cover',
+position: 'center' })
             .jpeg({ quality: 85 })
             .toBuffer();
 

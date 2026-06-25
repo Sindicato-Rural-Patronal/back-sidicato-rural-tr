@@ -17,7 +17,10 @@ export class UpdateInstructorController {
     ) {}
 
     async handle(
-        request: FastifyRequest<{ Params: { id: string }; Body: Body }>,
+        request: FastifyRequest<{
+ Params: { id: string };
+Body: Body 
+}>,
         reply: FastifyReply,
     ) {
         if ((await requirePermission(request, reply, 'UPDATE_USER', this.getAdminPermissions)) === null)
@@ -25,7 +28,11 @@ export class UpdateInstructorController {
 
         const { id } = request.params;
         const { bio, linkedin, instagram, facebook } = request.body ?? {};
-        const result = await this.useCase.execute({ userDataId: id, bio, linkedin, instagram, facebook });
+        const result = await this.useCase.execute({ userDataId: id,
+bio,
+linkedin,
+instagram,
+facebook });
         if (result.error) {
             return reply.status(errorToStatus(result.error)).send({ error: result.error.message });
         }

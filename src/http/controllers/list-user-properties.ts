@@ -12,7 +12,10 @@ export class ListUserPropertiesController {
     async handle(
         request: FastifyRequest<{
             Params: { id: string };
-            Querystring: { page?: number; limit?: number };
+            Querystring: {
+ page?: number;
+limit?: number 
+};
         }>,
         reply: FastifyReply,
     ) {

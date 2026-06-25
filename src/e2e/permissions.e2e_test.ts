@@ -17,8 +17,6 @@ import {
     seedSuperAdmin,
     loginAndGetToken,
     bearer,
-    E2E_ADMIN_USERNAME,
-    E2E_ADMIN_PASSWORD,
 } from './helpers/db.js';
 import { hash } from 'bcrypt';
 
@@ -47,7 +45,9 @@ beforeAll(async () => {
 
     // Create a limited admin user
     const limitedUserData = await prisma.userData.create({
-        data: { name: 'Limited Admin', email: 'limited@test.local', phone: '44900000001' },
+        data: { name: 'Limited Admin',
+email: 'limited@test.local',
+phone: '44900000001' },
     });
     await prisma.userAdmin.create({
         data: {
@@ -74,20 +74,30 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 describe('No token → 401', () => {
     const protectedRoutes = [
-        { method: 'GET' as const, url: '/admin/users' },
-        { method: 'GET' as const, url: '/admin/users/some-id' },
-        { method: 'PATCH' as const, url: '/users/some-id' },
-        { method: 'DELETE' as const, url: '/users/some-id' },
-        { method: 'GET' as const, url: '/admin/courses' },
-        { method: 'POST' as const, url: '/courses' },
-        { method: 'GET' as const, url: '/admin/me' },
-        { method: 'GET' as const, url: '/admin/rules' },
-        { method: 'GET' as const, url: '/admin/news' },
+        { method: 'GET' as const,
+url: '/admin/users' },
+        { method: 'GET' as const,
+url: '/admin/users/some-id' },
+        { method: 'PATCH' as const,
+url: '/users/some-id' },
+        { method: 'DELETE' as const,
+url: '/users/some-id' },
+        { method: 'GET' as const,
+url: '/admin/courses' },
+        { method: 'POST' as const,
+url: '/courses' },
+        { method: 'GET' as const,
+url: '/admin/me' },
+        { method: 'GET' as const,
+url: '/admin/rules' },
+        { method: 'GET' as const,
+url: '/admin/news' },
     ];
 
     for (const { method, url } of protectedRoutes) {
         it(`${method} ${url} returns 401`, async () => {
-            const res = await app.inject({ method, url });
+            const res = await app.inject({ method,
+url });
             expect(res.statusCode).toBe(401);
         });
     }
@@ -156,7 +166,10 @@ describe('Valid token, insufficient permission → 403', () => {
         const createRes = await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'Perm Target', email: 'permtarget@test.com', phone: '44911110080', cpf: '11122233380' },
+            payload: { name: 'Perm Target',
+email: 'permtarget@test.com',
+phone: '44911110080',
+cpf: '11122233380' },
         });
         const { id } = JSON.parse(createRes.body) as { id: string };
 
@@ -182,7 +195,9 @@ describe('Valid token, insufficient permission → 403', () => {
             method: 'POST',
             url: '/rules',
             headers: bearer(limitedToken),
-            payload: { name: 'Bad Rule', description: 'test', permissions: [] },
+            payload: { name: 'Bad Rule',
+description: 'test',
+permissions: [] },
         });
         expect(res.statusCode).toBe(403);
     });
@@ -268,16 +283,22 @@ describe('Limited admin (READ_USER only) → 200 on allowed routes', () => {
 // ---------------------------------------------------------------------------
 describe('Public routes accessible without token', () => {
     const publicRoutes = [
-        { method: 'GET' as const, url: '/courses' },
-        { method: 'GET' as const, url: '/news' },
-        { method: 'GET' as const, url: '/rooms' },
-        { method: 'GET' as const, url: '/partners' },
-        { method: 'GET' as const, url: '/banners' },
+        { method: 'GET' as const,
+url: '/courses' },
+        { method: 'GET' as const,
+url: '/news' },
+        { method: 'GET' as const,
+url: '/rooms' },
+        { method: 'GET' as const,
+url: '/partners' },
+        { method: 'GET' as const,
+url: '/banners' },
     ];
 
     for (const { method, url } of publicRoutes) {
         it(`${method} ${url} is accessible without token`, async () => {
-            const res = await app.inject({ method, url });
+            const res = await app.inject({ method,
+url });
             expect(res.statusCode).toBe(200);
         });
     }

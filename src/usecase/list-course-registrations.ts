@@ -21,6 +21,10 @@ export class ListCourseRegistrationsUseCase {
             this.registrationRepository.findByCourseId(courseId, skip, limit),
             this.registrationRepository.countByCourseId(courseId),
         ]);
-        return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+        return { data,
+total,
+page,
+limit,
+totalPages: Math.ceil(total / limit) };
     }
 }

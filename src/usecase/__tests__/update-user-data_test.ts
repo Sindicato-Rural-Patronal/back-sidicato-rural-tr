@@ -93,9 +93,11 @@ name: 'Novo Nome' });
     describe('unicidade de CPF e RG', () => {
         it('retorna erro se CPF já pertencer a outro usuário', async () => {
             vi.mocked(mockUserRepo.findById).mockResolvedValue(fakeUser as any);
-            vi.mocked(mockUserRepo.findByCpf).mockResolvedValue({ ...fakeUser, id: 'outro-user' } as any);
+            vi.mocked(mockUserRepo.findByCpf).mockResolvedValue({ ...fakeUser,
+id: 'outro-user' } as any);
             const uc = new UpdateUserDataUseCase(mockUserRepo);
-            const result = await uc.execute({ userId: 'user-001', cpf: '52998224725' });
+            const result = await uc.execute({ userId: 'user-001',
+cpf: '52998224725' });
             expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('CPF already in use');
         });
@@ -105,15 +107,18 @@ name: 'Novo Nome' });
             vi.mocked(mockUserRepo.findByCpf).mockResolvedValue(fakeUser as any);
             vi.mocked(mockUserRepo.update).mockResolvedValue(fakeUser as any);
             const uc = new UpdateUserDataUseCase(mockUserRepo);
-            const result = await uc.execute({ userId: 'user-001', cpf: '11144477735' });
+            const result = await uc.execute({ userId: 'user-001',
+cpf: '11144477735' });
             expect(result.error).toBeUndefined();
         });
 
         it('retorna erro se RG já pertencer a outro usuário', async () => {
             vi.mocked(mockUserRepo.findById).mockResolvedValue(fakeUser as any);
-            vi.mocked(mockUserRepo.findByRg).mockResolvedValue({ ...fakeUser, id: 'outro-user' } as any);
+            vi.mocked(mockUserRepo.findByRg).mockResolvedValue({ ...fakeUser,
+id: 'outro-user' } as any);
             const uc = new UpdateUserDataUseCase(mockUserRepo);
-            const result = await uc.execute({ userId: 'user-001', rg: '123456789' });
+            const result = await uc.execute({ userId: 'user-001',
+rg: '123456789' });
             expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('RG already in use');
         });

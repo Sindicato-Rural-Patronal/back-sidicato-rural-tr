@@ -25,7 +25,11 @@ export type UserAdminUpdateInput = Partial<{
 
 export type PublicContactItem = {
     publicTitle: string | null;
-    userData: { name: string; email: string; phone: string };
+    userData: {
+ name: string;
+email: string;
+phone: string 
+};
 };
 
 export type UserAdminListFilters = {

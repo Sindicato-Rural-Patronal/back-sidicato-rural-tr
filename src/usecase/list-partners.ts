@@ -1,6 +1,9 @@
 import type { UserDataRepository, PartnerItem } from '../ports/external/user-data-repository.js';
 
-type Response = { error?: Error; partners?: PartnerItem[] };
+type Response = {
+ error?: Error;
+partners?: PartnerItem[] 
+};
 
 export class ListPartnersUseCase {
     constructor(private readonly repo: UserDataRepository) {}

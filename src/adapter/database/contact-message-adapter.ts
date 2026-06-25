@@ -36,9 +36,12 @@ class ContactMessageAdapter implements ContactMessageRepository {
             ...(filters?.read !== undefined && { read: filters.read }),
             ...(filters?.search && {
                 OR: [
-                    { name: { contains: filters.search, mode: 'insensitive' as const } },
-                    { email: { contains: filters.search, mode: 'insensitive' as const } },
-                    { subject: { contains: filters.search, mode: 'insensitive' as const } },
+                    { name: { contains: filters.search,
+mode: 'insensitive' as const } },
+                    { email: { contains: filters.search,
+mode: 'insensitive' as const } },
+                    { subject: { contains: filters.search,
+mode: 'insensitive' as const } },
                 ],
             }),
         };
@@ -46,7 +49,8 @@ class ContactMessageAdapter implements ContactMessageRepository {
 
     findById(id: string): Promise<ContactMessageModel | null> {
         return this.prisma.contactMessage.findFirst({
-            where: { id, isDeleted: false },
+            where: { id,
+isDeleted: false },
         }) as Promise<ContactMessageModel | null>;
     }
 
@@ -60,7 +64,8 @@ class ContactMessageAdapter implements ContactMessageRepository {
     async delete(id: string): Promise<void> {
         await this.prisma.contactMessage.update({
             where: { id },
-            data: { isDeleted: true, deletedAt: new Date() },
+            data: { isDeleted: true,
+deletedAt: new Date() },
         });
     }
 }

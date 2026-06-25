@@ -27,6 +27,7 @@ export class CreateContactMessageUseCase {
         }
 
         const msg = await this.repo.create(parsed.data);
-        return { message: { id: msg.id, createdAt: msg.createdAt } };
+        return { message: { id: msg.id,
+createdAt: msg.createdAt } };
     }
 }

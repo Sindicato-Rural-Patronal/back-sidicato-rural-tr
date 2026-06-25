@@ -37,7 +37,9 @@ beforeAll(async () => {
         method: 'POST',
         url: '/rooms',
         headers: bearer(token),
-        payload: { name: 'Sala Principal', description: 'Sala de testes E2E', maxCapacity: 50 },
+        payload: { name: 'Sala Principal',
+description: 'Sala de testes E2E',
+maxCapacity: 50 },
     });
     expect(roomRes.statusCode, `Room creation failed: ${roomRes.body}`).toBe(201);
     roomId = (JSON.parse(roomRes.body) as { id: string }).id;
@@ -57,7 +59,9 @@ describe('POST /rooms', () => {
             method: 'POST',
             url: '/rooms',
             headers: bearer(token),
-            payload: { name: 'Sala Extra', description: 'Extra room', maxCapacity: 20 },
+            payload: { name: 'Sala Extra',
+description: 'Extra room',
+maxCapacity: 20 },
         });
         expect(res.statusCode).toBe(201);
         const body = JSON.parse(res.body) as { id: string };
@@ -68,7 +72,9 @@ describe('POST /rooms', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/rooms',
-            payload: { name: 'No Auth Room', description: 'Test', maxCapacity: 10 },
+            payload: { name: 'No Auth Room',
+description: 'Test',
+maxCapacity: 10 },
         });
         expect(res.statusCode).toBe(401);
     });
@@ -79,7 +85,8 @@ describe('POST /rooms', () => {
 // ---------------------------------------------------------------------------
 describe('GET /rooms', () => {
     it('returns array of rooms (public route)', async () => {
-        const res = await app.inject({ method: 'GET', url: '/rooms' });
+        const res = await app.inject({ method: 'GET',
+url: '/rooms' });
         expect(res.statusCode).toBe(200);
         expect(Array.isArray(JSON.parse(res.body))).toBe(true);
     });
@@ -94,7 +101,8 @@ describe('POST /courses', () => {
             method: 'POST',
             url: '/courses',
             headers: bearer(token),
-            payload: { ...COURSE_PAYLOAD, roomId },
+            payload: { ...COURSE_PAYLOAD,
+roomId },
         });
         expect(res.statusCode).toBe(201);
         const body = JSON.parse(res.body) as { id: string };
@@ -106,7 +114,10 @@ describe('POST /courses', () => {
             method: 'POST',
             url: '/courses',
             headers: bearer(token),
-            payload: { ...COURSE_PAYLOAD, name: 'Curso Rascunho', status: 'UNPUBLISHED', roomId },
+            payload: { ...COURSE_PAYLOAD,
+name: 'Curso Rascunho',
+status: 'UNPUBLISHED',
+roomId },
         });
         expect(res.statusCode).toBe(201);
     });
@@ -115,7 +126,8 @@ describe('POST /courses', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/courses',
-            payload: { ...COURSE_PAYLOAD, roomId },
+            payload: { ...COURSE_PAYLOAD,
+roomId },
         });
         expect(res.statusCode).toBe(401);
     });
@@ -125,7 +137,8 @@ describe('POST /courses', () => {
             method: 'POST',
             url: '/courses',
             headers: bearer(token),
-            payload: { ...COURSE_PAYLOAD, roomId: '00000000-0000-0000-0000-000000000000' },
+            payload: { ...COURSE_PAYLOAD,
+roomId: '00000000-0000-0000-0000-000000000000' },
         });
         expect(res.statusCode).toBe(404);
     });
@@ -141,18 +154,30 @@ describe('GET /courses', () => {
             method: 'POST',
             url: '/courses',
             headers: bearer(token),
-            payload: { ...COURSE_PAYLOAD, name: 'Public Visible', status: 'PUBLIC', roomId },
+            payload: { ...COURSE_PAYLOAD,
+name: 'Public Visible',
+status: 'PUBLIC',
+roomId },
         });
         await app.inject({
             method: 'POST',
             url: '/courses',
             headers: bearer(token),
-            payload: { ...COURSE_PAYLOAD, name: 'Hidden Draft', status: 'UNPUBLISHED', roomId },
+            payload: { ...COURSE_PAYLOAD,
+name: 'Hidden Draft',
+status: 'UNPUBLISHED',
+roomId },
         });
 
-        const res = await app.inject({ method: 'GET', url: '/courses' });
+        const res = await app.inject({ method: 'GET',
+url: '/courses' });
         expect(res.statusCode).toBe(200);
-        const body = JSON.parse(res.body) as { data: { name: string; status: string }[] };
+        const body = JSON.parse(res.body) as {
+ data: {
+ name: string;
+status: string 
+}[] 
+};
         const unpublished = body.data.filter(c => c.status === 'UNPUBLISHED');
         expect(unpublished).toHaveLength(0);
     });
@@ -174,7 +199,8 @@ describe('GET /admin/courses', () => {
     });
 
     it('returns 401 without token', async () => {
-        const res = await app.inject({ method: 'GET', url: '/admin/courses' });
+        const res = await app.inject({ method: 'GET',
+url: '/admin/courses' });
         expect(res.statusCode).toBe(401);
     });
 });
@@ -191,7 +217,10 @@ describe('GET /courses/:courseId', () => {
             method: 'POST',
             url: '/courses',
             headers: bearer(token),
-            payload: { ...COURSE_PAYLOAD, name: 'Detail Public', status: 'PUBLIC', roomId },
+            payload: { ...COURSE_PAYLOAD,
+name: 'Detail Public',
+status: 'PUBLIC',
+roomId },
         });
         publicCourseId = (JSON.parse(pubRes.body) as { id: string }).id;
 
@@ -199,7 +228,10 @@ describe('GET /courses/:courseId', () => {
             method: 'POST',
             url: '/courses',
             headers: bearer(token),
-            payload: { ...COURSE_PAYLOAD, name: 'Detail Unpublished', status: 'UNPUBLISHED', roomId },
+            payload: { ...COURSE_PAYLOAD,
+name: 'Detail Unpublished',
+status: 'UNPUBLISHED',
+roomId },
         });
         unpublishedCourseId = (JSON.parse(unpubRes.body) as { id: string }).id;
     });
@@ -210,7 +242,10 @@ describe('GET /courses/:courseId', () => {
             url: `/courses/${publicCourseId}`,
         });
         expect(res.statusCode).toBe(200);
-        const body = JSON.parse(res.body) as { id: string; name: string };
+        const body = JSON.parse(res.body) as {
+ id: string;
+name: string 
+};
         expect(body.id).toBe(publicCourseId);
         expect(body.name).toBe('Detail Public');
     });
@@ -243,7 +278,10 @@ describe('PATCH /courses/:courseId', () => {
             method: 'POST',
             url: '/courses',
             headers: bearer(token),
-            payload: { ...COURSE_PAYLOAD, name: 'To Update', status: 'UNPUBLISHED', roomId },
+            payload: { ...COURSE_PAYLOAD,
+name: 'To Update',
+status: 'UNPUBLISHED',
+roomId },
         });
         courseId = (JSON.parse(res.body) as { id: string }).id;
     });
@@ -253,7 +291,8 @@ describe('PATCH /courses/:courseId', () => {
             method: 'PATCH',
             url: `/courses/${courseId}`,
             headers: bearer(token),
-            payload: { name: 'Updated Course Name', status: 'PUBLIC' },
+            payload: { name: 'Updated Course Name',
+status: 'PUBLIC' },
         });
         expect(res.statusCode).toBe(200);
     });
@@ -278,7 +317,9 @@ describe('DELETE /courses/:courseId', () => {
             method: 'POST',
             url: '/courses',
             headers: bearer(token),
-            payload: { ...COURSE_PAYLOAD, name: 'Disposable Course', roomId },
+            payload: { ...COURSE_PAYLOAD,
+name: 'Disposable Course',
+roomId },
         });
         const { id } = JSON.parse(createRes.body) as { id: string };
 
@@ -312,7 +353,10 @@ describe('POST /courses/:courseId/register', () => {
             method: 'POST',
             url: '/courses',
             headers: bearer(token),
-            payload: { ...COURSE_PAYLOAD, name: 'Reg Public Course', status: 'PUBLIC', roomId },
+            payload: { ...COURSE_PAYLOAD,
+name: 'Reg Public Course',
+status: 'PUBLIC',
+roomId },
         });
         publicCourseId = (JSON.parse(pubRes.body) as { id: string }).id;
 
@@ -320,7 +364,10 @@ describe('POST /courses/:courseId/register', () => {
             method: 'POST',
             url: '/courses',
             headers: bearer(token),
-            payload: { ...COURSE_PAYLOAD, name: 'Reg Unpublished Course', status: 'UNPUBLISHED', roomId },
+            payload: { ...COURSE_PAYLOAD,
+name: 'Reg Unpublished Course',
+status: 'UNPUBLISHED',
+roomId },
         });
         unpublishedCourseId = (JSON.parse(unpubRes.body) as { id: string }).id;
     });
@@ -404,19 +451,28 @@ describe('GET /admin/courses/:courseId/registrations', () => {
             method: 'POST',
             url: '/courses',
             headers: bearer(token),
-            payload: { ...COURSE_PAYLOAD, name: 'List Reg Course', status: 'PUBLIC', roomId },
+            payload: { ...COURSE_PAYLOAD,
+name: 'List Reg Course',
+status: 'PUBLIC',
+roomId },
         });
         courseId = (JSON.parse(courseRes.body) as { id: string }).id;
 
         await app.inject({
             method: 'POST',
             url: `/courses/${courseId}/register`,
-            payload: { name: 'Reg 1', email: 'reg1@test.com', phone: '44911110070', cpf: '11122233370' },
+            payload: { name: 'Reg 1',
+email: 'reg1@test.com',
+phone: '44911110070',
+cpf: '11122233370' },
         });
         await app.inject({
             method: 'POST',
             url: `/courses/${courseId}/register`,
-            payload: { name: 'Reg 2', email: 'reg2@test.com', phone: '44911110071', cpf: '11122233371' },
+            payload: { name: 'Reg 2',
+email: 'reg2@test.com',
+phone: '44911110071',
+cpf: '11122233371' },
         });
     });
 

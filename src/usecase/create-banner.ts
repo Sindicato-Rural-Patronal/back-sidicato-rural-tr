@@ -24,7 +24,10 @@ const schema = z
         { message: 'startDate must be before endDate' },
     );
 
-type Response = { error?: Error; banner?: BannerModel };
+type Response = {
+ error?: Error;
+banner?: BannerModel 
+};
 
 export class CreateBannerUseCase {
     constructor(private readonly repo: BannerRepository) {}
@@ -38,7 +41,8 @@ export class CreateBannerUseCase {
         const { order, ...rest } = parsed.data;
         const resolvedOrder = order !== undefined ? order : (await this.repo.findMaxOrder()) + 1;
 
-        const banner = await this.repo.create({ ...rest, order: resolvedOrder });
+        const banner = await this.repo.create({ ...rest,
+order: resolvedOrder });
         return { banner };
     }
 }

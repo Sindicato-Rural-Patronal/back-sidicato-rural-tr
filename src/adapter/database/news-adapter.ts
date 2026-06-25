@@ -19,7 +19,8 @@ export class NewsAdapter implements NewsRepository {
     }
 
     findById(id: string): Promise<NewsModel | null> {
-        return this.prisma.news.findFirst({ where: { id, isDeleted: false } }) as Promise<NewsModel | null>;
+        return this.prisma.news.findFirst({ where: { id,
+isDeleted: false } }) as Promise<NewsModel | null>;
     }
 
     findAll(statusFilter?: NewsStatus, skip?: number, take?: number): Promise<NewsModel[]> {
@@ -56,7 +57,8 @@ data })) as NewsModel;
         try {
             await this.prisma.news.update({
                 where: { id },
-                data: { isDeleted: true, deletedAt: new Date() },
+                data: { isDeleted: true,
+deletedAt: new Date() },
             });
             return true;
         } catch {

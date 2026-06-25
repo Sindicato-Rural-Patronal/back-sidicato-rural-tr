@@ -1,7 +1,10 @@
 import type { UserInstructorModel, CourseInstructorModel } from '../../generated/prisma/models.js';
 
 export type UserInstructorWithUser = UserInstructorModel & {
-    userData: { id: string; name: string };
+userData: {
+ id: string;
+name: string 
+};
 };
 
 export type InstructorUpdateData = {

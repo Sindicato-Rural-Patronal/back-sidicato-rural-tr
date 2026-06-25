@@ -1,7 +1,10 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { ListAllBannersUseCase } from '../../usecase/list-all-banners.js';
 
-type Query = { page?: number; limit?: number };
+type Query = {
+ page?: number;
+limit?: number 
+};
 
 export class ListAllBannersController {
     constructor(private readonly useCase: ListAllBannersUseCase) {}

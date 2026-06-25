@@ -4,7 +4,6 @@ import type {
     CourseWithDetails,
     CourseCreateData,
     CourseUpdateData,
-    CourseStatus,
     CourseListFilters,
 } from '../../ports/external/course-repository.js';
 import type { courseModel } from '../../generated/prisma/models/course.js';
@@ -23,7 +22,9 @@ maxCapacity: true } },
         where: { isDeleted: false },
         include: {
             instructor: {
-                include: { userData: { select: { id: true, name: true, avatar: true } } },
+                include: { userData: { select: { id: true,
+name: true,
+avatar: true } } },
             },
         },
     },
@@ -42,7 +43,8 @@ room: { connect: { id: roomId } } },
 
     findById(id: string): Promise<CourseWithDetails | null> {
         return this.prisma.course.findFirst({
-            where: { id, isDeleted: false },
+            where: { id,
+isDeleted: false },
             include: courseIncludes,
         }) as Promise<CourseWithDetails | null>;
     }
@@ -53,7 +55,8 @@ room: { connect: { id: roomId } } },
                 isDeleted: false,
                 ...(filters?.status && { status: filters.status }),
                 ...(filters?.search && {
-                    name: { contains: filters.search, mode: 'insensitive' as const },
+                    name: { contains: filters.search,
+mode: 'insensitive' as const },
                 }),
             },
             include: courseIncludes,
@@ -69,7 +72,8 @@ room: { connect: { id: roomId } } },
                 isDeleted: false,
                 ...(filters?.status && { status: filters.status }),
                 ...(filters?.search && {
-                    name: { contains: filters.search, mode: 'insensitive' as const },
+                    name: { contains: filters.search,
+mode: 'insensitive' as const },
                 }),
             },
         });
@@ -92,15 +96,18 @@ data: updateData });
             const now = new Date();
             await this.prisma.coursePhoto.updateMany({
                 where: { courseId: id },
-                data: { isDeleted: true, deletedAt: now },
+                data: { isDeleted: true,
+deletedAt: now },
             });
             await this.prisma.courseUserRegistration.updateMany({
                 where: { courseId: id },
-                data: { isDeleted: true, deletedAt: now },
+                data: { isDeleted: true,
+deletedAt: now },
             });
             await this.prisma.course.update({
                 where: { id },
-                data: { isDeleted: true, deletedAt: now },
+                data: { isDeleted: true,
+deletedAt: now },
             });
             return true;
         } catch {
@@ -120,7 +127,8 @@ caption },
         try {
             await this.prisma.coursePhoto.update({
                 where: { id: photoId },
-                data: { isDeleted: true, deletedAt: new Date() },
+                data: { isDeleted: true,
+deletedAt: new Date() },
             });
             return true;
         } catch {

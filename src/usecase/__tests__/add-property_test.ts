@@ -78,7 +78,8 @@ describe('AddPropertyUseCase', () => {
         it('retorna ValidationError se address não fornecido', async () => {
             vi.mocked(mockUserRepo.findById).mockResolvedValue(fakeUser as any);
             const uc = new AddPropertyUseCase(mockUserRepo, mockPropertyRepo, mockAddressRepo);
-            const result = await uc.execute({ userDataId: 'user-001', name: 'Fazenda' } as any);
+            const result = await uc.execute({ userDataId: 'user-001',
+name: 'Fazenda' } as any);
             expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('Address is required');
             expect(mockPropertyRepo.create).not.toHaveBeenCalled();
@@ -159,7 +160,8 @@ describe('AddPropertyUseCase', () => {
                 userDataId: 'user-001',
                 name: 'Fazenda São João',
                 registration: 'MAT-123',
-                address: { type: 'RURAL', city: 'Terra Roxa' },
+                address: { type: 'RURAL',
+city: 'Terra Roxa' },
             });
             expect(mockPropertyRepo.create).toHaveBeenCalledWith(
                 expect.objectContaining({ registration: 'MAT-123' }),

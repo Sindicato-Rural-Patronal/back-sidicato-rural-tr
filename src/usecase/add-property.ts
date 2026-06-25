@@ -52,7 +52,8 @@ export class AddPropertyUseCase {
         const user = await this.userDataRepository.findById(userDataId);
         if (!user) return { error: new UserDataNotFoundError() };
 
-        const addressData: AddressCreateInput = { type: address.type ?? 'URBAN', ...address };
+        const addressData: AddressCreateInput = { type: address.type ?? 'URBAN',
+...address };
         const createdAddress = await this.addressRepository.create(addressData);
 
         const property = await this.propertyRepository.create({

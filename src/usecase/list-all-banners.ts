@@ -18,6 +18,10 @@ export class ListAllBannersUseCase {
             this.repo.findAll(skip, limit),
             this.repo.count(),
         ]);
-        return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+        return { data,
+total,
+page,
+limit,
+totalPages: Math.ceil(total / limit) };
     }
 }

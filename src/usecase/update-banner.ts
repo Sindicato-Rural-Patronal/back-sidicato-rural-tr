@@ -25,7 +25,10 @@ const schema = z
         { message: 'startDate must be before endDate' },
     );
 
-type Response = { error?: Error; banner?: BannerModel };
+type Response = {
+ error?: Error;
+banner?: BannerModel 
+};
 
 export class UpdateBannerUseCase {
     constructor(private readonly repo: BannerRepository) {}

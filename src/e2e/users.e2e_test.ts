@@ -43,7 +43,10 @@ describe('POST /users', () => {
             },
         });
         expect(res.statusCode).toBe(201);
-        const body = JSON.parse(res.body) as { id: string; email: string };
+        const body = JSON.parse(res.body) as {
+ id: string;
+email: string 
+};
         expect(body.id).toBeTruthy();
         expect(body.email).toBe('joao.silva@test.com');
     });
@@ -52,12 +55,18 @@ describe('POST /users', () => {
         await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'First', email: 'dup@test.com', phone: '44911110002', cpf: '11122233302' },
+            payload: { name: 'First',
+email: 'dup@test.com',
+phone: '44911110002',
+cpf: '11122233302' },
         });
         const res = await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'Second', email: 'dup@test.com', phone: '44911110003', cpf: '11122233303' },
+            payload: { name: 'Second',
+email: 'dup@test.com',
+phone: '44911110003',
+cpf: '11122233303' },
         });
         expect(res.statusCode).toBe(409);
     });
@@ -66,12 +75,18 @@ describe('POST /users', () => {
         await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'Phone First', email: 'phone1@test.com', phone: '44911110004', cpf: '11122233304' },
+            payload: { name: 'Phone First',
+email: 'phone1@test.com',
+phone: '44911110004',
+cpf: '11122233304' },
         });
         const res = await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'Phone Second', email: 'phone2@test.com', phone: '44911110004', cpf: '11122233305' },
+            payload: { name: 'Phone Second',
+email: 'phone2@test.com',
+phone: '44911110004',
+cpf: '11122233305' },
         });
         expect(res.statusCode).toBe(409);
     });
@@ -89,7 +104,10 @@ describe('POST /users', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'Bad Email', email: 'not-an-email', phone: '44911110006', cpf: '11122233306' },
+            payload: { name: 'Bad Email',
+email: 'not-an-email',
+phone: '44911110006',
+cpf: '11122233306' },
         });
         expect(res.statusCode).toBeGreaterThanOrEqual(400);
     });
@@ -121,7 +139,8 @@ describe('GET /admin/users', () => {
     });
 
     it('returns 401 without token', async () => {
-        const res = await app.inject({ method: 'GET', url: '/admin/users' });
+        const res = await app.inject({ method: 'GET',
+url: '/admin/users' });
         expect(res.statusCode).toBe(401);
     });
 });
@@ -136,7 +155,10 @@ describe('GET /admin/users/:id', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'Detail User', email: 'detail@test.com', phone: '44911110010', cpf: '11122233310' },
+            payload: { name: 'Detail User',
+email: 'detail@test.com',
+phone: '44911110010',
+cpf: '11122233310' },
         });
         userId = (JSON.parse(res.body) as { id: string }).id;
     });
@@ -180,7 +202,10 @@ describe('PATCH /users/:id', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'Update Target', email: 'update@test.com', phone: '44911110020', cpf: '11122233320' },
+            payload: { name: 'Update Target',
+email: 'update@test.com',
+phone: '44911110020',
+cpf: '11122233320' },
         });
         userId = (JSON.parse(res.body) as { id: string }).id;
     });
@@ -200,7 +225,9 @@ describe('PATCH /users/:id', () => {
             method: 'PATCH',
             url: `/users/${userId}`,
             headers: bearer(token),
-            payload: { maritalStatus: 'MARRIED', gender: 'MALE', memberStatus: 'ACTIVE' },
+            payload: { maritalStatus: 'MARRIED',
+gender: 'MALE',
+memberStatus: 'ACTIVE' },
         });
         expect(res.statusCode).toBe(200);
 
@@ -210,7 +237,10 @@ describe('PATCH /users/:id', () => {
             url: `/admin/users/${userId}`,
             headers: bearer(token),
         });
-        const body = JSON.parse(getRes.body) as { maritalStatus: string; gender: string };
+        const body = JSON.parse(getRes.body) as {
+ maritalStatus: string;
+gender: string 
+};
         expect(body.maritalStatus).toBe('MARRIED');
         expect(body.gender).toBe('MALE');
     });
@@ -253,7 +283,10 @@ describe('DELETE /users/:id', () => {
         const createRes = await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'To Delete', email: 'todelete@test.com', phone: '44911110030', cpf: '11122233330' },
+            payload: { name: 'To Delete',
+email: 'todelete@test.com',
+phone: '44911110030',
+cpf: '11122233330' },
         });
         const { id } = JSON.parse(createRes.body) as { id: string };
 
@@ -269,11 +302,16 @@ describe('DELETE /users/:id', () => {
         const createRes = await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'Ghost User', email: 'ghost@test.com', phone: '44911110031', cpf: '11122233331' },
+            payload: { name: 'Ghost User',
+email: 'ghost@test.com',
+phone: '44911110031',
+cpf: '11122233331' },
         });
         const { id } = JSON.parse(createRes.body) as { id: string };
 
-        await app.inject({ method: 'DELETE', url: `/users/${id}`, headers: bearer(token) });
+        await app.inject({ method: 'DELETE',
+url: `/users/${id}`,
+headers: bearer(token) });
 
         const getRes = await app.inject({
             method: 'GET',
@@ -287,11 +325,16 @@ describe('DELETE /users/:id', () => {
         const createRes = await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'Vanish User', email: 'vanish@test.com', phone: '44911110032', cpf: '11122233332' },
+            payload: { name: 'Vanish User',
+email: 'vanish@test.com',
+phone: '44911110032',
+cpf: '11122233332' },
         });
         const { id } = JSON.parse(createRes.body) as { id: string };
 
-        await app.inject({ method: 'DELETE', url: `/users/${id}`, headers: bearer(token) });
+        await app.inject({ method: 'DELETE',
+url: `/users/${id}`,
+headers: bearer(token) });
 
         const listRes = await app.inject({
             method: 'GET',
@@ -323,7 +366,10 @@ describe('PUT /admin/users/:id/address', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'Addr User', email: 'addruser@test.com', phone: '44911110040', cpf: '11122233340' },
+            payload: { name: 'Addr User',
+email: 'addruser@test.com',
+phone: '44911110040',
+cpf: '11122233340' },
         });
         userId = (JSON.parse(res.body) as { id: string }).id;
     });
@@ -353,7 +399,8 @@ describe('PUT /admin/users/:id/address', () => {
             method: 'PUT',
             url: `/admin/users/${userId}/address`,
             headers: bearer(token),
-            payload: { city: 'Nova Cidade', state: 'SP' },
+            payload: { city: 'Nova Cidade',
+state: 'SP' },
         });
         expect(res.statusCode).toBe(200);
         const body = JSON.parse(res.body) as { addressId: string };
@@ -372,12 +419,18 @@ describe('POST /admin/users/:id/relations', () => {
         const resA = await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'Rel User A', email: 'relA@test.com', phone: '44911110050', cpf: '11122233350' },
+            payload: { name: 'Rel User A',
+email: 'relA@test.com',
+phone: '44911110050',
+cpf: '11122233350' },
         });
         const resB = await app.inject({
             method: 'POST',
             url: '/users',
-            payload: { name: 'Rel User B', email: 'relB@test.com', phone: '44911110051', cpf: '11122233351' },
+            payload: { name: 'Rel User B',
+email: 'relB@test.com',
+phone: '44911110051',
+cpf: '11122233351' },
         });
         userAId = (JSON.parse(resA.body) as { id: string }).id;
         userBId = (JSON.parse(resB.body) as { id: string }).id;
@@ -388,7 +441,8 @@ describe('POST /admin/users/:id/relations', () => {
             method: 'POST',
             url: `/admin/users/${userAId}/relations`,
             headers: bearer(token),
-            payload: { targetId: userBId, label: 'cônjuge' },
+            payload: { targetId: userBId,
+label: 'cônjuge' },
         });
         expect(res.statusCode).toBe(201);
         const body = JSON.parse(res.body) as { id: string };
@@ -401,7 +455,12 @@ describe('POST /admin/users/:id/relations', () => {
             url: `/admin/users/${userAId}`,
             headers: bearer(token),
         });
-        const body = JSON.parse(res.body) as { relations: { label: string; target: { id: string } }[] };
+        const body = JSON.parse(res.body) as {
+ relations: {
+ label: string;
+target: { id: string } 
+}[] 
+};
         const rel = body.relations.find(r => r.target.id === userBId);
         expect(rel).toBeDefined();
         expect(rel!.label).toBe('cônjuge');

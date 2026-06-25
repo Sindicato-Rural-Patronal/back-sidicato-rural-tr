@@ -20,11 +20,16 @@ export class InstructorAdapter implements InstructorRepository {
         instagram?: string,
         facebook?: string,
     ): Promise<UserInstructorModel> {
-        return this.prisma.userInstructor.create({ data: { userDataId, bio, linkedin, instagram, facebook } });
+        return this.prisma.userInstructor.create({ data: { userDataId,
+bio,
+linkedin,
+instagram,
+facebook } });
     }
 
     update(userDataId: string, data: InstructorUpdateData): Promise<UserInstructorModel | null> {
-        return this.prisma.userInstructor.update({ where: { userDataId }, data });
+        return this.prisma.userInstructor.update({ where: { userDataId },
+data });
     }
 
     async demote(userDataId: string): Promise<boolean> {
@@ -42,7 +47,8 @@ export class InstructorAdapter implements InstructorRepository {
 
     findAll(skip?: number, take?: number): Promise<UserInstructorWithUser[]> {
         return this.prisma.userInstructor.findMany({
-            include: { userData: { select: { id: true, name: true } } },
+            include: { userData: { select: { id: true,
+name: true } } },
             orderBy: { userData: { name: 'asc' } },
             skip,
             take,
@@ -60,7 +66,10 @@ export class InstructorAdapter implements InstructorRepository {
         category?: string,
     ): Promise<CourseInstructorModel> {
         return this.prisma.courseInstructor.create({
-            data: { instructorId, courseId, title, category },
+            data: { instructorId,
+courseId,
+title,
+category },
         });
     }
 
@@ -68,7 +77,8 @@ export class InstructorAdapter implements InstructorRepository {
         try {
             await this.prisma.courseInstructor.update({
                 where: { id: assignmentId },
-                data: { isDeleted: true, deletedAt: new Date() },
+                data: { isDeleted: true,
+deletedAt: new Date() },
             });
             return true;
         } catch {
@@ -78,13 +88,16 @@ export class InstructorAdapter implements InstructorRepository {
 
     findAssignmentById(assignmentId: string): Promise<CourseInstructorModel | null> {
         return this.prisma.courseInstructor.findFirst({
-            where: { id: assignmentId, isDeleted: false },
+            where: { id: assignmentId,
+isDeleted: false },
         });
     }
 
     findAssignment(instructorId: string, courseId: string): Promise<CourseInstructorModel | null> {
         return this.prisma.courseInstructor.findFirst({
-            where: { instructorId, courseId, isDeleted: false },
+            where: { instructorId,
+courseId,
+isDeleted: false },
         });
     }
 }

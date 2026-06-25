@@ -10,7 +10,10 @@ type PromoteToInstructorRequest = {
     instagram?: string;
     facebook?: string;
 };
-type PromoteToInstructorResponse = { error?: Error; instructorId?: string };
+type PromoteToInstructorResponse = {
+ error?: Error;
+instructorId?: string 
+};
 
 export class PromoteToInstructorUseCase {
     constructor(

@@ -51,7 +51,11 @@ export type CourseWithDetails = courseModel & {
             linkedin: string | null;
             instagram: string | null;
             facebook: string | null;
-            userData: { id: string; name: string; avatar: string | null };
+            userData: {
+ id: string;
+name: string;
+avatar: string | null 
+};
         };
     }>;
 };

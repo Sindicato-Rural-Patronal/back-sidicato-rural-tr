@@ -4,7 +4,10 @@ import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permiss
 import { requirePermission } from '../lib/require-permission.js';
 
 type Params = { courseId: string };
-type Query = { page?: number; limit?: number };
+type Query = {
+ page?: number;
+limit?: number 
+};
 
 export class ListCourseRegistrationsController {
     constructor(
@@ -12,7 +15,10 @@ export class ListCourseRegistrationsController {
         private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
-    async handle(request: FastifyRequest<{ Params: Params; Querystring: Query }>, reply: FastifyReply) {
+    async handle(request: FastifyRequest<{
+ Params: Params;
+Querystring: Query 
+}>, reply: FastifyReply) {
         if (
             (await requirePermission(request, reply, 'READ_COURSE', this.getAdminPermissions)) ===
             null

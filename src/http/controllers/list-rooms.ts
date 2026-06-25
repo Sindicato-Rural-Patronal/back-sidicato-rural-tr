@@ -1,7 +1,10 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { ListRoomsUseCase } from '../../usecase/list-rooms.js';
 
-type Query = { page?: number; limit?: number };
+type Query = {
+ page?: number;
+limit?: number 
+};
 
 export class ListRoomsController {
     constructor(private readonly useCase: ListRoomsUseCase) {}

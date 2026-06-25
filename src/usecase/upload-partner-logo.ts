@@ -10,7 +10,10 @@ export interface UploadPartnerLogoInput {
     mimeType: string;
 }
 
-type Response = { error?: Error; partnerLogoUrl?: string };
+type Response = {
+ error?: Error;
+partnerLogoUrl?: string 
+};
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -35,14 +38,21 @@ export class UploadPartnerLogoUseCase {
         if (!user) return { error: new UserDataNotFoundError() };
 
         const processed = await sharp(input.file)
-            .resize(WIDTH, HEIGHT, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+            .resize(WIDTH, HEIGHT, { fit: 'contain',
+background: { r: 0,
+g: 0,
+b: 0,
+alpha: 0 } })
             .png({ compressionLevel: 8 })
             .toBuffer();
 
         const bucket = process.env.STORAGE_BUCKET ?? 'avatars';
         const key = `partner-logos/${input.userId}/logo.png`;
 
-        await this.storage.uploadFile({ bucket, key, body: processed, contentType: 'image/png' });
+        await this.storage.uploadFile({ bucket,
+key,
+body: processed,
+contentType: 'image/png' });
         const partnerLogoUrl = this.storage.getPublicUrl(bucket, key);
 
         await this.userDataRepository.update(input.userId, { partnerLogo: partnerLogoUrl });

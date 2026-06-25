@@ -30,7 +30,8 @@ describe('POST /auth/login', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/auth/login',
-            payload: { username: E2E_ADMIN_USERNAME, password: E2E_ADMIN_PASSWORD },
+            payload: { username: E2E_ADMIN_USERNAME,
+password: E2E_ADMIN_PASSWORD },
         });
         expect(res.statusCode).toBe(200);
         const body = JSON.parse(res.body) as { token: string };
@@ -42,7 +43,8 @@ describe('POST /auth/login', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/auth/login',
-            payload: { username: E2E_ADMIN_USERNAME, password: 'wrongpassword' },
+            payload: { username: E2E_ADMIN_USERNAME,
+password: 'wrongpassword' },
         });
         expect(res.statusCode).toBe(401);
         const body = JSON.parse(res.body) as { error: string };
@@ -53,7 +55,8 @@ describe('POST /auth/login', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/auth/login',
-            payload: { username: 'doesnotexist', password: 'anypassword' },
+            payload: { username: 'doesnotexist',
+password: 'anypassword' },
         });
         expect(res.statusCode).toBe(401);
     });
@@ -84,7 +87,8 @@ describe('GET /admin/me', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/auth/login',
-            payload: { username: E2E_ADMIN_USERNAME, password: E2E_ADMIN_PASSWORD },
+            payload: { username: E2E_ADMIN_USERNAME,
+password: E2E_ADMIN_PASSWORD },
         });
         token = (JSON.parse(res.body) as { token: string }).token;
     });
@@ -111,7 +115,8 @@ describe('GET /admin/me', () => {
     });
 
     it('returns 401 without token', async () => {
-        const res = await app.inject({ method: 'GET', url: '/admin/me' });
+        const res = await app.inject({ method: 'GET',
+url: '/admin/me' });
         expect(res.statusCode).toBe(401);
     });
 

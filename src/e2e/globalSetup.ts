@@ -2,7 +2,8 @@ import { execSync } from 'node:child_process';
 import { config } from 'dotenv';
 
 export async function setup() {
-    config({ path: '.env.test', override: true });
+    config({ path: '.env.test',
+override: true });
 
     const dbUrl = process.env.DATABASE_TEST_URL;
     if (!dbUrl) {
@@ -17,7 +18,8 @@ export async function setup() {
     console.log('\n🔄 Resetting E2E test database...');
     try {
         execSync('npx prisma db push --force-reset --skip-generate', {
-            env: { ...process.env, DATABASE_URL: dbUrl },
+            env: { ...process.env,
+DATABASE_URL: dbUrl },
             stdio: 'pipe',
         });
         console.log('✅ E2E test database ready\n');

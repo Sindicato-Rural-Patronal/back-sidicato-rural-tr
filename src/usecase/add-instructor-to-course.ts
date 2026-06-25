@@ -9,7 +9,10 @@ type AddInstructorToCourseRequest = {
     title?: string;
     category?: string;
 };
-type AddInstructorToCourseResponse = { error?: Error; assignmentId?: string };
+type AddInstructorToCourseResponse = {
+ error?: Error;
+assignmentId?: string 
+};
 
 export class AddInstructorToCourseUseCase {
     constructor(

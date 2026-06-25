@@ -20,7 +20,8 @@ export class PropertyAdapter implements PropertyRepository {
 
     findByUserDataId(userDataId: string, skip?: number, take?: number): Promise<PropertyWithAddress[]> {
         return this.prisma.property.findMany({
-            where: { userDataId, isDeleted: false },
+            where: { userDataId,
+isDeleted: false },
             include: { address: true },
             skip,
             take,
@@ -28,17 +29,20 @@ export class PropertyAdapter implements PropertyRepository {
     }
 
     countByUserDataId(userDataId: string): Promise<number> {
-        return this.prisma.property.count({ where: { userDataId, isDeleted: false } });
+        return this.prisma.property.count({ where: { userDataId,
+isDeleted: false } });
     }
 
     findById(id: string): Promise<Property | null> {
-        return this.prisma.property.findFirst({ where: { id, isDeleted: false } });
+        return this.prisma.property.findFirst({ where: { id,
+isDeleted: false } });
     }
 
     async delete(id: string): Promise<void> {
         await this.prisma.property.update({
             where: { id },
-            data: { isDeleted: true, deletedAt: new Date() },
+            data: { isDeleted: true,
+deletedAt: new Date() },
         });
     }
 }

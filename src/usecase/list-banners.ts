@@ -25,6 +25,10 @@ export class ListBannersUseCase {
             imageUrl,
             buttons,
         }));
-        return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+        return { data,
+total,
+page,
+limit,
+totalPages: Math.ceil(total / limit) };
     }
 }

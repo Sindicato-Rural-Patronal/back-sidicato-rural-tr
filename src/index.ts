@@ -37,7 +37,9 @@ const server = fastify({
 
 server.addHook('onRequest', (request, _reply, done) => {
     request.log.info(
-        { method: request.method, url: request.url, remoteAddress: request.ip },
+        { method: request.method,
+url: request.url,
+remoteAddress: request.ip },
         'incoming request',
     );
     done();

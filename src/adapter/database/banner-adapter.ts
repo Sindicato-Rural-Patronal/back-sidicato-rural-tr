@@ -84,7 +84,8 @@ class BannerAdapter implements BannerRepository {
     }
 
     async findById(id: string): Promise<BannerModel | null> {
-        const row = await this.prisma.banner.findFirst({ where: { id, isDeleted: false } });
+        const row = await this.prisma.banner.findFirst({ where: { id,
+isDeleted: false } });
         return row ? cast(row) : null;
     }
 
@@ -104,7 +105,8 @@ class BannerAdapter implements BannerRepository {
     async delete(id: string): Promise<void> {
         await this.prisma.banner.update({
             where: { id },
-            data: { isDeleted: true, deletedAt: new Date() },
+            data: { isDeleted: true,
+deletedAt: new Date() },
         });
     }
 
@@ -119,7 +121,8 @@ class BannerAdapter implements BannerRepository {
     async reorder(ids: string[]): Promise<void> {
         await this.prisma.$transaction(
             ids.map((id, index) =>
-                this.prisma.banner.update({ where: { id }, data: { order: index } }),
+                this.prisma.banner.update({ where: { id },
+data: { order: index } }),
             ),
         );
     }

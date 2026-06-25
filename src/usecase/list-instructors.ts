@@ -2,7 +2,14 @@ import type { InstructorRepository, UserInstructorWithUser } from '../ports/exte
 
 type ListInstructorsResponse = {
     error?: Error;
-    data?: Array<{ id: string; bio: string | null; userData: { id: string; name: string } }>;
+    data?: Array<{
+ id: string;
+bio: string | null;
+userData: {
+ id: string;
+name: string 
+} 
+}>;
     total?: number;
     page?: number;
     limit?: number;
@@ -22,7 +29,8 @@ export class ListInstructorsUseCase {
             data: instructors.map((i: UserInstructorWithUser) => ({
                 id: i.id,
                 bio: i.bio,
-                userData: { id: i.userData.id, name: i.userData.name },
+                userData: { id: i.userData.id,
+name: i.userData.name },
             })),
             total,
             page,

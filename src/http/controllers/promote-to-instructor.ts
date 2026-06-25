@@ -3,7 +3,12 @@ import type { PromoteToInstructorUseCase } from '../../usecase/promote-to-instru
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 
-type Body = { bio?: string; linkedin?: string; instagram?: string; facebook?: string };
+type Body = {
+ bio?: string;
+linkedin?: string;
+instagram?: string;
+facebook?: string 
+};
 
 export class PromoteToInstructorController {
     constructor(
@@ -12,7 +17,10 @@ export class PromoteToInstructorController {
     ) {}
 
     async handle(
-        request: FastifyRequest<{ Params: { id: string }; Body: Body }>,
+        request: FastifyRequest<{
+ Params: { id: string };
+Body: Body 
+}>,
         reply: FastifyReply,
     ) {
         if (
@@ -23,7 +31,11 @@ export class PromoteToInstructorController {
 
         const { id } = request.params;
         const { bio, linkedin, instagram, facebook } = request.body ?? {};
-        const result = await this.useCase.execute({ userDataId: id, bio, linkedin, instagram, facebook });
+        const result = await this.useCase.execute({ userDataId: id,
+bio,
+linkedin,
+instagram,
+facebook });
         if (result.error) {
             return reply.status(errorToStatus(result.error)).send({ error: result.error.message });
         }

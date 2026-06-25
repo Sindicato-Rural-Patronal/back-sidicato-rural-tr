@@ -8,7 +8,10 @@ type ListUserPropertiesResult = {
     totalPages: number;
 };
 
-type ListUserPropertiesResponse = { error?: Error; result?: ListUserPropertiesResult };
+type ListUserPropertiesResponse = {
+ error?: Error;
+result?: ListUserPropertiesResult 
+};
 
 export class ListUserPropertiesUseCase {
     constructor(private readonly propertyRepository: PropertyRepository) {}

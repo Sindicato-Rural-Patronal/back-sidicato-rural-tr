@@ -17,6 +17,10 @@ export class ListRoomsUseCase {
             this.roomRepository.findAll(skip, limit),
             this.roomRepository.count(),
         ]);
-        return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+        return { data,
+total,
+page,
+limit,
+totalPages: Math.ceil(total / limit) };
     }
 }

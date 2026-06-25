@@ -8,7 +8,10 @@ type ListUserRelationsResult = {
     totalPages: number;
 };
 
-type ListUserRelationsResponse = { error?: Error; result?: ListUserRelationsResult };
+type ListUserRelationsResponse = {
+ error?: Error;
+result?: ListUserRelationsResult 
+};
 
 export class ListUserRelationsUseCase {
     constructor(private readonly userRelationRepository: UserRelationRepository) {}

@@ -3,7 +3,10 @@ import type { ListInstructorsUseCase } from '../../usecase/list-instructors.js';
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 
-type Query = { page?: number; limit?: number };
+type Query = {
+ page?: number;
+limit?: number 
+};
 
 export class ListInstructorsController {
     constructor(

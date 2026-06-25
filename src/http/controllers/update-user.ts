@@ -37,7 +37,8 @@ export class UpdateUserController {
         const { id } = request.params;
         const { bio, linkedin, instagram, facebook, ...userBody } = request.body;
 
-        const result = await this.useCase.execute({ ...userBody, userId: id });
+        const result = await this.useCase.execute({ ...userBody,
+userId: id });
         if (result.error) {
             return reply.status(errorToStatus(result.error)).send({ error: result.error?.message });
         }

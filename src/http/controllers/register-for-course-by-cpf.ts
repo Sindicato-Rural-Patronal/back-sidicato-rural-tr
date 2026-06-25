@@ -9,12 +9,16 @@ export class RegisterForCourseByCpfController {
     constructor(private readonly useCase: RegisterForCourseByCpfUseCase) {}
 
     async handle(
-        request: FastifyRequest<{ Params: Params; Body: Body }>,
+        request: FastifyRequest<{
+ Params: Params;
+Body: Body 
+}>,
         reply: FastifyReply,
     ) {
         const { courseId } = request.params;
         const { cpf } = request.body;
-        const response = await this.useCase.execute({ courseId, cpf });
+        const response = await this.useCase.execute({ courseId,
+cpf });
         if (response.error) {
             return reply
                 .status(errorToStatus(response.error))
@@ -22,6 +26,7 @@ export class RegisterForCourseByCpfController {
         }
         return reply
             .status(201)
-            .send({ registrationId: response.registrationId, userDataId: response.userDataId });
+            .send({ registrationId: response.registrationId,
+userDataId: response.userDataId });
     }
 }

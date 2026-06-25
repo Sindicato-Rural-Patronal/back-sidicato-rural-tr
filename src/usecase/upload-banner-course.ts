@@ -7,7 +7,10 @@ const FULL_HD_WIDTH = 1920;
 const FULL_HD_HEIGHT = 1080;
 const BANNER_BUCKET = process.env.BANNER_BUCKET || 'course-banners';
 
-type UploadCourseBannerResponse = { error?: Error; url?: string };
+type UploadCourseBannerResponse = {
+ error?: Error;
+url?: string 
+};
 
 export class UploadCourseBannerUseCase {
     constructor(
@@ -21,7 +24,8 @@ export class UploadCourseBannerUseCase {
 
         console.log(`[UploadCourseBanner] courseId="${courseId}" bufferSize=${fileBuffer.length}`);
         const processedBuffer = await sharp(fileBuffer)
-            .resize(FULL_HD_WIDTH, FULL_HD_HEIGHT, { fit: 'cover', position: 'center' })
+            .resize(FULL_HD_WIDTH, FULL_HD_HEIGHT, { fit: 'cover',
+position: 'center' })
             .jpeg({ quality: 85 })
             .toBuffer();
 
