@@ -60,12 +60,16 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/sindicato
 JWT_SECRET=sua-chave-secreta-com-minimo-32-caracteres
 PORT=3000
 NODE_ENV=development
-STORAGE_TYPE=minio           # minio | s3
-MINIO_ENDPOINT=http://localhost:9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
+CORS_ORIGIN=*
+
+# Supabase Storage (Project Settings → API: URL + service_role key)
+SUPABASE_URL=https://<ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=service_role_key
+
+# Buckets (criar no Supabase e marcar como PUBLIC)
 STORAGE_BUCKET=avatars
 BANNER_BUCKET=course-banners
+NEWS_BANNER_BUCKET=news-banners
 ```
 
 ---

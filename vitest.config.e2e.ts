@@ -16,7 +16,6 @@ export default defineConfig({
             DATABASE_URL: process.env.DATABASE_TEST_URL ?? '',
             JWT_SECRET: 'e2e-test-secret-at-least-32-characters-long!!',
             NODE_ENV: 'test',
-            STORAGE_TYPE: 'minio',
             STORAGE_BUCKET: 'avatars',
             BANNER_BUCKET: 'course-banners',
         },

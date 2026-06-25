@@ -1,4 +1,5 @@
-version: '3.8'
+# Local development stack. Storage uses Supabase (set SUPABASE_* in .env).
+# For production use docker-compose.prod.yml.
 
 services:
   postgres:
@@ -19,20 +20,6 @@ services:
       retries: 10
     restart: unless-stopped
 
-  minio:
-    image: minio/minio
-    container_name: sindicato_minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    volumes:
-      - ./minio_data:/data
-    command: server /data --console-address ":9001"
-    restart: unless-stopped
-
   api:
     build: .
     container_name: sindicato_api
@@ -43,17 +30,11 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev_secret_32_chars_minimum_here}
       PORT: 3000
       NODE_ENV: production
-      STORAGE_TYPE: minio
-      STORAGE_BUCKET: avatars
-      BANNER_BUCKET: course-banners
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_started
     restart: unless-stopped
 
   prometheus:

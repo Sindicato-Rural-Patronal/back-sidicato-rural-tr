@@ -1,6 +1,6 @@
 # Production compose — managed deploy (Hostinger Docker Manager) or manual VPS.
 #
-# Storage = Supabase (S3-compatible). No MinIO container needed.
+# Storage = Supabase (via @supabase/supabase-js). No storage container needed.
 #
 # Managed (Hostinger): paste the variables below into the platform's
 #   "Environment variables" field. The platform runs `docker compose` itself
@@ -9,8 +9,7 @@
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 #
 # Required env vars: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, JWT_SECRET,
-#   CORS_ORIGIN, STORAGE_BUCKET, BANNER_BUCKET, AWS_REGION, AWS_ACCESS_KEY_ID,
-#   AWS_SECRET_ACCESS_KEY, S3_ENDPOINT, S3_PUBLIC_URL.
+#   CORS_ORIGIN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
 #
 # No host bind mounts — managed platforms only copy the compose file.
 
@@ -43,15 +42,9 @@ services:
       PORT: 3000
       NODE_ENV: production
       CORS_ORIGIN: ${CORS_ORIGIN}
-      STORAGE_TYPE: s3
-      STORAGE_BUCKET: ${STORAGE_BUCKET}
-      BANNER_BUCKET: ${BANNER_BUCKET}
-      # Supabase S3-compatible storage
-      AWS_REGION: ${AWS_REGION}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
-      S3_ENDPOINT: ${S3_ENDPOINT}              # https://<ref>.storage.supabase.co/storage/v1/s3
-      S3_PUBLIC_URL: ${S3_PUBLIC_URL}          # https://<ref>.supabase.co/storage/v1/object/public
+      # Supabase Storage — service_role key (server-side only, bypasses RLS)
+      SUPABASE_URL: ${SUPABASE_URL}                          # https://<ref>.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
     depends_on:
       postgres:
         condition: service_healthy
