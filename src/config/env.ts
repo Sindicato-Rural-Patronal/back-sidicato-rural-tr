@@ -14,6 +14,7 @@ const envSchema = z.object({
     MINIO_ACCESS_KEY: z.string().optional(),
     MINIO_SECRET_KEY: z.string().optional(),
     STORAGE_BUCKET: z.string().default('avatars'),
+    CORS_ORIGIN: z.string().default('*'),
 });
 
 export type Env = z.infer<typeof envSchema>;

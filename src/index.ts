@@ -1,4 +1,5 @@
 import fastify from 'fastify';
+import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
@@ -12,13 +13,48 @@ import { roomRouter } from './http/router/room-router.js';
 import { dashboardRouter } from './http/router/dashboard-router.js';
 import { registrationRouter } from './http/router/registration-router.js';
 import { newsRouter } from './http/router/news-router.js';
+import { addressRouter } from './http/router/address-router.js';
+import { instructorRouter } from './http/router/instructor-router.js';
+import { contactRouter } from './http/router/contact-router.js';
+import { bannerRouter } from './http/router/banner-router.js';
+import { userRelationRouter } from './http/router/user-relation-router.js';
+import { userPropertyRouter } from './http/router/user-property-router.js';
 
 import { loadEnv } from './config/env.js';
 import { createPrismaClient } from './lib/prisma.js';
 import type { Permission } from './generated/prisma/enums.js';
 import { hash } from 'bcrypt';
 
-const server = fastify({ logger: true });
+const server = fastify({
+    logger: true,
+    disableRequestLogging: true,
+    ajv: {
+        customOptions: {
+            keywords: ['example'],
+        },
+    },
+});
+
+server.addHook('onRequest', (request, _reply, done) => {
+    request.log.info(
+        { method: request.method, url: request.url, remoteAddress: request.ip },
+        'incoming request',
+    );
+    done();
+});
+
+server.addHook('onResponse', (request, reply, done) => {
+    request.log.info(
+        {
+            method: request.method,
+            url: request.url,
+            statusCode: reply.statusCode,
+            responseTime: reply.elapsedTime,
+        },
+        'request completed',
+    );
+    done();
+});
 
 server.register(metrics, {
     endpoint: '/metrics',
@@ -84,6 +120,14 @@ server.register(multipart);
 const env = loadEnv();
 const prisma = createPrismaClient(env);
 
+server.register(cors, {
+    origin: env.CORS_ORIGIN === '*'
+        ? true
+        : env.CORS_ORIGIN.split(',').map(o => o.trim()),
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+});
+
 await firstInitialize();
 
 server.register(userDataRouter, prisma);
@@ -95,6 +139,12 @@ server.register(ruleRouter, prisma);
 server.register(dashboardRouter, prisma);
 server.register(registrationRouter, prisma);
 server.register(newsRouter, prisma);
+server.register(addressRouter, prisma);
+server.register(instructorRouter, prisma);
+server.register(contactRouter, prisma);
+server.register(bannerRouter, prisma);
+server.register(userRelationRouter, prisma);
+server.register(userPropertyRouter, prisma);
 
 server.listen({ port: env.PORT }, (err, address) => {
     if (err) {
@@ -130,6 +180,12 @@ async function firstInitialize() {
         'UPDATE_NEWS',
         'DELETE_NEWS',
         'READ_NEWS',
+        'READ_CONTACT',
+        'UPDATE_CONTACT',
+        'CREATE_BANNER',
+        'UPDATE_BANNER',
+        'DELETE_BANNER',
+        'READ_BANNER',
     ] as Permission[];
 
     if (superRule) {
