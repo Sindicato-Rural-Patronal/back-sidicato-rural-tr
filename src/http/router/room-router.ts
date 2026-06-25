@@ -70,7 +70,15 @@ properties: roomProperties } },
                 },
             },
         },
-        (req: FastifyRequest, res: FastifyReply) => listRoomsController.handle(req, res),
+        (
+            req: FastifyRequest<{
+ Querystring: {
+ page?: number;
+limit?: number 
+} 
+}>,
+            res: FastifyReply,
+        ) => listRoomsController.handle(req, res),
     );
 
     fastify.post(

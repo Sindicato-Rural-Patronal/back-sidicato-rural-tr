@@ -23,14 +23,14 @@ name: 'Sala B' },
             vi.mocked(mockRoomRepo.findAll).mockResolvedValue(fakeRooms as any);
             const uc = new ListRoomsUseCase(mockRoomRepo);
             const result = await uc.execute();
-            expect(result.rooms).toHaveLength(2);
+            expect(result.data).toHaveLength(2);
         });
 
         it('retorna lista vazia quando não há salas', async () => {
             vi.mocked(mockRoomRepo.findAll).mockResolvedValue([]);
             const uc = new ListRoomsUseCase(mockRoomRepo);
             const result = await uc.execute();
-            expect(result.rooms).toHaveLength(0);
+            expect(result.data).toHaveLength(0);
         });
     });
 });

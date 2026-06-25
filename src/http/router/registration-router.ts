@@ -214,8 +214,16 @@ properties: { error: { type: 'string' } } },
                 },
             },
         },
-        (req: FastifyRequest<{ Params: { courseId: string } }>, res: FastifyReply) =>
-            listController.handle(req, res),
+        (
+            req: FastifyRequest<{
+                Params: { courseId: string };
+                Querystring: {
+ page?: number;
+limit?: number 
+};
+            }>,
+            res: FastifyReply,
+        ) => listController.handle(req, res),
     );
 
     fastify.delete(

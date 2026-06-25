@@ -15,26 +15,6 @@ const mockUserRepo = {
     delete: vi.fn(),
 } as unknown as UserDataRepository;
 
-const fakeAddress = {
-    id: 'addr-001',
-    type: 'URBAN' as const,
-    city: 'Terra Roxa',
-    state: 'PR',
-    zipCode: '85990-000',
-    street: 'Av da Saudade',
-    number: '991',
-    neighborhood: 'Centro',
-    complement: null,
-    notes: null,
-    localityName: null,
-    road: null,
-    km: null,
-    lot: null,
-    section: null,
-    createdAt: new Date('2026-01-01'),
-    updatedAt: new Date('2026-01-01'),
-};
-
 const fakeRelation = {
     id: 'rel-001',
     sourceId: 'user-001',
@@ -64,10 +44,8 @@ const fakeUserWithRelations = {
     cpf: '11122233344',
     cnpj: null,
     avatar: null,
-    addressId: 'addr-001',
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
-    address: fakeAddress,
     relations: [fakeRelation],
     properties: [fakeProperty],
 };
@@ -97,14 +75,6 @@ describe('GetUserDetailUseCase', () => {
             vi.mocked(mockUserRepo.findByIdWithRelations).mockResolvedValue(
                 fakeUserWithRelations as any,
             );
-        });
-
-        it('retorna o usuário com endereço', async () => {
-            const uc = new GetUserDetailUseCase(mockUserRepo);
-            const result = await uc.execute('user-001');
-            expect(result.error).toBeUndefined();
-            expect(result.user?.address?.city).toBe('Terra Roxa');
-            expect(result.user?.address?.type).toBe('URBAN');
         });
 
         it('retorna as relações com dados básicos do destino', async () => {

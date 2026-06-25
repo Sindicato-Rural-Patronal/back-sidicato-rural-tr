@@ -21,14 +21,14 @@ userData: { name: 'João' } }];
             const uc = new ListCourseRegistrationsUseCase(mockRegistrationRepo);
             const result = await uc.execute('course-001');
             expect(result.error).toBeUndefined();
-            expect(result.registrations).toHaveLength(1);
+            expect(result.data).toHaveLength(1);
         });
 
         it('retorna lista vazia se não há inscrições', async () => {
             vi.mocked(mockRegistrationRepo.findByCourseId).mockResolvedValue([]);
             const uc = new ListCourseRegistrationsUseCase(mockRegistrationRepo);
             const result = await uc.execute('course-001');
-            expect(result.registrations).toHaveLength(0);
+            expect(result.data).toHaveLength(0);
         });
     });
 });
