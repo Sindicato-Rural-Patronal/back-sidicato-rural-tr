@@ -148,6 +148,29 @@ server.register(bannerRouter, prisma);
 server.register(userRelationRouter, prisma);
 server.register(userPropertyRouter, prisma);
 
+server.get(
+    '/',
+    {
+        schema: {
+            tags: ['Health'],
+            summary: 'Health check',
+            response: {
+                200: {
+                    type: 'object',
+                    properties: {
+                        status: { type: 'string' },
+                        uptime: { type: 'number' },
+                    },
+                },
+            },
+        },
+    },
+    async () => ({
+        status: 'ok',
+        uptime: process.uptime(),
+    }),
+);
+
 server.listen({ port: env.PORT,
 host: '0.0.0.0' }, (err, address) => {
     if (err) {
