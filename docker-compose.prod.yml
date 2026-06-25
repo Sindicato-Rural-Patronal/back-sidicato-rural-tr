@@ -1,9 +1,17 @@
-# Production compose for VPS deploy.
-# Run with:  docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+# Production compose — managed deploy (Hostinger Docker Manager) or manual VPS.
 #
-# All secrets come from .env.production (see .env.production.example).
-# Postgres is NOT published to the internet — only reachable inside the compose network.
-# MinIO :9000 IS published because file URLs (getPublicUrl) are returned to the browser.
+# Managed (Hostinger): paste the variables below into the platform's
+#   "Environment variables" field. The platform runs `docker compose` itself
+#   and does NOT use --env-file, so an .env.production file is ignored.
+# Manual VPS:
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# Required env vars: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, JWT_SECRET,
+#   CORS_ORIGIN, STORAGE_BUCKET, BANNER_BUCKET, MINIO_ACCESS_KEY, MINIO_SECRET_KEY,
+#   MINIO_ENDPOINT (public address browsers reach, e.g. http://SEU_IP:9000).
+#
+# No host bind mounts here — managed platforms only copy the compose file, not
+# the rest of the repo, so bind-mounted config files would fail to mount.
 
 services:
   postgres:
@@ -35,11 +43,6 @@ services:
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: unless-stopped
 
   api:
@@ -67,37 +70,6 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: sindicato_prometheus
-    ports:
-      - "127.0.0.1:9090:9090"     # admin-only: localhost, reach via SSH tunnel
-    volumes:
-      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=15d'
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: sindicato_grafana
-    ports:
-      - "127.0.0.1:3001:3000"     # admin-only: localhost, reach via SSH tunnel
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
-      GF_USERS_ALLOW_SIGN_UP: 'false'
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./observability/grafana/provisioning:/etc/grafana/provisioning
-    depends_on:
-      - prometheus
-    restart: unless-stopped
-
 volumes:
   postgres_data:
   minio_data:
-  prometheus_data:
-  grafana_data:
