@@ -11,9 +11,9 @@
 # Required env vars: DATABASE_URL, JWT_SECRET, CORS_ORIGIN,
 #   SUPABASE_URL, SUPABASE_SECRET_KEY.
 #
-# DATABASE_URL must be the Supabase Postgres connection string. Use the DIRECT
-# connection (port 5432) so `prisma migrate deploy` works on boot — the pooled
-# connection (port 6543 / pgbouncer) does not support migrations.
+# DATABASE_URL must be the Supabase "Session pooler" string (IPv4, port 5432) —
+# host aws-0-<region>.pooler.supabase.com, user postgres.<project-ref>. The Direct
+# connection (db.<ref>.supabase.co) is IPv6-only and unreachable from Docker.
 
 services:
   api:
