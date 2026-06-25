@@ -1,72 +1,18 @@
-# Local development stack. Storage uses Supabase (set SUPABASE_* in .env).
-# For production use docker-compose.prod.yml.
+# Local stack — API only. Database and storage are external (Supabase).
+# Set DATABASE_URL, JWT_SECRET and SUPABASE_* in .env. For production use
+# docker-compose.prod.yml.
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: sindicato_rural_db
-    environment:
-      POSTGRES_USER: dev
-      POSTGRES_PASSWORD: dev
-      POSTGRES_DB: sindicato_rural_tr_dev
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dev -d sindicato_rural_tr_dev"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
   api:
     build: .
     container_name: sindicato_api
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://dev:dev@postgres:5432/sindicato_rural_tr_dev
+      DATABASE_URL: ${DATABASE_URL:-}
       JWT_SECRET: ${JWT_SECRET:-dev_secret_32_chars_minimum_here}
       PORT: 3000
       NODE_ENV: production
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: sindicato_prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=15d'
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: sindicato_grafana
-    ports:
-      - "3001:3000"
-    environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
-      GF_USERS_ALLOW_SIGN_UP: 'false'
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./observability/grafana/provisioning:/etc/grafana/provisioning
-    depends_on:
-      - prometheus
-    restart: unless-stopped
-
-volumes:
-  postgres_data:
-  prometheus_data:
-  grafana_data:

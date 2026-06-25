@@ -1,6 +1,6 @@
-# Production compose — managed deploy (Hostinger Docker Manager) or manual VPS.
+# Production compose — API only.
 #
-# Storage = Supabase (via @supabase/supabase-js). No storage container needed.
+# Storage AND database are external (Supabase), so this stack runs just the API.
 #
 # Managed (Hostinger): paste the variables below into the platform's
 #   "Environment variables" field. The platform runs `docker compose` itself
@@ -8,36 +8,21 @@
 # Manual VPS:
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 #
-# Required env vars: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, JWT_SECRET,
-#   CORS_ORIGIN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+# Required env vars: DATABASE_URL, JWT_SECRET, CORS_ORIGIN,
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
 #
-# No host bind mounts — managed platforms only copy the compose file.
+# DATABASE_URL must be the Supabase Postgres connection string. Use the DIRECT
+# connection (port 5432) so `prisma migrate deploy` works on boot — the pooled
+# connection (port 6543 / pgbouncer) does not support migrations.
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: sindicato_rural_db
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    # No "ports:" — DB stays private to the docker network. Reach it via `docker compose exec`.
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
   api:
     build: .
     container_name: sindicato_api
     ports:
       - "3000:3000"               # put a reverse proxy (Caddy/nginx) in front for TLS
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3000
       NODE_ENV: production
@@ -45,10 +30,4 @@ services:
       # Supabase Storage — service_role key (server-side only, bypasses RLS)
       SUPABASE_URL: ${SUPABASE_URL}                          # https://<ref>.supabase.co
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
-
-volumes:
-  postgres_data:
