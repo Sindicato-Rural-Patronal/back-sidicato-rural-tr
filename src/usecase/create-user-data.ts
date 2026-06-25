@@ -1,5 +1,8 @@
 import type { UserDataRepository } from '../ports/external/user-data-repository.js';
 import { UserAlreadyExistsError } from '../errors/conflict.js';
+import { ValidationError } from '../errors/validation.js';
+import { isValidCpf } from '../lib/cpf.js';
+import { isValidBrPhone } from '../lib/br-validators.js';
 
 type CreateUserRequest = {
     name: string;
@@ -24,13 +27,16 @@ export class CreateUserUseCase {
     constructor(private userDataRepository: UserDataRepository) {}
 
     async execute(request: CreateUserRequest): Promise<CreateUserResponse> {
-        console.log(`[CreateUser] email="${request.email}" phone="${request.phone}"`);
-        const existingUser = await this.userDataRepository.findByEmailOurPhone(
-            request.email,
-            request.phone,
-        );
+        if (!isValidCpf(request.cpf)) {
+            return { error: new ValidationError('CPF inválido') };
+        }
+        if (!isValidBrPhone(request.phone)) {
+            return { error: new ValidationError('Telefone inválido (DDD + 8 ou 9 dígitos)') };
+        }
+
+        const existingUser = await this.userDataRepository.findByCpf(request.cpf);
         if (existingUser) {
-            console.log(`[CreateUser] conflict: user already exists email="${request.email}"`);
+            console.log(`[CreateUser] conflict: CPF already registered cpf="${request.cpf}"`);
             return { error: new UserAlreadyExistsError() };
         }
 

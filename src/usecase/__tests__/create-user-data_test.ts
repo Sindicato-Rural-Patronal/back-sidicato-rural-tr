@@ -4,9 +4,10 @@ import type { UserDataRepository } from '../../ports/external/user-data-reposito
 
 const mockUserRepo = {
     create: vi.fn(),
-    findByEmailOurPhone: vi.fn(),
     findById: vi.fn(),
     findAll: vi.fn(),
+    findByCpf: vi.fn(),
+    findByRg: vi.fn(),
     findByEmailOrCpf: vi.fn(),
 } as unknown as UserDataRepository;
 
@@ -14,7 +15,7 @@ const validInput = {
     name: 'João Silva',
     email: 'joao@example.com',
     phone: '11999998888',
-    cpf: '12345678901',
+    cpf: '52998224725',
 };
 
 const fakeUser = {
@@ -32,17 +33,17 @@ const fakeUser = {
 describe('CreateUserUseCase', () => {
     beforeEach(() => vi.clearAllMocks());
 
-    describe('unicidade de email e telefone', () => {
-        it('retorna erro se email ou telefone já cadastrado', async () => {
-            vi.mocked(mockUserRepo.findByEmailOurPhone).mockResolvedValue(fakeUser as any);
+    describe('unicidade de CPF', () => {
+        it('retorna erro se CPF já cadastrado', async () => {
+            vi.mocked(mockUserRepo.findByCpf).mockResolvedValue(fakeUser as any);
             const uc = new CreateUserUseCase(mockUserRepo);
             const result = await uc.execute(validInput);
             expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('User already exists');
         });
 
-        it('não cria usuário se duplicata encontrada', async () => {
-            vi.mocked(mockUserRepo.findByEmailOurPhone).mockResolvedValue(fakeUser as any);
+        it('não cria usuário se CPF duplicado', async () => {
+            vi.mocked(mockUserRepo.findByCpf).mockResolvedValue(fakeUser as any);
             const uc = new CreateUserUseCase(mockUserRepo);
             await uc.execute(validInput);
             expect(mockUserRepo.create).not.toHaveBeenCalled();
@@ -51,7 +52,7 @@ describe('CreateUserUseCase', () => {
 
     describe('criação bem-sucedida', () => {
         it('retorna dados do usuário criado', async () => {
-            vi.mocked(mockUserRepo.findByEmailOurPhone).mockResolvedValue(null);
+            vi.mocked(mockUserRepo.findByCpf).mockResolvedValue(null);
             vi.mocked(mockUserRepo.create).mockResolvedValue(fakeUser as any);
             const uc = new CreateUserUseCase(mockUserRepo);
             const result = await uc.execute(validInput);
@@ -64,7 +65,7 @@ describe('CreateUserUseCase', () => {
 
     describe('falha no repositório', () => {
         it('retorna erro se repositório falhar na criação', async () => {
-            vi.mocked(mockUserRepo.findByEmailOurPhone).mockResolvedValue(null);
+            vi.mocked(mockUserRepo.findByCpf).mockResolvedValue(null);
             vi.mocked(mockUserRepo.create).mockResolvedValue(null);
             const uc = new CreateUserUseCase(mockUserRepo);
             const result = await uc.execute(validInput);
