@@ -25,6 +25,10 @@ data });
         return this.prisma.address.findUnique({ where: { id } });
     }
 
+    findByCep(zipCode: string): Promise<Address | null> {
+        return this.prisma.address.findFirst({ where: { zipCode } });
+    }
+
     async delete(id: string): Promise<void> {
         await this.prisma.address.delete({ where: { id } });
     }

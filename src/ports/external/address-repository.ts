@@ -21,5 +21,6 @@ export interface AddressRepository {
     create(data: AddressCreateInput): Promise<Address>;
     update(id: string, data: Partial<AddressCreateInput>): Promise<Address | null>;
     findById(id: string): Promise<Address | null>;
+    findByCep(zipCode: string): Promise<Address | null>;
     delete(id: string): Promise<void>;
 }
