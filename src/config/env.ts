@@ -9,12 +9,13 @@ const envSchema = z.object({
     PORT: z.coerce.number().int().positive().default(3000),
     DATABASE_URL: z.string(),
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
-    STORAGE_TYPE: z.enum(['minio', 's3']).default('minio'),
-    MINIO_ENDPOINT: z.string().optional(),
-    MINIO_ACCESS_KEY: z.string().optional(),
-    MINIO_SECRET_KEY: z.string().optional(),
-    STORAGE_BUCKET: z.string().default('avatars'),
     CORS_ORIGIN: z.string().default('*'),
+    // Supabase Storage
+    SUPABASE_URL: z.string().optional(),
+    SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+    STORAGE_BUCKET: z.string().default('avatars'),
+    BANNER_BUCKET: z.string().default('course-banners'),
+    NEWS_BANNER_BUCKET: z.string().default('news-banners'),
 });
 
 export type Env = z.infer<typeof envSchema>;

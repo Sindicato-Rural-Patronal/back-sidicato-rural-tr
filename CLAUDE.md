@@ -8,7 +8,7 @@ Backend de um **Sindicato Rural** para gerenciar fichas completas de associados 
 - **Framework HTTP**: Fastify v5 + `@fastify/multipart` (upload de arquivos)
 - **ORM**: Prisma 7 com driver `@prisma/adapter-pg` (PostgreSQL nativo)
 - **Auth**: JWT (`jsonwebtoken`) + bcrypt para hash de senhas
-- **Storage**: AWS S3 (produção) ou MinIO (desenvolvimento)
+- **Storage**: Supabase Storage (`@supabase/supabase-js`)
 - **Validação de env**: Zod — falha na inicialização se variáveis estiverem faltando
 - **Dev**: `tsx watch` para hot reload
 
@@ -19,12 +19,12 @@ DATABASE_URL=
 JWT_SECRET=               # mínimo 32 caracteres
 PORT=3000
 NODE_ENV=development
-STORAGE_TYPE=minio        # minio | s3
-MINIO_ENDPOINT=
-MINIO_ACCESS_KEY=
-MINIO_SECRET_KEY=
+CORS_ORIGIN=*
+SUPABASE_URL=                # https://<ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=   # service_role key (server-side, bypassa RLS)
 STORAGE_BUCKET=avatars
 BANNER_BUCKET=course-banners
+NEWS_BANNER_BUCKET=news-banners
 ```
 
 ## Arquitetura (Hexagonal / Ports & Adapters)
@@ -51,7 +51,7 @@ src/
   ports/external/             — interfaces TypeScript dos repositórios
   adapter/
     database/                 — implementações Prisma das interfaces de repositório
-    storage/                  — S3 e MinIO, selecionados via factory
+    storage/                  — adapter do Supabase Storage (via factory)
   generated/prisma/           — tipos gerados pelo Prisma (não editar)
 ```
 
@@ -404,7 +404,7 @@ async handle(request: FastifyRequest<{ Params: { id: string } }>, reply: Fastify
 }
 ```
 
-O `StorageRepository` é instanciado via `createStorageAdapter()` (sem parâmetros — lê `STORAGE_TYPE` do env).
+O `StorageRepository` é instanciado via `createStorageAdapter()` (sem parâmetros — retorna o `SupabaseStorageAdapter`, que lê `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` do env).
 
 ## Autenticação
 
@@ -490,5 +490,5 @@ npm run prisma:studio    # interface visual do banco
 - Importações internas devem usar extensão `.js` nos paths (requisito ESM)
 - Os tipos do Prisma são importados de `src/generated/prisma/` — nunca editar esses arquivos
 - O `PrismaClient` é importado de `../generated/prisma/client.js` (não do pacote padrão)
-- O `StorageAdapter` é instanciado via factory `createStorageAdapter()` que lê `STORAGE_TYPE` do env
+- O `StorageAdapter` é instanciado via factory `createStorageAdapter()` (Supabase Storage; buckets devem existir e ser públicos: `avatars`, `course-banners`, `news-banners`)
 - Todos os métodos de busca por email/CPF/telefone no `UserDataAdapter` filtram `isDeleted: false` — soft-deleted users não retornam em conflict checks

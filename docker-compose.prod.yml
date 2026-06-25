@@ -1,103 +1,33 @@
-# Production compose for VPS deploy.
-# Run with:  docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+# Production compose — API only.
 #
-# All secrets come from .env.production (see .env.production.example).
-# Postgres is NOT published to the internet — only reachable inside the compose network.
-# MinIO :9000 IS published because file URLs (getPublicUrl) are returned to the browser.
+# Storage AND database are external (Supabase), so this stack runs just the API.
+#
+# Managed (Hostinger): paste the variables below into the platform's
+#   "Environment variables" field. The platform runs `docker compose` itself
+#   and does NOT use --env-file, so an .env.production file is ignored.
+# Manual VPS:
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# Required env vars: DATABASE_URL, JWT_SECRET, CORS_ORIGIN,
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+#
+# DATABASE_URL must be the Supabase Postgres connection string. Use the DIRECT
+# connection (port 5432) so `prisma migrate deploy` works on boot — the pooled
+# connection (port 6543 / pgbouncer) does not support migrations.
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: sindicato_rural_db
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    # No "ports:" — DB stays private to the docker network. Reach it via `docker compose exec`.
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-  minio:
-    image: minio/minio
-    container_name: sindicato_minio
-    ports:
-      - "9000:9000"               # public: serves uploaded files to browsers
-      - "127.0.0.1:9001:9001"     # console: localhost only (use SSH tunnel to reach it)
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
   api:
     build: .
     container_name: sindicato_api
     ports:
       - "3000:3000"               # put a reverse proxy (Caddy/nginx) in front for TLS
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3000
       NODE_ENV: production
       CORS_ORIGIN: ${CORS_ORIGIN}
-      STORAGE_TYPE: minio
-      STORAGE_BUCKET: ${STORAGE_BUCKET}
-      BANNER_BUCKET: ${BANNER_BUCKET}
-      # MUST be the PUBLIC address browsers can reach (VPS IP or domain), NOT http://minio:9000
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_started
+      # Supabase Storage — service_role key (server-side only, bypasses RLS)
+      SUPABASE_URL: ${SUPABASE_URL}                          # https://<ref>.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
     restart: unless-stopped
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: sindicato_prometheus
-    ports:
-      - "127.0.0.1:9090:9090"     # admin-only: localhost, reach via SSH tunnel
-    volumes:
-      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=15d'
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: sindicato_grafana
-    ports:
-      - "127.0.0.1:3001:3000"     # admin-only: localhost, reach via SSH tunnel
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
-      GF_USERS_ALLOW_SIGN_UP: 'false'
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./observability/grafana/provisioning:/etc/grafana/provisioning
-    depends_on:
-      - prometheus
-    restart: unless-stopped
-
-volumes:
-  postgres_data:
-  minio_data:
-  prometheus_data:
-  grafana_data:
