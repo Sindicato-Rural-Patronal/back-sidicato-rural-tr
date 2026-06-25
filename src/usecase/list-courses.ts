@@ -21,7 +21,6 @@ export class ListCoursesUseCase {
     async execute(onlyPublic = true, page = 1, limit = 20): Promise<ListCoursesResponse> {
         const filters: CourseListFilters = onlyPublic ? { status: CourseStatus.PUBLIC } : {};
         const skip = (page - 1) * limit;
-        console.log(`[ListCourses] onlyPublic=${onlyPublic} page=${page} limit=${limit}`);
         const [courses, total] = await Promise.all([
             this.courseRepository.findAll(filters, skip, limit),
             this.courseRepository.count(filters),

@@ -19,7 +19,9 @@ const mockUserRepo = {
 const mockRelationRepo = {
     create: vi.fn(),
     findBySourceId: vi.fn(),
+    countBySourceId: vi.fn().mockResolvedValue(0),
     findById: vi.fn(),
+    findBySourceAndTarget: vi.fn(),
     delete: vi.fn(),
 } as unknown as UserRelationRepository;
 

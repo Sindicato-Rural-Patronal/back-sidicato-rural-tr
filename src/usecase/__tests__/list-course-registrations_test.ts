@@ -6,6 +6,7 @@ const mockRegistrationRepo = {
     create: vi.fn(),
     findById: vi.fn(),
     findByCourseId: vi.fn(),
+    countByCourseId: vi.fn().mockResolvedValue(0),
     findByUserDataAndCourse: vi.fn(),
     delete: vi.fn(),
 } as unknown as RegistrationRepository;

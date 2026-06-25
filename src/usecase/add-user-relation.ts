@@ -24,8 +24,6 @@ export class AddUserRelationUseCase {
             return { error: new ValidationError('A member cannot be related to themselves') };
         }
 
-        console.log(`[AddUserRelation] sourceId="${sourceId}" targetId="${targetId}"`);
-
         const source = await this.userDataRepository.findById(sourceId);
         if (!source) return { error: new UserDataNotFoundError() };
 
@@ -35,13 +33,11 @@ export class AddUserRelationUseCase {
         const relation = await this.userRelationRepository.create({ sourceId,
 targetId,
 label });
-        console.log(`[AddUserRelation] created relationId="${relation.id}"`);
 
         const inverseExists = await this.userRelationRepository.findBySourceAndTarget(targetId, sourceId);
         if (!inverseExists) {
             await this.userRelationRepository.create({ sourceId: targetId,
 targetId: sourceId });
-            console.log(`[AddUserRelation] created inverse relation ${targetId}→${sourceId}`);
         }
 
         return { relation };

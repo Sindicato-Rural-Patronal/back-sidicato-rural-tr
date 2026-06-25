@@ -6,6 +6,7 @@ const mockRoomRepo = {
     create: vi.fn(),
     findById: vi.fn(),
     findAll: vi.fn(),
+    count: vi.fn().mockResolvedValue(0),
     delete: vi.fn(),
 } as unknown as RoomRepository;
 

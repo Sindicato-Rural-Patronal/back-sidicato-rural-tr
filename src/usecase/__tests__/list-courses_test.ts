@@ -46,14 +46,18 @@ describe('ListCoursesUseCase', () => {
             vi.mocked(mockCourseRepo.findAll).mockResolvedValue([baseCourse as any]);
             const uc = new ListCoursesUseCase(mockCourseRepo);
             await uc.execute();
-            expect(mockCourseRepo.findAll).toHaveBeenCalledWith(CourseStatus.PUBLIC, 0, 20);
+            expect(mockCourseRepo.findAll).toHaveBeenCalledWith(
+                { status: CourseStatus.PUBLIC },
+                0,
+                20,
+            );
         });
 
         it('busca todos os cursos quando onlyPublic=false', async () => {
             vi.mocked(mockCourseRepo.findAll).mockResolvedValue([baseCourse as any]);
             const uc = new ListCoursesUseCase(mockCourseRepo);
             await uc.execute(false);
-            expect(mockCourseRepo.findAll).toHaveBeenCalledWith(undefined, 0, 20);
+            expect(mockCourseRepo.findAll).toHaveBeenCalledWith({}, 0, 20);
         });
 
         it('retorna lista mapeada para formato frontend', async () => {
