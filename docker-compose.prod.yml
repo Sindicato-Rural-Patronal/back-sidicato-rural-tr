@@ -1,5 +1,7 @@
 # Production compose — managed deploy (Hostinger Docker Manager) or manual VPS.
 #
+# Storage = Supabase (S3-compatible). No MinIO container needed.
+#
 # Managed (Hostinger): paste the variables below into the platform's
 #   "Environment variables" field. The platform runs `docker compose` itself
 #   and does NOT use --env-file, so an .env.production file is ignored.
@@ -7,11 +9,10 @@
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 #
 # Required env vars: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, JWT_SECRET,
-#   CORS_ORIGIN, STORAGE_BUCKET, BANNER_BUCKET, MINIO_ACCESS_KEY, MINIO_SECRET_KEY,
-#   MINIO_ENDPOINT (public address browsers reach, e.g. http://SEU_IP:9000).
+#   CORS_ORIGIN, STORAGE_BUCKET, BANNER_BUCKET, AWS_REGION, AWS_ACCESS_KEY_ID,
+#   AWS_SECRET_ACCESS_KEY, S3_ENDPOINT, S3_PUBLIC_URL.
 #
-# No host bind mounts here — managed platforms only copy the compose file, not
-# the rest of the repo, so bind-mounted config files would fail to mount.
+# No host bind mounts — managed platforms only copy the compose file.
 
 services:
   postgres:
@@ -31,20 +32,6 @@ services:
       retries: 10
     restart: unless-stopped
 
-  minio:
-    image: minio/minio
-    container_name: sindicato_minio
-    ports:
-      - "9000:9000"               # public: serves uploaded files to browsers
-      - "127.0.0.1:9001:9001"     # console: localhost only (use SSH tunnel to reach it)
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
-    restart: unless-stopped
-
   api:
     build: .
     container_name: sindicato_api
@@ -56,20 +43,19 @@ services:
       PORT: 3000
       NODE_ENV: production
       CORS_ORIGIN: ${CORS_ORIGIN}
-      STORAGE_TYPE: minio
+      STORAGE_TYPE: s3
       STORAGE_BUCKET: ${STORAGE_BUCKET}
       BANNER_BUCKET: ${BANNER_BUCKET}
-      # MUST be the PUBLIC address browsers can reach (VPS IP or domain), NOT http://minio:9000
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      # Supabase S3-compatible storage
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_ENDPOINT: ${S3_ENDPOINT}              # https://<ref>.storage.supabase.co/storage/v1/s3
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL}          # https://<ref>.supabase.co/storage/v1/object/public
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_started
     restart: unless-stopped
 
 volumes:
   postgres_data:
-  minio_data:

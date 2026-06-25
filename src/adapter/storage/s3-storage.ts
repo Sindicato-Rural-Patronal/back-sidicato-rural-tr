@@ -16,12 +16,35 @@ import type {
 
 export class S3StorageAdapter implements StorageRepository {
     private client: S3Client;
+    private region: string;
 
     constructor() {
+        this.region = process.env.AWS_REGION || 'us-east-1';
+        // S3_ENDPOINT set → S3-compatible provider (Supabase, MinIO, R2, etc.)
+        const endpoint = process.env.S3_ENDPOINT;
+        const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+        const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+
         this.client = new S3Client({
-            region: process.env.AWS_REGION || 'us-east-1',
-            // Credenciais serão obtidas do ambiente (IAM, ~/.aws, ou env vars)
+            region: this.region,
+            ...(endpoint
+                ? { endpoint,
+forcePathStyle: true }
+                : {}),
+            // Explicit creds when provided; otherwise fall back to the SDK default chain (IAM, ~/.aws).
+            ...(accessKeyId && secretAccessKey
+                ? { credentials: { accessKeyId,
+secretAccessKey } }
+                : {}),
         });
+    }
+
+    // Public URL base. Supabase serves public objects at a different host than the S3 API,
+    // so S3_PUBLIC_URL must be set (e.g. https://<ref>.supabase.co/storage/v1/object/public).
+    private publicBase(bucket: string, key: string): string {
+        const base = process.env.S3_PUBLIC_URL;
+        if (base) return `${base.replace(/\/$/, '')}/${bucket}/${key}`;
+        return `https://${bucket}.s3.${this.region}.amazonaws.com/${key}`;
     }
 
     async uploadFile(params: UploadParams): Promise<UploadResult> {
@@ -34,9 +57,7 @@ export class S3StorageAdapter implements StorageRepository {
 
         await this.client.send(command);
 
-        // Constroi uma URL pública (se o bucket for público) ou apenas o identificador
-        const location = `https://${params.bucket}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${params.key}`;
-        return { location,
+        return { location: this.publicBase(params.bucket, params.key),
 key: params.key,
 bucket: params.bucket };
     }
@@ -55,8 +76,7 @@ Key: key });
     }
 
     getPublicUrl(bucket: string, key: string): string {
-        const region = process.env.AWS_REGION || 'us-east-1';
-        return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+        return this.publicBase(bucket, key);
     }
 
     async deleteFile(bucket: string, key: string): Promise<void> {
