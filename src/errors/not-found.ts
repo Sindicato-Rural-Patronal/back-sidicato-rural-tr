@@ -90,3 +90,31 @@ export class PropertyNotFoundError extends NotFoundError {
         this.name = 'PropertyNotFoundError';
     }
 }
+
+export class AddressNotFoundError extends NotFoundError {
+    constructor() {
+        super('CEP not found');
+        this.name = 'AddressNotFoundError';
+    }
+}
+
+export class InstructorNotFoundError extends NotFoundError {
+    constructor() {
+        super('Instructor not found');
+        this.name = 'InstructorNotFoundError';
+    }
+}
+
+export class ContactMessageNotFoundError extends NotFoundError {
+    constructor() {
+        super('Contact message not found');
+        this.name = 'ContactMessageNotFoundError';
+    }
+}
+
+export class BannerNotFoundError extends NotFoundError {
+    constructor() {
+        super('Banner not found');
+        this.name = 'BannerNotFoundError';
+    }
+}
