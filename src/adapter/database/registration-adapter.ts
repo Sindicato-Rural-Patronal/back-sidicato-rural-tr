@@ -30,18 +30,24 @@ userDataId },
     }
 
     findById(id: string): Promise<RegistrationWithUserData | null> {
-        return this.prisma.courseUserRegistration.findUnique({
-            where: { id },
+        return this.prisma.courseUserRegistration.findFirst({
+            where: { id, isDeleted: false },
             include: { userData: { select: userDataSelect } },
         });
     }
 
-    findByCourseId(courseId: string): Promise<RegistrationWithUserData[]> {
+    findByCourseId(courseId: string, skip?: number, take?: number): Promise<RegistrationWithUserData[]> {
         return this.prisma.courseUserRegistration.findMany({
-            where: { courseId },
+            where: { courseId, isDeleted: false },
             include: { userData: { select: userDataSelect } },
             orderBy: { createdAt: 'desc' },
+            skip,
+            take,
         });
+    }
+
+    countByCourseId(courseId: string): Promise<number> {
+        return this.prisma.courseUserRegistration.count({ where: { courseId, isDeleted: false } });
     }
 
     findByUserDataAndCourse(
@@ -49,14 +55,20 @@ userDataId },
         courseId: string,
     ): Promise<courseUserRegistrationModel | null> {
         return this.prisma.courseUserRegistration.findFirst({
-            where: { userDataId,
-courseId },
+            where: { userDataId, courseId, isDeleted: false },
         });
+    }
+
+    count(): Promise<number> {
+        return this.prisma.courseUserRegistration.count({ where: { isDeleted: false } });
     }
 
     async delete(id: string): Promise<boolean> {
         try {
-            await this.prisma.courseUserRegistration.delete({ where: { id } });
+            await this.prisma.courseUserRegistration.update({
+                where: { id },
+                data: { isDeleted: true, deletedAt: new Date() },
+            });
             return true;
         } catch {
             return false;

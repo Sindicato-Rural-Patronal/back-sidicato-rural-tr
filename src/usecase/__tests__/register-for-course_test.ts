@@ -18,7 +18,7 @@ const mockCourseRepo = {
 const mockUserDataRepo = {
     create: vi.fn(),
     findById: vi.fn(),
-    findByEmailOurPhone: vi.fn(),
+    findByEmailOrPhone: vi.fn(),
     findByEmailOrCpf: vi.fn(),
     findAll: vi.fn(),
 } as unknown as UserDataRepository;
@@ -36,7 +36,7 @@ const validInput = {
     name: 'João Silva',
     phone: '11999999999',
     email: 'joao@email.com',
-    cpf: '12345678901',
+    cpf: '52998224725',
 };
 
 const publishedCourse = { id: validInput.courseId,

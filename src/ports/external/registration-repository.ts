@@ -6,10 +6,12 @@ export type RegistrationWithUserData = courseUserRegistrationModel & {userData: 
 export interface RegistrationRepository {
     create(courseId: string, userDataId: string): Promise<courseUserRegistrationModel>;
     findById(id: string): Promise<RegistrationWithUserData | null>;
-    findByCourseId(courseId: string): Promise<RegistrationWithUserData[]>;
+    findByCourseId(courseId: string, skip?: number, take?: number): Promise<RegistrationWithUserData[]>;
+    countByCourseId(courseId: string): Promise<number>;
     findByUserDataAndCourse(
         userDataId: string,
         courseId: string,
     ): Promise<courseUserRegistrationModel | null>;
+    count(): Promise<number>;
     delete(id: string): Promise<boolean>;
 }

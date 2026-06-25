@@ -5,16 +5,22 @@ import type {
 
 type Response = {
     error?: Error;
-    registrations?: RegistrationWithUserData[];
+    data?: RegistrationWithUserData[];
+    total?: number;
+    page?: number;
+    limit?: number;
+    totalPages?: number;
 };
 
 export class ListCourseRegistrationsUseCase {
     constructor(private readonly registrationRepository: RegistrationRepository) {}
 
-    async execute(courseId: string): Promise<Response> {
-        console.log(`[ListCourseRegistrations] courseId="${courseId}"`);
-        const registrations = await this.registrationRepository.findByCourseId(courseId);
-        console.log(`[ListCourseRegistrations] returning ${registrations.length} registrations`);
-        return { registrations };
+    async execute(courseId: string, page = 1, limit = 20): Promise<Response> {
+        const skip = (page - 1) * limit;
+        const [data, total] = await Promise.all([
+            this.registrationRepository.findByCourseId(courseId, skip, limit),
+            this.registrationRepository.countByCourseId(courseId),
+        ]);
+        return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
     }
 }
