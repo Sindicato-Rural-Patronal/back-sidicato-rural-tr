@@ -13,9 +13,9 @@ export class AddPropertyController {
 
     async handle(
         request: FastifyRequest<{
- Params: { id: string };
-Body: Body 
-}>,
+            Params: { id: string };
+            Body: Body;
+        }>,
         reply: FastifyReply,
     ) {
         if (

@@ -6,12 +6,13 @@ import type {
 } from '../ports/external/address-repository.js';
 import type { Property } from '../generated/prisma/client.js';
 import { UserDataNotFoundError } from '../errors/not-found.js';
+import { ValidationError } from '../errors/validation.js';
 
 export type AddPropertyRequest = {
     userDataId: string;
     name: string;
     registration?: string;
-    address?: {
+    address: {
         type?: 'URBAN' | 'RURAL';
         city?: string;
         state?: string;
@@ -30,8 +31,8 @@ export type AddPropertyRequest = {
 };
 
 type AddPropertyResponse = {
- error?: Error;
-property?: Property 
+    error?: Error;
+    property?: Property;
 };
 
 export class AddPropertyUseCase {
@@ -45,22 +46,20 @@ export class AddPropertyUseCase {
         const { userDataId, name, registration, address } = request;
         console.log(`[AddProperty] userDataId="${userDataId}" name="${name}"`);
 
+        if (!name.trim()) return { error: new ValidationError('Property name is required') };
+        if (!address) return { error: new ValidationError('Address is required') };
+
         const user = await this.userDataRepository.findById(userDataId);
         if (!user) return { error: new UserDataNotFoundError() };
 
-        let addressId: string | undefined;
-        if (address) {
-            const addressData: AddressCreateInput = { type: address.type ?? 'URBAN',
-...address };
-            const created = await this.addressRepository.create(addressData);
-            addressId = created.id;
-        }
+        const addressData: AddressCreateInput = { type: address.type ?? 'URBAN', ...address };
+        const createdAddress = await this.addressRepository.create(addressData);
 
         const property = await this.propertyRepository.create({
             userDataId,
             name,
             registration,
-            addressId,
+            addressId: createdAddress.id,
         });
         console.log(`[AddProperty] created propertyId="${property.id}"`);
         return { property };

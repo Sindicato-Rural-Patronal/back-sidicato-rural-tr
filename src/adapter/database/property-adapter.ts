@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client/extension';
-import type { PropertyRepository } from '../../ports/external/property-repository.js';
-import type { PropertyModel as Property } from '../../generated/prisma/models/Property.js';
+import type { PropertyRepository, PropertyWithAddress } from '../../ports/external/property-repository.js';
+import type { Property } from '../../generated/prisma/client.js';
 
 export function createPropertyAdapter(prisma: PrismaClient): PropertyRepository {
     return new PropertyAdapter(prisma);
@@ -18,15 +18,27 @@ export class PropertyAdapter implements PropertyRepository {
         return this.prisma.property.create({ data });
     }
 
-    findByUserDataId(userDataId: string): Promise<Property[]> {
-        return this.prisma.property.findMany({ where: { userDataId } });
+    findByUserDataId(userDataId: string, skip?: number, take?: number): Promise<PropertyWithAddress[]> {
+        return this.prisma.property.findMany({
+            where: { userDataId, isDeleted: false },
+            include: { address: true },
+            skip,
+            take,
+        }) as Promise<PropertyWithAddress[]>;
+    }
+
+    countByUserDataId(userDataId: string): Promise<number> {
+        return this.prisma.property.count({ where: { userDataId, isDeleted: false } });
     }
 
     findById(id: string): Promise<Property | null> {
-        return this.prisma.property.findUnique({ where: { id } });
+        return this.prisma.property.findFirst({ where: { id, isDeleted: false } });
     }
 
     async delete(id: string): Promise<void> {
-        await this.prisma.property.delete({ where: { id } });
+        await this.prisma.property.update({
+            where: { id },
+            data: { isDeleted: true, deletedAt: new Date() },
+        });
     }
 }

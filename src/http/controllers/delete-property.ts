@@ -11,11 +11,11 @@ export class DeletePropertyController {
 
     async handle(
         request: FastifyRequest<{
- Params: {
- id: string;
-propertyId: string 
-} 
-}>,
+            Params: {
+                id: string;
+                propertyId: string;
+            };
+        }>,
         reply: FastifyReply,
     ) {
         if (
@@ -24,8 +24,8 @@ propertyId: string
         )
             return;
 
-        const { propertyId } = request.params;
-        const result = await this.useCase.execute(propertyId);
+        const { id: userId, propertyId } = request.params;
+        const result = await this.useCase.execute(propertyId, userId);
         if (result.error) {
             return reply.status(errorToStatus(result.error)).send({ error: result.error.message });
         }
