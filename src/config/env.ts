@@ -12,7 +12,7 @@ const envSchema = z.object({
     CORS_ORIGIN: z.string().default('*'),
     // Supabase Storage
     SUPABASE_URL: z.string().optional(),
-    SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+    SUPABASE_SECRET_KEY: z.string().optional(),
     STORAGE_BUCKET: z.string().default('avatars'),
     BANNER_BUCKET: z.string().default('course-banners'),
     NEWS_BANNER_BUCKET: z.string().default('news-banners'),

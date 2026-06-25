@@ -9,7 +9,7 @@
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 #
 # Required env vars: DATABASE_URL, JWT_SECRET, CORS_ORIGIN,
-#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+#   SUPABASE_URL, SUPABASE_SECRET_KEY.
 #
 # DATABASE_URL must be the Supabase Postgres connection string. Use the DIRECT
 # connection (port 5432) so `prisma migrate deploy` works on boot — the pooled
@@ -27,7 +27,7 @@ services:
       PORT: 3000
       NODE_ENV: production
       CORS_ORIGIN: ${CORS_ORIGIN}
-      # Supabase Storage — service_role key (server-side only, bypasses RLS)
+      # Supabase Storage — secret key (sb_secret_..., server-side only, full access)
       SUPABASE_URL: ${SUPABASE_URL}                          # https://<ref>.supabase.co
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
     restart: unless-stopped

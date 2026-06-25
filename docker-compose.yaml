@@ -14,5 +14,5 @@ services:
       PORT: 3000
       NODE_ENV: production
       SUPABASE_URL: ${SUPABASE_URL:-}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY:-}
     restart: unless-stopped
