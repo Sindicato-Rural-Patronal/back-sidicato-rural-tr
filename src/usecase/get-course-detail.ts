@@ -24,6 +24,17 @@ export type CourseFrontendDetail = {
     workloadHours: number;
     location: string;
     instructorName: string;
+    instructors: {
+        id: string;
+        title: string | null;
+        category: string | null;
+        name: string;
+        bio: string | null;
+        avatar: string | null;
+        linkedin: string | null;
+        instagram: string | null;
+        facebook: string | null;
+    }[];
     registrationDeadline: string | null;
     observations: string | null;
     eventNumber: string | null;
@@ -35,7 +46,7 @@ export type CourseFrontendDetail = {
 };
 
 export function mapToFrontend(course: CourseWithDetails): CourseFrontendDetail {
-    const instructorName = course.instructors[0]?.userData?.name ?? '';
+    const instructorName = course.instructors[0]?.instructor?.userData?.name ?? '';
     return {
         id: course.id,
         status: course.status,
@@ -55,6 +66,17 @@ export function mapToFrontend(course: CourseWithDetails): CourseFrontendDetail {
         workloadHours: course.workloadHours,
         location: course.room.name,
         instructorName,
+        instructors: course.instructors.map((ci) => ({
+            id: ci.id,
+            title: ci.title ?? null,
+            category: ci.category ?? null,
+            name: ci.instructor?.userData?.name ?? '',
+            bio: ci.instructor?.bio ?? null,
+            avatar: ci.instructor?.userData?.avatar ?? null,
+            linkedin: ci.instructor?.linkedin ?? null,
+            instagram: ci.instructor?.instagram ?? null,
+            facebook: ci.instructor?.facebook ?? null,
+        })),
         registrationDeadline: course.registrationDeadline?.toISOString().split('T')[0] ?? null,
         observations: course.observations ?? null,
         eventNumber: course.eventNumber ?? null,
@@ -85,6 +107,10 @@ export class GetCourseDetailUseCase {
         const course = await this.courseRepository.findById(id);
         if (!course) {
             console.log(`[GetCourseDetail] not found: ${id}`);
+            return { error: new CourseNotFoundError() };
+        }
+        if (course.status === 'UNPUBLISHED') {
+            console.log(`[GetCourseDetail] blocked UNPUBLISHED: ${id}`);
             return { error: new CourseNotFoundError() };
         }
         console.log(`[GetCourseDetail] found: name="${course.name}" status="${course.status}"`);

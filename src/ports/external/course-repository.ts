@@ -41,18 +41,31 @@ export type CourseWithDetails = courseModel & {
     };
     photos: CoursePhotoModel[];
     _count: { courseUserRegistration: number };
-    instructors: { userData: { name: string } }[];
+    instructors: Array<{
+        id: string;
+        title: string | null;
+        category: string | null;
+        instructor: {
+            id: string;
+            bio: string | null;
+            linkedin: string | null;
+            instagram: string | null;
+            facebook: string | null;
+            userData: { id: string; name: string; avatar: string | null };
+        };
+    }>;
+};
+
+export type CourseListFilters = {
+    status?: CourseStatus;
+    search?: string;
 };
 
 export interface CourseRepository {
     create(course: CourseCreateData): Promise<courseModel>;
     findById(id: string): Promise<CourseWithDetails | null>;
-    findAll(
-        statusFilter?: CourseStatus,
-        skip?: number,
-        take?: number,
-    ): Promise<CourseWithDetails[]>;
-    count(statusFilter?: CourseStatus): Promise<number>;
+    findAll(filters?: CourseListFilters, skip?: number, take?: number): Promise<CourseWithDetails[]>;
+    count(filters?: CourseListFilters): Promise<number>;
     update(id: string, data: CourseUpdateData): Promise<courseModel | null>;
     delete(id: string): Promise<boolean>;
     isRoomAvailable(
