@@ -21,7 +21,7 @@ PORT=3000
 NODE_ENV=development
 CORS_ORIGIN=*
 SUPABASE_URL=                # https://<ref>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=   # service_role key (server-side, bypassa RLS)
+SUPABASE_SECRET_KEY=         # sb_secret_... (server-side, acesso total)
 STORAGE_BUCKET=avatars
 BANNER_BUCKET=course-banners
 NEWS_BANNER_BUCKET=news-banners
@@ -404,7 +404,7 @@ async handle(request: FastifyRequest<{ Params: { id: string } }>, reply: Fastify
 }
 ```
 
-O `StorageRepository` é instanciado via `createStorageAdapter()` (sem parâmetros — retorna o `SupabaseStorageAdapter`, que lê `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` do env).
+O `StorageRepository` é instanciado via `createStorageAdapter()` (sem parâmetros — retorna o `SupabaseStorageAdapter`, que lê `SUPABASE_URL` e `SUPABASE_SECRET_KEY` do env).
 
 ## Autenticação
 

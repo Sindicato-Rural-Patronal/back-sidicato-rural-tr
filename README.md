@@ -62,9 +62,9 @@ PORT=3000
 NODE_ENV=development
 CORS_ORIGIN=*
 
-# Supabase Storage (Project Settings → API: URL + service_role key)
+# Supabase Storage (Project Settings → API Keys: URL + secret key)
 SUPABASE_URL=https://<ref>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=service_role_key
+SUPABASE_SECRET_KEY=sb_secret_...
 
 # Buckets (criar no Supabase e marcar como PUBLIC)
 STORAGE_BUCKET=avatars

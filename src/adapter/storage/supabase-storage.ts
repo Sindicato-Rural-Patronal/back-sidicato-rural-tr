@@ -14,11 +14,11 @@ export class SupabaseStorageAdapter implements StorageRepository {
     private get client(): SupabaseClient {
         if (!this._client) {
             const url = process.env.SUPABASE_URL;
-            const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-            if (!url || !serviceKey) {
-                throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+            const secretKey = process.env.SUPABASE_SECRET_KEY;
+            if (!url || !secretKey) {
+                throw new Error('SUPABASE_URL and SUPABASE_SECRET_KEY are required');
             }
-            this._client = createClient(url, serviceKey, {
+            this._client = createClient(url, secretKey, {
                 auth: { persistSession: false },
             });
         }
