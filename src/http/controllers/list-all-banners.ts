@@ -1,0 +1,20 @@
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import type { ListAllBannersUseCase } from '../../usecase/list-all-banners.js';
+
+type Query = { page?: number; limit?: number };
+
+export class ListAllBannersController {
+    constructor(private readonly useCase: ListAllBannersUseCase) {}
+
+    async handle(request: FastifyRequest<{ Querystring: Query }>, reply: FastifyReply) {
+        const { page = 1, limit = 20 } = request.query;
+        const response = await this.useCase.execute(page, limit);
+        return reply.status(200).send({
+            data: response.data,
+            total: response.total,
+            page: response.page,
+            limit: response.limit,
+            totalPages: response.totalPages,
+        });
+    }
+}
