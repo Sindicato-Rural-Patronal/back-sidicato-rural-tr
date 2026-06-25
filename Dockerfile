@@ -3,6 +3,7 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY tsconfig.json ./
+COPY prisma.config.ts ./
 COPY prisma ./prisma/
 
 RUN npm ci
@@ -20,6 +21,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package*.json ./
+COPY prisma.config.ts ./
 COPY prisma ./prisma/
 
 RUN npm ci --omit=dev
