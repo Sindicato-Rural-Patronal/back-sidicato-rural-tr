@@ -17,6 +17,12 @@ model UserAdmin {
   username     String @unique
   passwordHash String
 
+  isPublic    Boolean @default(false)
+  publicTitle String?
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -75,9 +81,14 @@ model UserData {
   memberNotes      String?
   memberNotesNumber String?
 
-  // Address relation
-  addressId        String?
-  address          Address?       @relation(fields: [addressId], references: [id])
+  // Partner (corporate members shown publicly)
+  isPartner    Boolean @default(false)
+  partnerUrl   String?
+  partnerLogo  String?
+  partnerOrder Int?
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
 
   courseUserRegistration courseUserRegistration[]
   userAdmin              UserAdmin?
@@ -93,11 +104,30 @@ model UserData {
 }
 
 model UserInstructor {
-  id String @id @default(uuid())
-
-  course course[]
+  id         String   @id @default(uuid())
+  bio        String?
+  linkedin   String?
+  instagram  String?
+  facebook   String?
   userData   UserData @relation(fields: [userDataId], references: [id])
   userDataId String   @unique
+
+  courseAssignments CourseInstructor[]
+}
+
+model CourseInstructor {
+  id           String   @id @default(uuid())
+  title        String?
+  category     String?
+  instructor   UserInstructor @relation(fields: [instructorId], references: [id])
+  instructorId String
+  course       course   @relation(fields: [courseId], references: [id])
+  courseId     String
+  isDeleted    Boolean  @default(false)
+  deletedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  @@unique([instructorId, courseId])
 }
 
 model Rule {
@@ -133,9 +163,12 @@ model course {
   room    room   @relation(fields: [roomId], references: [id])
   roomId  String
 
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
   photos                 CoursePhoto[]
   courseUserRegistration courseUserRegistration[]
-  instructors            UserInstructor[]
+  instructors            CourseInstructor[]
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 }
@@ -146,6 +179,8 @@ model CoursePhoto {
   caption   String?
   course    course   @relation(fields: [courseId], references: [id])
   courseId  String
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
   createdAt DateTime @default(now())
 }
 
@@ -170,6 +205,8 @@ model News {
   bannerUrl   String?
   status      NewsStatus @default(UNPUBLISHED)
   publishedAt DateTime?
+  isDeleted   Boolean    @default(false)
+  deletedAt   DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }
@@ -180,6 +217,9 @@ model courseUserRegistration {
   courseId   String
   userData   UserData @relation(fields: [userDataId], references: [id])
   userDataId String
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -221,6 +261,14 @@ enum Permission {
   UPDATE_NEWS
   DELETE_NEWS
   READ_NEWS
+
+  READ_CONTACT
+  UPDATE_CONTACT
+
+  CREATE_BANNER
+  UPDATE_BANNER
+  DELETE_BANNER
+  READ_BANNER
 }
 
 enum MaritalStatus {
@@ -292,7 +340,6 @@ model Address {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  userData     UserData[]
   properties   Property[]
   rooms        room[]
 }
@@ -302,19 +349,54 @@ model Property {
   userDataId    String
   name          String
   registration  String?
-  addressId     String?
+  addressId     String
+  isDeleted     Boolean   @default(false)
+  deletedAt     DateTime?
   createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   userData  UserData @relation(fields: [userDataId], references: [id], onDelete: Cascade)
-  address   Address? @relation(fields: [addressId], references: [id])
+  address   Address  @relation(fields: [addressId], references: [id])
+}
+
+model Banner {
+  id        String    @id @default(uuid())
+  title     String
+  subtitle  String?
+  imageUrl  String?
+  active    Boolean   @default(true)
+  order     Int       @default(0)
+  buttons   Json      @default("[]")
+  startDate DateTime?
+  endDate   DateTime?
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model ContactMessage {
+  id        String    @id @default(uuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String?
+  message   String
+  read      Boolean   @default(false)
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model UserRelation {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   sourceId  String
   targetId  String
   label     String?
-  createdAt DateTime @default(now())
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
 
   source    UserData @relation("RelationSource", fields: [sourceId], references: [id], onDelete: Cascade)
   target    UserData @relation("RelationTarget", fields: [targetId], references: [id], onDelete: Cascade)
