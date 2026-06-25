@@ -2,6 +2,7 @@ import type {
     CourseRepository,
     CourseWithDetails,
     CourseStatus,
+    CourseListFilters,
 } from '../ports/external/course-repository.js';
 
 export type CourseCardItem = {
@@ -47,12 +48,12 @@ type ListAllCoursesResponse = {
 export class ListAllCoursesUseCase {
     constructor(private courseRepository: CourseRepository) {}
 
-    async execute(page = 1, limit = 20): Promise<ListAllCoursesResponse> {
+    async execute(page = 1, limit = 20, filters?: CourseListFilters): Promise<ListAllCoursesResponse> {
         console.log(`[ListAllCourses] page=${page} limit=${limit}`);
         const skip = (page - 1) * limit;
         const [courses, total] = await Promise.all([
-            this.courseRepository.findAll(undefined, skip, limit),
-            this.courseRepository.count(),
+            this.courseRepository.findAll(filters, skip, limit),
+            this.courseRepository.count(filters),
         ]);
         console.log(`[ListAllCourses] total=${total}`);
         return {

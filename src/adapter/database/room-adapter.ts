@@ -21,7 +21,11 @@ maxCapacity: number
         return this.prisma.room.findUnique({ where: { id } });
     }
 
-    findAll(): Promise<roomModel[]> {
-        return this.prisma.room.findMany({ orderBy: { name: 'asc' } });
+    findAll(skip?: number, take?: number): Promise<roomModel[]> {
+        return this.prisma.room.findMany({ orderBy: { name: 'asc' }, skip, take });
+    }
+
+    count(): Promise<number> {
+        return this.prisma.room.count();
     }
 }

@@ -51,30 +51,63 @@ export type UserDataUpdateInput = Partial<{
     memberNotes: string | null;
     memberNotesNumber: string | null;
 
-    // Address
-    addressId: string | null;
+    // Partner
+    isPartner: boolean;
+    partnerUrl: string | null;
+    partnerLogo: string | null;
+    partnerOrder: number | null;
 }>;
 
-export type UserDataWithRelations = UserDataModel & {
-    address: AddressModel | null;
-    relations: (UserRelation & {
-target: {
- id: string;
-name: string;
-cpf: string | null 
+export type PartnerItem = {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+    partnerLogoUrl: string | null;
+    partnerUrl: string | null;
+    cnpj: string | null;
 };
-})[];
-    properties: (Property & {address: AddressModel | null;})[];
+
+export type UserInstructorProfile = {
+    id: string;
+    bio: string | null;
+    linkedin: string | null;
+    instagram: string | null;
+    facebook: string | null;
+};
+
+export type UserDataWithRelations = UserDataModel & {
+    relations: (UserRelation & {
+        target: {
+            id: string;
+            name: string;
+            cpf: string | null;
+        };
+    })[];
+    properties: (Property & { address: AddressModel | null })[];
+    userInstructor: UserInstructorProfile | null;
+};
+
+export type UserListFilters = {
+    search?: string;
+    memberType?: string;
+    memberClassification?: string;
+    gender?: string;
+    ethnicity?: string;
+    educationLevel?: string;
+    incompleteRegistration?: boolean;
 };
 
 export interface UserDataRepository {
     create(data: UserDataUncheckedCreateInput): Promise<UserDataModel | null>;
-    findByEmailOurPhone(email: string, phone: string): Promise<UserDataModel | null>;
     findById(id: string): Promise<UserDataModel | null>;
     findByIdWithRelations(id: string): Promise<UserDataWithRelations | null>;
-    findAll(skip?: number, take?: number): Promise<UserDataModel[]>;
-    count(): Promise<number>;
+    findAll(filters?: UserListFilters, skip?: number, take?: number): Promise<UserDataModel[]>;
+    count(filters?: UserListFilters): Promise<number>;
+    findByCpf(cpf: string): Promise<UserDataModel | null>;
+    findByRg(rg: string): Promise<UserDataModel | null>;
     findByEmailOrCpf(email: string, cpf: string): Promise<UserDataModel | null>;
     update(id: string, data: UserDataUpdateInput): Promise<UserDataModel | null>;
     delete(id: string): Promise<void>;
+    findAllPartners(): Promise<PartnerItem[]>;
+    reorderPartners(ids: string[]): Promise<void>;
 }

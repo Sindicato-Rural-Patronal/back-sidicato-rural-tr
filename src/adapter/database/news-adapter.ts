@@ -19,12 +19,15 @@ export class NewsAdapter implements NewsRepository {
     }
 
     findById(id: string): Promise<NewsModel | null> {
-        return this.prisma.news.findUnique({ where: { id } }) as Promise<NewsModel | null>;
+        return this.prisma.news.findFirst({ where: { id, isDeleted: false } }) as Promise<NewsModel | null>;
     }
 
     findAll(statusFilter?: NewsStatus, skip?: number, take?: number): Promise<NewsModel[]> {
         return this.prisma.news.findMany({
-            where: statusFilter ? { status: statusFilter } : undefined,
+            where: {
+                isDeleted: false,
+                ...(statusFilter ? { status: statusFilter } : {}),
+            },
             orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
             skip,
             take,
@@ -33,7 +36,10 @@ export class NewsAdapter implements NewsRepository {
 
     count(statusFilter?: NewsStatus): Promise<number> {
         return this.prisma.news.count({
-            where: statusFilter ? { status: statusFilter } : undefined,
+            where: {
+                isDeleted: false,
+                ...(statusFilter ? { status: statusFilter } : {}),
+            },
         });
     }
 
@@ -48,7 +54,10 @@ data })) as NewsModel;
 
     async delete(id: string): Promise<boolean> {
         try {
-            await this.prisma.news.delete({ where: { id } });
+            await this.prisma.news.update({
+                where: { id },
+                data: { isDeleted: true, deletedAt: new Date() },
+            });
             return true;
         } catch {
             return false;

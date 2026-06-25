@@ -14,6 +14,8 @@ import { DeleteUserAdminUseCase } from '../../usecase/delete-user-admin.js';
 import { GetCurrentAdminController } from '../controllers/get-current-admin.js';
 import { GetCurrentAdminUseCase } from '../../usecase/get-current-admin.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
+import { ListPublicContactsController } from '../controllers/list-public-contacts.js';
+import { ListPublicContactsUseCase } from '../../usecase/list-public-contacts.js';
 
 export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userAdminRepository = createUserAdminAdapter(prisma);
@@ -41,6 +43,40 @@ export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaCl
         new GetCurrentAdminUseCase(userAdminRepository, ruleRepository),
         getAdminPermissions,
     );
+    const listPublicContactsController = new ListPublicContactsController(
+        new ListPublicContactsUseCase(userAdminRepository),
+    );
+
+    fastify.get(
+        '/contacts',
+        {
+            schema: {
+                tags: ['Contatos Públicos'],
+                summary: 'Listar contatos públicos',
+                description: 'Retorna administradores marcados como públicos. Sem autenticação.',
+                response: {
+                    200: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                publicTitle: { type: 'string', nullable: true },
+                                userData: {
+                                    type: 'object',
+                                    properties: {
+                                        name: { type: 'string' },
+                                        email: { type: 'string' },
+                                        phone: { type: 'string' },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        (req: FastifyRequest, res: FastifyReply) => listPublicContactsController.handle(req, res),
+    );
 
     fastify.get(
         '/admin/me',
@@ -55,6 +91,7 @@ export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaCl
                         type: 'object',
                         properties: {
                             userId: { type: 'string' },
+                            userDataId: { type: 'string' },
                             username: { type: 'string' },
                             rulesId: { type: 'string' },
                             ruleName: { type: 'string' },
@@ -82,13 +119,11 @@ properties: { error: { type: 'string' } } },
                 querystring: {
                     type: 'object',
                     properties: {
-                        page: { type: 'integer',
-minimum: 1,
-default: 1 },
-                        limit: { type: 'integer',
-minimum: 1,
-maximum: 100,
-default: 20 },
+                        page: { type: 'integer', minimum: 1, default: 1 },
+                        limit: { type: 'integer', minimum: 1, maximum: 1000, default: 20 },
+                        search: { type: 'string', description: 'Busca por username, nome ou email' },
+                        rulesId: { type: 'string', description: 'Filtrar por ID da regra de permissão' },
+                        isPublic: { type: 'boolean', description: 'Filtrar por visibilidade pública (true/false)' },
                     },
                 },
                 response: {
@@ -104,6 +139,8 @@ default: 20 },
                                         username: { type: 'string' },
                                         userDataId: { type: 'string' },
                                         rulesId: { type: 'string' },
+                                        isPublic: { type: 'boolean' },
+                                        publicTitle: { type: 'string', nullable: true },
                                         createdAt: { type: 'string' },
                                         updatedAt: { type: 'string' },
                                         userData: {
@@ -162,13 +199,13 @@ properties: { error: { type: 'string' } } },
                     type: 'object',
                     required: ['username', 'password', 'userDataId', 'userRole'],
                     properties: {
-                        username: { type: 'string' },
-                        password: { type: 'string' },
-                        userDataId: { type: 'string',
-description: 'ID of an existing UserData' },
+                        username: { type: 'string', example: 'joao.silva' },
+                        password: { type: 'string', example: 'senha@Segura123' },
+                        userDataId: { type: 'string', description: 'ID of an existing UserData', example: '550e8400-e29b-41d4-a716-446655440000' },
                         userRole: {
                             type: 'string',
                             description: 'ID of the Rule to assign to the admin',
+                            example: '550e8400-e29b-41d4-a716-446655440099',
                         },
                     },
                 },
@@ -224,8 +261,9 @@ description: 'ID of an existing UserData' },
                             type: 'string',
                             description: 'Leave empty to keep current password',
                         },
-                        rulesId: { type: 'string',
-description: 'ID of the Rule to assign' },
+                        rulesId: { type: 'string', description: 'ID of the Rule to assign' },
+                        isPublic: { type: 'boolean', description: 'Show this admin on the public contacts page' },
+                        publicTitle: { type: 'string', nullable: true, description: 'Title shown on contact page (e.g. Executivo, Estagiário)' },
                     },
                 },
                 response: {

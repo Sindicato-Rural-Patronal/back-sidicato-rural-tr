@@ -5,7 +5,8 @@ import type { UserDataRepository } from '../../ports/external/user-data-reposito
 const mockUserDataRepo = {
     create: vi.fn(),
     findById: vi.fn(),
-    findByEmailOurPhone: vi.fn(),
+    findByCpf: vi.fn(),
+    findByRg: vi.fn(),
     findByEmailOrCpf: vi.fn(),
     findAll: vi.fn(),
     count: vi.fn().mockResolvedValue(0),

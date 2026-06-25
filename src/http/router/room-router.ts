@@ -42,11 +42,23 @@ export async function roomRouter(fastify: FastifyInstance, prisma: PrismaClient)
 - Public route — no authentication required
 - The \`maxCapacity\` field of each room determines the maximum number of enrollments for any course held in it
 - Use this route to populate the room selector in the course creation form`,
+                querystring: {
+                    type: 'object',
+                    properties: {
+                        page: { type: 'integer', minimum: 1, default: 1 },
+                        limit: { type: 'integer', minimum: 1, maximum: 1000, default: 20 },
+                    },
+                },
                 response: {
                     200: {
-                        type: 'array',
-                        items: { type: 'object',
-properties: roomProperties },
+                        type: 'object',
+                        properties: {
+                            data: { type: 'array', items: { type: 'object', properties: roomProperties } },
+                            total: { type: 'integer' },
+                            page: { type: 'integer' },
+                            limit: { type: 'integer' },
+                            totalPages: { type: 'integer' },
+                        },
                     },
                 },
             },
@@ -71,19 +83,16 @@ properties: roomProperties },
                     type: 'object',
                     required: ['name', 'description', 'maxCapacity'],
                     properties: {
-                        name: { type: 'string' },
-                        description: { type: 'string' },
-                        maxCapacity: { type: 'integer',
-minimum: 1 },
+                        name: { type: 'string', example: 'Sala A' },
+                        description: { type: 'string', example: 'Auditório principal com projetor e ar-condicionado.' },
+                        maxCapacity: { type: 'integer', minimum: 1, example: 40 },
                     },
                 },
                 response: {
-                    201: { type: 'object',
-properties: { id: { type: 'string' } } },
-                    400: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    201: { type: 'object', properties: { id: { type: 'string' } } },
+                    400: { type: 'object', properties: { error: { type: 'string' } } },
+                    401: { type: 'object', properties: { error: { type: 'string' } } },
+                    403: { type: 'object', properties: { error: { type: 'string' } } },
                 },
             },
         },

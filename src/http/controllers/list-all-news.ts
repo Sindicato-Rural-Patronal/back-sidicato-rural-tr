@@ -18,7 +18,8 @@ export class ListAllNewsController {
         const q = request.query as Record<string, string>;
         const page = Math.max(1, Number(q.page) || 1);
         const limit = Math.min(100, Math.max(1, Number(q.limit) || 20));
-        const response = await this.listNewsUseCase.execute(undefined, page, limit);
+        const status = (q.status as 'PUBLISHED' | 'UNPUBLISHED') || undefined;
+        const response = await this.listNewsUseCase.execute(status, page, limit);
         return reply.status(200).send(response.result);
     }
 }

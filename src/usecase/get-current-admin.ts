@@ -6,6 +6,7 @@ export type CurrentAdminResponse = {
     error?: Error;
     data?: {
         userId: string;
+        userDataId: string;
         username: string;
         rulesId: string;
         ruleName: string;
@@ -29,6 +30,7 @@ export class GetCurrentAdminUseCase {
         return {
             data: {
                 userId: admin.id,
+                userDataId: admin.userDataId,
                 username: admin.username,
                 rulesId: admin.rulesId,
                 ruleName: rule.name,

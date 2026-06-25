@@ -14,28 +14,25 @@ import { DeleteUserDataUseCase } from '../../usecase/delete-user-data.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { GetUserDetailController } from '../controllers/get-user-detail.js';
 import { GetUserDetailUseCase } from '../../usecase/get-user-detail.js';
-import { UpsertUserAddressController } from '../controllers/upsert-user-address.js';
-import { UpsertUserAddressUseCase } from '../../usecase/upsert-user-address.js';
-import { AddUserRelationController } from '../controllers/add-user-relation.js';
-import { AddUserRelationUseCase } from '../../usecase/add-user-relation.js';
-import { DeleteUserRelationController } from '../controllers/delete-user-relation.js';
-import { DeleteUserRelationUseCase } from '../../usecase/delete-user-relation.js';
-import { AddPropertyController } from '../controllers/add-property.js';
-import { AddPropertyUseCase } from '../../usecase/add-property.js';
-import { DeletePropertyController } from '../controllers/delete-property.js';
-import { DeletePropertyUseCase } from '../../usecase/delete-property.js';
-import { createAddressAdapter } from '../../adapter/database/address-adapter.js';
-import { createUserRelationAdapter } from '../../adapter/database/user-relation-adapter.js';
-import { createPropertyAdapter } from '../../adapter/database/property-adapter.js';
+import { UploadAvatarController } from '../controllers/upload-avatar.js';
+import { UploadAvatarUseCase } from '../../usecase/upload-avatar.js';
+import { createStorageAdapter } from '../../adapter/storage/factory.js';
+import { requirePermission } from '../lib/require-permission.js';
+import { ListPartnersController } from '../controllers/list-partners.js';
+import { ListPartnersUseCase } from '../../usecase/list-partners.js';
+import { ReorderPartnersController } from '../controllers/reorder-partners.js';
+import { ReorderPartnersUseCase } from '../../usecase/reorder-partners.js';
+import { UploadPartnerLogoController } from '../controllers/upload-partner-logo.js';
+import { UploadPartnerLogoUseCase } from '../../usecase/upload-partner-logo.js';
+import { createInstructorAdapter } from '../../adapter/database/instructor-adapter.js';
+import { UpdateInstructorUseCase } from '../../usecase/update-instructor.js';
 
 export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userRepository = createUserDataAdapter(prisma);
     const userAdminRepository = createUserAdminAdapter(prisma);
     const ruleRepository = createRuleAdapter(prisma);
-    const addressRepository = createAddressAdapter(prisma);
-    const userRelationRepository = createUserRelationAdapter(prisma);
-    const propertyRepository = createPropertyAdapter(prisma);
     const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
+    const instructorRepository = createInstructorAdapter(prisma);
 
     const createUserController = new CreateUserController(new CreateUserUseCase(userRepository));
     const listUsersController = new ListUsersController(
@@ -45,6 +42,7 @@ export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaCli
     const updateUserController = new UpdateUserController(
         new UpdateUserDataUseCase(userRepository),
         getAdminPermissions,
+        new UpdateInstructorUseCase(instructorRepository),
     );
     const deleteUserController = new DeleteUserController(
         new DeleteUserDataUseCase(userRepository),
@@ -54,25 +52,14 @@ export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaCli
         new GetUserDetailUseCase(userRepository),
         getAdminPermissions,
     );
-    const upsertUserAddressController = new UpsertUserAddressController(
-        new UpsertUserAddressUseCase(userRepository, addressRepository),
+    const uploadAvatarController = new UploadAvatarController(
+        new UploadAvatarUseCase(createStorageAdapter(), userRepository),
         getAdminPermissions,
     );
-    const addUserRelationController = new AddUserRelationController(
-        new AddUserRelationUseCase(userRepository, userRelationRepository),
-        getAdminPermissions,
-    );
-    const deleteUserRelationController = new DeleteUserRelationController(
-        new DeleteUserRelationUseCase(userRelationRepository),
-        getAdminPermissions,
-    );
-    const addPropertyController = new AddPropertyController(
-        new AddPropertyUseCase(userRepository, propertyRepository, addressRepository),
-        getAdminPermissions,
-    );
-    const deletePropertyController = new DeletePropertyController(
-        new DeletePropertyUseCase(propertyRepository),
-        getAdminPermissions,
+    const listPartnersController = new ListPartnersController(new ListPartnersUseCase(userRepository));
+    const reorderPartnersController = new ReorderPartnersController(new ReorderPartnersUseCase(userRepository));
+    const uploadPartnerLogoController = new UploadPartnerLogoController(
+        new UploadPartnerLogoUseCase(createStorageAdapter(), userRepository),
     );
 
     fastify.get(
@@ -85,13 +72,15 @@ export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaCli
                 querystring: {
                     type: 'object',
                     properties: {
-                        page: { type: 'integer',
-minimum: 1,
-default: 1 },
-                        limit: { type: 'integer',
-minimum: 1,
-maximum: 100,
-default: 20 },
+                        page: { type: 'integer', minimum: 1, default: 1 },
+                        limit: { type: 'integer', minimum: 1, maximum: 1000, default: 20 },
+                        search: { type: 'string', description: 'Busca em nome, email e CPF' },
+                        memberType: { type: 'string', description: 'Tipo de membro (exact match)' },
+                        memberClassification: { type: 'string', description: 'Classificação do membro (exact match)' },
+                        gender: { type: 'string', enum: ['MALE', 'FEMALE', 'OTHER'], description: 'Gênero' },
+                        ethnicity: { type: 'string', enum: ['WHITE', 'BLACK', 'MIXED', 'ASIAN', 'INDIGENOUS'], description: 'Etnia' },
+                        educationLevel: { type: 'string', enum: ['NO_FORMAL_EDUCATION', 'INCOMPLETE_PRIMARY', 'COMPLETE_PRIMARY', 'INCOMPLETE_SECONDARY', 'COMPLETE_SECONDARY', 'INCOMPLETE_HIGHER', 'COMPLETE_HIGHER', 'POSTGRADUATE'], description: 'Nível de escolaridade' },
+                        incompleteRegistration: { type: 'boolean', description: 'true = só cadastros incompletos (sem avatar, sem propriedades, cpf, rg, birthDate ou gender nulos) | false = só cadastros completos' },
                     },
                 },
                 response: {
@@ -107,12 +96,15 @@ default: 20 },
                                         name: { type: 'string' },
                                         email: { type: 'string' },
                                         phone: { type: 'string' },
-                                        cpf: { type: 'string',
-nullable: true },
-                                        cnpj: { type: 'string',
-nullable: true },
-                                        avatar: { type: 'string',
-nullable: true },
+                                        cpf: { type: 'string', nullable: true },
+                                        cnpj: { type: 'string', nullable: true },
+                                        avatar: { type: 'string', nullable: true },
+                                        rg: { type: 'string', nullable: true },
+                                        birthDate: { type: 'string', nullable: true },
+                                        gender: { type: 'string', nullable: true },
+                                        memberStatus: { type: 'string', nullable: true },
+                                        memberType: { type: 'string', nullable: true },
+                                        memberClassification: { type: 'string', nullable: true },
                                         createdAt: { type: 'string' },
                                         updatedAt: { type: 'string' },
                                     },
@@ -137,7 +129,7 @@ properties: { error: { type: 'string' } } },
         {
             schema: {
                 tags: ['Admin — Users'],
-                summary: 'Get worker detail with address, relations and properties',
+                summary: 'Get worker detail with relations and properties',
                 security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
@@ -147,14 +139,114 @@ properties: { error: { type: 'string' } } },
                 response: {
                     200: {
                         type: 'object',
-                        description: 'Full UserData with address, relations and properties',
+                        properties: {
+                            id: { type: 'string' },
+                            name: { type: 'string' },
+                            email: { type: 'string' },
+                            phone: { type: 'string' },
+                            cpf: { type: 'string', nullable: true },
+                            cnpj: { type: 'string', nullable: true },
+                            avatar: { type: 'string', nullable: true },
+                            nickname: { type: 'string', nullable: true },
+                            maritalStatus: { type: 'string', nullable: true },
+                            phone2: { type: 'string', nullable: true },
+                            phone3: { type: 'string', nullable: true },
+                            rg: { type: 'string', nullable: true },
+                            rgIssuer: { type: 'string', nullable: true },
+                            rgIssuedAt: { type: 'string', nullable: true },
+                            birthDate: { type: 'string', nullable: true },
+                            driverLicense: { type: 'string', nullable: true },
+                            driverLicenseCategory: { type: 'string', nullable: true },
+                            birthPlace: { type: 'string', nullable: true },
+                            nationality: { type: 'string', nullable: true },
+                            gender: { type: 'string', nullable: true },
+                            ethnicity: { type: 'string', nullable: true },
+                            educationLevel: { type: 'string', nullable: true },
+                            functionalCategory: { type: 'string', nullable: true },
+                            specialNeeds: { type: 'boolean' },
+                            memberClassification: { type: 'string', nullable: true },
+                            cadPro: { type: 'string', nullable: true },
+                            familyIncome: { type: 'string', nullable: true },
+                            memberType: { type: 'string', nullable: true },
+                            boardPosition: { type: 'string', nullable: true },
+                            boardMember: { type: 'boolean' },
+                            memberStatus: { type: 'string', nullable: true },
+                            memberSince: { type: 'string', nullable: true },
+                            memberNotes: { type: 'string', nullable: true },
+                            memberNotesNumber: { type: 'string', nullable: true },
+                            isPartner: { type: 'boolean' },
+                            partnerUrl: { type: 'string', nullable: true },
+                            partnerLogo: { type: 'string', nullable: true },
+                            partnerOrder: { type: 'integer', nullable: true },
+                            createdAt: { type: 'string' },
+                            updatedAt: { type: 'string' },
+                            relations: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        id: { type: 'string' },
+                                        label: { type: 'string', nullable: true },
+                                        createdAt: { type: 'string' },
+                                        target: {
+                                            type: 'object',
+                                            properties: {
+                                                id: { type: 'string' },
+                                                name: { type: 'string' },
+                                                cpf: { type: 'string', nullable: true },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            properties: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        id: { type: 'string' },
+                                        name: { type: 'string' },
+                                        registration: { type: 'string', nullable: true },
+                                        createdAt: { type: 'string' },
+                                        updatedAt: { type: 'string' },
+                                        address: {
+                                            type: 'object',
+                                            nullable: true,
+                                            properties: {
+                                                id: { type: 'string' },
+                                                type: { type: 'string' },
+                                                city: { type: 'string', nullable: true },
+                                                state: { type: 'string', nullable: true },
+                                                zipCode: { type: 'string', nullable: true },
+                                                street: { type: 'string', nullable: true },
+                                                number: { type: 'string', nullable: true },
+                                                neighborhood: { type: 'string', nullable: true },
+                                                localityName: { type: 'string', nullable: true },
+                                                road: { type: 'string', nullable: true },
+                                                km: { type: 'string', nullable: true },
+                                                lot: { type: 'string', nullable: true },
+                                                section: { type: 'string', nullable: true },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            userInstructor: {
+                                type: 'object',
+                                nullable: true,
+                                properties: {
+                                    id: { type: 'string' },
+                                    bio: { type: 'string', nullable: true },
+                                    linkedin: { type: 'string', nullable: true },
+                                    instagram: { type: 'string', nullable: true },
+                                    facebook: { type: 'string', nullable: true },
+                                },
+                            },
+                        },
                     },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    404: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    401: { type: 'object', properties: { error: { type: 'string' } } },
+                    403: { type: 'object', properties: { error: { type: 'string' } } },
+                    404: { type: 'object', properties: { error: { type: 'string' } } },
                 },
             },
         },
@@ -168,24 +260,27 @@ properties: { error: { type: 'string' } } },
     fastify.post(
         '/users',
         {
+            preValidation: async (req: FastifyRequest) => {
+                req.log.info({ body: req.body }, '[POST /users] raw body before schema validation');
+            },
             schema: {
                 tags: ['Users'],
                 summary: 'Create worker user',
                 description: `Creates a new UserData (rural worker). Public route — no authentication required.
 
 **Business rules:**
-- \`email\` and \`cpf\` must be unique in the system — returns 409 if already registered
+- \`cpf\` must be unique per user — returns 409 if the CPF is already registered
+- \`email\` and \`phone\` may be shared across multiple users
 - This record represents the rural worker; to have admin access, a \`UserAdmin\` linked to this record must be created (via \`POST /admin/users\`)
 - The \`cnpj\` field is optional (for legal-entity rural producers)`,
                 body: {
                     type: 'object',
                     required: ['name', 'email', 'phone', 'cpf'],
                     properties: {
-                        name: { type: 'string' },
-                        email: { type: 'string',
-format: 'email' },
-                        phone: { type: 'string' },
-                        cpf: { type: 'string' },
+                        name: { type: 'string', example: 'João da Silva' },
+                        email: { type: 'string', format: 'email', example: 'joao@example.com' },
+                        phone: { type: 'string', example: '44999990001' },
+                        cpf: { type: 'string', example: '52998224725' },
                     },
                 },
                 response: {
@@ -234,15 +329,12 @@ format: 'date-time' },
                     type: 'object',
                     properties: {
                         name: { type: 'string' },
-                        email: { type: 'string',
-format: 'email' },
+                        email: { type: 'string', format: 'email' },
                         phone: { type: 'string' },
-                        cpf: { type: 'string',
-nullable: true },
-                        cnpj: { type: 'string',
-nullable: true },
-                        nickname: { type: 'string',
-nullable: true },
+                        cpf: { type: 'string', nullable: true },
+                        cnpj: { type: 'string', nullable: true },
+                        avatar: { type: 'string', nullable: true },
+                        nickname: { type: 'string', nullable: true },
                         maritalStatus: { type: 'string',
 nullable: true },
                         phone2: { type: 'string',
@@ -293,6 +385,13 @@ nullable: true },
 nullable: true },
                         memberNotesNumber: { type: 'string',
 nullable: true },
+                        isPartner: { type: 'boolean', description: 'Mark as public partner' },
+                        partnerUrl: { type: 'string', nullable: true, description: 'Partner website URL' },
+                        partnerOrder: { type: 'integer', minimum: 0, nullable: true, description: 'Display order in partner list' },
+                        bio: { type: 'string', nullable: true, description: 'Instructor bio (only saved if user is an instructor)' },
+                        linkedin: { type: 'string', nullable: true },
+                        instagram: { type: 'string', nullable: true },
+                        facebook: { type: 'string', nullable: true },
                     },
                 },
                 response: {
@@ -348,222 +447,127 @@ properties: { error: { type: 'string' } } },
             ),
     );
 
-    fastify.put(
-        '/admin/users/:id/address',
+    fastify.get(
+        '/partners',
         {
             schema: {
-                tags: ['Admin — Users'],
-                summary: 'Upsert address for a worker',
-                security: [{ bearerAuth: [] }],
-                params: {
-                    type: 'object',
-                    properties: { id: { type: 'string' } },
-                    required: ['id'],
-                },
-                body: {
-                    type: 'object',
-                    properties: {
-                        type: { type: 'string',
-enum: ['URBAN', 'RURAL'] },
-                        city: { type: 'string' },
-                        state: { type: 'string' },
-                        zipCode: { type: 'string' },
-                        complement: { type: 'string' },
-                        notes: { type: 'string' },
-                        street: { type: 'string' },
-                        number: { type: 'string' },
-                        neighborhood: { type: 'string' },
-                        localityName: { type: 'string' },
-                        road: { type: 'string' },
-                        km: { type: 'string' },
-                        lot: { type: 'string' },
-                        section: { type: 'string' },
-                    },
-                },
+                tags: ['Parceiros'],
+                summary: 'Listar parceiros públicos',
+                description: 'Retorna UserData marcados como isPartner=true, ordenados por partnerOrder ASC (nulls last) depois name ASC. Sem autenticação.',
                 response: {
-                    200: { type: 'object',
-properties: { addressId: { type: 'string' } } },
-                    400: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    404: { type: 'object',
-properties: { error: { type: 'string' } } },
-                },
-            },
-        },
-        (req: FastifyRequest, res: FastifyReply) =>
-            upsertUserAddressController.handle(
-                req as Parameters<typeof upsertUserAddressController.handle>[0],
-                res,
-            ),
-    );
-
-    fastify.post(
-        '/admin/users/:id/relations',
-        {
-            schema: {
-                tags: ['Admin — Users'],
-                summary: 'Link two worker records as related',
-                security: [{ bearerAuth: [] }],
-                params: {
-                    type: 'object',
-                    properties: { id: { type: 'string' } },
-                    required: ['id'],
-                },
-                body: {
-                    type: 'object',
-                    required: ['targetId'],
-                    properties: {
-                        targetId: { type: 'string',
-example: 'uuid-of-other-user' },
-                        label: { type: 'string',
-example: 'spouse' },
-                    },
-                },
-                response: {
-                    201: { type: 'object',
-properties: { id: { type: 'string' } } },
-                    400: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    404: { type: 'object',
-properties: { error: { type: 'string' } } },
-                },
-            },
-        },
-        (req: FastifyRequest, res: FastifyReply) =>
-            addUserRelationController.handle(
-                req as Parameters<typeof addUserRelationController.handle>[0],
-                res,
-            ),
-    );
-
-    fastify.delete(
-        '/admin/users/:id/relations/:relationId',
-        {
-            schema: {
-                tags: ['Admin — Users'],
-                summary: 'Remove a relation between two workers',
-                security: [{ bearerAuth: [] }],
-                params: {
-                    type: 'object',
-                    properties: {
-                        id: { type: 'string' },
-                        relationId: { type: 'string' },
-                    },
-                    required: ['id', 'relationId'],
-                },
-                response: {
-                    204: { type: 'null' },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    404: { type: 'object',
-properties: { error: { type: 'string' } } },
-                },
-            },
-        },
-        (req: FastifyRequest, res: FastifyReply) =>
-            deleteUserRelationController.handle(
-                req as Parameters<typeof deleteUserRelationController.handle>[0],
-                res,
-            ),
-    );
-
-    fastify.post(
-        '/admin/users/:id/properties',
-        {
-            schema: {
-                tags: ['Admin — Users'],
-                summary: 'Add a property (rural land) to a worker',
-                security: [{ bearerAuth: [] }],
-                params: {
-                    type: 'object',
-                    properties: { id: { type: 'string' } },
-                    required: ['id'],
-                },
-                body: {
-                    type: 'object',
-                    required: ['name'],
-                    properties: {
-                        name: { type: 'string',
-example: 'Fazenda São João' },
-                        registration: { type: 'string',
-example: '12345-6' },
-                        address: {
+                    200: {
+                        type: 'array',
+                        items: {
                             type: 'object',
                             properties: {
-                                type: { type: 'string',
-enum: ['URBAN', 'RURAL'] },
-                                city: { type: 'string' },
-                                state: { type: 'string' },
-                                zipCode: { type: 'string' },
-                                localityName: { type: 'string' },
-                                road: { type: 'string' },
-                                km: { type: 'string' },
-                                lot: { type: 'string' },
-                                section: { type: 'string' },
+                                id: { type: 'string' },
+                                name: { type: 'string' },
+                                avatarUrl: { type: 'string', nullable: true },
+                                partnerLogoUrl: { type: 'string', nullable: true },
+                                partnerUrl: { type: 'string', nullable: true },
+                                cnpj: { type: 'string', nullable: true },
                             },
                         },
                     },
                 },
+            },
+        },
+        (req: FastifyRequest, res: FastifyReply) => listPartnersController.handle(req, res),
+    );
+
+    fastify.patch(
+        '/admin/partners/reorder',
+        {
+            schema: {
+                tags: ['Parceiros'],
+                summary: 'Reordenar parceiros',
+                security: [{ bearerAuth: [] }],
+                body: {
+                    type: 'object',
+                    required: ['order'],
+                    properties: {
+                        order: { type: 'array', items: { type: 'string' }, description: 'Array de UserData IDs na nova ordem' },
+                    },
+                },
                 response: {
-                    201: { type: 'object',
-properties: { id: { type: 'string' } } },
-                    400: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    404: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    200: { type: 'object', properties: { message: { type: 'string' } } },
+                    400: { type: 'object', properties: { error: { type: 'string' } } },
+                    401: { type: 'object', properties: { error: { type: 'string' } } },
+                    403: { type: 'object', properties: { error: { type: 'string' } } },
                 },
             },
         },
-        (req: FastifyRequest, res: FastifyReply) =>
-            addPropertyController.handle(
-                req as Parameters<typeof addPropertyController.handle>[0],
-                res,
-            ),
+        async (req: FastifyRequest, res: FastifyReply) => {
+            const userId = await requirePermission(req, res, 'UPDATE_USER', getAdminPermissions);
+            if (!userId) return;
+            return reorderPartnersController.handle(req, res);
+        },
     );
 
-    fastify.delete(
-        '/admin/users/:id/properties/:propertyId',
+    fastify.post(
+        '/admin/users/:id/partner-logo',
+        {
+            schema: {
+                tags: ['Parceiros'],
+                summary: 'Upload da logo do parceiro (300×150px)',
+                description: 'Aceita multipart/form-data com campo "file". PNG/JPG/WebP, max 5MB. Redimensiona para 300×150px com fundo transparente.',
+                security: [{ bearerAuth: [] }],
+                consumes: ['multipart/form-data'],
+                params: {
+                    type: 'object',
+                    required: ['id'],
+                    properties: { id: { type: 'string' } },
+                },
+                response: {
+                    200: { type: 'object', properties: { partnerLogoUrl: { type: 'string' } } },
+                    400: { type: 'object', properties: { error: { type: 'string' } } },
+                    401: { type: 'object', properties: { error: { type: 'string' } } },
+                    403: { type: 'object', properties: { error: { type: 'string' } } },
+                    404: { type: 'object', properties: { error: { type: 'string' } } },
+                },
+            },
+        },
+        async (req: FastifyRequest, res: FastifyReply) => {
+            const userId = await requirePermission(req, res, 'UPDATE_USER', getAdminPermissions);
+            if (!userId) return;
+            return uploadPartnerLogoController.handle(
+                req as Parameters<typeof uploadPartnerLogoController.handle>[0],
+                res,
+            );
+        },
+    );
+
+    fastify.post(
+        '/admin/users/:id/avatar',
         {
             schema: {
                 tags: ['Admin — Users'],
-                summary: 'Delete a property from a worker',
+                summary: 'Upload avatar for a worker',
+                description: `Uploads an image as the worker's avatar. Requires JWT token with \`UPDATE_USER\` permission.
+
+**Business rules:**
+- Send as \`multipart/form-data\` with the file in the \`file\` field
+- The URL is saved to \`UserData.avatar\` and returned in \`avatarUrl\`
+- Uploading a new avatar overwrites the previous URL (old file remains in storage)`,
                 security: [{ bearerAuth: [] }],
+                consumes: ['multipart/form-data'],
                 params: {
                     type: 'object',
-                    properties: {
-                        id: { type: 'string' },
-                        propertyId: { type: 'string' },
-                    },
-                    required: ['id', 'propertyId'],
+                    required: ['id'],
+                    properties: { id: { type: 'string' } },
                 },
                 response: {
-                    204: { type: 'null' },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    404: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    200: { type: 'object', properties: { avatarUrl: { type: 'string' } } },
+                    400: { type: 'object', properties: { error: { type: 'string' } } },
+                    401: { type: 'object', properties: { error: { type: 'string' } } },
+                    403: { type: 'object', properties: { error: { type: 'string' } } },
+                    404: { type: 'object', properties: { error: { type: 'string' } } },
                 },
             },
         },
         (req: FastifyRequest, res: FastifyReply) =>
-            deletePropertyController.handle(
-                req as Parameters<typeof deletePropertyController.handle>[0],
+            uploadAvatarController.handle(
+                req as Parameters<typeof uploadAvatarController.handle>[0],
                 res,
             ),
     );

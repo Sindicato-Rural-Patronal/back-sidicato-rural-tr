@@ -1,6 +1,6 @@
-// core/usecases/upload-avatar.usecase.ts
-import type { Env } from '../config/env';
-import type { StorageRepository, UploadParams } from '../ports/external/storage-repository';
+import type { StorageRepository, UploadParams } from '../ports/external/storage-repository.js';
+import type { UserDataRepository } from '../ports/external/user-data-repository.js';
+import { UserDataNotFoundError } from '../errors/not-found.js';
 
 export interface UploadAvatarInput {
     userId: string;
@@ -9,18 +9,23 @@ export interface UploadAvatarInput {
     originalName: string;
 }
 
+type UploadAvatarResponse = {
+    error?: Error;
+    avatarUrl?: string;
+};
+
 export class UploadAvatarUseCase {
     constructor(
         private readonly storage: StorageRepository,
-        private readonly env: Env,
+        private readonly userDataRepository: UserDataRepository,
     ) {}
 
-    async execute(input: UploadAvatarInput): Promise<string> {
-        console.log(
-            `[UploadAvatar] userId="${input.userId}" file="${input.originalName}" mimeType="${input.mimeType}"`,
-        );
-        const bucket = this.env.STORAGE_BUCKET || 'avatars';
-        const key = `users/${input.userId}/${Date.now()}-${input.originalName}`;
+    async execute(input: UploadAvatarInput): Promise<UploadAvatarResponse> {
+        const user = await this.userDataRepository.findById(input.userId);
+        if (!user) return { error: new UserDataNotFoundError() };
+
+        const bucket = process.env.STORAGE_BUCKET ?? 'avatars';
+        const key = `users/${input.userId}/avatar-${Date.now()}-${input.originalName}`;
 
         const uploadParams: UploadParams = {
             bucket,
@@ -30,9 +35,10 @@ export class UploadAvatarUseCase {
         };
 
         await this.storage.uploadFile(uploadParams);
+        const avatarUrl = this.storage.getPublicUrl(bucket, key);
 
-        const signedUrl = await this.storage.getSignedUrl(bucket, key, 3600);
-        console.log(`[UploadAvatar] success key="${key}"`);
-        return signedUrl;
+        await this.userDataRepository.update(input.userId, { avatar: avatarUrl });
+
+        return { avatarUrl };
     }
 }

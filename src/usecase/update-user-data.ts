@@ -2,31 +2,31 @@ import { z } from 'zod';
 import type { UserDataRepository } from '../ports/external/user-data-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { UserNotFoundError } from '../errors/not-found.js';
-import { EmailOrCpfAlreadyInUseError } from '../errors/conflict.js';
+import { EmailOrCpfAlreadyInUseError, RgAlreadyInUseError } from '../errors/conflict.js';
+import { isValidCpf } from '../lib/cpf.js';
+import { isValidCnpj } from '../lib/cnpj.js';
+import { isValidBrPhone, isValidRg, isValidCnh } from '../lib/br-validators.js';
 
 const updateUserDataSchema = z.object({
     name: z.string().min(1).optional(),
     email: z.string().email().optional(),
-    phone: z.string().min(1).optional(),
-    cpf: z.string().nullable().optional(),
-    cnpj: z.string().nullable().optional(),
+    phone: z.string().refine(v => isValidBrPhone(v), 'Telefone inválido (DDD + 8 ou 9 dígitos)').optional(),
+    cpf: z.string().refine(v => isValidCpf(v), 'CPF inválido').nullable().optional(),
+    cnpj: z.string().refine(v => isValidCnpj(v), 'CNPJ inválido').nullable().optional(),
     avatar: z.string().nullable().optional(),
 
     // Identity
     nickname: z.string().nullable().optional(),
-    maritalStatus: z
-        .enum(['SINGLE', 'MARRIED', 'DIVORCED', 'WIDOWED', 'DOMESTIC_PARTNERSHIP'])
-        .nullable()
-        .optional(),
-    phone2: z.string().nullable().optional(),
-    phone3: z.string().nullable().optional(),
+    maritalStatus: z.enum(['SINGLE', 'MARRIED', 'DIVORCED', 'WIDOWED', 'DOMESTIC_PARTNERSHIP']).nullable().optional(),
+    phone2: z.string().refine(v => isValidBrPhone(v), 'Telefone 2 inválido (DDD + 8 ou 9 dígitos)').nullable().optional(),
+    phone3: z.string().refine(v => isValidBrPhone(v), 'Telefone 3 inválido (DDD + 8 ou 9 dígitos)').nullable().optional(),
 
     // Documents
-    rg: z.string().nullable().optional(),
+    rg: z.string().refine(v => isValidRg(v), 'RG inválido (7 a 9 dígitos)').nullable().optional(),
     rgIssuer: z.string().nullable().optional(),
-    rgIssuedAt: z.string().datetime().nullable().optional(),
-    birthDate: z.string().datetime().nullable().optional(),
-    driverLicense: z.string().nullable().optional(),
+    rgIssuedAt: z.coerce.date().nullable().optional(),
+    birthDate: z.coerce.date().nullable().optional(),
+    driverLicense: z.string().refine(v => isValidCnh(v), 'CNH inválida (11 dígitos)').nullable().optional(),
     driverLicenseCategory: z.string().nullable().optional(),
 
     // Origin
@@ -36,19 +36,7 @@ const updateUserDataSchema = z.object({
     // Profile
     gender: z.enum(['MALE', 'FEMALE', 'OTHER']).nullable().optional(),
     ethnicity: z.enum(['WHITE', 'BLACK', 'MIXED', 'ASIAN', 'INDIGENOUS']).nullable().optional(),
-    educationLevel: z
-        .enum([
-            'NO_FORMAL_EDUCATION',
-            'INCOMPLETE_PRIMARY',
-            'COMPLETE_PRIMARY',
-            'INCOMPLETE_SECONDARY',
-            'COMPLETE_SECONDARY',
-            'INCOMPLETE_HIGHER',
-            'COMPLETE_HIGHER',
-            'POSTGRADUATE',
-        ])
-        .nullable()
-        .optional(),
+    educationLevel: z.enum(['NO_FORMAL_EDUCATION','INCOMPLETE_PRIMARY','COMPLETE_PRIMARY','INCOMPLETE_SECONDARY','COMPLETE_SECONDARY','INCOMPLETE_HIGHER','COMPLETE_HIGHER','POSTGRADUATE',]).nullable().optional(),
     functionalCategory: z.string().nullable().optional(),
     specialNeeds: z.boolean().optional(),
 
@@ -60,12 +48,14 @@ const updateUserDataSchema = z.object({
     boardPosition: z.string().nullable().optional(),
     boardMember: z.boolean().optional(),
     memberStatus: z.enum(['ACTIVE', 'INACTIVE']).nullable().optional(),
-    memberSince: z.string().datetime().nullable().optional(),
+    memberSince: z.coerce.date().nullable().optional(),
     memberNotes: z.string().nullable().optional(),
     memberNotesNumber: z.string().nullable().optional(),
 
-    // Address
-    addressId: z.string().nullable().optional(),
+    // Partner
+    isPartner: z.boolean().optional(),
+    partnerUrl: z.string().url().max(500).nullable().optional(),
+    partnerOrder: z.number().int().min(0).nullable().optional(),
 });
 
 export type UpdateUserDataRequest = z.infer<typeof updateUserDataSchema> & { userId: string };
@@ -90,13 +80,16 @@ export class UpdateUserDataUseCase {
 
         const data = validation.data;
 
-        if (data.email || data.cpf) {
-            const conflict = await this.userDataRepository.findByEmailOrCpf(
-                data.email ?? existing.email,
-                data.cpf ?? existing.cpf ?? '',
-            );
+        if (data.cpf) {
+            const conflict = await this.userDataRepository.findByCpf(data.cpf);
             if (conflict && conflict.id !== userId) {
                 return { error: new EmailOrCpfAlreadyInUseError() };
+            }
+        }
+        if (data.rg) {
+            const conflict = await this.userDataRepository.findByRg(data.rg);
+            if (conflict && conflict.id !== userId) {
+                return { error: new RgAlreadyInUseError() };
             }
         }
 

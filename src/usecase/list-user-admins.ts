@@ -1,6 +1,7 @@
 import type {
     UserAdminRepository,
     UserAdminWithDetails,
+    UserAdminListFilters,
 } from '../ports/external/user-admin-repository.js';
 
 type PagedResult<T> = {
@@ -18,11 +19,11 @@ type ListUserAdminsResponse = {
 export class ListUserAdminsUseCase {
     constructor(private userAdminRepository: UserAdminRepository) {}
 
-    async execute(page = 1, limit = 20): Promise<ListUserAdminsResponse> {
+    async execute(page = 1, limit = 20, filters?: UserAdminListFilters): Promise<ListUserAdminsResponse> {
         const skip = (page - 1) * limit;
         const [admins, total] = await Promise.all([
-            this.userAdminRepository.findAll(skip, limit),
-            this.userAdminRepository.count(),
+            this.userAdminRepository.findAll(filters, skip, limit),
+            this.userAdminRepository.count(filters),
         ]);
         console.log(`[ListUserAdmins] page=${page} limit=${limit} total=${total}`);
         return {

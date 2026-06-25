@@ -6,6 +6,7 @@ import { createCourseAdapter } from '../../adapter/database/course-adapter.js';
 import { createUserDataAdapter } from '../../adapter/database/user-data.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
 import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
+import { createRegistrationAdapter } from '../../adapter/database/registration-adapter.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 
 export async function dashboardRouter(fastify: FastifyInstance, prisma: PrismaClient) {
@@ -13,10 +14,11 @@ export async function dashboardRouter(fastify: FastifyInstance, prisma: PrismaCl
     const userDataRepository = createUserDataAdapter(prisma);
     const userAdminRepository = createUserAdminAdapter(prisma);
     const ruleRepository = createRuleAdapter(prisma);
+    const registrationRepository = createRegistrationAdapter(prisma);
     const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const dashboardStatsController = new DashboardStatsController(
-        new DashboardStatsUseCase(courseRepository, userDataRepository, userAdminRepository),
+        new DashboardStatsUseCase(courseRepository, userDataRepository, userAdminRepository, registrationRepository),
         getAdminPermissions,
     );
 

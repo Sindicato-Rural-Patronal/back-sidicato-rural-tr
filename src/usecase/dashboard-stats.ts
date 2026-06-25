@@ -2,6 +2,7 @@ import type { CourseRepository } from '../ports/external/course-repository.js';
 import { CourseStatus } from '../ports/external/course-repository.js';
 import type { UserDataRepository } from '../ports/external/user-data-repository.js';
 import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { RegistrationRepository } from '../ports/external/registration-repository.js';
 
 export type DashboardStats = {
     totalUsers: number;
@@ -25,38 +26,37 @@ export class DashboardStatsUseCase {
         private readonly courseRepository: CourseRepository,
         private readonly userDataRepository: UserDataRepository,
         private readonly userAdminRepository: UserAdminRepository,
+        private readonly registrationRepository: RegistrationRepository,
     ) {}
 
     async execute(): Promise<DashboardStatsResponse> {
-        console.log(`[DashboardStats] fetching stats`);
-        const [allUsers, allAdmins, allCourses] = await Promise.all([
-            this.userDataRepository.findAll(),
-            this.userAdminRepository.findAll(),
-            this.courseRepository.findAll(),
+        const [
+            totalUsers,
+            totalAdmins,
+            totalCourses,
+            publicCourses,
+            privateCourses,
+            unpublishedCourses,
+            totalRegistrations,
+        ] = await Promise.all([
+            this.userDataRepository.count(),
+            this.userAdminRepository.count(),
+            this.courseRepository.count(),
+            this.courseRepository.count({ status: CourseStatus.PUBLIC }),
+            this.courseRepository.count({ status: CourseStatus.PRIVATE }),
+            this.courseRepository.count({ status: CourseStatus.UNPUBLISHED }),
+            this.registrationRepository.count(),
         ]);
 
-        const publicCount = allCourses.filter(c => c.status === CourseStatus.PUBLIC).length;
-        const privateCount = allCourses.filter(c => c.status === CourseStatus.PRIVATE).length;
-        const unpublishedCount = allCourses.filter(
-            c => c.status === CourseStatus.UNPUBLISHED,
-        ).length;
-        const totalRegistrations = allCourses.reduce(
-            (sum, c) => sum + c._count.courseUserRegistration,
-            0,
-        );
-
-        console.log(
-            `[DashboardStats] users=${allUsers.length} admins=${allAdmins.length} courses=${allCourses.length} registrations=${totalRegistrations}`,
-        );
         return {
             stats: {
-                totalUsers: allUsers.length,
-                totalAdmins: allAdmins.length,
+                totalUsers,
+                totalAdmins,
                 courses: {
-                    total: allCourses.length,
-                    public: publicCount,
-                    private: privateCount,
-                    unpublished: unpublishedCount,
+                    total: totalCourses,
+                    public: publicCourses,
+                    private: privateCourses,
+                    unpublished: unpublishedCourses,
                 },
                 totalRegistrations,
             },
