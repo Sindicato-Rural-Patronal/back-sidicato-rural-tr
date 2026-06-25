@@ -1,6 +1,6 @@
 # back-sindicato-rural-tr
 
-Backend REST para o sistema de gestão do Sindicato Rural. Gerencia trabalhadores, administradores, cursos, inscrições, notícias e permissões.
+Backend REST para o sistema de gestão do Sindicato Rural. Gerencia trabalhadores rurais (ficha de associado completa), administradores, cursos, inscrições, notícias e permissões.
 
 ---
 
@@ -15,6 +15,9 @@ Backend REST para o sistema de gestão do Sindicato Rural. Gerencia trabalhadore
 - [Funcionalidades](#funcionalidades)
   - [Autenticação](#autenticação)
   - [Usuários (UserData)](#usuários-userdata)
+  - [Endereços](#endereços)
+  - [Relações entre Cadastros](#relações-entre-cadastros)
+  - [Propriedades Rurais](#propriedades-rurais)
   - [Administradores](#administradores)
   - [Regras de Permissão](#regras-de-permissão)
   - [Salas](#salas)
@@ -22,10 +25,15 @@ Backend REST para o sistema de gestão do Sindicato Rural. Gerencia trabalhadore
   - [Inscrições em Cursos](#inscrições-em-cursos)
   - [Notícias](#notícias)
   - [Dashboard](#dashboard)
+  - [Instrutores](#instrutores)
+  - [Parceiros](#parceiros)
+  - [Banners](#banners)
+  - [Mensagens de Contato](#mensagens-de-contato)
 - [Regras de Negócio](#regras-de-negócio)
 - [Fluxos de Trabalho](#fluxos-de-trabalho)
 - [Sistema de Erros](#sistema-de-erros)
 - [Rotas](#rotas)
+- [Filtros de Listagem](#filtros-de-listagem)
 - [Testes](#testes)
 
 ---
@@ -86,7 +94,7 @@ npm run prisma:studio    # interface visual do banco
 
 Na primeira execução (`firstInitialize`), o servidor cria automaticamente:
 
-1. Regra `SUPER_RULE` com todas as 20 permissões do sistema
+1. Regra `SUPER_RULE` com todas as 26 permissões do sistema
 2. `UserData` do administrador principal (`eduardofrnkdev@gmail.com`)
 3. `UserAdmin` com `username: admin` / `password: admin`
 
@@ -145,17 +153,84 @@ Login de administradores via username/password com retorno de JWT.
 
 ### Usuários (UserData)
 
-Gerenciamento de trabalhadores rurais cadastrados no sistema.
+Ficha de associado completa do trabalhador rural.
 
-**Campos:** `id`, `name`, `email`, `phone`, `cpf`, `cnpj`, `avatar`
+**Campos obrigatórios:** `name`, `email`, `phone`
+
+**Campos opcionais — Identificação:** `nickname`, `cpf`, `cnpj`, `rg`, `rgIssuer`, `rgIssuedAt`, `birthDate`, `driverLicense`, `driverLicenseCategory`, `birthPlace`, `nationality`
+
+**Campos opcionais — Perfil:** `maritalStatus`, `gender`, `ethnicity`, `educationLevel`, `functionalCategory`, `specialNeeds`, `phone2`, `phone3`
+
+**Campos opcionais — Associação:** `memberClassification`, `cadPro`, `familyIncome`, `memberType`, `boardPosition`, `boardMember`, `memberStatus`, `memberSince`, `memberNotes`, `memberNotesNumber`
+
+**Enums:**
+
+| Campo | Valores |
+|-------|---------|
+| `maritalStatus` | `SINGLE`, `MARRIED`, `DIVORCED`, `WIDOWED`, `DOMESTIC_PARTNERSHIP` |
+| `gender` | `MALE`, `FEMALE`, `OTHER` |
+| `ethnicity` | `WHITE`, `BLACK`, `MIXED`, `ASIAN`, `INDIGENOUS` |
+| `educationLevel` | `NO_FORMAL_EDUCATION`, `INCOMPLETE_PRIMARY`, `COMPLETE_PRIMARY`, `INCOMPLETE_SECONDARY`, `COMPLETE_SECONDARY`, `INCOMPLETE_HIGHER`, `COMPLETE_HIGHER`, `POSTGRADUATE` |
+| `memberStatus` | `ACTIVE`, `INACTIVE` |
 
 | Operação | Descrição |
 |----------|-----------|
-| Cadastrar | Cria novo usuário com nome, email, telefone e CPF |
-| Listar | Lista paginada de todos os usuários (admin) |
-| Atualizar | Atualiza dados do perfil (nome, email, telefone, CPF, CNPJ) |
+| Cadastrar | Cria novo usuário (campos obrigatórios + quaisquer opcionais) |
+| Detalhe | Retorna ficha completa com endereço, relações e propriedades |
+| Listar | Lista paginada de todos os usuários (admin) com filtros |
+| Atualizar | Atualiza qualquer campo do perfil |
 | Excluir | Remove usuário do sistema |
 | Avatar | Upload de foto de perfil |
+| Instrutor | Promover a instrutor (adiciona bio) ou rebaixar |
+
+---
+
+### Endereços
+
+Modelo centralizado para endereços de usuários, propriedades e salas. Suporta endereço urbano e rural no mesmo registro.
+
+**Campos compartilhados:** `city`, `state`, `zipCode`, `complement`, `notes`
+
+**Campos urbanos:** `street`, `number`, `neighborhood`
+
+**Campos rurais:** `localityName`, `road`, `km`, `lot`, `section`
+
+| `type` | Uso |
+|--------|-----|
+| `URBAN` | Endereço de cidade/município |
+| `RURAL` | Localidade rural (fazenda, sítio, comunidade) |
+
+| Operação | Descrição |
+|----------|-----------|
+| Criar/Atualizar endereço do usuário | `PUT /admin/users/:id/address` — cria se não existir, atualiza se já houver |
+
+---
+
+### Relações entre Cadastros
+
+Vincula dois cadastros de `UserData` com um rótulo livre (sem enum fixo). Permite modelar qualquer tipo de relação: cônjuge, filho, sócio, etc.
+
+**Campos:** `sourceId`, `targetId`, `label` (texto livre)
+
+A relação é direcional — se A aponta para B, B não aponta automaticamente para A.
+
+| Operação | Descrição |
+|----------|-----------|
+| Adicionar relação | Vincula dois cadastros com rótulo opcional |
+| Remover relação | Remove o vínculo |
+
+---
+
+### Propriedades Rurais
+
+Imóveis rurais vinculados a um associado. Cada propriedade pode ter seu próprio endereço.
+
+**Campos:** `name`, `registration` (matrícula, opcional), `addressId` (opcional)
+
+| Operação | Descrição |
+|----------|-----------|
+| Adicionar | Cria propriedade vinculada ao usuário, com endereço opcional |
+| Remover | Remove a propriedade |
 
 ---
 
@@ -179,7 +254,7 @@ Contas de acesso ao painel administrativo, vinculadas a um `UserData`.
 
 Sistema de controle de acesso baseado em roles. Cada admin possui uma regra com um conjunto de permissões.
 
-**Permissões disponíveis (20 no total):**
+**Permissões disponíveis (26 no total):**
 
 | Domínio | Permissões |
 |---------|-----------|
@@ -188,6 +263,8 @@ Sistema de controle de acesso baseado em roles. Cada admin possui uma regra com 
 | Regras | `CREATE_RULE`, `UPDATE_RULE`, `DELETE_RULE`, `READ_RULE` |
 | Admins | `CREATE_USER_ADMIN`, `UPDATE_USER_ADMIN`, `DELETE_USER_ADMIN`, `READ_USER_ADMIN` |
 | Notícias | `CREATE_NEWS`, `UPDATE_NEWS`, `DELETE_NEWS`, `READ_NEWS` |
+| Contatos | `READ_CONTACT`, `UPDATE_CONTACT` |
+| Banners | `CREATE_BANNER`, `UPDATE_BANNER`, `DELETE_BANNER`, `READ_BANNER` |
 
 | Operação | Descrição |
 |----------|-----------|
@@ -220,9 +297,9 @@ Cursos e eventos oferecidos pelo sindicato.
 
 | Status | Visibilidade |
 |--------|-------------|
-| `PUBLICO` | Visível na listagem pública |
-| `PRIVADO` | Oculto na listagem pública, mas aceita inscrições via link direto |
-| `NAO_PUBLICADO` | Oculto e sem inscrições |
+| `PUBLIC` | Visível na listagem pública |
+| `PRIVATE` | Oculto na listagem pública, mas aceita inscrições via link direto |
+| `UNPUBLISHED` | Oculto e sem inscrições |
 
 | Operação | Descrição |
 |----------|-----------|
@@ -258,7 +335,7 @@ Publicação de conteúdo editorial pelo sindicato.
 
 **Campos:** `id`, `title`, `content`, `summary`, `bannerUrl`, `status`, `publishedAt`
 
-**Status possíveis:** `PUBLICADO`, `NAO_PUBLICADO`
+**Status possíveis:** `PUBLISHED`, `UNPUBLISHED`
 
 | Operação | Descrição |
 |----------|-----------|
@@ -280,8 +357,73 @@ Estatísticas agregadas do sistema para o painel administrativo.
 Retorna:
 - Total de usuários cadastrados
 - Total de administradores
-- Cursos por status (`PUBLICO`, `PRIVADO`, `NAO_PUBLICADO`) e total
+- Cursos por status (`PUBLIC`, `PRIVATE`, `UNPUBLISHED`) e total
 - Total de inscrições em cursos
+
+---
+
+### Instrutores
+
+`UserData` pode ser promovido a instrutor para ministrar cursos. A promoção cria um registro `UserInstructor` vinculado.
+
+**Campo extra:** `bio` (descrição/biografia do instrutor)
+
+Instrutores são atribuídos a cursos com um `title` e uma `category` por atribuição.
+
+| Operação | Descrição |
+|----------|-----------|
+| Promover | Cria registro de instrutor vinculado ao UserData |
+| Rebaixar | Remove o registro de instrutor |
+| Listar | Retorna todos os instrutores com dados do usuário |
+| Adicionar ao curso | Vincula instrutor a um curso com título e categoria |
+| Remover do curso | Remove a atribuição do instrutor ao curso |
+
+---
+
+### Parceiros
+
+`UserData` marcados como parceiro (`isPartner: true`) aparecem na página pública de parceiros do sindicato.
+
+**Campos:** `isPartner`, `partnerLogo` (URL), `partnerUrl`, `partnerOrder` (ordenação)
+
+| Operação | Descrição |
+|----------|-----------|
+| Listar (público) | Retorna todos os parceiros ativos ordenados por `partnerOrder` |
+| Reordenar | Atualiza a ordem dos parceiros em lote |
+| Upload logo | Faz upload da logo do parceiro |
+
+---
+
+### Banners
+
+Banners rotativos exibidos na página inicial. Suportam botões de ação e agendamento por data.
+
+**Campos:** `title`, `subtitle`, `imageUrl`, `active`, `order`, `buttons` (JSON — lista de `{ label, url }`), `startDate`, `endDate`
+
+| Operação | Descrição |
+|----------|-----------|
+| Listar (público) | Retorna banners ativos dentro do período `startDate–endDate` |
+| Listar (admin) | Retorna todos os banners independente de status ou data |
+| Criar | Cria novo banner com título, subtítulo, status e botões |
+| Atualizar | Atualiza qualquer campo do banner |
+| Excluir | Remove o banner |
+| Upload imagem | Faz upload da imagem do banner |
+| Reordenar | Atualiza a ordem dos banners em lote |
+
+---
+
+### Mensagens de Contato
+
+Formulário público de contato cujas mensagens ficam armazenadas para triagem interna.
+
+**Campos:** `name`, `email`, `phone`, `subject`, `message`, `read`, `createdAt`
+
+| Operação | Descrição |
+|----------|-----------|
+| Enviar (público) | Registra nova mensagem de contato |
+| Listar (admin) | Lista todas as mensagens com filtro de lidas/não lidas |
+| Marcar como lido | Marca uma mensagem como lida |
+| Excluir | Remove a mensagem |
 
 ---
 
@@ -290,6 +432,12 @@ Retorna:
 ### Usuários
 - Email e telefone devem ser únicos no sistema
 - Email e CPF devem ser únicos ao atualizar (não pode colidir com outro usuário)
+
+### Endereços / Propriedades / Relações
+- Endereço é centralizado: um único modelo `Address` serve usuários, propriedades e salas
+- `PUT /admin/users/:id/address` é um upsert — cria endereço se não existir, atualiza se já houver
+- Relações são direcionais e com rótulo livre — não há enum de tipo de parentesco
+- Excluir um `UserData` cascata em suas relações e propriedades
 
 ### Administradores
 - Username deve ser único entre todos os admins
@@ -300,18 +448,18 @@ Retorna:
 ### Cursos
 - A sala selecionada deve existir
 - **Verificação de conflito de sala:** ao criar ou atualizar, o sistema verifica se a sala já está ocupada no intervalo `startTime–endTime` por outro curso — retorna erro `RoomAlreadyBookedError` se houver sobreposição
-- Cursos `PRIVADO` ficam ocultos na listagem pública mas **aceitam inscrições** via link direto
-- Cursos `NAO_PUBLICADO` **não aceitam inscrições**
+- Cursos `PRIVATE` ficam ocultos na listagem pública mas **aceitam inscrições** via link direto
+- Cursos `UNPUBLISHED` **não aceitam inscrições**
 
 ### Inscrições
 - O curso deve existir
-- Cursos `NAO_PUBLICADO` retornam `RegistrationsUnavailableError`
+- Cursos `UNPUBLISHED` retornam `RegistrationsUnavailableError`
 - Se já existir um `UserData` com o mesmo email **ou** CPF informado, a inscrição é vinculada ao usuário existente (não cria duplicata)
 - Um usuário não pode se inscrever no mesmo curso duas vezes — retorna `CourseRegistrationAlreadyExistsError`
 
 ### Notícias
-- Ao publicar (`status: PUBLICADO`) sem informar `publishedAt`, o campo é preenchido automaticamente com a data/hora atual
-- Ao republicar (estava `NAO_PUBLICADO`, muda para `PUBLICADO`), `publishedAt` também é definido automaticamente se não informado
+- Ao publicar (`status: PUBLISHED`) sem informar `publishedAt`, o campo é preenchido automaticamente com a data/hora atual
+- Ao republicar (estava `UNPUBLISHED`, muda para `PUBLISHED`), `publishedAt` também é definido automaticamente se não informado
 
 ### Regras de Permissão
 - Uma regra deve ter ao menos **uma** permissão
@@ -324,14 +472,25 @@ Retorna:
 
 ## Fluxos de Trabalho
 
+### Fluxo: Cadastrar associado completo
+
+```
+1. POST /users                             — criar UserData com campos básicos
+2. PUT  /admin/users/:id/address           — registrar endereço (urbano ou rural)
+3. POST /admin/users/:id/properties        — adicionar propriedade rural (opcional, repetir)
+4. POST /admin/users/:id/relations         — vincular cadastro relacionado, ex: { targetId, label: "conjugue" }
+5. PATCH /users/:id                        — atualizar dados de associação (memberStatus, memberSince, etc.)
+6. GET   /admin/users/:id                  — verificar ficha completa
+```
+
 ### Fluxo: Criar e publicar um curso
 
 ```
 1. POST /rooms               — criar sala (se necessário)
-2. POST /courses             — criar curso com status NAO_PUBLICADO
+2. POST /courses             — criar curso com status UNPUBLISHED
 3. POST /courses/:id/banner  — upload da imagem de capa
 4. POST /courses/:id/gallery — adicionar fotos à galeria (opcional)
-5. PATCH /courses/:id        — atualizar status para PUBLICO
+5. PATCH /courses/:id        — atualizar status para PUBLIC
 ```
 
 ### Fluxo: Inscrição de usuário em curso
@@ -356,10 +515,10 @@ Retorna:
 ### Fluxo: Publicar notícia
 
 ```
-1. POST /news                — criar notícia com status NAO_PUBLICADO
+1. POST /news                — criar notícia com status UNPUBLISHED
 2. POST /news/:id/banner     — upload do banner
 3. POST /news/:id/image      — upload de imagens de bloco (opcional, repetir)
-4. PATCH /news/:id           — atualizar status para PUBLICADO
+4. PATCH /news/:id           — atualizar status para PUBLISHED
    → publishedAt é definido automaticamente
 ```
 
@@ -407,6 +566,8 @@ Erros de domínio são classes tipadas retornadas pelos use cases. Controllers m
 | `RegistrationNotFoundError` | Inscrição não encontrada |
 | `PhotoNotFoundError` | Foto não encontrada |
 | `PermissionRuleNotFoundError` | Regra de permissão do admin não encontrada |
+| `UserRelationNotFoundError` | Relação entre cadastros não encontrada |
+| `PropertyNotFoundError` | Propriedade rural não encontrada |
 | `ValidationError` | Dados de entrada inválidos (mensagem do Zod) |
 
 ---
@@ -425,13 +586,29 @@ Erros de domínio são classes tipadas retornadas pelos use cases. Controllers m
 |--------|------|-----------|
 | `POST` | `/users` | Pública |
 | `GET` | `/admin/users` | `READ_USER` |
+| `GET` | `/admin/users/:id` | `READ_USER` |
 | `PATCH` | `/users/:id` | `UPDATE_USER` |
 | `DELETE` | `/users/:id` | `DELETE_USER` |
+| `PUT` | `/admin/users/:id/address` | `UPDATE_USER` |
+| `POST` | `/admin/users/:id/relations` | `UPDATE_USER` |
+| `DELETE` | `/admin/users/:id/relations/:relationId` | `UPDATE_USER` |
+| `POST` | `/admin/users/:id/properties` | `UPDATE_USER` |
+| `DELETE` | `/admin/users/:id/properties/:propertyId` | `UPDATE_USER` |
+| `POST` | `/admin/users/:id/avatar` | `UPDATE_USER` |
+
+### Parceiros
+
+| Método | Rota | Permissão |
+|--------|------|-----------|
+| `GET` | `/partners` | Pública |
+| `PATCH` | `/admin/partners/reorder` | `UPDATE_USER` |
+| `POST` | `/admin/users/:id/partner-logo` | `UPDATE_USER` |
 
 ### Administradores
 
 | Método | Rota | Permissão |
 |--------|------|-----------|
+| `GET` | `/contacts` | Pública (lista admins públicos) |
 | `GET` | `/admin/me` | JWT (qualquer admin) |
 | `GET` | `/admin/users/admins` | `READ_USER_ADMIN` |
 | `POST` | `/admin/users` | `CREATE_USER_ADMIN` |
@@ -481,6 +658,37 @@ Erros de domínio são classes tipadas retornadas pelos use cases. Controllers m
 | `POST` | `/news/:newsId/image` | `UPDATE_NEWS` |
 | `GET` | `/admin/news` | `READ_NEWS` |
 
+### Instrutores
+
+| Método | Rota | Permissão |
+|--------|------|-----------|
+| `POST` | `/admin/users/:id/instructor` | `UPDATE_USER` |
+| `DELETE` | `/admin/users/:id/instructor` | `UPDATE_USER` |
+| `GET` | `/admin/instructors` | `READ_USER` |
+| `POST` | `/admin/courses/:courseId/instructors` | `UPDATE_COURSE` |
+| `DELETE` | `/admin/courses/:courseId/instructors/:assignmentId` | `UPDATE_COURSE` |
+
+### Banners
+
+| Método | Rota | Permissão |
+|--------|------|-----------|
+| `GET` | `/banners` | Pública |
+| `GET` | `/admin/banners` | `READ_BANNER` |
+| `POST` | `/admin/banners` | `CREATE_BANNER` |
+| `PATCH` | `/admin/banners/:id` | `UPDATE_BANNER` |
+| `DELETE` | `/admin/banners/:id` | `DELETE_BANNER` |
+| `POST` | `/admin/banners/:id/image` | `UPDATE_BANNER` |
+| `PATCH` | `/admin/banners/reorder` | `UPDATE_BANNER` |
+
+### Mensagens de Contato
+
+| Método | Rota | Permissão |
+|--------|------|-----------|
+| `POST` | `/contacts/message` | Pública |
+| `GET` | `/admin/contacts/messages` | `READ_CONTACT` |
+| `PATCH` | `/admin/contacts/messages/:messageId` | `UPDATE_CONTACT` |
+| `DELETE` | `/admin/contacts/messages/:messageId` | `UPDATE_CONTACT` |
+
 ### Regras
 
 | Método | Rota | Permissão |
@@ -488,6 +696,12 @@ Erros de domínio são classes tipadas retornadas pelos use cases. Controllers m
 | `GET` | `/admin/rules` | `READ_RULE` |
 | `POST` | `/rules` | `CREATE_RULE` |
 | `PATCH` | `/rules/:ruleId` | `UPDATE_RULE` |
+
+### Endereço
+
+| Método | Rota | Permissão |
+|--------|------|-----------|
+| `GET` | `/address/cep/:cep` | Pública |
 
 ### Dashboard
 
@@ -509,7 +723,22 @@ Rotas de listagem aceitam query params `?page=1&limit=20`. Resposta padrão:
 }
 ```
 
-Rota sem paginação: `GET /rooms` e `GET /admin/courses/:courseId/registrations`.
+Rotas sem paginação: `GET /rooms`, `GET /admin/courses/:courseId/registrations`, `GET /banners`, `GET /admin/banners`, `GET /admin/instructors`.
+
+---
+
+## Filtros de Listagem
+
+Além de `page` e `limit`, as seguintes rotas aceitam filtros adicionais:
+
+| Rota | Query params |
+|------|-------------|
+| `GET /admin/users` | `search` (nome/email/CPF), `memberType`, `memberClassification`, `gender`, `ethnicity`, `educationLevel` |
+| `GET /admin/users/admins` | `search` (username) |
+| `GET /admin/courses` | `status` (PUBLIC/PRIVATE/UNPUBLISHED), `search` (nome) |
+| `GET /admin/news` | `status` (PUBLISHED/UNPUBLISHED) |
+
+Todos os filtros são opcionais e combinativos. Exemplo: `GET /admin/users?search=joão&gender=MALE&memberType=WORKER`.
 
 ---
 
@@ -519,4 +748,6 @@ Rota sem paginação: `GET /rooms` e `GET /admin/courses/:courseId/registrations
 npm run test:run
 ```
 
-101 testes unitários cobrindo todos os use cases. Os testes usam repositórios em memória — sem banco real, sem storage.
+Testes unitários cobrindo os use cases principais. Os testes usam repositórios em memória — sem banco real, sem storage.
+
+> Use cases sem cobertura de testes: `get-user-detail`, `upsert-user-address`, `add-user-relation`, `delete-user-relation`, `add-property`, `delete-property`, e todos os use cases de instrutores, parceiros, banners e contatos.

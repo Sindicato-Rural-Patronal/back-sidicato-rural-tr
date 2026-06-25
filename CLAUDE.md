@@ -1,6 +1,6 @@
 # CLAUDE.md — back-sindicato-rural-tr
 
-Backend de um **Sindicato Rural** para gerenciar usuários trabalhadores, administradores, regras de permissão, cursos e notícias.
+Backend de um **Sindicato Rural** para gerenciar fichas completas de associados (trabalhadores rurais), administradores, regras de permissão, cursos e notícias.
 
 ## Stack
 
@@ -39,8 +39,8 @@ src/
   errors/
     auth.ts                   — AuthError (base) + InvalidCredentialsError
     business-rule.ts          — BusinessRuleError (base) + RoomAlreadyBookedError, RegistrationsUnavailableError
-    conflict.ts               — ConflictError (base) + 6 erros específicos de conflito
-    not-found.ts              — NotFoundError (base) + 11 erros específicos de not found
+    conflict.ts               — ConflictError (base) + 7 erros específicos de conflito
+    not-found.ts              — NotFoundError (base) + 17 erros específicos de not found
     validation.ts             — ValidationError (aceita msg do Zod — único com parâmetro)
   http/
     controllers/              — recebem FastifyRequest/Reply, delegam ao use case
@@ -59,16 +59,37 @@ src/
 
 | Modelo                   | Campos principais                                                                                          |
 |--------------------------|------------------------------------------------------------------------------------------------------------|
-| `UserData`               | id, name, email, phone, cpf, cnpj, avatar                                                                  |
+| `UserData`               | id, name, email, phone, cpf, cnpj, avatar, nickname, maritalStatus, phone2, phone3, rg, rgIssuer, rgIssuedAt, birthDate, driverLicense, driverLicenseCategory, birthPlace, nationality, gender, ethnicity, educationLevel, functionalCategory, specialNeeds, memberClassification, cadPro, familyIncome, memberType, boardPosition, boardMember, memberStatus, memberSince, memberNotes, memberNotesNumber, addressId (FK), isPartner, partnerLogo, partnerUrl, partnerOrder |
 | `UserAdmin`              | id, username, passwordHash, userDataId (FK), rulesId (FK)                                                  |
-| `Rule`                   | id, name, description, permitions (String[])                                                               |
+| `UserInstructor`         | id, userDataId (FK único), bio, linkedin, instagram, facebook                                              |
+| `Rule`                   | id, name, description, permissions (Permission[])                                                          |
 | `Course`                 | id, name, description, roomId (FK), startTime, endTime, status, price, workloadHours, coverImage, eventNumber, minStudents, preEnrolled, waitlist, registrationDeadline, observations |
-| `Room`                   | id, name, description, maxCapacity                                                                         |
+| `CourseInstructor`       | id, courseId (FK), instructorId (FK→UserInstructor), title, category                                      |
+| `Room`                   | id, name, description, maxCapacity, addressId (FK)                                                         |
 | `News`                   | id, title, content, summary, bannerUrl, status, publishedAt                                                |
 | `CoursePhoto`            | id, courseId (FK), url, caption                                                                            |
 | `CourseUserRegistration` | id, courseId (FK), userDataId (FK)                                                                         |
+| `Address`                | id, type (URBAN/RURAL), city, state, zipCode, complement, notes, street, number, neighborhood, localityName, road, km, lot, section |
+| `Property`               | id, userDataId (FK), name, registration, addressId (FK)                                                    |
+| `UserRelation`           | id, sourceId (FK→UserData), targetId (FK→UserData), label (texto livre)                                    |
+| `Banner`                 | id, title, subtitle, imageUrl, active, order, buttons (JSON), startDate, endDate                           |
+| `ContactMessage`         | id, name, email, phone, subject, message, read, createdAt                                                  |
 
-## Permissões disponíveis (em `Rule.permitions`)
+## Enums
+
+| Enum | Valores |
+|------|---------|
+| `CourseStatus` | `PUBLIC`, `PRIVATE`, `UNPUBLISHED` |
+| `NewsStatus` | `PUBLISHED`, `UNPUBLISHED` |
+| `Permission` | `CREATE_USER`, `UPDATE_USER`, `DELETE_USER`, `READ_USER`, `CREATE_COURSE`, `UPDATE_COURSE`, `DELETE_COURSE`, `READ_COURSE`, `CREATE_RULE`, `UPDATE_RULE`, `DELETE_RULE`, `READ_RULE`, `CREATE_USER_ADMIN`, `UPDATE_USER_ADMIN`, `DELETE_USER_ADMIN`, `READ_USER_ADMIN`, `CREATE_NEWS`, `UPDATE_NEWS`, `DELETE_NEWS`, `READ_NEWS`, `READ_CONTACT`, `UPDATE_CONTACT`, `CREATE_BANNER`, `UPDATE_BANNER`, `DELETE_BANNER`, `READ_BANNER` |
+| `MaritalStatus` | `SINGLE`, `MARRIED`, `DIVORCED`, `WIDOWED`, `DOMESTIC_PARTNERSHIP` |
+| `Gender` | `MALE`, `FEMALE`, `OTHER` |
+| `Ethnicity` | `WHITE`, `BLACK`, `MIXED`, `ASIAN`, `INDIGENOUS` |
+| `EducationLevel` | `NO_FORMAL_EDUCATION`, `INCOMPLETE_PRIMARY`, `COMPLETE_PRIMARY`, `INCOMPLETE_SECONDARY`, `COMPLETE_SECONDARY`, `INCOMPLETE_HIGHER`, `COMPLETE_HIGHER`, `POSTGRADUATE` |
+| `MemberStatus` | `ACTIVE`, `INACTIVE` |
+| `AddressType` | `URBAN`, `RURAL` |
+
+## Permissões disponíveis (em `Rule.permissions`)
 
 ```
 CREATE_USER    UPDATE_USER    DELETE_USER    READ_USER
@@ -76,6 +97,8 @@ CREATE_COURSE  UPDATE_COURSE  DELETE_COURSE  READ_COURSE
 CREATE_RULE    UPDATE_RULE    DELETE_RULE    READ_RULE
 CREATE_USER_ADMIN  UPDATE_USER_ADMIN  DELETE_USER_ADMIN  READ_USER_ADMIN
 CREATE_NEWS    UPDATE_NEWS    DELETE_NEWS    READ_NEWS
+READ_CONTACT   UPDATE_CONTACT
+CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 ```
 
 ## Rotas HTTP
@@ -90,17 +113,47 @@ CREATE_NEWS    UPDATE_NEWS    DELETE_NEWS    READ_NEWS
 |--------|------|----------|--------------|
 | `POST` | `/users` | `CreateUserUseCase` | Pública |
 | `GET` | `/admin/users` | `ListUsersUseCase` | `READ_USER` |
+| `GET` | `/admin/users/:id` | `GetUserDetailUseCase` | `READ_USER` |
 | `PATCH` | `/users/:id` | `UpdateUserDataUseCase` | `UPDATE_USER` |
 | `DELETE` | `/users/:id` | `DeleteUserDataUseCase` | `DELETE_USER` |
+| `PUT` | `/admin/users/:id/address` | `UpsertUserAddressUseCase` | `UPDATE_USER` |
+| `GET` | `/admin/users/:id/relations` | `ListUserRelationsUseCase` | `READ_USER` |
+| `POST` | `/admin/users/:id/relations` | `AddUserRelationUseCase` | `UPDATE_USER` |
+| `DELETE` | `/admin/users/:id/relations/:relationId` | `DeleteUserRelationUseCase` | `UPDATE_USER` |
+| `GET` | `/admin/users/:id/properties` | `ListUserPropertiesUseCase` | `READ_USER` |
+| `POST` | `/admin/users/:id/properties` | `AddPropertyUseCase` | `UPDATE_USER` |
+| `DELETE` | `/admin/users/:id/properties/:propertyId` | `DeletePropertyUseCase` | `UPDATE_USER` |
+| `POST` | `/admin/users/:id/avatar` | `UploadAvatarUseCase` | `UPDATE_USER` |
+
+### Parceiros
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/partners` | `ListPartnersUseCase` | Pública |
+| `PATCH` | `/admin/partners/reorder` | `ReorderPartnersUseCase` | `UPDATE_USER` |
+| `POST` | `/admin/users/:id/partner-logo` | `UploadPartnerLogoUseCase` | `UPDATE_USER` |
 
 ### Administradores (UserAdmin)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
+| `GET` | `/contacts` | `ListPublicContactsUseCase` | Pública |
 | `GET` | `/admin/me` | `GetCurrentAdminUseCase` | JWT (qualquer admin) |
 | `GET` | `/admin/users/admins` | `ListUserAdminsUseCase` | `READ_USER_ADMIN` |
 | `POST` | `/admin/users` | `CreateUserAdminUseCase` | `CREATE_USER_ADMIN` |
 | `PATCH` | `/admin/users/:id` | `UpdateUserAdminUseCase` | `UPDATE_USER_ADMIN` |
 | `DELETE` | `/admin/users/:id` | `DeleteUserAdminUseCase` | `DELETE_USER_ADMIN` |
+
+> `GET /admin/me` retorna `{ userId, userDataId, username, rulesId, ruleName, permissions[] }`.
+> `userId` = UserAdmin.id (igual ao JWT). `userDataId` = UserData.id vinculado.
+
+### Instrutores
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `POST` | `/admin/users/:id/instructor` | `PromoteToInstructorUseCase` | `UPDATE_USER` |
+| `PATCH` | `/admin/users/:id/instructor` | `UpdateInstructorUseCase` | `UPDATE_USER` |
+| `DELETE` | `/admin/users/:id/instructor` | `DemoteInstructorUseCase` | `UPDATE_USER` |
+| `GET` | `/admin/instructors` | `ListInstructorsUseCase` | `READ_USER` |
+| `POST` | `/admin/courses/:courseId/instructors` | `AddInstructorToCourseUseCase` | `UPDATE_COURSE` |
+| `DELETE` | `/admin/courses/:courseId/instructors/:assignmentId` | `RemoveInstructorFromCourseUseCase` | `UPDATE_COURSE` |
 
 ### Cursos
 | Método | Path | Use Case | Autenticação |
@@ -116,6 +169,10 @@ CREATE_NEWS    UPDATE_NEWS    DELETE_NEWS    READ_NEWS
 | `GET` | `/admin/courses` | `ListAllCoursesUseCase` | `READ_COURSE` |
 | `GET` | `/admin/courses/:courseId` | `GetAdminCourseDetailUseCase` | `READ_COURSE` |
 
+> Cursos com status `PRIVATE` aparecem apenas para admins (`/admin/courses`), mas aceitam inscrições via link direto. Apenas `UNPUBLISHED` bloqueia inscrições.
+>
+> `GET /courses/:courseId` e `GET /admin/courses/:courseId` retornam `instructors[]` com os campos: `id`, `title`, `category`, `name`, `bio`, `avatar`, `linkedin`, `instagram`, `facebook`. O campo `instructorName` (primeiro instrutor) ainda é retornado para compatibilidade.
+
 ### Salas
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
@@ -126,6 +183,7 @@ CREATE_NEWS    UPDATE_NEWS    DELETE_NEWS    READ_NEWS
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
 | `POST` | `/courses/:courseId/register` | `RegisterForCourseUseCase` | Pública |
+| `POST` | `/courses/:courseId/register-by-cpf` | `RegisterForCourseByCpfUseCase` | Pública |
 | `GET` | `/admin/courses/:courseId/registrations` | `ListCourseRegistrationsUseCase` | `READ_COURSE` |
 | `DELETE` | `/admin/registrations/:registrationId` | `CancelRegistrationUseCase` | `UPDATE_COURSE` |
 
@@ -139,7 +197,26 @@ CREATE_NEWS    UPDATE_NEWS    DELETE_NEWS    READ_NEWS
 | `DELETE` | `/news/:newsId` | `DeleteNewsUseCase` | `DELETE_NEWS` |
 | `POST` | `/news/:newsId/banner` | `UploadNewsBannerUseCase` | `UPDATE_NEWS` |
 | `POST` | `/news/:newsId/image` | `UploadNewsBlockImageUseCase` | `UPDATE_NEWS` |
-| `GET` | `/admin/news` | `ListNewsUseCase` | `READ_NEWS` |
+| `GET` | `/admin/news` | `ListAllNewsUseCase` | `READ_NEWS` |
+
+### Banners
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/banners` | `ListBannersUseCase` | Pública |
+| `GET` | `/admin/banners` | `ListAllBannersUseCase` | `READ_BANNER` |
+| `POST` | `/admin/banners` | `CreateBannerUseCase` | `CREATE_BANNER` |
+| `PATCH` | `/admin/banners/:id` | `UpdateBannerUseCase` | `UPDATE_BANNER` |
+| `DELETE` | `/admin/banners/:id` | `DeleteBannerUseCase` | `DELETE_BANNER` |
+| `POST` | `/admin/banners/:id/image` | `UploadBannerImageUseCase` | `UPDATE_BANNER` |
+| `PATCH` | `/admin/banners/reorder` | `ReorderBannersUseCase` | `UPDATE_BANNER` |
+
+### Contatos (Formulário público)
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `POST` | `/contacts/message` | `CreateContactMessageUseCase` | Pública |
+| `GET` | `/admin/contacts/messages` | `ListContactMessagesUseCase` | `READ_CONTACT` |
+| `PATCH` | `/admin/contacts/messages/:messageId` | `MarkContactMessageReadUseCase` | `UPDATE_CONTACT` |
+| `DELETE` | `/admin/contacts/messages/:messageId` | `DeleteContactMessageUseCase` | `UPDATE_CONTACT` |
 
 ### Regras
 | Método | Path | Use Case | Autenticação |
@@ -153,6 +230,11 @@ CREATE_NEWS    UPDATE_NEWS    DELETE_NEWS    READ_NEWS
 |--------|------|----------|--------------|
 | `GET` | `/admin/dashboard/stats` | `DashboardStatsUseCase` | `READ_COURSE` |
 
+### Endereço
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/address/cep/:cep` | `FetchAddressByCepUseCase` | Pública |
+
 ## Paginação
 
 Rotas de listagem aceitam `?page=1&limit=20`. Resposta padrão:
@@ -161,7 +243,16 @@ Rotas de listagem aceitam `?page=1&limit=20`. Resposta padrão:
 { "data": [...], "total": 100, "page": 1, "limit": 20, "totalPages": 5 }
 ```
 
-Rotas sem paginação: `GET /rooms`, `GET /admin/courses/:courseId/registrations`.
+Todas as rotas de listagem suportam paginação via `?page=1&limit=20`.
+
+### Filtros disponíveis por endpoint
+
+| Endpoint | Query params de filtro |
+|----------|------------------------|
+| `GET /admin/users` | `search` (nome/email/CPF), `memberType`, `memberClassification`, `gender`, `ethnicity`, `educationLevel` |
+| `GET /admin/users/admins` | `search` (username) |
+| `GET /admin/courses` | `status` (PUBLIC/PRIVATE/UNPUBLISHED), `search` (nome) |
+| `GET /admin/news` | `status` (PUBLISHED/UNPUBLISHED) |
 
 ## Adaptadores de banco disponíveis
 
@@ -174,6 +265,12 @@ Rotas sem paginação: `GET /rooms`, `GET /admin/courses/:courseId/registrations
 | `createNewsAdapter` | `adapter/database/news-adapter.ts` | `NewsRepository` |
 | `createRoomAdapter` | `adapter/database/room-adapter.ts` | `RoomRepository` |
 | `createRegistrationAdapter` | `adapter/database/registration-adapter.ts` | `RegistrationRepository` |
+| `createAddressAdapter` | `adapter/database/address-adapter.ts` | `AddressRepository` |
+| `createUserRelationAdapter` | `adapter/database/user-relation-adapter.ts` | `UserRelationRepository` |
+| `createPropertyAdapter` | `adapter/database/property-adapter.ts` | `PropertyRepository` |
+| `createInstructorAdapter` | `adapter/database/instructor-adapter.ts` | `InstructorRepository` |
+| `createBannerAdapter` | `adapter/database/banner-adapter.ts` | `BannerRepository` |
+| `createContactMessageAdapter` | `adapter/database/contact-message-adapter.ts` | `ContactMessageRepository` |
 | `createStorageAdapter` | `adapter/storage/factory.ts` | `StorageRepository` |
 
 ## Padrão de implementação
@@ -204,7 +301,7 @@ export class FooAdapter implements FooRepository {
 // src/usecase/create-foo.ts
 export class CreateFooUseCase {
   constructor(private repo: FooRepository) {}
-  async execute(request): Promise<{ success: boolean; error?: Error; fooId?: string }> { ... }
+  async execute(request): Promise<{ error?: Error; fooId?: string }> { ... }
 }
 ```
 
@@ -217,8 +314,8 @@ export class CreateFooController {
     const body = req.body as CreateFooRequest;
     const response = await this.useCase.execute(body);
     // SEMPRE verificar erro antes de enviar resposta
-    if (!response.success) {
-      return reply.status(400).send({ error: response.error?.message });
+    if (response.error) {
+      return reply.status(errorToStatus(response.error)).send({ error: response.error.message });
     }
     return reply.status(201).send({ id: response.fooId });
   }
@@ -248,33 +345,49 @@ Os erros de domínio vivem em `src/errors/` divididos por categoria:
 |---------|-------------|------------------------|
 | `auth.ts` | `AuthError` | `InvalidCredentialsError` |
 | `business-rule.ts` | `BusinessRuleError` | `RoomAlreadyBookedError`, `RegistrationsUnavailableError` |
-| `conflict.ts` | `ConflictError` | `UserAlreadyExistsError`, `UsernameAlreadyExistsError`, `UsernameAlreadyInUseError`, `AdminAccountAlreadyExistsError`, `EmailOrCpfAlreadyInUseError`, `CourseRegistrationAlreadyExistsError` |
-| `not-found.ts` | `NotFoundError` | `CourseNotFoundError`, `UserNotFoundError`, `UserDataNotFoundError`, `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError` |
+| `conflict.ts` | `ConflictError` | `UserAlreadyExistsError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `EmailOrCpfAlreadyInUseError`, `CourseRegistrationAlreadyExistsError`, `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError` |
+| `not-found.ts` | `NotFoundError` | `CourseNotFoundError`, `UserNotFoundError`, `UserDataNotFoundError`, `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError`, `UserRelationNotFoundError`, `PropertyNotFoundError`, `AddressNotFoundError`, `InstructorNotFoundError`, `ContactMessageNotFoundError`, `BannerNotFoundError` |
 | `validation.ts` | `ValidationError` | — (único com parâmetro de mensagem, para erros dinâmicos do Zod) |
 
 Use cases lançam a subclasse específica. Controllers usam `errorToStatus(response.error)` de `http/lib/require-permission.ts` para mapear para HTTP status:
 
 ```ts
 // errorToStatus mapping
-NotFoundError  → 404
-ConflictError  → 409
-AuthError      → 401
-default        → 400
+NotFoundError      → 404
+ConflictError      → 409
+BusinessRuleError  → 409
+AuthError          → 401
+default            → 400
 ```
 
 ### Padrão de error handling nos use cases
 
 ```ts
-// Padrão padrão — success flag
-type Response = { success: boolean; error?: Error; result?: ... }
+// Use cases retornam { error?: Error; result?: ... } — sem success flag
+// Ausência de error == sucesso
 
 // No controller — verificar erro ANTES de send()
-if (!response.success) {
-    return reply.status(errorToStatus(response.error)).send({ error: response.error?.message });
+if (response.error) {
+    return reply.status(errorToStatus(response.error)).send({ error: response.error.message });
 }
 ```
 
 Nunca chamar `reply.send()` duas vezes — causa erro de dupla resposta no Fastify.
+
+### Regra: listagens sempre retornam 200
+
+Use cases de listagem **nunca** retornam `NotFoundError` quando o resultado está vazio. Retornam sempre 200 com array vazio ou objeto paginado zerado:
+
+```ts
+// Correto — listagem sem resultados
+return { result: { data: [], total: 0, page: 1, limit: 20, totalPages: 0 } };
+return { items: [] };
+
+// ERRADO — nunca fazer isso em listagem
+if (!items.length) return { error: new SomethingNotFoundError() };
+```
+
+404 só é correto em operações de **detalhe** (busca por ID único) ou **ação** (update/delete) quando o recurso não existe.
 
 ## Upload de arquivos (multipart)
 
@@ -295,14 +408,14 @@ O `StorageRepository` é instanciado via `createStorageAdapter()` (sem parâmetr
 
 ## Autenticação
 
-O JWT é gerado no `LoginUserAdminUseCase` com payload `{ userId, username, role }` e expiração de 1h.
+O JWT é gerado no `LoginUserAdminUseCase` com payload `{ userId, username, role }` e expiração de 1h. `userId` no payload = `UserAdmin.id`.
 
 Para rotas protegidas, verificar o token e checar a permissão na `Rule` do admin:
 ```ts
 const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
 const admin = await userAdminRepository.findById(decoded.userId);
 const rule = await ruleRepository.findById(admin.rulesId);
-const canDo = rule.permitions.includes('CREATE_COURSE');
+const canDo = rule.permissions.includes('CREATE_COURSE');
 ```
 
 No `CreateUserAdminUseCase`, o token é passado como `creatorToken` no request — o próprio use case faz a verificação de permissão.
@@ -315,7 +428,7 @@ const token = request.headers['authorization']?.replace('Bearer ', '') ?? '';
 ## Inicialização automática
 
 Na primeira execução (`firstInitialize` em `index.ts`), o servidor cria:
-1. Rule `SUPER_RULE` com todas as permissões
+1. Rule `SUPER_RULE` com todas as permissões (atualizada automaticamente se novas permissões forem adicionadas)
 2. `UserData` do Eduardo (email: `eduardofrnkdev@gmail.com`)
 3. `UserAdmin` com username `admin` e senha `admin` (apenas desenvolvimento)
 
@@ -378,3 +491,4 @@ npm run prisma:studio    # interface visual do banco
 - Os tipos do Prisma são importados de `src/generated/prisma/` — nunca editar esses arquivos
 - O `PrismaClient` é importado de `../generated/prisma/client.js` (não do pacote padrão)
 - O `StorageAdapter` é instanciado via factory `createStorageAdapter()` que lê `STORAGE_TYPE` do env
+- Todos os métodos de busca por email/CPF/telefone no `UserDataAdapter` filtram `isDeleted: false` — soft-deleted users não retornam em conflict checks
