@@ -4,8 +4,8 @@ import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permiss
 import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 
 type Body = {
- targetId: string;
-label?: string 
+    targetId: string;
+    label?: string;
 };
 
 export class AddUserRelationController {
@@ -16,9 +16,9 @@ export class AddUserRelationController {
 
     async handle(
         request: FastifyRequest<{
- Params: { id: string };
-Body: Body 
-}>,
+            Params: { id: string };
+            Body: Body;
+        }>,
         reply: FastifyReply,
     ) {
         if (

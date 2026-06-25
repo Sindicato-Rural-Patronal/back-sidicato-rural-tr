@@ -11,11 +11,11 @@ export class DeleteUserRelationController {
 
     async handle(
         request: FastifyRequest<{
- Params: {
- id: string;
-relationId: string 
-} 
-}>,
+            Params: {
+                id: string;
+                relationId: string;
+            };
+        }>,
         reply: FastifyReply,
     ) {
         if (
@@ -24,8 +24,8 @@ relationId: string
         )
             return;
 
-        const { relationId } = request.params;
-        const result = await this.useCase.execute(relationId);
+        const { id: userId, relationId } = request.params;
+        const result = await this.useCase.execute(relationId, userId);
         if (result.error) {
             return reply.status(errorToStatus(result.error)).send({ error: result.error.message });
         }
