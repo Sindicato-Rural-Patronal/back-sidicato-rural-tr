@@ -25,9 +25,6 @@ export class CreateUserAdminUseCase {
     ) {}
 
     async execute(request: CreateUserAdminRequest): Promise<CreateUserAdminResponse> {
-        console.log(
-            `[CreateUserAdmin] username="${request.username}" userDataId="${request.userDataId}" userRole="${request.userRole}"`,
-        );
         const existingAdmin = await this.userAdminRepository.findByUsername(request.username);
         if (existingAdmin) {
             return { error: new UsernameAlreadyExistsError() };
@@ -59,7 +56,6 @@ export class CreateUserAdminUseCase {
                 userDataId: request.userDataId,
                 rulesId: request.userRole,
             });
-            console.log(`[CreateUserAdmin] success userAdminId="${newAdmin.id}"`);
             return { userAdminId: newAdmin.id };
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);

@@ -1,4 +1,5 @@
 import type { BannerRepository, BannerModel } from '../ports/external/banner-repository.js';
+import { paginate } from '../lib/pagination.js';
 
 type Response = {
     error?: Error;
@@ -13,15 +14,11 @@ export class ListAllBannersUseCase {
     constructor(private readonly repo: BannerRepository) {}
 
     async execute(page = 1, limit = 20): Promise<Response> {
-        const skip = (page - 1) * limit;
-        const [data, total] = await Promise.all([
-            this.repo.findAll(skip, limit),
-            this.repo.count(),
-        ]);
-        return { data,
-total,
-page,
-limit,
-totalPages: Math.ceil(total / limit) };
+        return paginate(
+            page,
+            limit,
+            (skip, take) => this.repo.findAll(skip, take),
+            () => this.repo.count(),
+        );
     }
 }

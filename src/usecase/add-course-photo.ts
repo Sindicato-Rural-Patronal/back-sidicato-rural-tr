@@ -1,8 +1,9 @@
 import type { CourseRepository } from '../ports/external/course-repository.js';
 import type { StorageRepository, UploadParams } from '../ports/external/storage-repository.js';
 import { CourseNotFoundError } from '../errors/not-found.js';
+import { buckets } from '../lib/buckets.js';
 
-const BANNER_BUCKET = process.env.BANNER_BUCKET || 'course-banners';
+const BANNER_BUCKET = buckets.courseBanners;
 
 type AddCoursePhotoResponse = {
     error?: Error;
@@ -22,12 +23,8 @@ export class AddCoursePhotoUseCase {
         originalFilename: string,
         caption?: string,
     ): Promise<AddCoursePhotoResponse> {
-        console.log(
-            `[AddCoursePhoto] courseId="${courseId}" file="${originalFilename}" caption="${caption ?? ''}"`,
-        );
         const existing = await this.courseRepository.findById(courseId);
         if (!existing) {
-            console.log(`[AddCoursePhoto] course not found: ${courseId}`);
             return { error: new CourseNotFoundError() };
         }
 
@@ -39,7 +36,6 @@ body: fileBuffer };
         const url = this.storage.getPublicUrl(BANNER_BUCKET, key);
 
         const photo = await this.courseRepository.addPhoto(courseId, url, caption);
-        console.log(`[AddCoursePhoto] success photoId="${photo.id}" url="${url}"`);
         return { url,
 photoId: photo.id };
     }

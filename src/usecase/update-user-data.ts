@@ -66,7 +66,6 @@ export class UpdateUserDataUseCase {
     constructor(private readonly userDataRepository: UserDataRepository) {}
 
     async execute(request: UpdateUserDataRequest): Promise<UpdateUserDataResponse> {
-        console.log(`[UpdateUserData] userId="${request.userId}"`);
         const { userId, ...body } = request;
         const validation = updateUserDataSchema.safeParse(body);
         if (!validation.success) {
@@ -96,7 +95,6 @@ export class UpdateUserDataUseCase {
         const updated = await this.userDataRepository.update(userId, data);
         if (!updated) return { error: new Error('Failed to update user') };
 
-        console.log(`[UpdateUserData] success userId="${userId}"`);
         return {};
     }
 }

@@ -33,7 +33,6 @@ export class UpdateCourseUseCase {
     ) {}
 
     async execute(request: UpdateCourseRequest): Promise<UpdateCourseResponse> {
-        console.log(`[UpdateCourse] courseId="${request.courseId}"`);
         const { courseId, ...body } = request;
         const validation = updateCourseBodySchema.safeParse(body);
         if (!validation.success) {
@@ -82,7 +81,6 @@ export class UpdateCourseUseCase {
         const updated = await this.courseRepository.update(courseId, updatePayload);
         if (!updated) return { error: new Error('Failed to update course') };
 
-        console.log(`[UpdateCourse] success courseId="${courseId}"`);
         return {};
     }
 }

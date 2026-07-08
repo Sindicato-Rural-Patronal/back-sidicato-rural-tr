@@ -28,9 +28,6 @@ export class RegisterForCourseByCpfUseCase {
     ) {}
 
     async execute(request: Request): Promise<Response> {
-        console.log(
-            `[RegisterForCourseByCpf] courseId="${request.courseId}" cpf="${request.cpf}"`,
-        );
         const parsed = schema.safeParse(request);
         if (!parsed.success) {
             return {
@@ -66,9 +63,6 @@ export class RegisterForCourseByCpfUseCase {
         }
 
         const registration = await this.registrationRepository.create(courseId, userData.id);
-        console.log(
-            `[RegisterForCourseByCpf] success registrationId="${registration.id}" userDataId="${userData.id}"`,
-        );
         return { registrationId: registration.id,
 userDataId: userData.id };
     }

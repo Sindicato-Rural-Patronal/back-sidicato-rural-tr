@@ -19,19 +19,14 @@ export class UpdateNewsUseCase {
     constructor(private readonly newsRepository: NewsRepository) {}
 
     async execute(request: UpdateNewsRequest): Promise<UpdateNewsResponse> {
-        console.log(`[UpdateNews] newsId="${request.newsId}"`);
         const validation = updateNewsRequestSchema.safeParse(request);
         if (!validation.success) {
-            console.log(
-                `[UpdateNews] validation failed: ${validation.error.issues.map(e => e.message).join(', ')}`,
-            );
             return {
                 error: new ValidationError(validation.error.issues.map(e => e.message).join(', ')),
             };
         }
 
         const { newsId, publishedAt, ...updateData } = validation.data;
-        console.log(`[UpdateNews] fields to update: ${JSON.stringify(Object.keys(updateData))}`);
 
         const existing = await this.newsRepository.findById(newsId);
         if (!existing) return { error: new NewsNotFoundError() };
@@ -50,7 +45,6 @@ export class UpdateNewsUseCase {
 
         if (!updated) return { error: new Error('Failed to update news') };
 
-        console.log(`[UpdateNews] success newsId="${newsId}"`);
         return {};
     }
 }

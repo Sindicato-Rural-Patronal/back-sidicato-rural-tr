@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client/extension';
 import { createAddressAdapter } from '../../adapter/database/address-adapter.js';
 import { FetchAddressByCepUseCase } from '../../usecase/fetch-address-by-cep.js';
 import { FetchAddressByCepController } from '../controllers/fetch-address-by-cep.js';
+import { errorResponse } from '../lib/swagger-schemas.js';
 
 export async function addressRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const addressRepo = createAddressAdapter(prisma);
@@ -41,8 +42,7 @@ nullable: true },
 nullable: true },
                         },
                     },
-                    404: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    404: errorResponse,
                 },
             },
         },

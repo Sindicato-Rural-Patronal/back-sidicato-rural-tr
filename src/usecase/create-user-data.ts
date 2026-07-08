@@ -36,7 +36,6 @@ export class CreateUserUseCase {
 
         const existingUser = await this.userDataRepository.findByCpf(request.cpf);
         if (existingUser) {
-            console.log(`[CreateUser] conflict: CPF already registered cpf="${request.cpf}"`);
             return { error: new UserAlreadyExistsError() };
         }
 
@@ -51,7 +50,6 @@ export class CreateUserUseCase {
             return { error: new Error('Failed to create user') };
         }
 
-        console.log(`[CreateUser] success userId="${newUser.id}"`);
         return {
             data: {
                 id: newUser.id,

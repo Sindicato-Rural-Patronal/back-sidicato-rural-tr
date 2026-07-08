@@ -3,6 +3,7 @@ import type { StorageRepository } from '../ports/external/storage-repository.js'
 import type { UserDataRepository } from '../ports/external/user-data-repository.js';
 import { UserDataNotFoundError } from '../errors/not-found.js';
 import { ValidationError } from '../errors/validation.js';
+import { buckets } from '../lib/buckets.js';
 
 export interface UploadPartnerLogoInput {
     userId: string;
@@ -46,7 +47,7 @@ alpha: 0 } })
             .png({ compressionLevel: 8 })
             .toBuffer();
 
-        const bucket = process.env.STORAGE_BUCKET ?? 'avatars';
+        const bucket = buckets.avatars;
         const key = `partner-logos/${input.userId}/logo.png`;
 
         await this.storage.uploadFile({ bucket,

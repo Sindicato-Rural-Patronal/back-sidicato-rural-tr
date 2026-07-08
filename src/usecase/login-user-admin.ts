@@ -14,16 +14,13 @@ export class LoginUserAdminUseCase {
     constructor(private userAdminRepository: UserAdminRepository) {}
 
     async execute(username: string, password: string): Promise<LoginUserAdminResponse> {
-        console.log(`[LoginUserAdmin] attempt username="${username}"`);
         const user = await this.userAdminRepository.findByUsername(username);
         if (!user) {
-            console.log(`[LoginUserAdmin] user not found: "${username}"`);
             return { error: new InvalidCredentialsError() };
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
         if (!isPasswordValid) {
-            console.log(`[LoginUserAdmin] wrong password for username="${username}"`);
             return { error: new InvalidCredentialsError() };
         }
 
@@ -35,7 +32,6 @@ role: user.rulesId },
             { expiresIn: '1h' },
         );
 
-        console.log(`[LoginUserAdmin] success userId="${user.id}" rulesId="${user.rulesId}"`);
         return { token };
     }
 }
