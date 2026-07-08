@@ -403,7 +403,7 @@ properties: { error: { type: 'string' } } },
 
 **Business rules:**
 - Send as \`multipart/form-data\` with the file in the \`file\` field
-- The storage bucket is created automatically if it does not exist (MinIO in development, S3 in production)
+- The file is stored in the public Supabase Storage bucket (\`course-banners\`), which must already exist
 - The URL returned in \`url\` is saved to the course \`coverImage\` field and should be used directly in \`<img>\`
 - Uploading a new banner overwrites the previous one
 - \`courseId\` must be an existing course ID`,

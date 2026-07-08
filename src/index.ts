@@ -3,7 +3,6 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
-import metrics from 'fastify-metrics';
 import { userDataRouter } from './http/router/user-data-router.js';
 import { authRouter } from './http/router/auth-router.js';
 import { userAdminRouter } from './http/router/user-admin.js';
@@ -56,24 +55,6 @@ server.addHook('onResponse', (request, reply, done) => {
         'request completed',
     );
     done();
-});
-
-server.register(metrics, {
-    endpoint: '/metrics',
-    routeMetrics: {
-        enabled: true,
-        registeredRoutesOnly: false,
-        groupStatusCodes: false,
-        overrides: {
-            histogram: {
-                name: 'http_request_duration_seconds',
-                buckets: [0.01, 0.05, 0.1, 0.3, 0.5, 1, 2, 5],
-            },
-            summary: {
-                name: 'http_request_summary_seconds',
-            },
-        },
-    },
 });
 
 server.register(swagger, {

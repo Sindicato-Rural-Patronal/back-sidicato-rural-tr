@@ -1,6 +1,5 @@
 // adapters/supabase-storage.adapter.ts
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { Readable } from 'stream';
 import type {
     StorageRepository,
     UploadParams,
@@ -35,20 +34,6 @@ export class SupabaseStorageAdapter implements StorageRepository {
         return { location: this.getPublicUrl(params.bucket, params.key),
 key: params.key,
 bucket: params.bucket };
-    }
-
-    async downloadFile(bucket: string, key: string): Promise<Readable> {
-        const { data, error } = await this.client.storage.from(bucket).download(key);
-        if (error) throw error;
-        return Readable.from(Buffer.from(await data.arrayBuffer()));
-    }
-
-    async getSignedUrl(bucket: string, key: string, expiresIn = 3600): Promise<string> {
-        const { data, error } = await this.client.storage
-            .from(bucket)
-            .createSignedUrl(key, expiresIn);
-        if (error) throw error;
-        return data.signedUrl;
     }
 
     getPublicUrl(bucket: string, key: string): string {
