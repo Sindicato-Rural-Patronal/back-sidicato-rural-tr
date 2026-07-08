@@ -8,6 +8,7 @@ import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapte
 import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createRegistrationAdapter } from '../../adapter/database/registration-adapter.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
+import { errorResponse } from '../lib/swagger-schemas.js';
 
 export async function dashboardRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const courseRepository = createCourseAdapter(prisma);
@@ -57,8 +58,7 @@ export async function dashboardRouter(fastify: FastifyInstance, prisma: PrismaCl
                             totalRegistrations: { type: 'integer' },
                         },
                     },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    403: errorResponse,
                 },
             },
         },

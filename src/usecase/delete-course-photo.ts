@@ -7,14 +7,11 @@ export class DeleteCoursePhotoUseCase {
     constructor(private readonly courseRepository: CourseRepository) {}
 
     async execute(photoId: string): Promise<DeleteCoursePhotoResponse> {
-        console.log(`[DeleteCoursePhoto] photoId="${photoId}"`);
         const deleted = await this.courseRepository.deletePhoto(photoId);
         if (!deleted) {
-            console.log(`[DeleteCoursePhoto] photo not found: ${photoId}`);
             return { error: new PhotoNotFoundError() };
         }
 
-        console.log(`[DeleteCoursePhoto] success`);
         return {};
     }
 }

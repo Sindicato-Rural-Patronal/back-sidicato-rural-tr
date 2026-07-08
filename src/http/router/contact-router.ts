@@ -13,6 +13,7 @@ import { MarkContactMessageReadController } from '../controllers/mark-contact-me
 import { DeleteContactMessageController } from '../controllers/delete-contact-message.js';
 import { DeleteContactMessageUseCase } from '../../usecase/delete-contact-message.js';
 import { requirePermission } from '../lib/require-permission.js';
+import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
 
 export async function contactRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const repo = createContactMessageAdapter(prisma);
@@ -66,8 +67,7 @@ example: 'Gostaria de saber mais informações sobre o próximo curso de manejo.
 format: 'date-time' },
                         },
                     },
-                    400: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    400: errorResponse,
                 },
             },
         },
@@ -99,12 +99,7 @@ description: 'Busca por nome, email ou assunto' },
                     },
                 },
                 response: {
-                    200: {
-                        type: 'object',
-                        properties: {
-                            data: {
-                                type: 'array',
-                                items: {
+                    200: pagedResponse({
                                     type: 'object',
                                     properties: {
                                         id: { type: 'string' },
@@ -119,18 +114,9 @@ nullable: true },
                                         createdAt: { type: 'string',
 format: 'date-time' },
                                     },
-                                },
-                            },
-                            total: { type: 'integer' },
-                            page: { type: 'integer' },
-                            limit: { type: 'integer' },
-                            totalPages: { type: 'integer' },
-                        },
-                    },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
+                                }),
+                    401: errorResponse,
+                    403: errorResponse,
                 },
             },
         },
@@ -160,12 +146,9 @@ properties: { error: { type: 'string' } } },
                 response: {
                     200: { type: 'object',
 properties: { message: { type: 'string' } } },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    404: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
                 },
             },
         },
@@ -190,12 +173,9 @@ properties: { error: { type: 'string' } } },
                 },
                 response: {
                     204: { type: 'null' },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    404: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
                 },
             },
         },

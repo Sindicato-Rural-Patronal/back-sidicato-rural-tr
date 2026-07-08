@@ -44,7 +44,6 @@ export class AddPropertyUseCase {
 
     async execute(request: AddPropertyRequest): Promise<AddPropertyResponse> {
         const { userDataId, name, registration, address } = request;
-        console.log(`[AddProperty] userDataId="${userDataId}" name="${name}"`);
 
         if (!name.trim()) return { error: new ValidationError('Property name is required') };
         if (!address) return { error: new ValidationError('Address is required') };
@@ -62,7 +61,6 @@ export class AddPropertyUseCase {
             registration,
             addressId: createdAddress.id,
         });
-        console.log(`[AddProperty] created propertyId="${property.id}"`);
         return { property };
     }
 }

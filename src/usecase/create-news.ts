@@ -20,9 +20,6 @@ export class CreateNewsUseCase {
     constructor(private readonly newsRepository: NewsRepository) {}
 
     async execute(request: CreateNewsRequest): Promise<CreateNewsResponse> {
-        console.log(
-            `[CreateNews] title="${request.title}" status="${request.status ?? 'default'}"`,
-        );
         const validation = createNewsRequestSchema.safeParse(request);
         if (!validation.success) {
             return {
@@ -44,7 +41,6 @@ export class CreateNewsUseCase {
                   : undefined,
         });
 
-        console.log(`[CreateNews] success newsId="${news.id}"`);
         return { newsId: news.id };
     }
 }
