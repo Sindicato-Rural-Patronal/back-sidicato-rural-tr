@@ -29,7 +29,7 @@ describe('AddCoursePhotoUseCase', () => {
         it('falha se curso não existir', async () => {
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(null);
             const uc = new AddCoursePhotoUseCase(mockCourseRepo, mockStorage);
-            const result = await uc.execute('course-inexistente', fakeBuffer, 'foto.jpg');
+            const result = await uc.execute('course-inexistente', fakeBuffer, 'foto.jpg', 'image/jpeg');
             expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('Course not found');
         });
@@ -46,10 +46,26 @@ describe('AddCoursePhotoUseCase', () => {
             vi.mocked(mockStorage.getPublicUrl).mockReturnValue('http://bucket/foto.jpg');
             vi.mocked(mockCourseRepo.addPhoto).mockResolvedValue({ id: 'photo-001' } as any);
             const uc = new AddCoursePhotoUseCase(mockCourseRepo, mockStorage);
-            const result = await uc.execute('course-001', fakeBuffer, 'foto.jpg', 'Legenda');
+            const result = await uc.execute('course-001', fakeBuffer, 'foto.jpg', 'image/jpeg', 'Legenda');
             expect(result.error).toBeUndefined();
             expect(result.url).toBe('http://bucket/foto.jpg');
             expect(result.photoId).toBe('photo-001');
+        });
+
+        it('repassa o contentType (mimeType) ao storage — evita 415 do bucket', async () => {
+            vi.mocked(mockCourseRepo.findById).mockResolvedValue({ id: 'course-001' } as any);
+            vi.mocked(mockStorage.uploadFile).mockResolvedValue({
+                location: 'http://bucket/foto.png',
+                key: 'foto.png',
+                bucket: 'test-bucket',
+            });
+            vi.mocked(mockStorage.getPublicUrl).mockReturnValue('http://bucket/foto.png');
+            vi.mocked(mockCourseRepo.addPhoto).mockResolvedValue({ id: 'photo-002' } as any);
+            const uc = new AddCoursePhotoUseCase(mockCourseRepo, mockStorage);
+            await uc.execute('course-001', fakeBuffer, 'foto.png', 'image/png');
+            expect(mockStorage.uploadFile).toHaveBeenCalledWith(
+                expect.objectContaining({ contentType: 'image/png' }),
+            );
         });
     });
 });

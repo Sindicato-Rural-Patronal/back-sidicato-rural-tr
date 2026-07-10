@@ -1,8 +1,9 @@
 import type { NewsRepository } from '../ports/external/news-repository.js';
 import type { StorageRepository } from '../ports/external/storage-repository.js';
 import { NewsNotFoundError } from '../errors/not-found.js';
+import { buckets } from '../lib/buckets.js';
 
-const NEWS_BANNER_BUCKET = process.env.NEWS_BANNER_BUCKET || 'news-banners';
+const NEWS_BANNER_BUCKET = buckets.newsBanners;
 
 type UploadNewsBlockImageResponse = {
     error?: Error;
@@ -20,7 +21,6 @@ export class UploadNewsBlockImageUseCase {
         file: Buffer,
         mimeType: string,
     ): Promise<UploadNewsBlockImageResponse> {
-        console.log(`[UploadNewsBlockImage] newsId="${newsId}" mimeType="${mimeType}"`);
         const news = await this.newsRepository.findById(newsId);
         if (!news) return { error: new NewsNotFoundError() };
 
@@ -35,7 +35,6 @@ export class UploadNewsBlockImageUseCase {
         });
 
         const url = this.storage.getPublicUrl(NEWS_BANNER_BUCKET, key);
-        console.log(`[UploadNewsBlockImage] success url="${url}"`);
         return { url };
     }
 }

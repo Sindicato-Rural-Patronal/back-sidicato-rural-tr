@@ -1,6 +1,7 @@
 import type { StorageRepository, UploadParams } from '../ports/external/storage-repository.js';
 import type { UserDataRepository } from '../ports/external/user-data-repository.js';
 import { UserDataNotFoundError } from '../errors/not-found.js';
+import { buckets } from '../lib/buckets.js';
 
 export interface UploadAvatarInput {
     userId: string;
@@ -24,7 +25,7 @@ export class UploadAvatarUseCase {
         const user = await this.userDataRepository.findById(input.userId);
         if (!user) return { error: new UserDataNotFoundError() };
 
-        const bucket = process.env.STORAGE_BUCKET ?? 'avatars';
+        const bucket = buckets.avatars;
         const key = `users/${input.userId}/avatar-${Date.now()}-${input.originalName}`;
 
         const uploadParams: UploadParams = {

@@ -12,6 +12,7 @@ import { AddPropertyController } from '../controllers/add-property.js';
 import { DeletePropertyController } from '../controllers/delete-property.js';
 import { ListUserPropertiesController } from '../controllers/list-user-properties.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
+import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 
 export async function userPropertyRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userDataRepository = createUserDataAdapter(prisma);
@@ -46,25 +47,9 @@ export async function userPropertyRouter(fastify: FastifyInstance, prisma: Prism
                     properties: { id: { type: 'string' } },
                     required: ['id'],
                 },
-                querystring: {
-                    type: 'object',
-                    properties: {
-                        page: { type: 'integer',
-minimum: 1,
-default: 1 },
-                        limit: { type: 'integer',
-minimum: 1,
-maximum: 1000,
-default: 20 },
-                    },
-                },
+                querystring: paginationQuerystring,
                 response: {
-                    200: {
-                        type: 'object',
-                        properties: {
-                            data: {
-                                type: 'array',
-                                items: {
+                    200: pagedResponse({
                                     type: 'object',
                                     properties: {
                                         id: { type: 'string' },
@@ -106,18 +91,9 @@ nullable: true },
                                             },
                                         },
                                     },
-                                },
-                            },
-                            total: { type: 'integer' },
-                            page: { type: 'integer' },
-                            limit: { type: 'integer' },
-                            totalPages: { type: 'integer' },
-                        },
-                    },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
+                                }),
+                    401: errorResponse,
+                    403: errorResponse,
                 },
             },
         },
@@ -187,14 +163,10 @@ example: 'B' },
                 response: {
                     201: { type: 'object',
 properties: { id: { type: 'string' } } },
-                    400: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    404: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
                 },
             },
         },
@@ -222,12 +194,9 @@ properties: { error: { type: 'string' } } },
                 },
                 response: {
                     204: { type: 'null' },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    404: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
                 },
             },
         },

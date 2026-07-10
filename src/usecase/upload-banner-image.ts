@@ -3,7 +3,9 @@ import { BannerNotFoundError } from '../errors/not-found.js';
 import type { BannerRepository } from '../ports/external/banner-repository.js';
 import type { StorageRepository } from '../ports/external/storage-repository.js';
 
-const BANNER_BUCKET = process.env.BANNER_BUCKET || 'course-banners';
+import { buckets } from '../lib/buckets.js';
+
+const BANNER_BUCKET = buckets.courseBanners;
 const BANNER_WIDTH = 1440;
 const BANNER_HEIGHT = 600;
 

@@ -35,12 +35,8 @@ export class UpdateUserAdminUseCase {
 
         const existing = await this.userAdminRepository.findById(targetAdminId);
         if (!existing) return { error: new AdminNotFoundError() };
-        console.log(
-            `[UpdateUserAdmin] found admin: id="${existing.id}" username="${existing.username}" rulesId="${existing.rulesId}"`,
-        );
 
         const data = validation.data;
-        console.log(`[UpdateUserAdmin] update payload from request: ${JSON.stringify(data)}`);
 
         if (data.username) {
             const conflict = await this.userAdminRepository.findByUsername(data.username);
@@ -52,11 +48,6 @@ export class UpdateUserAdminUseCase {
         if (data.rulesId) {
             const rule = await this.ruleRepository.findById(data.rulesId);
             if (!rule) return { error: new RuleNotFoundError() };
-            console.log(
-                `[UpdateUserAdmin] new rule found: id="${rule.id}" name="${rule.name}" permissions=${JSON.stringify(rule.permissions)}`,
-            );
-        } else {
-            console.log(`[UpdateUserAdmin] rulesId NOT in request — rule will NOT be changed`);
         }
 
         const updatePayload: {
@@ -72,16 +63,8 @@ export class UpdateUserAdminUseCase {
         if (data.isPublic !== undefined) updatePayload.isPublic = data.isPublic;
         if (data.publicTitle !== undefined) updatePayload.publicTitle = data.publicTitle;
 
-        console.log(
-            `[UpdateUserAdmin] final DB updatePayload keys: ${JSON.stringify(Object.keys(updatePayload))}`,
-        );
-
         const updated = await this.userAdminRepository.update(targetAdminId, updatePayload);
         if (!updated) return { error: new Error('Failed to update admin') };
-
-        console.log(
-            `[UpdateUserAdmin] after update: id="${updated.id}" rulesId="${updated.rulesId}"`,
-        );
 
         return {};
     }

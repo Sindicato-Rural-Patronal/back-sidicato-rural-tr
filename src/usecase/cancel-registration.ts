@@ -7,10 +7,8 @@ export class CancelRegistrationUseCase {
     constructor(private readonly registrationRepository: RegistrationRepository) {}
 
     async execute(registrationId: string): Promise<Response> {
-        console.log(`[CancelRegistration] registrationId="${registrationId}"`);
         const registration = await this.registrationRepository.findById(registrationId);
         if (!registration) {
-            console.log(`[CancelRegistration] registration not found: ${registrationId}`);
             return { error: new RegistrationNotFoundError() };
         }
 
@@ -19,7 +17,6 @@ export class CancelRegistrationUseCase {
             return { error: new Error('Failed to cancel registration') };
         }
 
-        console.log(`[CancelRegistration] success`);
         return {};
     }
 }

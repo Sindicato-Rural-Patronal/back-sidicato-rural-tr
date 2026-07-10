@@ -103,17 +103,13 @@ export class GetCourseDetailUseCase {
     constructor(private readonly courseRepository: CourseRepository) {}
 
     async execute(id: string): Promise<GetCourseDetailResponse> {
-        console.log(`[GetCourseDetail] id="${id}"`);
         const course = await this.courseRepository.findById(id);
         if (!course) {
-            console.log(`[GetCourseDetail] not found: ${id}`);
             return { error: new CourseNotFoundError() };
         }
         if (course.status === 'UNPUBLISHED') {
-            console.log(`[GetCourseDetail] blocked UNPUBLISHED: ${id}`);
             return { error: new CourseNotFoundError() };
         }
-        console.log(`[GetCourseDetail] found: name="${course.name}" status="${course.status}"`);
         return { course: mapToFrontend(course) };
     }
 }

@@ -1,35 +1,22 @@
 import type { UserRelationRepository, UserRelationWithTarget } from '../ports/external/user-relation-repository.js';
-
-type ListUserRelationsResult = {
-    data: UserRelationWithTarget[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-};
+import { paginate, type PagedResult } from '../lib/pagination.js';
 
 type ListUserRelationsResponse = {
- error?: Error;
-result?: ListUserRelationsResult 
+    error?: Error;
+    result?: PagedResult<UserRelationWithTarget>;
 };
 
 export class ListUserRelationsUseCase {
     constructor(private readonly userRelationRepository: UserRelationRepository) {}
 
     async execute(sourceId: string, page = 1, limit = 20): Promise<ListUserRelationsResponse> {
-        const skip = (page - 1) * limit;
-        const [data, total] = await Promise.all([
-            this.userRelationRepository.findBySourceId(sourceId, skip, limit),
-            this.userRelationRepository.countBySourceId(sourceId),
-        ]);
         return {
-            result: {
-                data,
-                total,
+            result: await paginate(
                 page,
                 limit,
-                totalPages: Math.ceil(total / limit),
-            },
+                (skip, take) => this.userRelationRepository.findBySourceId(sourceId, skip, take),
+                () => this.userRelationRepository.countBySourceId(sourceId),
+            ),
         };
     }
 }

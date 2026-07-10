@@ -18,9 +18,12 @@ export class ListUsersController {
         const q = request.query as Record<string, string>;
         const page = Math.max(1, Number(q.page) || 1);
         const limit = Math.min(100, Math.max(1, Number(q.limit) || 20));
+        // Fastify coage a query (schema type: 'boolean') para boolean real,
+        // mas mantemos aceite de string por robustez.
+        const rawIncomplete: unknown = (request.query as Record<string, unknown>).incompleteRegistration;
         const incompleteRegistration =
-            q.incompleteRegistration === 'true' ? true :
-            q.incompleteRegistration === 'false' ? false : undefined;
+            rawIncomplete === true || rawIncomplete === 'true' ? true :
+            rawIncomplete === false || rawIncomplete === 'false' ? false : undefined;
         const filters = {
             search: q.search || undefined,
             memberType: q.memberType || undefined,

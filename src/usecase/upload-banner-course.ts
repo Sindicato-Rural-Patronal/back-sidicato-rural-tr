@@ -3,9 +3,11 @@ import type { StorageRepository, UploadParams } from '../ports/external/storage-
 import type { CourseRepository } from '../ports/external/course-repository.js';
 import { CourseNotFoundError } from '../errors/not-found.js';
 
+import { buckets } from '../lib/buckets.js';
+
 const FULL_HD_WIDTH = 1920;
 const FULL_HD_HEIGHT = 1080;
-const BANNER_BUCKET = process.env.BANNER_BUCKET || 'course-banners';
+const BANNER_BUCKET = buckets.courseBanners;
 
 type UploadCourseBannerResponse = {
  error?: Error;
@@ -22,7 +24,6 @@ export class UploadCourseBannerUseCase {
         const course = await this.courseRepository.findById(courseId);
         if (!course) return { error: new CourseNotFoundError() };
 
-        console.log(`[UploadCourseBanner] courseId="${courseId}" bufferSize=${fileBuffer.length}`);
         const processedBuffer = await sharp(fileBuffer)
             .resize(FULL_HD_WIDTH, FULL_HD_HEIGHT, { fit: 'cover',
 position: 'center' })
@@ -43,7 +44,6 @@ position: 'center' })
         const urlWithBust = `${publicUrl}?t=${Date.now()}`;
 
         await this.courseRepository.update(courseId, { bannerUrl: urlWithBust });
-        console.log(`[UploadCourseBanner] success url="${urlWithBust}"`);
 
         return { url: urlWithBust };
     }

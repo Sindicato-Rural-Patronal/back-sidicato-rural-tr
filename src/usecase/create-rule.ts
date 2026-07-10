@@ -26,9 +26,6 @@ export class CreateRuleUseCase {
     constructor(private ruleRepository: RuleRepository) {}
 
     async execute(request: CreateRuleRequest): Promise<CreateRuleResponse> {
-        console.log(
-            `[CreateRule] name="${request.name}" permissions=${JSON.stringify(request.permissions)}`,
-        );
         const validationResult = createRuleRequestSchema.safeParse(request);
         if (!validationResult.success) {
             const errorMessage = validationResult.error.issues.map(e => e.message).join(', ');
@@ -40,7 +37,6 @@ export class CreateRuleUseCase {
             permissions: request.permissions,
             description: request.description,
         });
-        console.log(`[CreateRule] success ruleId="${rule.id}"`);
         return {
             rule: {
                 name: rule.name,

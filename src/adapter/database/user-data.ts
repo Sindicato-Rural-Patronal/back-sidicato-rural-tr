@@ -83,13 +83,18 @@ mode: 'insensitive' as const } },
             ...(ethnicity && { ethnicity }),
             ...(educationLevel && { educationLevel }),
             ...(incompleteRegistration === true && {
-                OR: [
-                    { avatar: null },
-                    { properties: { none: {} } },
-                    { cpf: null },
-                    { rg: null },
-                    { birthDate: null },
-                    { gender: null },
+                // envolto em AND p/ não sobrescrever o OR da busca (search)
+                AND: [
+                    {
+                        OR: [
+                            { avatar: null },
+                            { properties: { none: {} } },
+                            { cpf: null },
+                            { rg: null },
+                            { birthDate: null },
+                            { gender: null },
+                        ],
+                    },
                 ],
             }),
             ...(incompleteRegistration === false && {

@@ -64,8 +64,13 @@ isDeleted: false },
         });
     }
 
-    count(): Promise<number> {
-        return this.prisma.courseUserRegistration.count({ where: { isDeleted: false } });
+    count(filter?: { since?: Date }): Promise<number> {
+        return this.prisma.courseUserRegistration.count({
+            where: {
+                isDeleted: false,
+                ...(filter?.since && { createdAt: { gte: filter.since } }),
+            },
+        });
     }
 
     async delete(id: string): Promise<boolean> {

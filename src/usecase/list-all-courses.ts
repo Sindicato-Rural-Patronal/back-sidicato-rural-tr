@@ -4,6 +4,7 @@ import type {
     CourseStatus,
     CourseListFilters,
 } from '../ports/external/course-repository.js';
+import { paginate, type PagedResult } from '../lib/pagination.js';
 
 export type CourseCardItem = {
     id: string;
@@ -33,13 +34,6 @@ export function mapToCard(course: CourseWithDetails): CourseCardItem {
     };
 }
 
-type PagedResult<T> = {
-    data: T[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-};
 type ListAllCoursesResponse = {
     error?: Error;
     result?: PagedResult<CourseCardItem>;
@@ -49,21 +43,14 @@ export class ListAllCoursesUseCase {
     constructor(private courseRepository: CourseRepository) {}
 
     async execute(page = 1, limit = 20, filters?: CourseListFilters): Promise<ListAllCoursesResponse> {
-        console.log(`[ListAllCourses] page=${page} limit=${limit}`);
-        const skip = (page - 1) * limit;
-        const [courses, total] = await Promise.all([
-            this.courseRepository.findAll(filters, skip, limit),
-            this.courseRepository.count(filters),
-        ]);
-        console.log(`[ListAllCourses] total=${total}`);
         return {
-            result: {
-                data: courses.map(mapToCard),
-                total,
+            result: await paginate(
                 page,
                 limit,
-                totalPages: Math.ceil(total / limit),
-            },
+                (skip, take) =>
+                    this.courseRepository.findAll(filters, skip, take).then(cs => cs.map(mapToCard)),
+                () => this.courseRepository.count(filters),
+            ),
         };
     }
 }

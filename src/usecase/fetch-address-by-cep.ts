@@ -21,11 +21,9 @@ export class FetchAddressByCepUseCase {
 
     async execute(cep: string): Promise<FetchAddressByCepResponse> {
         const cepClean = cep.replace(/\D/g, '');
-        console.log(`[FetchAddressByCep] cep="${cepClean}"`);
 
         const existing = await this.addressRepository.findByCep(cepClean);
         if (existing) {
-            console.log(`[FetchAddressByCep] found in DB id="${existing.id}"`);
             return { address: existing };
         }
 
@@ -43,7 +41,6 @@ export class FetchAddressByCepUseCase {
             city: data.localidade || undefined,
             state: data.uf || undefined,
         });
-        console.log(`[FetchAddressByCep] fetched from ViaCEP, saved id="${address.id}"`);
         return { address };
     }
 }

@@ -9,6 +9,7 @@ import { ListRulesController } from '../controllers/list-rules.js';
 import { ListRulesUseCase } from '../../usecase/list-rules.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
+import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 
 const PERMISSIONS_ENUM = [
     'CREATE_USER',
@@ -64,25 +65,9 @@ export async function ruleRouter(fastify: FastifyInstance, prisma: PrismaClient)
                 tags: ['Admin — Rules'],
                 summary: 'List permission rules (internal)',
                 security: [{ bearerAuth: [] }],
-                querystring: {
-                    type: 'object',
-                    properties: {
-                        page: { type: 'integer',
-minimum: 1,
-default: 1 },
-                        limit: { type: 'integer',
-minimum: 1,
-maximum: 1000,
-default: 20 },
-                    },
-                },
+                querystring: paginationQuerystring,
                 response: {
-                    200: {
-                        type: 'object',
-                        properties: {
-                            data: {
-                                type: 'array',
-                                items: {
+                    200: pagedResponse({
                                     type: 'object',
                                     properties: {
                                         id: { type: 'string' },
@@ -93,18 +78,9 @@ items: { type: 'string' } },
                                         createdAt: { type: 'string' },
                                         updatedAt: { type: 'string' },
                                     },
-                                },
-                            },
-                            total: { type: 'integer' },
-                            page: { type: 'integer' },
-                            limit: { type: 'integer' },
-                            totalPages: { type: 'integer' },
-                        },
-                    },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
+                                }),
+                    401: errorResponse,
+                    403: errorResponse,
                 },
             },
         },
@@ -150,12 +126,9 @@ format: 'date-time' },
 format: 'date-time' },
                         },
                     },
-                    400: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
                 },
             },
         },
@@ -193,14 +166,10 @@ enum: PERMISSIONS_ENUM },
                 response: {
                     200: { type: 'object',
 properties: { message: { type: 'string' } } },
-                    400: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    404: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
                 },
             },
         },

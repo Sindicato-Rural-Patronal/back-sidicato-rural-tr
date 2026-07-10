@@ -44,7 +44,7 @@ Backend REST para o sistema de gestão do Sindicato Rural. Gerencia trabalhadore
 - **Fastify v5** — framework HTTP
 - **Prisma 7 + PostgreSQL** — banco de dados com driver nativo `@prisma/adapter-pg`
 - **JWT + bcrypt** — autenticação e hash de senha
-- **AWS S3 / MinIO** — storage de arquivos (imagens, banners, fotos)
+- **Supabase Storage** — storage de arquivos (imagens, banners, fotos)
 - **Zod** — validação de schemas e variáveis de ambiente
 - **Sharp** — processamento de imagens (resize, compressão)
 - **Vitest** — testes unitários
@@ -129,7 +129,7 @@ src/
   ports/external/   — interfaces TypeScript dos repositórios
   adapter/
     database/       — implementações Prisma das interfaces
-    storage/        — S3 e MinIO, selecionados via factory
+    storage/        — adapter do Supabase Storage (via factory)
   config/env.ts     — validação de variáveis de ambiente (Zod)
   lib/
     auth.ts         — decodeToken (jwt.verify wrapper)

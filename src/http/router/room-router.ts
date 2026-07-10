@@ -8,6 +8,7 @@ import { CreateRoomUseCase } from '../../usecase/create-room.js';
 import { ListRoomsController } from '../controllers/list-rooms.js';
 import { ListRoomsUseCase } from '../../usecase/list-rooms.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
+import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 
 const roomProperties = {
     id: { type: 'string' },
@@ -42,31 +43,10 @@ export async function roomRouter(fastify: FastifyInstance, prisma: PrismaClient)
 - Public route — no authentication required
 - The \`maxCapacity\` field of each room determines the maximum number of enrollments for any course held in it
 - Use this route to populate the room selector in the course creation form`,
-                querystring: {
-                    type: 'object',
-                    properties: {
-                        page: { type: 'integer',
-minimum: 1,
-default: 1 },
-                        limit: { type: 'integer',
-minimum: 1,
-maximum: 1000,
-default: 20 },
-                    },
-                },
+                querystring: paginationQuerystring,
                 response: {
-                    200: {
-                        type: 'object',
-                        properties: {
-                            data: { type: 'array',
-items: { type: 'object',
-properties: roomProperties } },
-                            total: { type: 'integer' },
-                            page: { type: 'integer' },
-                            limit: { type: 'integer' },
-                            totalPages: { type: 'integer' },
-                        },
-                    },
+                    200: pagedResponse({ type: 'object',
+properties: roomProperties }),
                 },
             },
         },
@@ -110,12 +90,9 @@ example: 40 },
                 response: {
                     201: { type: 'object',
 properties: { id: { type: 'string' } } },
-                    400: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    401: { type: 'object',
-properties: { error: { type: 'string' } } },
-                    403: { type: 'object',
-properties: { error: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
                 },
             },
         },

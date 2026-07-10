@@ -18,19 +18,14 @@ export class CreateRoomUseCase {
     constructor(private readonly roomRepository: RoomRepository) {}
 
     async execute(request: CreateRoomRequest): Promise<CreateRoomResponse> {
-        console.log(`[CreateRoom] name="${request.name}" maxCapacity=${request.maxCapacity}`);
         const validation = createRoomRequestSchema.safeParse(request);
         if (!validation.success) {
-            console.log(
-                `[CreateRoom] validation failed: ${validation.error.issues.map(e => e.message).join(', ')}`,
-            );
             return {
                 error: new ValidationError(validation.error.issues.map(e => e.message).join(', ')),
             };
         }
 
         const room = await this.roomRepository.create(validation.data);
-        console.log(`[CreateRoom] success roomId="${room.id}"`);
         return { roomId: room.id };
     }
 }
