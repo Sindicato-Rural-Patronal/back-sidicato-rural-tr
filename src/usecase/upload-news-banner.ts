@@ -33,7 +33,10 @@ export class UploadNewsBannerUseCase {
             contentType: mimeType,
         });
 
-        const url = this.storage.getPublicUrl(NEWS_BANNER_BUCKET, key);
+        // key é determinístico (banner.jpg) → URL pública é sempre igual.
+        // Sem cache-bust, o browser/React não percebem a troca da imagem.
+        // Mesmo padrão do upload-banner-course.
+        const url = `${this.storage.getPublicUrl(NEWS_BANNER_BUCKET, key)}?t=${Date.now()}`;
         await this.newsRepository.updateBanner(newsId, url);
 
         return { url };

@@ -54,7 +54,8 @@ alpha: 0 } })
 key,
 body: processed,
 contentType: 'image/png' });
-        const partnerLogoUrl = this.storage.getPublicUrl(bucket, key);
+        // key determinístico (logo.png) → cache-bust p/ refletir a troca (mesmo padrão do banner).
+        const partnerLogoUrl = `${this.storage.getPublicUrl(bucket, key)}?t=${Date.now()}`;
 
         await this.userDataRepository.update(input.userId, { partnerLogo: partnerLogoUrl });
 
