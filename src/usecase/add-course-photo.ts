@@ -21,6 +21,7 @@ export class AddCoursePhotoUseCase {
         courseId: string,
         fileBuffer: Buffer,
         originalFilename: string,
+        mimeType: string,
         caption?: string,
     ): Promise<AddCoursePhotoResponse> {
         const existing = await this.courseRepository.findById(courseId);
@@ -29,9 +30,12 @@ export class AddCoursePhotoUseCase {
         }
 
         const key = `courses/${courseId}/gallery/${Date.now()}-${originalFilename}`;
+        // contentType é obrigatório: sem ele o Supabase assume text/plain e o
+        // bucket (restrito a imagens) rejeita com 415 Unsupported Media Type.
         const params: UploadParams = { bucket: BANNER_BUCKET,
 key,
-body: fileBuffer };
+body: fileBuffer,
+contentType: mimeType };
         await this.storage.uploadFile(params);
         const url = this.storage.getPublicUrl(BANNER_BUCKET, key);
 

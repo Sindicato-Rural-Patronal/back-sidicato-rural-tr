@@ -27,7 +27,7 @@ export class AddCoursePhotoController {
         const captionField = (data.fields as Record<string, { value?: string } | undefined>)
             ?.caption;
         const caption = captionField?.value;
-        const response = await this.useCase.execute(courseId, fileBuffer, data.filename, caption);
+        const response = await this.useCase.execute(courseId, fileBuffer, data.filename, data.mimetype, caption);
 
         if (response.error) return reply.status(400).send({ error: response.error?.message });
         return reply.status(201).send({ url: response.url,
