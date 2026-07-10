@@ -95,5 +95,21 @@ describe('DashboardStatsUseCase', () => {
             const result = await makeUseCase().execute();
             expect(result.stats?.totalRegistrations).toBe(20);
         });
+
+        it('conta inscrições dos últimos 30 dias via count({ since })', async () => {
+            vi.mocked(mockUserDataRepo.count).mockResolvedValue(0);
+            vi.mocked(mockUserAdminRepo.count).mockResolvedValue(0);
+            vi.mocked(mockCourseRepo.count).mockResolvedValue(0);
+            vi.mocked(mockRegistrationRepo.count).mockImplementation((filter?) =>
+                Promise.resolve(filter?.since ? 5 : 20),
+            );
+            const result = await makeUseCase().execute();
+            expect(result.stats?.totalRegistrations).toBe(20);
+            expect(result.stats?.registrationsLast30Days).toBe(5);
+            const sinceCall = vi
+                .mocked(mockRegistrationRepo.count)
+                .mock.calls.find(c => c[0]?.since);
+            expect(sinceCall?.[0]?.since).toBeInstanceOf(Date);
+        });
     });
 });

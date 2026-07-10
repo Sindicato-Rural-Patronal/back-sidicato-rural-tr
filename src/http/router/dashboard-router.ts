@@ -38,7 +38,8 @@ export async function dashboardRouter(fastify: FastifyInstance, prisma: PrismaCl
 - \`courses.public\` — courses with status \`PUBLIC\`
 - \`courses.private\` — courses with status \`PRIVATE\`
 - \`courses.unpublished\` — courses with status \`UNPUBLISHED\`
-- \`totalRegistrations\` — total course registrations`,
+- \`totalRegistrations\` — total course registrations
+- \`registrationsLast30Days\` — course registrations in the last 30 days`,
                 security: [{ bearerAuth: [] }],
                 response: {
                     200: {
@@ -56,6 +57,7 @@ export async function dashboardRouter(fastify: FastifyInstance, prisma: PrismaCl
                                 },
                             },
                             totalRegistrations: { type: 'integer' },
+                            registrationsLast30Days: { type: 'integer' },
                         },
                     },
                     403: errorResponse,

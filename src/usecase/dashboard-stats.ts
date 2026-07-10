@@ -14,6 +14,7 @@ export type DashboardStats = {
         unpublished: number;
     };
     totalRegistrations: number;
+    registrationsLast30Days: number;
 };
 
 type DashboardStatsResponse = {
@@ -30,6 +31,8 @@ export class DashboardStatsUseCase {
     ) {}
 
     async execute(): Promise<DashboardStatsResponse> {
+        const since30Days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
         const [
             totalUsers,
             totalAdmins,
@@ -38,6 +41,7 @@ export class DashboardStatsUseCase {
             privateCourses,
             unpublishedCourses,
             totalRegistrations,
+            registrationsLast30Days,
         ] = await Promise.all([
             this.userDataRepository.count(),
             this.userAdminRepository.count(),
@@ -46,6 +50,7 @@ export class DashboardStatsUseCase {
             this.courseRepository.count({ status: CourseStatus.PRIVATE }),
             this.courseRepository.count({ status: CourseStatus.UNPUBLISHED }),
             this.registrationRepository.count(),
+            this.registrationRepository.count({ since: since30Days }),
         ]);
 
         return {
@@ -59,6 +64,7 @@ export class DashboardStatsUseCase {
                     unpublished: unpublishedCourses,
                 },
                 totalRegistrations,
+                registrationsLast30Days,
             },
         };
     }

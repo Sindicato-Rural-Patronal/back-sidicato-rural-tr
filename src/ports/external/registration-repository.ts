@@ -12,6 +12,6 @@ export interface RegistrationRepository {
         userDataId: string,
         courseId: string,
     ): Promise<courseUserRegistrationModel | null>;
-    count(): Promise<number>;
+    count(filter?: { since?: Date }): Promise<number>;
     delete(id: string): Promise<boolean>;
 }
