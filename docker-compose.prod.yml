@@ -2,25 +2,29 @@
 #
 # Storage AND database are external (Supabase), so this stack runs just the API.
 #
-# Managed (Hostinger): paste the variables below into the platform's
-#   "Environment variables" field. The platform runs `docker compose` itself
-#   and does NOT use --env-file, so an .env.production file is ignored.
-# Manual VPS:
+# SEM DOMÍNIO (atual): acesso direto via porta 3000, sem Traefik.
+# COM DOMÍNIO: remover `ports`, descomentar bloco de labels Traefik abaixo.
+#
+# CI/CD (normal): GitHub Actions builda no ghcr.io, VPS faz pull.
+# Build local (emergência):
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 #
-# Required env vars: DATABASE_URL, JWT_SECRET, CORS_ORIGIN,
-#   SUPABASE_URL, SUPABASE_SECRET_KEY.
+# Required env vars (.env.production): DATABASE_URL, JWT_SECRET, CORS_ORIGIN,
+#   SUPABASE_URL, SUPABASE_SECRET_KEY. DOMAIN só é usado quando Traefik está ativo.
 #
 # DATABASE_URL must be the Supabase "Session pooler" string (IPv4, port 5432) —
 # host aws-0-<region>.pooler.supabase.com, user postgres.<project-ref>. The Direct
 # connection (db.<ref>.supabase.co) is IPv6-only and unreachable from Docker.
+#
+# As migrations rodam no start do container (prisma migrate deploy).
 
 services:
   api:
-    build: .
+    image: ghcr.io/sindicato-rural-patronal/back-sidicato-rural-tr:latest
+    build: .                          # fallback para build local com --build
     container_name: sindicato_api
     ports:
-      - "3000:3000"               # put a reverse proxy (Caddy/nginx) in front for TLS
+      - "3000:3000"                   # acesso direto: http://IP:3000 — remover quando usar Traefik
     environment:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
@@ -30,4 +34,22 @@ services:
       # Supabase Storage — secret key (sb_secret_..., server-side only, full access)
       SUPABASE_URL: ${SUPABASE_URL}                          # https://<ref>.supabase.co
       SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
+    # --- Traefik: descomentar quando tiver domínio ---
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.docker.network=traefik-crga"
+    #   - "traefik.http.routers.sindicato-api.rule=Host(`${DOMAIN}`)"
+    #   - "traefik.http.routers.sindicato-api.entrypoints=websecure"
+    #   - "traefik.http.routers.sindicato-api.tls.certresolver=letsencrypt"
+    #   - "traefik.http.services.sindicato-api.loadbalancer.server.port=3000"
+    #   - "traefik.http.routers.sindicato-api-http.rule=Host(`${DOMAIN}`)"
+    #   - "traefik.http.routers.sindicato-api-http.entrypoints=web"
+    #   - "traefik.http.routers.sindicato-api-http.middlewares=sindicato-api-https"
+    #   - "traefik.http.middlewares.sindicato-api-https.redirectscheme.scheme=https"
+    networks:
+      - traefik-crga
     restart: unless-stopped
+
+networks:
+  traefik-crga:
+    external: true
