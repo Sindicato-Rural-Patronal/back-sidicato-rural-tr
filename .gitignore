@@ -17,3 +17,5 @@ dist
 *.log
 npm-debug.log*
 /docs
+# MinIO local data
+minio_data/

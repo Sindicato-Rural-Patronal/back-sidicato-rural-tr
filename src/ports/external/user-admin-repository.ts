@@ -8,6 +8,7 @@ export type UserAdminWithDetails = UserAdminModel & {
         name: string;
         email: string;
         cpf: string | null;
+        avatar: string | null;
     };
     rules: {
         name: string;

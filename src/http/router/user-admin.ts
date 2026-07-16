@@ -154,6 +154,8 @@ nullable: true },
                                                 email: { type: 'string' },
                                                 cpf: { type: 'string',
 nullable: true },
+                                                avatar: { type: 'string',
+nullable: true },
                                             },
                                         },
                                         rules: {
