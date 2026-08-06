@@ -35,10 +35,12 @@ export class CreateUserAdminUseCase {
             return { error: new UserDataNotFoundError() };
         }
 
-        const existingAdminForUserData = await this.userAdminRepository.findByUserDataId(
+        // Considera também registros soft-deleted: a constraint unique de
+        // userDataId no banco os mantém, então recriar direto violaria o unique.
+        const existingAdminForUserData = await this.userAdminRepository.findByUserDataIdAny(
             request.userDataId,
         );
-        if (existingAdminForUserData) {
+        if (existingAdminForUserData && !existingAdminForUserData.isDeleted) {
             return { error: new AdminAccountAlreadyExistsError() };
         }
 
@@ -50,6 +52,19 @@ export class CreateUserAdminUseCase {
         const hashedPassword = await hash(request.password, 10);
 
         try {
+            // Se havia um admin removido para esse associado, reaproveita a linha.
+            if (existingAdminForUserData) {
+                const reactivated = await this.userAdminRepository.reactivate(
+                    existingAdminForUserData.id,
+                    {
+                        username: request.username,
+                        passwordHash: hashedPassword,
+                        rulesId: request.userRole,
+                    },
+                );
+                return { userAdminId: reactivated.id };
+            }
+
             const newAdmin = await this.userAdminRepository.create({
                 username: request.username,
                 passwordHash: hashedPassword,
