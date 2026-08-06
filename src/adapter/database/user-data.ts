@@ -110,9 +110,18 @@ mode: 'insensitive' as const } },
         };
     }
 
-    findByCpf(cpf: string): Promise<UserDataModel | null> {
-        return this.prisma.userData.findFirst({ where: { isDeleted: false,
-cpf } });
+    // Compara por CPF ignorando formatação: os CPFs foram gravados em formatos
+    // inconsistentes (com pontos, traços, só dígitos), então normalizamos os
+    // dois lados removendo tudo que não é dígito.
+    async findByCpf(cpf: string): Promise<UserDataModel | null> {
+        const digits = cpf.replace(/\D/g, '');
+        if (!digits) return null;
+        const rows = await this.prisma.$queryRaw<UserDataModel[]>`
+            SELECT * FROM "UserData"
+            WHERE "isDeleted" = false
+              AND regexp_replace(COALESCE("cpf", ''), '[^0-9]', '', 'g') = ${digits}
+            LIMIT 1`;
+        return rows[0] ?? null;
     }
 
     findByRg(rg: string): Promise<UserDataModel | null> {
@@ -120,13 +129,15 @@ cpf } });
 rg } });
     }
 
-    findByEmailOrCpf(email: string, cpf: string): Promise<UserDataModel | null> {
-        return this.prisma.userData.findFirst({
-            where: {
-                isDeleted: false,
-                OR: [{ email }, { cpf }],
-            },
-        });
+    async findByEmailOrCpf(email: string, cpf: string): Promise<UserDataModel | null> {
+        const digits = cpf.replace(/\D/g, '');
+        const rows = await this.prisma.$queryRaw<UserDataModel[]>`
+            SELECT * FROM "UserData"
+            WHERE "isDeleted" = false
+              AND ("email" = ${email}
+                   OR regexp_replace(COALESCE("cpf", ''), '[^0-9]', '', 'g') = ${digits})
+            LIMIT 1`;
+        return rows[0] ?? null;
     }
 
     update(id: string, data: UserDataUpdateInput): Promise<UserDataModel | null> {
