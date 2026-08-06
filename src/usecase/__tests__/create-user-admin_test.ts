@@ -9,6 +9,8 @@ const mockUserAdminRepo = {
     findById: vi.fn(),
     findByUsername: vi.fn(),
     findByUserDataId: vi.fn(),
+    findByUserDataIdAny: vi.fn(),
+    reactivate: vi.fn(),
     findAll: vi.fn(),
 } as unknown as UserAdminRepository;
 
@@ -69,7 +71,7 @@ describe('CreateUserAdminUseCase', () => {
         it('falha se userData já tiver conta admin', async () => {
             vi.mocked(mockUserAdminRepo.findByUsername).mockResolvedValue(null);
             vi.mocked(mockUserDataRepo.findById).mockResolvedValue({ id: 'ud-001' } as any);
-            vi.mocked(mockUserAdminRepo.findByUserDataId).mockResolvedValue({
+            vi.mocked(mockUserAdminRepo.findByUserDataIdAny).mockResolvedValue({
                 id: 'existing-admin',
             } as any);
             const uc = new CreateUserAdminUseCase(
@@ -85,7 +87,7 @@ describe('CreateUserAdminUseCase', () => {
         it('falha se role de destino não existir', async () => {
             vi.mocked(mockUserAdminRepo.findByUsername).mockResolvedValue(null);
             vi.mocked(mockUserDataRepo.findById).mockResolvedValue({ id: 'ud-001' } as any);
-            vi.mocked(mockUserAdminRepo.findByUserDataId).mockResolvedValue(null);
+            vi.mocked(mockUserAdminRepo.findByUserDataIdAny).mockResolvedValue(null);
             vi.mocked(mockRuleRepo.findById).mockResolvedValue(null);
             const uc = new CreateUserAdminUseCase(
                 mockUserAdminRepo,
@@ -102,7 +104,7 @@ describe('CreateUserAdminUseCase', () => {
         it('retorna userAdminId ao criar admin válido', async () => {
             vi.mocked(mockUserAdminRepo.findByUsername).mockResolvedValue(null);
             vi.mocked(mockUserDataRepo.findById).mockResolvedValue({ id: 'ud-001' } as any);
-            vi.mocked(mockUserAdminRepo.findByUserDataId).mockResolvedValue(null);
+            vi.mocked(mockUserAdminRepo.findByUserDataIdAny).mockResolvedValue(null);
             vi.mocked(mockRuleRepo.findById).mockResolvedValue({ id: 'role-001' } as any);
             vi.mocked(mockUserAdminRepo.create).mockResolvedValue({ id: 'new-admin-001' } as any);
             const uc = new CreateUserAdminUseCase(

@@ -28,6 +28,26 @@ isDeleted: false } });
 isDeleted: false } });
     }
 
+    findByUserDataIdAny(userDataId: string): Promise<UserAdminModel | null> {
+        return this.prisma.userAdmin.findFirst({ where: { userDataId } });
+    }
+
+    reactivate(
+        id: string,
+        data: {
+ username: string;
+passwordHash: string;
+rulesId: string 
+},
+    ): Promise<UserAdminModel> {
+        return this.prisma.userAdmin.update({
+            where: { id },
+            data: { ...data,
+isDeleted: false,
+deletedAt: null },
+        });
+    }
+
     findById(id: string): Promise<UserAdminModel | null> {
         return this.prisma.userAdmin.findFirst({ where: { id,
 isDeleted: false } });
