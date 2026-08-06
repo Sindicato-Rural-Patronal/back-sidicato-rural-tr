@@ -30,4 +30,27 @@ take });
     count(): Promise<number> {
         return this.prisma.room.count();
     }
+
+    update(
+        id: string,
+        data: { name: string; description: string; maxCapacity: number },
+    ): Promise<roomModel> {
+        return this.prisma.room.update({ where: { id },
+data });
+    }
+
+    async delete(id: string): Promise<boolean> {
+        try {
+            await this.prisma.room.delete({ where: { id } });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    // Conta cursos vinculados (linhas físicas — o FK impede remover a sala
+    // mesmo que o curso esteja soft-deletado).
+    countCourses(roomId: string): Promise<number> {
+        return this.prisma.course.count({ where: { roomId } });
+    }
 }
