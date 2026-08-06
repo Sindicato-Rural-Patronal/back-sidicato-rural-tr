@@ -13,6 +13,11 @@ const userDataSelect = {
     cpf: true,
     cnpj: true,
     avatar: true,
+    isPartner: true,
+    boardMember: true,
+    boardPosition: true,
+    userAdmin: { select: { publicTitle: true,
+isPublic: true } },
 } as const;
 
 export function createRegistrationAdapter(prisma: PrismaClient): RegistrationRepository {

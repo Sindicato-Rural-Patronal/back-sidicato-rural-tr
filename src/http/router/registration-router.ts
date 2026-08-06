@@ -275,6 +275,19 @@ nullable: true },
 nullable: true },
         avatar: { type: 'string',
 nullable: true },
+        isPartner: { type: 'boolean' },
+        boardMember: { type: 'boolean' },
+        boardPosition: { type: 'string',
+nullable: true },
+        userAdmin: {
+            type: 'object',
+            nullable: true,
+            properties: {
+                publicTitle: { type: 'string',
+nullable: true },
+                isPublic: { type: 'boolean' },
+            },
+        },
     };
 
     fastify.get(
