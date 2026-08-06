@@ -14,6 +14,13 @@ export class EmailOrCpfAlreadyInUseError extends ConflictError {
     }
 }
 
+export class RoomHasCoursesError extends ConflictError {
+    constructor() {
+        super('Sala vinculada a cursos e não pode ser removida.');
+        this.name = 'RoomHasCoursesError';
+    }
+}
+
 export class RgAlreadyInUseError extends ConflictError {
     constructor() {
         super('RG already in use');

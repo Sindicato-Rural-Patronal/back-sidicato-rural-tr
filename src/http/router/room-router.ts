@@ -7,6 +7,10 @@ import { CreateRoomController } from '../controllers/create-room.js';
 import { CreateRoomUseCase } from '../../usecase/create-room.js';
 import { ListRoomsController } from '../controllers/list-rooms.js';
 import { ListRoomsUseCase } from '../../usecase/list-rooms.js';
+import { UpdateRoomController } from '../controllers/update-room.js';
+import { UpdateRoomUseCase } from '../../usecase/update-room.js';
+import { DeleteRoomController } from '../controllers/delete-room.js';
+import { DeleteRoomUseCase } from '../../usecase/delete-room.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 
@@ -30,6 +34,14 @@ export async function roomRouter(fastify: FastifyInstance, prisma: PrismaClient)
         getAdminPermissions,
     );
     const listRoomsController = new ListRoomsController(new ListRoomsUseCase(roomRepository));
+    const updateRoomController = new UpdateRoomController(
+        new UpdateRoomUseCase(roomRepository),
+        getAdminPermissions,
+    );
+    const deleteRoomController = new DeleteRoomController(
+        new DeleteRoomUseCase(roomRepository),
+        getAdminPermissions,
+    );
 
     fastify.get(
         '/rooms',
@@ -97,5 +109,76 @@ properties: { id: { type: 'string' } } },
             },
         },
         (req: FastifyRequest, res: FastifyReply) => createRoomController.handle(req, res),
+    );
+
+    fastify.patch(
+        '/rooms/:roomId',
+        {
+            schema: {
+                tags: ['Rooms'],
+                summary: 'Update room',
+                description: 'Atualiza nome, descrição e capacidade da sala. Requer permissão `UPDATE_COURSE`.',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['roomId'],
+                    properties: { roomId: { type: 'string' } },
+                },
+                body: {
+                    type: 'object',
+                    required: ['name', 'description', 'maxCapacity'],
+                    properties: {
+                        name: { type: 'string',
+example: 'Sala A' },
+                        description: { type: 'string' },
+                        maxCapacity: { type: 'integer',
+minimum: 1,
+example: 40 },
+                    },
+                },
+                response: {
+                    200: { type: 'object',
+properties: { message: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (
+            req: FastifyRequest<{
+                Params: { roomId: string };
+                Body: { name: string; description: string; maxCapacity: number };
+            }>,
+            res: FastifyReply,
+        ) => updateRoomController.handle(req, res),
+    );
+
+    fastify.delete(
+        '/rooms/:roomId',
+        {
+            schema: {
+                tags: ['Rooms'],
+                summary: 'Delete room',
+                description:
+                    'Remove a sala. Falha com 409 se houver cursos vinculados. Requer permissão `DELETE_COURSE`.',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['roomId'],
+                    properties: { roomId: { type: 'string' } },
+                },
+                response: {
+                    204: { type: 'null' },
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                    409: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { roomId: string } }>, res: FastifyReply) =>
+            deleteRoomController.handle(req, res),
     );
 }
