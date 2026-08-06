@@ -5,12 +5,18 @@ import { createUserDataAdapter } from '../../adapter/database/user-data.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
 import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createCourseAdapter } from '../../adapter/database/course-adapter.js';
+import { createPropertyAdapter } from '../../adapter/database/property-adapter.js';
+import { createAddressAdapter } from '../../adapter/database/address-adapter.js';
 import { RegisterForCourseUseCase } from '../../usecase/register-for-course.js';
 import { RegisterForCourseByCpfUseCase } from '../../usecase/register-for-course-by-cpf.js';
+import { RegisterForCourseFullUseCase } from '../../usecase/register-for-course-full.js';
+import { LookupUserByCpfUseCase } from '../../usecase/lookup-user-by-cpf.js';
 import { ListCourseRegistrationsUseCase } from '../../usecase/list-course-registrations.js';
 import { CancelRegistrationUseCase } from '../../usecase/cancel-registration.js';
 import { RegisterForCourseController } from '../controllers/register-for-course.js';
 import { RegisterForCourseByCpfController } from '../controllers/register-for-course-by-cpf.js';
+import { RegisterForCourseFullController } from '../controllers/register-for-course-full.js';
+import { LookupUserByCpfController } from '../controllers/lookup-user-by-cpf.js';
 import { ListCourseRegistrationsController } from '../controllers/list-course-registrations.js';
 import { CancelRegistrationController } from '../controllers/cancel-registration.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
@@ -22,6 +28,8 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
     const userAdminRepository = createUserAdminAdapter(prisma);
     const ruleRepository = createRuleAdapter(prisma);
     const registrationRepository = createRegistrationAdapter(prisma);
+    const propertyRepository = createPropertyAdapter(prisma);
+    const addressRepository = createAddressAdapter(prisma);
     const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const registerController = new RegisterForCourseController(
@@ -29,6 +37,18 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
     );
     const registerByCpfController = new RegisterForCourseByCpfController(
         new RegisterForCourseByCpfUseCase(courseRepository, userDataRepository, registrationRepository),
+    );
+    const registerFullController = new RegisterForCourseFullController(
+        new RegisterForCourseFullUseCase(
+            courseRepository,
+            userDataRepository,
+            registrationRepository,
+            propertyRepository,
+            addressRepository,
+        ),
+    );
+    const lookupByCpfController = new LookupUserByCpfController(
+        new LookupUserByCpfUseCase(userDataRepository),
     );
     const listController = new ListCourseRegistrationsController(
         new ListCourseRegistrationsUseCase(registrationRepository),
@@ -137,6 +157,96 @@ Body: { cpf: string }
 }>,
             res: FastifyReply,
         ) => registerByCpfController.handle(req, res),
+    );
+
+    fastify.get(
+        '/users/lookup-cpf/:cpf',
+        {
+            schema: {
+                tags: ['Registrations'],
+                summary: 'Look up a participant by CPF',
+                description:
+                    'Public. Returns whether a UserData exists for the CPF and a masked name to confirm identity. Does not register.',
+                params: {
+                    type: 'object',
+                    required: ['cpf'],
+                    properties: { cpf: { type: 'string' } },
+                },
+                response: {
+                    200: {
+                        type: 'object',
+                        properties: {
+                            found: { type: 'boolean' },
+                            name: { type: 'string', nullable: true },
+                        },
+                    },
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { cpf: string } }>, res: FastifyReply) =>
+            lookupByCpfController.handle(req, res),
+    );
+
+    fastify.post(
+        '/courses/:courseId/register-full',
+        {
+            schema: {
+                tags: ['Registrations'],
+                summary: 'Register a new participant with full data',
+                description:
+                    'Public. Creates the participant (with rg/birthDate and address as their primary property) and registers for the course. If a UserData already exists for the email/CPF, only registers.',
+                params: {
+                    type: 'object',
+                    required: ['courseId'],
+                    properties: { courseId: { type: 'string' } },
+                },
+                body: {
+                    type: 'object',
+                    required: ['name', 'phone', 'email', 'cpf'],
+                    properties: {
+                        name: { type: 'string' },
+                        phone: { type: 'string' },
+                        email: { type: 'string', format: 'email' },
+                        cpf: { type: 'string' },
+                        rg: { type: 'string' },
+                        birthDate: { type: 'string' },
+                        address: {
+                            type: 'object',
+                            properties: {
+                                type: { type: 'string', enum: ['URBAN', 'RURAL'] },
+                                zipCode: { type: 'string' },
+                                street: { type: 'string' },
+                                number: { type: 'string' },
+                                neighborhood: { type: 'string' },
+                                city: { type: 'string' },
+                                state: { type: 'string' },
+                                road: { type: 'string' },
+                                km: { type: 'string' },
+                            },
+                        },
+                    },
+                },
+                response: {
+                    201: {
+                        type: 'object',
+                        properties: {
+                            registrationId: { type: 'string' },
+                            userDataId: { type: 'string' },
+                        },
+                    },
+                    400: errorResponse,
+                    404: errorResponse,
+                    409: errorResponse,
+                },
+            },
+        },
+        (
+            req: FastifyRequest<{
+                Params: { courseId: string };
+                Body: Parameters<typeof registerFullController.handle>[0]['body'];
+            }>,
+            res: FastifyReply,
+        ) => registerFullController.handle(req, res),
     );
 
     const userDataProperties = {
