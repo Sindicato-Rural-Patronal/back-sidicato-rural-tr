@@ -73,6 +73,19 @@ isDeleted: false },
         });
     }
 
+    setConfirmed(id: string, confirmed: boolean): Promise<courseUserRegistrationModel | null> {
+        return this.prisma.courseUserRegistration.update({ where: { id },
+data: { confirmed } });
+    }
+
+    countUnconfirmed(courseId: string): Promise<number> {
+        return this.prisma.courseUserRegistration.count({
+            where: { courseId,
+isDeleted: false,
+confirmed: false },
+        });
+    }
+
     async delete(id: string): Promise<boolean> {
         try {
             await this.prisma.courseUserRegistration.update({
