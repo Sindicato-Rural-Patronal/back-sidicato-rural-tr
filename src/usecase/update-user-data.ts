@@ -49,6 +49,7 @@ const updateUserDataSchema = z.object({
     boardMember: z.boolean().optional(),
     memberStatus: z.enum(['ACTIVE', 'INACTIVE']).nullable().optional(),
     memberSince: z.coerce.date().nullable().optional(),
+    membershipValidUntil: z.coerce.date().nullable().optional(),
     memberNotes: z.string().nullable().optional(),
     memberNotesNumber: z.string().nullable().optional(),
 

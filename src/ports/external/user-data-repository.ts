@@ -48,6 +48,7 @@ export type UserDataUpdateInput = Partial<{
     boardMember: boolean;
     memberStatus: string | null;
     memberSince: Date | string | null;
+    membershipValidUntil: Date | string | null;
     memberNotes: string | null;
     memberNotesNumber: string | null;
 

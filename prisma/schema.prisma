@@ -80,6 +80,8 @@ model UserData {
   boardMember      Boolean        @default(false)
   memberStatus     MemberStatus?
   memberSince      DateTime?
+  // Data de validade / fim da associação ("associado até").
+  membershipValidUntil DateTime?
   memberNotes      String?
   memberNotesNumber String?
 
