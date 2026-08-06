@@ -13,12 +13,16 @@ import { RegisterForCourseFullUseCase } from '../../usecase/register-for-course-
 import { LookupUserByCpfUseCase } from '../../usecase/lookup-user-by-cpf.js';
 import { ListCourseRegistrationsUseCase } from '../../usecase/list-course-registrations.js';
 import { CancelRegistrationUseCase } from '../../usecase/cancel-registration.js';
+import { SetRegistrationConfirmedUseCase } from '../../usecase/set-registration-confirmed.js';
+import { StartCourseUseCase } from '../../usecase/start-course.js';
 import { RegisterForCourseController } from '../controllers/register-for-course.js';
 import { RegisterForCourseByCpfController } from '../controllers/register-for-course-by-cpf.js';
 import { RegisterForCourseFullController } from '../controllers/register-for-course-full.js';
 import { LookupUserByCpfController } from '../controllers/lookup-user-by-cpf.js';
 import { ListCourseRegistrationsController } from '../controllers/list-course-registrations.js';
 import { CancelRegistrationController } from '../controllers/cancel-registration.js';
+import { SetRegistrationConfirmedController } from '../controllers/set-registration-confirmed.js';
+import { StartCourseController } from '../controllers/start-course.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 
@@ -56,6 +60,14 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
     );
     const cancelController = new CancelRegistrationController(
         new CancelRegistrationUseCase(registrationRepository),
+        getAdminPermissions,
+    );
+    const setConfirmedController = new SetRegistrationConfirmedController(
+        new SetRegistrationConfirmedUseCase(registrationRepository),
+        getAdminPermissions,
+    );
+    const startCourseController = new StartCourseController(
+        new StartCourseUseCase(courseRepository, registrationRepository),
         getAdminPermissions,
     );
 
@@ -285,6 +297,7 @@ nullable: true },
                                         id: { type: 'string' },
                                         courseId: { type: 'string' },
                                         userDataId: { type: 'string' },
+                                        confirmed: { type: 'boolean' },
                                         createdAt: { type: 'string' },
                                         userData: { type: 'object',
 properties: userDataProperties },
@@ -330,5 +343,68 @@ limit?: number
         },
         (req: FastifyRequest<{ Params: { registrationId: string } }>, res: FastifyReply) =>
             cancelController.handle(req, res),
+    );
+
+    fastify.patch(
+        '/admin/registrations/:registrationId/confirm',
+        {
+            schema: {
+                tags: ['Admin — Registrations'],
+                summary: 'Confirm or unconfirm a registration',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['registrationId'],
+                    properties: { registrationId: { type: 'string' } },
+                },
+                body: {
+                    type: 'object',
+                    required: ['confirmed'],
+                    properties: { confirmed: { type: 'boolean' } },
+                },
+                response: {
+                    200: { type: 'object',
+properties: { message: { type: 'string' } } },
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (
+            req: FastifyRequest<{
+ Params: { registrationId: string };
+Body: { confirmed: boolean } 
+}>,
+            res: FastifyReply,
+        ) => setConfirmedController.handle(req, res),
+    );
+
+    fastify.post(
+        '/admin/courses/:courseId/start',
+        {
+            schema: {
+                tags: ['Admin — Registrations'],
+                summary: 'Start the course (requires all registrations confirmed)',
+                description:
+                    'Sets the course status to IN_PROGRESS. Fails if there are no registrations or any is unconfirmed.',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['courseId'],
+                    properties: { courseId: { type: 'string' } },
+                },
+                response: {
+                    200: { type: 'object',
+properties: { message: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { courseId: string } }>, res: FastifyReply) =>
+            startCourseController.handle(req, res),
     );
 }

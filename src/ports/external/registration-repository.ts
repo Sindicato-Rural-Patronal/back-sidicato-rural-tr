@@ -13,5 +13,7 @@ export interface RegistrationRepository {
         courseId: string,
     ): Promise<courseUserRegistrationModel | null>;
     count(filter?: { since?: Date }): Promise<number>;
+    setConfirmed(id: string, confirmed: boolean): Promise<courseUserRegistrationModel | null>;
+    countUnconfirmed(courseId: string): Promise<number>;
     delete(id: string): Promise<boolean>;
 }

@@ -223,6 +223,9 @@ model courseUserRegistration {
   userData   UserData @relation(fields: [userDataId], references: [id])
   userDataId String
 
+  // Inscrição confirmada pelo admin (pré-requisito p/ iniciar o curso).
+  confirmed Boolean @default(false)
+
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
@@ -234,6 +237,7 @@ enum CourseStatus {
   PUBLIC
   PRIVATE
   UNPUBLISHED
+  IN_PROGRESS
 }
 
 enum NewsStatus {
