@@ -4,7 +4,7 @@ import type { UserDataModel } from '../../generated/prisma/models/UserData.js';
 export type RegistrationWithUserData = courseUserRegistrationModel & {
     userData: Pick<
         UserDataModel,
-        'id' | 'name' | 'email' | 'phone' | 'cpf' | 'cnpj' | 'avatar' | 'isPartner' | 'boardMember' | 'boardPosition'
+        'id' | 'name' | 'email' | 'phone' | 'cpf' | 'cnpj' | 'avatar' | 'birthDate' | 'isPartner' | 'boardMember' | 'boardPosition'
     > & {
 userAdmin: {
  publicTitle: string | null;
