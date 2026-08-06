@@ -51,6 +51,9 @@ export type UserDataUpdateInput = Partial<{
     memberNotes: string | null;
     memberNotesNumber: string | null;
 
+    // Primary property (id de uma Property do próprio usuário)
+    primaryPropertyId: string | null;
+
     // Partner
     isPartner: boolean;
     partnerUrl: string | null;

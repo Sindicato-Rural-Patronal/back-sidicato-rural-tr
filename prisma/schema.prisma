@@ -103,6 +103,9 @@ model UserData {
 
   // Properties owned
   properties       Property[]
+  // Propriedade marcada como principal (endereço usado na ficha). Sem FK formal:
+  // guarda o id de uma Property do próprio usuário.
+  primaryPropertyId String?
 }
 
 model UserInstructor {

@@ -52,6 +52,9 @@ const updateUserDataSchema = z.object({
     memberNotes: z.string().nullable().optional(),
     memberNotesNumber: z.string().nullable().optional(),
 
+    // Primary property
+    primaryPropertyId: z.string().nullable().optional(),
+
     // Partner
     isPartner: z.boolean().optional(),
     partnerUrl: z.string().url().max(500).nullable().optional(),
