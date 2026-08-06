@@ -37,7 +37,11 @@ const schema = z.object({
 });
 
 type Request = z.input<typeof schema>;
-type Response = { error?: Error; registrationId?: string; userDataId?: string };
+type Response = {
+ error?: Error;
+registrationId?: string;
+userDataId?: string 
+};
 
 /**
  * Inscrição pública completa: cria o participante com os dados da ficha simples
@@ -81,11 +85,13 @@ export class RegisterForCourseFullUseCase {
             });
             if (!userData) return { error: new Error('Failed to create user record') };
 
-            // endereço → propriedade principal
-            const hasAddress =
-                address && Object.values(address).some(v => v && String(v).trim());
-            if (hasAddress) {
-                const addressData: AddressCreateInput = { ...address, type: address.type ?? 'URBAN' };
+            // endereço → propriedade principal (ignora o `type`, que tem default)
+            const hasAddress = address
+                ? Object.entries(address).some(([k, v]) => k !== 'type' && v && String(v).trim())
+                : false;
+            if (address && hasAddress) {
+                const addressData: AddressCreateInput = { ...address,
+type: address.type ?? 'URBAN' };
                 const createdAddress = await this.addressRepository.create(addressData);
                 const property = await this.propertyRepository.create({
                     userDataId: userData.id,
@@ -103,6 +109,7 @@ export class RegisterForCourseFullUseCase {
         if (existing) return { error: new CourseRegistrationAlreadyExistsError() };
 
         const registration = await this.registrationRepository.create(courseId, userData.id);
-        return { registrationId: registration.id, userDataId: userData.id };
+        return { registrationId: registration.id,
+userDataId: userData.id };
     }
 }

@@ -177,7 +177,8 @@ Body: { cpf: string }
                         type: 'object',
                         properties: {
                             found: { type: 'boolean' },
-                            name: { type: 'string', nullable: true },
+                            name: { type: 'string',
+nullable: true },
                         },
                     },
                 },
@@ -206,14 +207,16 @@ Body: { cpf: string }
                     properties: {
                         name: { type: 'string' },
                         phone: { type: 'string' },
-                        email: { type: 'string', format: 'email' },
+                        email: { type: 'string',
+format: 'email' },
                         cpf: { type: 'string' },
                         rg: { type: 'string' },
                         birthDate: { type: 'string' },
                         address: {
                             type: 'object',
                             properties: {
-                                type: { type: 'string', enum: ['URBAN', 'RURAL'] },
+                                type: { type: 'string',
+enum: ['URBAN', 'RURAL'] },
                                 zipCode: { type: 'string' },
                                 street: { type: 'string' },
                                 number: { type: 'string' },
