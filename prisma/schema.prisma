@@ -228,8 +228,25 @@ model courseUserRegistration {
   // Inscrição confirmada pelo admin (pré-requisito p/ iniciar o curso).
   confirmed Boolean @default(false)
 
+  // Ficha de inscrição escaneada e preenchida, anexada pelo admin.
+  ficha registrationFicha?
+
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Ficha de inscrição escaneada (PDF) anexada a uma inscrição. Guardada no
+// banco (privada, servida atrás de auth admin) — sem bucket público.
+model registrationFicha {
+  id             String                 @id @default(uuid())
+  registration   courseUserRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  registrationId String                 @unique
+  data           Bytes
+  filename       String
+  mimeType       String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

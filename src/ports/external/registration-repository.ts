@@ -8,10 +8,13 @@ export type RegistrationWithUserData = courseUserRegistrationModel & {
     > & {
 userAdmin: {
  publicTitle: string | null;
-isPublic: boolean 
+isPublic: boolean
 } | null;
 };
+    ficha: { id: string; filename: string; createdAt: Date } | null;
 };
+
+export type RegistrationFichaFile = { data: Buffer; filename: string; mimeType: string };
 
 export interface RegistrationRepository {
     create(courseId: string, userDataId: string): Promise<courseUserRegistrationModel>;
@@ -26,4 +29,7 @@ export interface RegistrationRepository {
     setConfirmed(id: string, confirmed: boolean): Promise<courseUserRegistrationModel | null>;
     countUnconfirmed(courseId: string): Promise<number>;
     delete(id: string): Promise<boolean>;
+    setFicha(registrationId: string, data: Buffer, filename: string, mimeType: string): Promise<void>;
+    getFicha(registrationId: string): Promise<RegistrationFichaFile | null>;
+    deleteFicha(registrationId: string): Promise<boolean>;
 }

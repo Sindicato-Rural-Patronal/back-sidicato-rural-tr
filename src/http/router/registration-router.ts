@@ -15,6 +15,9 @@ import { ListCourseRegistrationsUseCase } from '../../usecase/list-course-regist
 import { CancelRegistrationUseCase } from '../../usecase/cancel-registration.js';
 import { SetRegistrationConfirmedUseCase } from '../../usecase/set-registration-confirmed.js';
 import { StartCourseUseCase } from '../../usecase/start-course.js';
+import { UploadRegistrationFichaUseCase } from '../../usecase/upload-registration-ficha.js';
+import { GetRegistrationFichaUseCase } from '../../usecase/get-registration-ficha.js';
+import { DeleteRegistrationFichaUseCase } from '../../usecase/delete-registration-ficha.js';
 import { RegisterForCourseController } from '../controllers/register-for-course.js';
 import { RegisterForCourseByCpfController } from '../controllers/register-for-course-by-cpf.js';
 import { RegisterForCourseFullController } from '../controllers/register-for-course-full.js';
@@ -23,6 +26,9 @@ import { ListCourseRegistrationsController } from '../controllers/list-course-re
 import { CancelRegistrationController } from '../controllers/cancel-registration.js';
 import { SetRegistrationConfirmedController } from '../controllers/set-registration-confirmed.js';
 import { StartCourseController } from '../controllers/start-course.js';
+import { UploadRegistrationFichaController } from '../controllers/upload-registration-ficha.js';
+import { DownloadRegistrationFichaController } from '../controllers/download-registration-ficha.js';
+import { DeleteRegistrationFichaController } from '../controllers/delete-registration-ficha.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 
@@ -68,6 +74,18 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
     );
     const startCourseController = new StartCourseController(
         new StartCourseUseCase(courseRepository, registrationRepository),
+        getAdminPermissions,
+    );
+    const uploadFichaController = new UploadRegistrationFichaController(
+        new UploadRegistrationFichaUseCase(registrationRepository),
+        getAdminPermissions,
+    );
+    const downloadFichaController = new DownloadRegistrationFichaController(
+        new GetRegistrationFichaUseCase(registrationRepository),
+        getAdminPermissions,
+    );
+    const deleteFichaController = new DeleteRegistrationFichaController(
+        new DeleteRegistrationFichaUseCase(registrationRepository),
         getAdminPermissions,
     );
 
@@ -316,6 +334,15 @@ nullable: true },
                                         createdAt: { type: 'string' },
                                         userData: { type: 'object',
 properties: userDataProperties },
+                                        ficha: {
+                                            type: 'object',
+                                            nullable: true,
+                                            properties: {
+                                                id: { type: 'string' },
+                                                filename: { type: 'string' },
+                                                createdAt: { type: 'string' },
+                                            },
+                                        },
                                     },
                                 }),
                     401: errorResponse,
@@ -421,5 +448,81 @@ properties: { message: { type: 'string' } } },
         },
         (req: FastifyRequest<{ Params: { courseId: string } }>, res: FastifyReply) =>
             startCourseController.handle(req, res),
+    );
+
+    fastify.post(
+        '/admin/registrations/:registrationId/ficha',
+        {
+            schema: {
+                tags: ['Admin — Registrations'],
+                summary: 'Attach the filled/scanned enrollment form (PDF)',
+                description:
+                    'Envie como multipart/form-data com o PDF no campo "file". Máx 15MB. Substitui a ficha anterior, se houver.',
+                security: [{ bearerAuth: [] }],
+                consumes: ['multipart/form-data'],
+                params: {
+                    type: 'object',
+                    required: ['registrationId'],
+                    properties: { registrationId: { type: 'string' } },
+                },
+                response: {
+                    201: { type: 'object',
+properties: { filename: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { registrationId: string } }>, res: FastifyReply) =>
+            uploadFichaController.handle(req, res),
+    );
+
+    fastify.get(
+        '/admin/registrations/:registrationId/ficha',
+        {
+            schema: {
+                tags: ['Admin — Registrations'],
+                summary: 'Download the attached enrollment form (PDF)',
+                description: 'Retorna o PDF anexado (inline). Requer admin autenticado.',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['registrationId'],
+                    properties: { registrationId: { type: 'string' } },
+                },
+                response: {
+                    401: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { registrationId: string } }>, res: FastifyReply) =>
+            downloadFichaController.handle(req, res),
+    );
+
+    fastify.delete(
+        '/admin/registrations/:registrationId/ficha',
+        {
+            schema: {
+                tags: ['Admin — Registrations'],
+                summary: 'Remove the attached enrollment form',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['registrationId'],
+                    properties: { registrationId: { type: 'string' } },
+                },
+                response: {
+                    204: { type: 'null' },
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { registrationId: string } }>, res: FastifyReply) =>
+            deleteFichaController.handle(req, res),
     );
 }
