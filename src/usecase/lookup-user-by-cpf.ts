@@ -8,7 +8,10 @@ function maskName(name: string): string {
     return parts[0] + ' ' + parts.slice(1).map(p => (p[0] ? p[0].toUpperCase() + '.' : '')).join(' ');
 }
 
-type LookupResponse = { found: boolean; name: string | null };
+type LookupResponse = {
+ found: boolean;
+name: string | null 
+};
 
 /**
  * Consulta pública por CPF: diz se já existe um cadastro e devolve o nome
@@ -18,9 +21,12 @@ export class LookupUserByCpfUseCase {
     constructor(private readonly userDataRepository: UserDataRepository) {}
 
     async execute(cpf: string): Promise<LookupResponse> {
-        if (!isValidCpf(cpf)) return { found: false, name: null };
+        if (!isValidCpf(cpf)) return { found: false,
+name: null };
         const user = await this.userDataRepository.findByCpf(cpf);
-        if (!user) return { found: false, name: null };
-        return { found: true, name: maskName(user.name) };
+        if (!user) return { found: false,
+name: null };
+        return { found: true,
+name: maskName(user.name) };
     }
 }

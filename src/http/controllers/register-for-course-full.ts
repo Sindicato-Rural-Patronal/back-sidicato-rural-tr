@@ -26,14 +26,19 @@ type Params = { courseId: string };
 export class RegisterForCourseFullController {
     constructor(private readonly useCase: RegisterForCourseFullUseCase) {}
 
-    async handle(request: FastifyRequest<{ Params: Params; Body: Body }>, reply: FastifyReply) {
+    async handle(request: FastifyRequest<{
+ Params: Params;
+Body: Body 
+}>, reply: FastifyReply) {
         const { courseId } = request.params;
-        const response = await this.useCase.execute({ courseId, ...request.body });
+        const response = await this.useCase.execute({ courseId,
+...request.body });
         if (response.error) {
             return reply.status(errorToStatus(response.error)).send({ error: response.error.message });
         }
         return reply
             .status(201)
-            .send({ registrationId: response.registrationId, userDataId: response.userDataId });
+            .send({ registrationId: response.registrationId,
+userDataId: response.userDataId });
     }
 }

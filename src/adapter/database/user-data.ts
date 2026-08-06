@@ -131,11 +131,13 @@ rg } });
 
     async findByEmailOrCpf(email: string, cpf: string): Promise<UserDataModel | null> {
         const digits = cpf.replace(/\D/g, '');
+        // digits vazio não deve casar com CPFs nulos ('' = ''), por isso o guard.
         const rows = await this.prisma.$queryRaw<UserDataModel[]>`
             SELECT * FROM "UserData"
             WHERE "isDeleted" = false
               AND ("email" = ${email}
-                   OR regexp_replace(COALESCE("cpf", ''), '[^0-9]', '', 'g') = ${digits})
+                   OR (${digits} <> ''
+                       AND regexp_replace(COALESCE("cpf", ''), '[^0-9]', '', 'g') = ${digits}))
             LIMIT 1`;
         return rows[0] ?? null;
     }
