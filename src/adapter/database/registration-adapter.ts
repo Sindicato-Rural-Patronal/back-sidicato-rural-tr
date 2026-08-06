@@ -13,6 +13,7 @@ const userDataSelect = {
     cpf: true,
     cnpj: true,
     avatar: true,
+    birthDate: true,
     isPartner: true,
     boardMember: true,
     boardPosition: true,
