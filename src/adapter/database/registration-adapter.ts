@@ -3,6 +3,7 @@ import type { courseUserRegistrationModel } from '../../generated/prisma/models/
 import type {
     RegistrationRepository,
     RegistrationWithUserData,
+    RegistrationFichaFile,
 } from '../../ports/external/registration-repository.js';
 
 const userDataSelect = {
@@ -20,6 +21,14 @@ const userDataSelect = {
     userAdmin: { select: { publicTitle: true,
 isPublic: true } },
 } as const;
+
+// Só metadados da ficha — nunca os bytes (`data`) na listagem.
+const fichaMetaSelect = { select: { id: true,
+filename: true,
+createdAt: true } } as const;
+
+const registrationInclude = { userData: { select: userDataSelect },
+ficha: fichaMetaSelect } as const;
 
 export function createRegistrationAdapter(prisma: PrismaClient): RegistrationRepository {
     return new RegistrationAdapter(prisma);
@@ -39,7 +48,7 @@ userDataId },
         return this.prisma.courseUserRegistration.findFirst({
             where: { id,
 isDeleted: false },
-            include: { userData: { select: userDataSelect } },
+            include: registrationInclude,
         });
     }
 
@@ -47,7 +56,7 @@ isDeleted: false },
         return this.prisma.courseUserRegistration.findMany({
             where: { courseId,
 isDeleted: false },
-            include: { userData: { select: userDataSelect } },
+            include: registrationInclude,
             orderBy: { createdAt: 'desc' },
             skip,
             take,
@@ -99,6 +108,41 @@ confirmed: false },
                 data: { isDeleted: true,
 deletedAt: new Date() },
             });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    async setFicha(
+        registrationId: string,
+        data: Buffer,
+        filename: string,
+        mimeType: string,
+    ): Promise<void> {
+        await this.prisma.registrationFicha.upsert({
+            where: { registrationId },
+            create: { registrationId,
+data,
+filename,
+mimeType },
+            update: { data,
+filename,
+mimeType },
+        });
+    }
+
+    async getFicha(registrationId: string): Promise<RegistrationFichaFile | null> {
+        const row = await this.prisma.registrationFicha.findUnique({ where: { registrationId } });
+        if (!row) return null;
+        return { data: Buffer.from(row.data),
+filename: row.filename,
+mimeType: row.mimeType };
+    }
+
+    async deleteFicha(registrationId: string): Promise<boolean> {
+        try {
+            await this.prisma.registrationFicha.delete({ where: { registrationId } });
             return true;
         } catch {
             return false;
