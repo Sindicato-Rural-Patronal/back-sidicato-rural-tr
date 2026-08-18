@@ -8,10 +8,13 @@ import { createPropertyAdapter } from '../adapter/database/property-adapter.js';
 import { createRegistrationAdapter } from '../adapter/database/registration-adapter.js';
 import { ValidationError } from '../errors/validation.js';
 import { CourseNotFoundError } from '../errors/not-found.js';
-import { CourseRegistrationAlreadyExistsError } from '../errors/conflict.js';
+import {
+    CourseRegistrationAlreadyExistsError,
+    DuplicateUserContactError,
+} from '../errors/conflict.js';
 import { isValidCpf } from '../lib/cpf.js';
 import { checkCourseAcceptsRegistration } from '../lib/course-registration-rules.js';
-import { isPrismaUniqueViolation } from '../lib/prisma-errors.js';
+import { isPrismaUniqueViolation, uniqueViolationFields } from '../lib/prisma-errors.js';
 
 const schema = z.object({
     courseId: z.string().min(1),
@@ -124,7 +127,13 @@ userDataId: userData.id };
             });
         } catch (e) {
             if (e instanceof CourseRegistrationAlreadyExistsError) return { error: e };
-            if (isPrismaUniqueViolation(e)) return { error: new CourseRegistrationAlreadyExistsError() };
+            const fields = uniqueViolationFields(e);
+            const isRegistrationDup = fields.some(
+                f => f.includes('courseId') || f.includes('userDataId') || f.includes('active'),
+            );
+            if (isRegistrationDup) return { error: new CourseRegistrationAlreadyExistsError() };
+            // Outra violação de unicidade = e-mail/telefone/CPF de outro usuário.
+            if (isPrismaUniqueViolation(e)) return { error: new DuplicateUserContactError() };
             return { error: e instanceof Error ? e : new Error('Registration failed') };
         }
     }

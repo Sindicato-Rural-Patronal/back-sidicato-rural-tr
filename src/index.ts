@@ -21,6 +21,7 @@ import { userRelationRouter } from './http/router/user-relation-router.js';
 import { userPropertyRouter } from './http/router/user-property-router.js';
 
 import { loadEnv } from './config/env.js';
+import { isPrismaUniqueViolation } from './lib/prisma-errors.js';
 import { createPrismaClient } from './lib/prisma.js';
 import type { Permission } from './generated/prisma/enums.js';
 import { hash, compare } from 'bcrypt';
@@ -166,6 +167,25 @@ server.get(
         status: 'ok',
         uptime: process.uptime(),
     }),
+);
+
+// Rede de segurança para erros não tratados: mapeia P2002 (unicidade) para 409
+// e nunca vaza stack/detalhe interno num 500.
+server.setErrorHandler(
+    (error: Error & { validation?: unknown; statusCode?: number }, request, reply) => {
+        if (error.validation) {
+            return reply.status(400).send({ error: error.message });
+        }
+        if (isPrismaUniqueViolation(error)) {
+            return reply.status(409).send({ error: 'Registro já existe (dados únicos em conflito).' });
+        }
+        const status = error.statusCode ?? 500;
+        if (status >= 500) {
+            request.log.error(error);
+            return reply.status(500).send({ error: 'Erro interno do servidor.' });
+        }
+        return reply.status(status).send({ error: error.message });
+    },
 );
 
 server.listen({ port: env.PORT,

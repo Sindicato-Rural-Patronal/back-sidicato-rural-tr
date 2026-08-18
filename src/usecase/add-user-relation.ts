@@ -30,9 +30,14 @@ export class AddUserRelationUseCase {
         const target = await this.userDataRepository.findById(targetId);
         if (!target) return { error: new UserDataNotFoundError() };
 
-        const relation = await this.userRelationRepository.create({ sourceId,
+        // Idempotente: não duplica a direção existente e recria a inversa que
+        // porventura tenha faltado (auto-cura sem depender de transação).
+        let relation = await this.userRelationRepository.findBySourceAndTarget(sourceId, targetId);
+        if (!relation) {
+            relation = await this.userRelationRepository.create({ sourceId,
 targetId,
 label });
+        }
 
         const inverseExists = await this.userRelationRepository.findBySourceAndTarget(targetId, sourceId);
         if (!inverseExists) {

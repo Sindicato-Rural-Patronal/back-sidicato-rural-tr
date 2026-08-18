@@ -325,9 +325,6 @@ nullable: true },
     fastify.post(
         '/users',
         {
-            preValidation: async (req: FastifyRequest) => {
-                req.log.info({ body: req.body }, '[POST /users] raw body before schema validation');
-            },
             schema: {
                 tags: ['Users'],
                 summary: 'Create worker user',
