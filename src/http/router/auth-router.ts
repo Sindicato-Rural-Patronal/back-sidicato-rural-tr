@@ -13,6 +13,8 @@ export async function authRouter(fastify: FastifyInstance, prisma: PrismaClient)
     fastify.post(
         '/auth/login',
         {
+            // Limite estrito contra brute-force de senha (bem abaixo do global).
+            config: { rateLimit: { max: 10, timeWindow: '5 minutes' } },
             schema: {
                 tags: ['Auth'],
                 summary: 'Admin login',

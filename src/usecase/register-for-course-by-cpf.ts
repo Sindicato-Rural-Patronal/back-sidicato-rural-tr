@@ -5,8 +5,9 @@ import type { RegistrationRepository } from '../ports/external/registration-repo
 import { ValidationError } from '../errors/validation.js';
 import { CourseNotFoundError, UserDataNotFoundError } from '../errors/not-found.js';
 import { CourseRegistrationAlreadyExistsError } from '../errors/conflict.js';
-import { RegistrationsUnavailableError } from '../errors/business-rule.js';
 import { isValidCpf } from '../lib/cpf.js';
+import { checkCourseAcceptsRegistration } from '../lib/course-registration-rules.js';
+import { isPrismaUniqueViolation } from '../lib/prisma-errors.js';
 
 const schema = z.object({
     courseId: z.string().min(1),
@@ -45,9 +46,8 @@ export class RegisterForCourseByCpfUseCase {
         if (!course) {
             return { error: new CourseNotFoundError() };
         }
-        if (course.status === 'UNPUBLISHED') {
-            return { error: new RegistrationsUnavailableError() };
-        }
+        const closed = checkCourseAcceptsRegistration(course);
+        if (closed) return { error: closed };
 
         const userData = await this.userDataRepository.findByCpf(cpf);
         if (!userData) {
@@ -62,8 +62,15 @@ export class RegisterForCourseByCpfUseCase {
             return { error: new CourseRegistrationAlreadyExistsError() };
         }
 
-        const registration = await this.registrationRepository.create(courseId, userData.id);
-        return { registrationId: registration.id,
+        try {
+            const registration = await this.registrationRepository.create(courseId, userData.id);
+            return { registrationId: registration.id,
 userDataId: userData.id };
+        } catch (e) {
+            if (isPrismaUniqueViolation(e)) {
+                return { error: new CourseRegistrationAlreadyExistsError() };
+            }
+            throw e;
+        }
     }
 }

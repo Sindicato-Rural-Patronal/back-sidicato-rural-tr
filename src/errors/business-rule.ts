@@ -13,3 +13,17 @@ export class RegistrationsUnavailableError extends BusinessRuleError {
         this.name = 'RegistrationsUnavailableError';
     }
 }
+
+export class RegistrationDeadlinePassedError extends BusinessRuleError {
+    constructor() {
+        super('Prazo de inscrição encerrado.');
+        this.name = 'RegistrationDeadlinePassedError';
+    }
+}
+
+export class CourseFullError extends BusinessRuleError {
+    constructor() {
+        super('Curso lotado — sem vagas disponíveis.');
+        this.name = 'CourseFullError';
+    }
+}

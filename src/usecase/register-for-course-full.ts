@@ -1,17 +1,17 @@
 import { z } from 'zod';
-import type { CourseRepository } from '../ports/external/course-repository.js';
-import type { UserDataRepository } from '../ports/external/user-data-repository.js';
-import type { RegistrationRepository } from '../ports/external/registration-repository.js';
-import type { PropertyRepository } from '../ports/external/property-repository.js';
-import type {
-    AddressRepository,
-    AddressCreateInput,
-} from '../ports/external/address-repository.js';
+import type { PrismaClient } from '@prisma/client/extension';
+import type { AddressCreateInput } from '../ports/external/address-repository.js';
+import { createCourseAdapter } from '../adapter/database/course-adapter.js';
+import { createUserDataAdapter } from '../adapter/database/user-data.js';
+import { createAddressAdapter } from '../adapter/database/address-adapter.js';
+import { createPropertyAdapter } from '../adapter/database/property-adapter.js';
+import { createRegistrationAdapter } from '../adapter/database/registration-adapter.js';
 import { ValidationError } from '../errors/validation.js';
 import { CourseNotFoundError } from '../errors/not-found.js';
 import { CourseRegistrationAlreadyExistsError } from '../errors/conflict.js';
-import { RegistrationsUnavailableError } from '../errors/business-rule.js';
 import { isValidCpf } from '../lib/cpf.js';
+import { checkCourseAcceptsRegistration } from '../lib/course-registration-rules.js';
+import { isPrismaUniqueViolation } from '../lib/prisma-errors.js';
 
 const schema = z.object({
     courseId: z.string().min(1),
@@ -40,22 +40,19 @@ type Request = z.input<typeof schema>;
 type Response = {
  error?: Error;
 registrationId?: string;
-userDataId?: string 
+userDataId?: string
 };
 
 /**
  * Inscrição pública completa: cria o participante com os dados da ficha simples
  * (rg, nascimento) e registra o endereço como propriedade principal, depois
  * inscreve no curso. Se já existir alguém com o mesmo email/CPF, apenas inscreve.
+ *
+ * Toda a criação (user → endereço → propriedade → primaryProperty → inscrição)
+ * roda numa transação: falha no meio não deixa registros órfãos.
  */
 export class RegisterForCourseFullUseCase {
-    constructor(
-        private readonly courseRepository: CourseRepository,
-        private readonly userDataRepository: UserDataRepository,
-        private readonly registrationRepository: RegistrationRepository,
-        private readonly propertyRepository: PropertyRepository,
-        private readonly addressRepository: AddressRepository,
-    ) {}
+    constructor(private readonly prisma: PrismaClient) {}
 
     async execute(request: Request): Promise<Response> {
         const parsed = schema.safeParse(request);
@@ -68,48 +65,67 @@ export class RegisterForCourseFullUseCase {
             return { error: new ValidationError('CPF inválido') };
         }
 
-        const course = await this.courseRepository.findById(courseId);
+        const courseRepository = createCourseAdapter(this.prisma);
+        const userDataRepository = createUserDataAdapter(this.prisma);
+
+        const course = await courseRepository.findById(courseId);
         if (!course) return { error: new CourseNotFoundError() };
-        if (course.status === 'UNPUBLISHED') return { error: new RegistrationsUnavailableError() };
+        const closed = checkCourseAcceptsRegistration(course);
+        if (closed) return { error: closed };
 
-        let userData = await this.userDataRepository.findByEmailOrCpf(email, cpf);
+        const existingUser = await userDataRepository.findByEmailOrCpf(email, cpf);
 
-        if (!userData) {
-            userData = await this.userDataRepository.create({
-                name,
-                phone,
-                email,
-                cpf,
-                rg: rg || null,
-                birthDate: birthDate ?? null,
-            });
-            if (!userData) return { error: new Error('Failed to create user record') };
+        const hasAddress = address
+            ? Object.entries(address).some(([k, v]) => k !== 'type' && v && String(v).trim())
+            : false;
 
-            // endereço → propriedade principal (ignora o `type`, que tem default)
-            const hasAddress = address
-                ? Object.entries(address).some(([k, v]) => k !== 'type' && v && String(v).trim())
-                : false;
-            if (address && hasAddress) {
-                const addressData: AddressCreateInput = { ...address,
-type: address.type ?? 'URBAN' };
-                const createdAddress = await this.addressRepository.create(addressData);
-                const property = await this.propertyRepository.create({
-                    userDataId: userData.id,
-                    name: 'Principal',
-                    addressId: createdAddress.id,
-                });
-                await this.userDataRepository.update(userData.id, { primaryPropertyId: property.id });
-            }
-        }
+        try {
+            return await this.prisma.$transaction(async (tx: unknown) => {
+                const t = tx as PrismaClient;
+                const userRepo = createUserDataAdapter(t);
+                const addressRepo = createAddressAdapter(t);
+                const propertyRepo = createPropertyAdapter(t);
+                const registrationRepo = createRegistrationAdapter(t);
 
-        const existing = await this.registrationRepository.findByUserDataAndCourse(
-            userData.id,
-            courseId,
-        );
-        if (existing) return { error: new CourseRegistrationAlreadyExistsError() };
+                let userData = existingUser;
+                if (!userData) {
+                    userData = await userRepo.create({
+                        name,
+                        phone,
+                        email,
+                        cpf,
+                        rg: rg || null,
+                        birthDate: birthDate ?? null,
+                    });
+                    if (!userData) throw new Error('Failed to create user record');
 
-        const registration = await this.registrationRepository.create(courseId, userData.id);
-        return { registrationId: registration.id,
+                    // endereço → propriedade principal (ignora o `type`, que tem default)
+                    if (address && hasAddress) {
+                        const addressData: AddressCreateInput = {
+                            ...address,
+                            type: address.type ?? 'URBAN',
+                        };
+                        const createdAddress = await addressRepo.create(addressData);
+                        const property = await propertyRepo.create({
+                            userDataId: userData.id,
+                            name: 'Principal',
+                            addressId: createdAddress.id,
+                        });
+                        await userRepo.update(userData.id, { primaryPropertyId: property.id });
+                    }
+                }
+
+                const existing = await registrationRepo.findByUserDataAndCourse(userData.id, courseId);
+                if (existing) throw new CourseRegistrationAlreadyExistsError();
+
+                const registration = await registrationRepo.create(courseId, userData.id);
+                return { registrationId: registration.id,
 userDataId: userData.id };
+            });
+        } catch (e) {
+            if (e instanceof CourseRegistrationAlreadyExistsError) return { error: e };
+            if (isPrismaUniqueViolation(e)) return { error: new CourseRegistrationAlreadyExistsError() };
+            return { error: e instanceof Error ? e : new Error('Registration failed') };
+        }
     }
 }
