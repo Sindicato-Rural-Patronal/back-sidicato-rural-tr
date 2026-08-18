@@ -98,7 +98,10 @@ server.addContentTypeParser('application/json', { parseAs: 'string' }, function 
     }
 });
 
-server.register(multipart);
+// Sem `limits`, o @fastify/multipart usa o bodyLimit padrão do Fastify (1MB),
+// que rejeita (413) avatares/banners/fichas reais. 15MB cobre a ficha escaneada
+// (usecase valida 15MB) e imagens (~5MB, redimensionadas depois).
+server.register(multipart, { limits: { fileSize: 15 * 1024 * 1024 } });
 
 const env = loadEnv();
 const prisma = createPrismaClient(env);
