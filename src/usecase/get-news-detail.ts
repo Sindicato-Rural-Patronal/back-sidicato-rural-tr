@@ -11,7 +11,8 @@ export class GetNewsDetailUseCase {
 
     async execute(id: string): Promise<GetNewsDetailResponse> {
         const news = await this.newsRepository.findById(id);
-        if (!news) {
+        // Rota pública: rascunhos (não PUBLISHED) não devem vazar por UUID.
+        if (!news || news.status !== 'PUBLISHED') {
             return { error: new NewsNotFoundError() };
         }
         return { news };

@@ -10,3 +10,15 @@ export function isPrismaUniqueViolation(error: unknown): boolean {
         (error as { code?: unknown }).code === 'P2002'
     );
 }
+
+/**
+ * Campos/índice envolvidos numa violação de unicidade (P2002). Prisma expõe
+ * `meta.target` como array de colunas ou, para índices nomeados, uma string.
+ */
+export function uniqueViolationFields(error: unknown): string[] {
+    if (!isPrismaUniqueViolation(error)) return [];
+    const target = (error as { meta?: { target?: unknown } }).meta?.target;
+    if (Array.isArray(target)) return target.map(String);
+    if (typeof target === 'string') return [target];
+    return [];
+}

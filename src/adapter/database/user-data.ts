@@ -131,13 +131,25 @@ rg } });
 
     async findByEmailOrCpf(email: string, cpf: string): Promise<UserDataModel | null> {
         const digits = cpf.replace(/\D/g, '');
-        // digits vazio não deve casar com CPFs nulos ('' = ''), por isso o guard.
+        // O CPF é a identidade: se bate por CPF, é a pessoa (prioridade). Só casa
+        // por e-mail quando o registro NÃO tem CPF ou tem o MESMO CPF — assim um
+        // e-mail que pertence a outra pessoa (CPF diferente) não vincula errado
+        // (o create seguinte colide no unique de e-mail e vira 409, não bind).
         const rows = await this.prisma.$queryRaw<UserDataModel[]>`
             SELECT * FROM "UserData"
             WHERE "isDeleted" = false
-              AND ("email" = ${email}
-                   OR (${digits} <> ''
-                       AND regexp_replace(COALESCE("cpf", ''), '[^0-9]', '', 'g') = ${digits}))
+              AND (
+                    (${digits} <> ''
+                     AND regexp_replace(COALESCE("cpf", ''), '[^0-9]', '', 'g') = ${digits})
+                    OR ("email" = ${email}
+                        AND (COALESCE("cpf", '') = ''
+                             OR regexp_replace(COALESCE("cpf", ''), '[^0-9]', '', 'g') = ${digits}))
+                  )
+            ORDER BY (
+                CASE WHEN ${digits} <> ''
+                          AND regexp_replace(COALESCE("cpf", ''), '[^0-9]', '', 'g') = ${digits}
+                     THEN 0 ELSE 1 END
+            )
             LIMIT 1`;
         return rows[0] ?? null;
     }

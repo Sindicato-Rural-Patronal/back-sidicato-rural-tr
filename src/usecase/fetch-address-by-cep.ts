@@ -1,6 +1,7 @@
 import type { AddressRepository } from '../ports/external/address-repository.js';
 import type { Address } from '../generated/prisma/client.js';
 import { AddressNotFoundError } from '../errors/not-found.js';
+import { ValidationError } from '../errors/validation.js';
 
 type ViaCepResponse = {
     erro?: boolean;
@@ -21,6 +22,12 @@ export class FetchAddressByCepUseCase {
 
     async execute(cep: string): Promise<FetchAddressByCepResponse> {
         const cepClean = cep.replace(/\D/g, '');
+
+        // Rejeita CEP inválido antes de bater no ViaCEP / inserir Address —
+        // evita chamada externa com `//json/` e amplificação por CEPs aleatórios.
+        if (cepClean.length !== 8) {
+            return { error: new ValidationError('CEP inválido — informe 8 dígitos.') };
+        }
 
         const existing = await this.addressRepository.findByCep(cepClean);
         if (existing) {

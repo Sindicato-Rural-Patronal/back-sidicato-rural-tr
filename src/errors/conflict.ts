@@ -14,6 +14,13 @@ export class EmailOrCpfAlreadyInUseError extends ConflictError {
     }
 }
 
+export class DuplicateUserContactError extends ConflictError {
+    constructor() {
+        super('E-mail, telefone ou CPF já cadastrado para outro usuário.');
+        this.name = 'DuplicateUserContactError';
+    }
+}
+
 export class RoomHasCoursesError extends ConflictError {
     constructor() {
         super('Sala vinculada a cursos e não pode ser removida.');
