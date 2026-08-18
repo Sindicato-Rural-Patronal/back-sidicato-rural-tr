@@ -39,10 +39,17 @@ const validInput = {
     cpf: '52998224725',
 };
 
+const courseBase = {
+    registrationDeadline: null,
+    room: { maxCapacity: 100 },
+    _count: { courseUserRegistration: 0 },
+};
 const publishedCourse = { id: validInput.courseId,
-status: 'PUBLIC' };
+status: 'PUBLIC',
+...courseBase };
 const unpublishedCourse = { id: validInput.courseId,
-status: 'UNPUBLISHED' };
+status: 'UNPUBLISHED',
+...courseBase };
 
 describe('RegisterForCourseUseCase', () => {
     beforeEach(() => vi.clearAllMocks());

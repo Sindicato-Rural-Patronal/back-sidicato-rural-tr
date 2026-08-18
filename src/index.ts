@@ -1,6 +1,7 @@
 import fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
+import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { userDataRouter } from './http/router/user-data-router.js';
@@ -22,7 +23,7 @@ import { userPropertyRouter } from './http/router/user-property-router.js';
 import { loadEnv } from './config/env.js';
 import { createPrismaClient } from './lib/prisma.js';
 import type { Permission } from './generated/prisma/enums.js';
-import { hash } from 'bcrypt';
+import { hash, compare } from 'bcrypt';
 
 const server = fastify({
     logger: true,
@@ -78,13 +79,17 @@ server.register(swagger, {
     },
 });
 
-server.register(swaggerUi, {
-    routePrefix: '/docs',
-    uiConfig: {
-        docExpansion: 'list',
-        deepLinking: true,
-    },
-});
+// Swagger UI expõe o mapa completo da API publicamente. Em produção só habilita
+// via ENABLE_DOCS=true (evita entregar o mapa a qualquer visitante).
+if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_DOCS === 'true') {
+    server.register(swaggerUi, {
+        routePrefix: '/docs',
+        uiConfig: {
+            docExpansion: 'list',
+            deepLinking: true,
+        },
+    });
+}
 
 server.addContentTypeParser('application/json', { parseAs: 'string' }, function (_req, body, done) {
     if (body === '' || body === null || body === undefined) {
@@ -112,6 +117,14 @@ server.register(cors, {
         : env.CORS_ORIGIN.split(',').map(o => o.trim()),
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+});
+
+// Rate limit global por IP (barra spam/brute-force). Rotas sensíveis (login)
+// definem um limite mais estrito via `config.rateLimit` na própria rota.
+server.register(rateLimit, {
+    global: true,
+    max: 200,
+    timeWindow: '1 minute',
 });
 
 await firstInitialize();
@@ -268,16 +281,36 @@ async function firstInitialize() {
     const existingAdmin = await prisma.userAdmin.findUnique({
         where: { username: 'admin' },
     });
+
+    // Senha inicial vem SEMPRE do ambiente — nunca semear com senha conhecida.
+    const initialPassword = process.env.INITIAL_ADMIN_PASSWORD;
+
     if (existingAdmin) {
+        // Remediação do default fraco: se a senha ainda é o antigo "admin" e há
+        // uma INITIAL_ADMIN_PASSWORD configurada, rotaciona automaticamente.
+        if (initialPassword && (await compare('admin', existingAdmin.passwordHash))) {
+            await prisma.userAdmin.update({
+                where: { id: existingAdmin.id },
+                data: { passwordHash: await hash(initialPassword, 10) },
+            });
+            console.log('Default admin password rotated from INITIAL_ADMIN_PASSWORD');
+        }
         console.log('Admin user already exists');
         console.log('First initialization completed');
+        return;
+    }
+
+    if (!initialPassword) {
+        console.warn(
+            'INITIAL_ADMIN_PASSWORD not set — skipping admin seed. Set it to create the first admin.',
+        );
         return;
     }
 
     const firstUser = await prisma.userAdmin.create({
         data: {
             username: 'admin',
-            passwordHash: await hash('admin', 10),
+            passwordHash: await hash(initialPassword, 10),
             userDataId: userData!.id,
             rulesId: superRule.id,
         },
