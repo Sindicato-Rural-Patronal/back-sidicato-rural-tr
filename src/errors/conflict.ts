@@ -21,6 +21,13 @@ export class DuplicateUserContactError extends ConflictError {
     }
 }
 
+export class RuleInUseError extends ConflictError {
+    constructor() {
+        super('Regra em uso por um ou mais administradores — não pode ser removida.');
+        this.name = 'RuleInUseError';
+    }
+}
+
 export class RoomHasCoursesError extends ConflictError {
     constructor() {
         super('Sala vinculada a cursos e não pode ser removida.');
