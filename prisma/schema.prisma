@@ -215,8 +215,23 @@ model MarketQuote {
   isActive      Boolean   @default(true)
   order         Int       @default(0)
 
+  history MarketQuoteHistory[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Histórico de valores de uma cotação. A cada novo valor cadastrado guarda-se
+// o texto + o número extraído, usado para calcular a variação automaticamente.
+model MarketQuoteHistory {
+  id            String      @id @default(uuid())
+  marketQuote   MarketQuote @relation(fields: [marketQuoteId], references: [id], onDelete: Cascade)
+  marketQuoteId String
+  value         String
+  numeric       Float?
+  createdAt     DateTime    @default(now())
+
+  @@index([marketQuoteId, createdAt])
 }
 
 // Trilha de auditoria: registra mutações (POST/PATCH/PUT/DELETE bem-sucedidas)
