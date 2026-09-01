@@ -25,14 +25,14 @@ export class MarketQuoteController {
 
     // Admin: todos (inclui inativos).
     async listAdmin(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_BANNER', this.getAdminPermissions)) === null)
+        if ((await requirePermission(request, reply, 'READ_MARKET_QUOTE', this.getAdminPermissions)) === null)
             return;
         const items = await this.listUseCase.execute(false);
         return reply.send(items);
     }
 
     async create(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'CREATE_BANNER', this.getAdminPermissions)) === null)
+        if ((await requirePermission(request, reply, 'CREATE_MARKET_QUOTE', this.getAdminPermissions)) === null)
             return;
         const response = await this.createUseCase.execute(request.body);
         if (response.error) {
@@ -42,7 +42,7 @@ export class MarketQuoteController {
     }
 
     async update(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'UPDATE_BANNER', this.getAdminPermissions)) === null)
+        if ((await requirePermission(request, reply, 'UPDATE_MARKET_QUOTE', this.getAdminPermissions)) === null)
             return;
         const response = await this.updateUseCase.execute(request.params.id, request.body);
         if (response.error) {
@@ -52,7 +52,7 @@ export class MarketQuoteController {
     }
 
     async remove(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'DELETE_BANNER', this.getAdminPermissions)) === null)
+        if ((await requirePermission(request, reply, 'DELETE_MARKET_QUOTE', this.getAdminPermissions)) === null)
             return;
         const response = await this.deleteUseCase.execute(request.params.id);
         if (response.error) {

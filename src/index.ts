@@ -260,6 +260,11 @@ async function firstInitialize() {
         'UPDATE_BANNER',
         'DELETE_BANNER',
         'READ_BANNER',
+        'CREATE_MARKET_QUOTE',
+        'UPDATE_MARKET_QUOTE',
+        'DELETE_MARKET_QUOTE',
+        'READ_MARKET_QUOTE',
+        'READ_AUDIT',
     ] as Permission[];
 
     if (superRule) {
