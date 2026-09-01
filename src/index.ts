@@ -29,17 +29,6 @@ import { isPrismaUniqueViolation } from './lib/prisma-errors.js';
 import { createPrismaClient } from './lib/prisma.js';
 import type { Permission } from './generated/prisma/enums.js';
 import { hash, compare } from 'bcrypt';
-import * as Sentry from '@sentry/node';
-
-// Monitoramento de erros (inerte sem SENTRY_DSN). Init cedo, antes do servidor.
-if (process.env.SENTRY_DSN) {
-    Sentry.init({
-        dsn: process.env.SENTRY_DSN,
-        environment: process.env.NODE_ENV ?? 'production',
-        tracesSampleRate: 0,
-    });
-    console.log('Sentry error monitoring enabled');
-}
 
 const server = fastify({
     logger: true,
@@ -224,7 +213,6 @@ server.setErrorHandler(
         const status = error.statusCode ?? 500;
         if (status >= 500) {
             request.log.error(error);
-            Sentry.captureException(error);
             return reply.status(500).send({ error: 'Erro interno do servidor.' });
         }
         return reply.status(status).send({ error: error.message });
