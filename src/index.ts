@@ -19,6 +19,7 @@ import { contactRouter } from './http/router/contact-router.js';
 import { bannerRouter } from './http/router/banner-router.js';
 import { userRelationRouter } from './http/router/user-relation-router.js';
 import { userPropertyRouter } from './http/router/user-property-router.js';
+import { marketQuoteRouter } from './http/router/market-quote-router.js';
 
 import { loadEnv } from './config/env.js';
 import { isPrismaUniqueViolation } from './lib/prisma-errors.js';
@@ -145,6 +146,7 @@ server.register(contactRouter, prisma);
 server.register(bannerRouter, prisma);
 server.register(userRelationRouter, prisma);
 server.register(userPropertyRouter, prisma);
+server.register(marketQuoteRouter, prisma);
 
 server.get(
     '/',

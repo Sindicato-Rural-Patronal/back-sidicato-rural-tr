@@ -118,3 +118,10 @@ export class BannerNotFoundError extends NotFoundError {
         this.name = 'BannerNotFoundError';
     }
 }
+
+export class MarketQuoteNotFoundError extends NotFoundError {
+    constructor() {
+        super('Cotação não encontrada');
+        this.name = 'MarketQuoteNotFoundError';
+    }
+}

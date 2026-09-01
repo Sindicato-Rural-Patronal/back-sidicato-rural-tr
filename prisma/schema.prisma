@@ -204,6 +204,21 @@ model room {
   address    Address? @relation(fields: [addressId], references: [id])
 }
 
+// Cotações/ativos exibidos na home (dólar, soja, milho…). Valor é texto livre
+// (formato varia por ativo/unidade), preenchido manualmente no painel admin.
+model MarketQuote {
+  id            String    @id @default(uuid())
+  label         String
+  value         String
+  variation     String?
+  referenceDate DateTime?
+  isActive      Boolean   @default(true)
+  order         Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model News {
   id          String     @id @default(uuid())
   title       String
