@@ -41,6 +41,8 @@ export type UserAdminListFilters = {
 
 export interface UserAdminRepository {
     findByUsername(username: string): Promise<UserAdminModel | null>;
+    /** Inclui soft-deleted (o unique de username no banco os considera). */
+    findByUsernameAny(username: string): Promise<UserAdminModel | null>;
     findByUserDataId(userDataId: string): Promise<UserAdminModel | null>;
     /** Inclui registros soft-deleted (a constraint unique do banco os considera). */
     findByUserDataIdAny(userDataId: string): Promise<UserAdminModel | null>;

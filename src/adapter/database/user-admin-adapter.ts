@@ -23,6 +23,11 @@ export class UserAdminAdapter implements UserAdminRepository {
 isDeleted: false } });
     }
 
+    /** Inclui soft-deleted — o unique de username no banco considera os apagados. */
+    findByUsernameAny(username: string): Promise<UserAdminModel | null> {
+        return this.prisma.userAdmin.findFirst({ where: { username } });
+    }
+
     findByUserDataId(userDataId: string): Promise<UserAdminModel | null> {
         return this.prisma.userAdmin.findFirst({ where: { userDataId,
 isDeleted: false } });

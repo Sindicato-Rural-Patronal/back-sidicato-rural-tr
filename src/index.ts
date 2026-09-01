@@ -24,6 +24,7 @@ import { auditRouter } from './http/router/audit-router.js';
 import { adminInviteRouter } from './http/router/admin-invite-router.js';
 import { decodeToken } from './lib/auth.js';
 import { deriveAuditEntity } from './lib/audit-entity.js';
+import { lookupTargetLabel, bodyLabel } from './lib/audit-label.js';
 
 import { loadEnv } from './config/env.js';
 import { isPrismaUniqueViolation } from './lib/prisma-errors.js';
@@ -116,6 +117,21 @@ server.register(multipart, { limits: { fileSize: 15 * 1024 * 1024 } });
 const env = loadEnv();
 const prisma = createPrismaClient(env);
 
+// Antes de editar/excluir, captura o nome do alvo (some depois numa exclusão).
+server.addHook('preHandler', async request => {
+    const m = request.method;
+    if (m !== 'PATCH' && m !== 'PUT' && m !== 'DELETE') return;
+    const path = (request.url ?? '').split('?')[0];
+    try {
+        (request as { _auditLabel?: string | null })._auditLabel = await lookupTargetLabel(
+            prisma,
+            path,
+        );
+    } catch {
+        /* auditoria nunca deve derrubar a request */
+    }
+});
+
 // Trilha de auditoria: registra mutações bem-sucedidas (quem/o quê/quando).
 // Roda após a resposta ser enviada — nunca atrasa nem quebra a request.
 server.addHook('onResponse', async (request, reply) => {
@@ -127,12 +143,15 @@ server.addHook('onResponse', async (request, reply) => {
     try {
         const token = request.headers['authorization']?.replace('Bearer ', '') ?? '';
         const decoded = decodeToken(token);
+        const stashed = (request as { _auditLabel?: string | null })._auditLabel ?? null;
+        const targetLabel = stashed ?? bodyLabel(request.body);
         await prisma.auditLog.create({
             data: {
                 actorId: decoded?.userId ?? null,
                 method,
                 path,
                 entity: deriveAuditEntity(path),
+                targetLabel,
                 statusCode: reply.statusCode,
             },
         });
