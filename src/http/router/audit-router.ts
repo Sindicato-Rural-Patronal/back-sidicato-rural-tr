@@ -30,6 +30,8 @@ nullable: true },
                             method: { type: 'string' },
                             path: { type: 'string' },
                             entity: { type: 'string' },
+                            targetLabel: { type: 'string',
+nullable: true },
                             statusCode: { type: 'integer' },
                             createdAt: { type: 'string' },
                         },
@@ -54,6 +56,7 @@ nullable: true },
                 method: string;
                 path: string;
                 entity: string;
+                targetLabel: string | null;
                 statusCode: number;
                 createdAt: Date;
             };

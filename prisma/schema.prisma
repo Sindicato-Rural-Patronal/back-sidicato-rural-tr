@@ -237,13 +237,14 @@ model MarketQuoteHistory {
 // Trilha de auditoria: registra mutações (POST/PATCH/PUT/DELETE bem-sucedidas)
 // feitas via API — quem (actorId), o quê (método/entidade/rota) e quando.
 model AuditLog {
-  id         String   @id @default(uuid())
-  actorId    String?
-  method     String
-  path       String
-  entity     String
-  statusCode Int
-  createdAt  DateTime @default(now())
+  id          String   @id @default(uuid())
+  actorId     String?
+  method      String
+  path        String
+  entity      String
+  targetLabel String?
+  statusCode  Int
+  createdAt   DateTime @default(now())
 
   @@index([createdAt])
   @@index([actorId])
