@@ -7,6 +7,8 @@ import { UpdateRuleUseCase } from '../../usecase/update-rule.js';
 import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { ListRulesController } from '../controllers/list-rules.js';
 import { ListRulesUseCase } from '../../usecase/list-rules.js';
+import { DeleteRuleController } from '../controllers/delete-rule.js';
+import { DeleteRuleUseCase } from '../../usecase/delete-rule.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
@@ -38,6 +40,11 @@ const PERMISSIONS_ENUM = [
     'UPDATE_BANNER',
     'DELETE_BANNER',
     'READ_BANNER',
+    'CREATE_MARKET_QUOTE',
+    'UPDATE_MARKET_QUOTE',
+    'DELETE_MARKET_QUOTE',
+    'READ_MARKET_QUOTE',
+    'READ_AUDIT',
 ] as const;
 
 export async function ruleRouter(fastify: FastifyInstance, prisma: PrismaClient) {
@@ -55,6 +62,10 @@ export async function ruleRouter(fastify: FastifyInstance, prisma: PrismaClient)
     );
     const listRulesController = new ListRulesController(
         new ListRulesUseCase(ruleRepository),
+        getAdminPermissions,
+    );
+    const deleteRuleController = new DeleteRuleController(
+        new DeleteRuleUseCase(ruleRepository, userAdminRepository),
         getAdminPermissions,
     );
 
@@ -175,5 +186,31 @@ properties: { message: { type: 'string' } } },
         },
         (req: FastifyRequest<{ Params: { ruleId: string } }>, res: FastifyReply) =>
             updateRuleController.handle(req, res),
+    );
+
+    fastify.delete(
+        '/rules/:ruleId',
+        {
+            schema: {
+                tags: ['Rules'],
+                summary: 'Delete permission rule',
+                description: 'Remove uma regra. Falha com 409 se houver admin ativo usando-a.',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['ruleId'],
+                    properties: { ruleId: { type: 'string' } },
+                },
+                response: {
+                    204: { type: 'null' },
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                    409: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { ruleId: string } }>, res: FastifyReply) =>
+            deleteRuleController.handle(req, res),
     );
 }
