@@ -15,6 +15,7 @@ import {
 import { isValidCpf } from '../lib/cpf.js';
 import { checkCourseAcceptsRegistration } from '../lib/course-registration-rules.js';
 import { isPrismaUniqueViolation, uniqueViolationFields } from '../lib/prisma-errors.js';
+import { sendRegistrationConfirmation } from '../lib/mailer.js';
 
 const schema = z.object({
     courseId: z.string().min(1),
@@ -83,7 +84,7 @@ export class RegisterForCourseFullUseCase {
             : false;
 
         try {
-            return await this.prisma.$transaction(async (tx: unknown) => {
+            const result = await this.prisma.$transaction(async (tx: unknown) => {
                 const t = tx as PrismaClient;
                 const userRepo = createUserDataAdapter(t);
                 const addressRepo = createAddressAdapter(t);
@@ -125,6 +126,8 @@ export class RegisterForCourseFullUseCase {
                 return { registrationId: registration.id,
 userDataId: userData.id };
             });
+            sendRegistrationConfirmation(email, name, course.name);
+            return result;
         } catch (e) {
             if (e instanceof CourseRegistrationAlreadyExistsError) return { error: e };
             const fields = uniqueViolationFields(e);

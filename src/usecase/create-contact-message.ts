@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ValidationError } from '../errors/validation.js';
 import type { ContactMessageRepository, ContactMessageModel } from '../ports/external/contact-message-repository.js';
+import { sendContactAutoReply } from '../lib/mailer.js';
 
 const schema = z.object({
     name: z.string().min(1).max(100),
@@ -27,6 +28,7 @@ export class CreateContactMessageUseCase {
         }
 
         const msg = await this.repo.create(parsed.data);
+        sendContactAutoReply(parsed.data.email, parsed.data.name);
         return { message: { id: msg.id,
 createdAt: msg.createdAt } };
     }

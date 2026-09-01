@@ -8,6 +8,7 @@ import { CourseRegistrationAlreadyExistsError } from '../errors/conflict.js';
 import { isValidCpf } from '../lib/cpf.js';
 import { checkCourseAcceptsRegistration } from '../lib/course-registration-rules.js';
 import { isPrismaUniqueViolation } from '../lib/prisma-errors.js';
+import { sendRegistrationConfirmation } from '../lib/mailer.js';
 
 const schema = z.object({
     courseId: z.string().min(1),
@@ -76,6 +77,7 @@ export class RegisterForCourseUseCase {
 
         try {
             const registration = await this.registrationRepository.create(courseId, userData.id);
+            sendRegistrationConfirmation(userData.email, userData.name, course.name);
             return { registrationId: registration.id,
 userDataId: userData.id };
         } catch (e) {
