@@ -20,6 +20,9 @@ import { bannerRouter } from './http/router/banner-router.js';
 import { userRelationRouter } from './http/router/user-relation-router.js';
 import { userPropertyRouter } from './http/router/user-property-router.js';
 import { marketQuoteRouter } from './http/router/market-quote-router.js';
+import { auditRouter } from './http/router/audit-router.js';
+import { decodeToken } from './lib/auth.js';
+import { deriveAuditEntity } from './lib/audit-entity.js';
 
 import { loadEnv } from './config/env.js';
 import { isPrismaUniqueViolation } from './lib/prisma-errors.js';
@@ -113,6 +116,31 @@ server.register(multipart, { limits: { fileSize: 15 * 1024 * 1024 } });
 const env = loadEnv();
 const prisma = createPrismaClient(env);
 
+// Trilha de auditoria: registra mutações bem-sucedidas (quem/o quê/quando).
+// Roda após a resposta ser enviada — nunca atrasa nem quebra a request.
+server.addHook('onResponse', async (request, reply) => {
+    const method = request.method;
+    if (method !== 'POST' && method !== 'PATCH' && method !== 'PUT' && method !== 'DELETE') return;
+    if (reply.statusCode >= 400) return;
+    const path = (request.url ?? '').split('?')[0];
+    if (path === '/auth/login') return; // ruído + sem ator
+    try {
+        const token = request.headers['authorization']?.replace('Bearer ', '') ?? '';
+        const decoded = decodeToken(token);
+        await prisma.auditLog.create({
+            data: {
+                actorId: decoded?.userId ?? null,
+                method,
+                path,
+                entity: deriveAuditEntity(path),
+                statusCode: reply.statusCode,
+            },
+        });
+    } catch {
+        /* auditoria nunca deve derrubar a aplicação */
+    }
+});
+
 server.register(cors, {
     origin: env.CORS_ORIGIN === '*'
         ? true
@@ -147,6 +175,7 @@ server.register(bannerRouter, prisma);
 server.register(userRelationRouter, prisma);
 server.register(userPropertyRouter, prisma);
 server.register(marketQuoteRouter, prisma);
+server.register(auditRouter, prisma);
 
 server.get(
     '/',
