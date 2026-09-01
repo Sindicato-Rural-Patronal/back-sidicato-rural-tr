@@ -19,4 +19,7 @@ export interface MarketQuoteRepository {
     create(data: MarketQuoteCreateInput): Promise<MarketQuoteModel>;
     update(id: string, data: MarketQuoteUpdateInput): Promise<MarketQuoteModel>;
     delete(id: string): Promise<boolean>;
+    // Histórico de valores → cálculo automático da variação.
+    addHistory(marketQuoteId: string, value: string, numeric: number | null): Promise<void>;
+    getLastNumeric(marketQuoteId: string): Promise<number | null>;
 }

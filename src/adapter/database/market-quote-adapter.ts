@@ -42,4 +42,19 @@ data });
             return false;
         }
     }
+
+    async addHistory(marketQuoteId: string, value: string, numeric: number | null): Promise<void> {
+        await this.prisma.marketQuoteHistory.create({ data: { marketQuoteId,
+value,
+numeric } });
+    }
+
+    async getLastNumeric(marketQuoteId: string): Promise<number | null> {
+        const row = await this.prisma.marketQuoteHistory.findFirst({
+            where: { marketQuoteId },
+            orderBy: { createdAt: 'desc' },
+            select: { numeric: true },
+        });
+        return row?.numeric ?? null;
+    }
 }

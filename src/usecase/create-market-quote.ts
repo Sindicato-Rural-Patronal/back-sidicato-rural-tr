@@ -4,11 +4,12 @@ import type {
     MarketQuoteModel,
 } from '../ports/external/market-quote-repository.js';
 import { ValidationError } from '../errors/validation.js';
+import { parseQuoteNumber } from '../lib/quote-number.js';
 
+// `variation` NÃO entra por aqui — é calculada automaticamente pelo histórico.
 export const marketQuoteSchema = z.object({
     label: z.string().min(1, 'Informe o rótulo'),
     value: z.string().min(1, 'Informe o valor'),
-    variation: z.string().trim().nullish(),
     referenceDate: z.preprocess(
         v => (v === '' || v == null ? null : v),
         z.coerce.date().nullable(),
@@ -25,7 +26,10 @@ export class CreateMarketQuoteUseCase {
         if (!parsed.success) {
             return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Dados inválidos') };
         }
-        const quote = await this.repo.create(parsed.data);
+        // Primeiro cadastro: sem valor anterior → sem variação ainda.
+        const quote = await this.repo.create({ ...parsed.data,
+variation: null });
+        await this.repo.addHistory(quote.id, parsed.data.value, parseQuoteNumber(parsed.data.value));
         return { quote };
     }
 }
