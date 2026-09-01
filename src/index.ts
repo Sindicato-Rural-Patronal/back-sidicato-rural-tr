@@ -21,6 +21,7 @@ import { userRelationRouter } from './http/router/user-relation-router.js';
 import { userPropertyRouter } from './http/router/user-property-router.js';
 import { marketQuoteRouter } from './http/router/market-quote-router.js';
 import { auditRouter } from './http/router/audit-router.js';
+import { adminInviteRouter } from './http/router/admin-invite-router.js';
 import { decodeToken } from './lib/auth.js';
 import { deriveAuditEntity } from './lib/audit-entity.js';
 
@@ -176,6 +177,7 @@ server.register(userRelationRouter, prisma);
 server.register(userPropertyRouter, prisma);
 server.register(marketQuoteRouter, prisma);
 server.register(auditRouter, prisma);
+server.register(adminInviteRouter, prisma);
 
 server.get(
     '/',

@@ -249,6 +249,20 @@ model AuditLog {
   @@index([actorId])
 }
 
+// Convite para criar um admin: o gestor escolhe a pessoa (userData) + a regra e
+// gera um token. A pessoa abre o link e define username/senha para ativar.
+model AdminInvite {
+  id         String    @id @default(uuid())
+  token      String    @unique
+  userDataId String
+  rulesId    String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userDataId])
+}
+
 model News {
   id          String     @id @default(uuid())
   title       String

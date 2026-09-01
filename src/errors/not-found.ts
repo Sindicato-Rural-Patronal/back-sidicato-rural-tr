@@ -125,3 +125,10 @@ export class MarketQuoteNotFoundError extends NotFoundError {
         this.name = 'MarketQuoteNotFoundError';
     }
 }
+
+export class AdminInviteInvalidError extends NotFoundError {
+    constructor() {
+        super('Convite inválido, expirado ou já utilizado.');
+        this.name = 'AdminInviteInvalidError';
+    }
+}
