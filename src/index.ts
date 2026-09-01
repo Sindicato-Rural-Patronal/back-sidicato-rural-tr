@@ -26,6 +26,7 @@ import { deriveAuditEntity } from './lib/audit-entity.js';
 
 import { loadEnv } from './config/env.js';
 import { isPrismaUniqueViolation } from './lib/prisma-errors.js';
+import { hash } from 'bcrypt';
 import { createPrismaClient } from './lib/prisma.js';
 
 const server = fastify({
@@ -156,6 +157,8 @@ server.register(rateLimit, {
 });
 
 
+await bootstrapAdmin();
+
 server.register(userDataRouter, prisma);
 server.register(authRouter, prisma);
 server.register(userAdminRouter, prisma);
@@ -224,4 +227,53 @@ host: '0.0.0.0' }, (err, address) => {
     }
     console.log(`Server listening at ${address}`);
 });
+
+// TEMPORÁRIO (recuperação de acesso): cria um admin a partir de env
+// (BOOTSTRAP_ADMIN_USERNAME / BOOTSTRAP_ADMIN_PASSWORD, opcional _EMAIL) se ele
+// ainda não existir, com a rule mais completa. Idempotente e inerte sem as env.
+// Remover após o acesso ser restabelecido.
+async function bootstrapAdmin() {
+    const username = process.env.BOOTSTRAP_ADMIN_USERNAME;
+    const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+    if (!username || !password) return;
+    try {
+        const existing = await prisma.userAdmin.findFirst({ where: { username } });
+        if (existing) {
+            console.log(`[bootstrap] admin "${username}" já existe — nada a fazer`);
+            return;
+        }
+        const rules = await prisma.rule.findMany();
+        if (rules.length === 0) {
+            console.warn('[bootstrap] nenhuma rule cadastrada — não é possível criar admin');
+            return;
+        }
+        const rule = rules.reduce((a, b) =>
+            (b.permissions?.length ?? 0) > (a.permissions?.length ?? 0) ? b : a);
+        const email = process.env.BOOTSTRAP_ADMIN_EMAIL || `${username}@bootstrap.local`;
+        let userData = await prisma.userData.findUnique({ where: { email } });
+        if (!userData) {
+            userData = await prisma.userData.create({ data: { name: username,
+email,
+phone: '' } });
+        }
+        const linked = await prisma.userAdmin.findFirst({ where: { userDataId: userData.id } });
+        if (linked) {
+            console.warn('[bootstrap] userData já vinculado a um admin — abortando');
+            return;
+        }
+        await prisma.userAdmin.create({
+            data: {
+                username,
+                passwordHash: await hash(password, 10),
+                userDataId: userData.id,
+                rulesId: rule.id,
+            },
+        });
+        console.log(
+            `[bootstrap] admin "${username}" criado com a rule "${rule.name}" (${rule.permissions.length} perms)`,
+        );
+    } catch (e) {
+        console.error('[bootstrap] falhou:', e);
+    }
+}
 
