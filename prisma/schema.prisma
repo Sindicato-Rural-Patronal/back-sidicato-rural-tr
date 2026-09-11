@@ -73,7 +73,8 @@ model UserData {
 
   // Membership
   memberClassification String?
-  cadPro           String?
+  // CAD/PRO do associado — até 3 por usuário (validado na aplicação).
+  cadPro           String[]
   familyIncome     String?
   memberType       String?
   boardPosition    String?

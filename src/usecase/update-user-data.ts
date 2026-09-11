@@ -42,7 +42,13 @@ const updateUserDataSchema = z.object({
 
     // Membership
     memberClassification: z.string().nullable().optional(),
-    cadPro: z.string().nullable().optional(),
+    // CAD/PRO: até 3. Aceita array; normaliza (tira vazios, corta em 3).
+    cadPro: z.preprocess(
+        v => (Array.isArray(v)
+            ? v.map(x => String(x).trim()).filter(Boolean).slice(0, 3)
+            : v == null || v === '' ? undefined : [String(v).trim()]),
+        z.array(z.string()).max(3).optional(),
+    ),
     familyIncome: z.string().nullable().optional(),
     memberType: z.string().nullable().optional(),
     boardPosition: z.string().nullable().optional(),
