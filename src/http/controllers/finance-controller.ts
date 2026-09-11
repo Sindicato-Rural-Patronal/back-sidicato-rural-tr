@@ -11,6 +11,7 @@ import type { ListFinanceTransactionsUseCase } from '../../usecase/list-finance-
 import type { CreateFinanceTransactionUseCase } from '../../usecase/create-finance-transaction.js';
 import type { UpdateFinanceTransactionUseCase } from '../../usecase/update-finance-transaction.js';
 import type { DeleteFinanceTransactionUseCase } from '../../usecase/delete-finance-transaction.js';
+import type { CreateFinanceTransferUseCase } from '../../usecase/create-finance-transfer.js';
 import type { FinanceSummaryUseCase } from '../../usecase/finance-summary.js';
 import type { ExportFinanceTransactionsUseCase } from '../../usecase/export-finance-transactions.js';
 import type { UploadFinanceAttachmentUseCase } from '../../usecase/upload-finance-attachment.js';
@@ -35,6 +36,7 @@ export class FinanceController {
         private readonly createTransaction: CreateFinanceTransactionUseCase,
         private readonly updateTransaction: UpdateFinanceTransactionUseCase,
         private readonly deleteTransaction: DeleteFinanceTransactionUseCase,
+        private readonly createTransfer: CreateFinanceTransferUseCase,
         private readonly summaryUseCase: FinanceSummaryUseCase,
         private readonly exportUseCase: ExportFinanceTransactionsUseCase,
         private readonly uploadAttachmentUseCase: UploadFinanceAttachmentUseCase,
@@ -120,6 +122,14 @@ export class FinanceController {
         const res = await this.createTransaction.execute(request.body, actorId);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(201).send(res.transaction);
+    }
+
+    async postTransfer(request: FastifyRequest, reply: FastifyReply) {
+        const actorId = await requirePermission(request, reply, 'CREATE_FINANCE', this.getAdminPermissions);
+        if (actorId === null) return;
+        const res = await this.createTransfer.execute(request.body, actorId);
+        if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
+        return reply.status(201).send({ message: 'ok' });
     }
 
     async patchTransaction(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {

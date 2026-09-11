@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client/extension';
 import type { FinancialCategoryModel } from '../../generated/prisma/models/FinancialCategory.js';
 import type { FinancialTransactionModel } from '../../generated/prisma/models/FinancialTransaction.js';
@@ -10,6 +11,7 @@ import type {
     FinanceAccountUpdateInput,
     FinanceTransactionCreateInput,
     FinanceTransactionUpdateInput,
+    FinanceTransferInput,
     FinanceTransactionFilters,
     FinanceTransactionWithCategory,
     FinanceAttachmentMeta,
@@ -140,6 +142,34 @@ class FinanceAdapter implements FinanceRepository {
         return r.count === 1;
     }
 
+    async createTransfer(input: FinanceTransferInput): Promise<void> {
+        const transferId = randomUUID();
+        const base = {
+            transferId,
+            amountCents: input.amountCents,
+            date: input.date,
+            description: input.description,
+            method: input.method ?? null,
+            createdBy: input.createdBy ?? null,
+        };
+        await this.prisma.$transaction([
+            this.prisma.financialTransaction.create({
+                data: { ...base, type: 'OUT', accountId: input.fromAccountId },
+            }),
+            this.prisma.financialTransaction.create({
+                data: { ...base, type: 'IN', accountId: input.toAccountId },
+            }),
+        ]);
+    }
+
+    async softDeleteTransfer(transferId: string): Promise<boolean> {
+        const r = await this.prisma.financialTransaction.updateMany({
+            where: { transferId, isDeleted: false },
+            data: { isDeleted: true, deletedAt: new Date() },
+        });
+        return r.count > 0;
+    }
+
     // ── Comprovantes ──────────────────────────────────────────────────────────
     async addAttachment(
         transactionId: string,
@@ -229,6 +259,9 @@ class FinanceAdapter implements FinanceRepository {
         const monthMap = new Map<string, { inCents: number; outCents: number }>();
 
         for (const t of rows) {
+            // Transferências entre caixas não são receita/despesa — fora dos KPIs,
+            // categorias e gráfico mensal (mas contam no saldo por caixa, via groupBy).
+            if (t.transferId) continue;
             if (t.type === 'IN') periodInCents += t.amountCents;
             else periodOutCents += t.amountCents;
 

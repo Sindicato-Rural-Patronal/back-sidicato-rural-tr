@@ -40,6 +40,16 @@ export type FinanceTransactionUpdateInput = Partial<
     Omit<FinanceTransactionCreateInput, 'createdBy'>
 >;
 
+export type FinanceTransferInput = {
+    fromAccountId: string;
+    toAccountId: string;
+    amountCents: number;
+    date: Date;
+    description: string;
+    method?: string | null;
+    createdBy?: string | null;
+};
+
 // Metadados de um comprovante — nunca os bytes (`data`) na listagem.
 export type FinanceAttachmentMeta = {
     id: string;
@@ -110,6 +120,11 @@ export interface FinanceRepository {
     createTransaction(data: FinanceTransactionCreateInput): Promise<FinancialTransactionModel>;
     updateTransaction(id: string, data: FinanceTransactionUpdateInput): Promise<FinancialTransactionModel>;
     softDeleteTransaction(id: string): Promise<boolean>;
+
+    // Transferência entre caixas: cria os 2 lançamentos ligados (OUT + IN).
+    createTransfer(input: FinanceTransferInput): Promise<void>;
+    // Soft-delete dos 2 lançamentos de uma transferência.
+    softDeleteTransfer(transferId: string): Promise<boolean>;
 
     // Comprovantes (anexos)
     addAttachment(
