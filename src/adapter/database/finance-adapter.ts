@@ -1,10 +1,13 @@
 import type { PrismaClient } from '@prisma/client/extension';
 import type { FinancialCategoryModel } from '../../generated/prisma/models/FinancialCategory.js';
 import type { FinancialTransactionModel } from '../../generated/prisma/models/FinancialTransaction.js';
+import type { FinancialAccountModel } from '../../generated/prisma/models/FinancialAccount.js';
 import type {
     FinanceRepository,
     FinanceCategoryCreateInput,
     FinanceCategoryUpdateInput,
+    FinanceAccountCreateInput,
+    FinanceAccountUpdateInput,
     FinanceTransactionCreateInput,
     FinanceTransactionUpdateInput,
     FinanceTransactionFilters,
@@ -54,6 +57,34 @@ class FinanceAdapter implements FinanceRepository {
         return r.count === 1;
     }
 
+    // ── Contas / caixas ─────────────────────────────────────────────────────────
+    listAccounts(includeInactive: boolean): Promise<FinancialAccountModel[]> {
+        return this.prisma.financialAccount.findMany({
+            where: { isDeleted: false, ...(includeInactive ? {} : { active: true }) },
+            orderBy: [{ order: 'asc' }, { name: 'asc' }],
+        });
+    }
+
+    findAccountById(id: string): Promise<FinancialAccountModel | null> {
+        return this.prisma.financialAccount.findFirst({ where: { id, isDeleted: false } });
+    }
+
+    createAccount(data: FinanceAccountCreateInput): Promise<FinancialAccountModel> {
+        return this.prisma.financialAccount.create({ data });
+    }
+
+    updateAccount(id: string, data: FinanceAccountUpdateInput): Promise<FinancialAccountModel> {
+        return this.prisma.financialAccount.update({ where: { id }, data });
+    }
+
+    async softDeleteAccount(id: string): Promise<boolean> {
+        const r = await this.prisma.financialAccount.updateMany({
+            where: { id, isDeleted: false },
+            data: { isDeleted: true, deletedAt: new Date() },
+        });
+        return r.count === 1;
+    }
+
     // ── Lançamentos ─────────────────────────────────────────────────────────
     async listTransactions(
         filters: FinanceTransactionFilters,
@@ -64,6 +95,7 @@ class FinanceAdapter implements FinanceRepository {
                 where,
                 include: {
                     category: true,
+                    account: true,
                     attachments: { ...attachmentMetaSelect, orderBy: { createdAt: 'asc' } },
                 },
                 orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
@@ -73,6 +105,19 @@ class FinanceAdapter implements FinanceRepository {
             this.prisma.financialTransaction.count({ where }),
         ]);
         return { items, total };
+    }
+
+    listTransactionsForExport(
+        filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>,
+    ): Promise<FinanceTransactionWithCategory[]> {
+        return this.prisma.financialTransaction.findMany({
+            where: this.buildWhere(filters),
+            include: {
+                category: true,
+                attachments: { ...attachmentMetaSelect, orderBy: { createdAt: 'asc' } },
+            },
+            orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+        });
     }
 
     findTransactionById(id: string): Promise<FinancialTransactionModel | null> {
@@ -140,6 +185,35 @@ class FinanceAdapter implements FinanceRepository {
         const balanceAllTimeCents =
             (allIn._sum.amountCents ?? 0) - (allOut._sum.amountCents ?? 0);
 
+        // Saldo acumulado por conta/caixa (todas as datas).
+        const [accounts, grouped] = await Promise.all([
+            this.prisma.financialAccount.findMany({
+                where: { isDeleted: false },
+                orderBy: [{ order: 'asc' }, { name: 'asc' }],
+            }),
+            this.prisma.financialTransaction.groupBy({
+                by: ['accountId', 'type'],
+                where: { isDeleted: false },
+                _sum: { amountCents: true },
+            }),
+        ]);
+        const acctBal = new Map<string, number>();
+        for (const g of grouped) {
+            const key = g.accountId ?? '__none';
+            const delta = (g._sum.amountCents ?? 0) * (g.type === 'IN' ? 1 : -1);
+            acctBal.set(key, (acctBal.get(key) ?? 0) + delta);
+        }
+        const byAccount = (accounts as FinancialAccountModel[]).map(a => ({
+            accountId: a.id as string | null,
+            name: a.name,
+            color: a.color,
+            balanceCents: acctBal.get(a.id) ?? 0,
+        }));
+        const noneBal = acctBal.get('__none') ?? 0;
+        if (noneBal !== 0) {
+            byAccount.push({ accountId: null, name: 'Sem caixa', color: '#94a3b8', balanceCents: noneBal });
+        }
+
         // Lançamentos do período → agregações em JS (volume pequeno).
         const rows = await this.prisma.financialTransaction.findMany({
             where: { isDeleted: false, date: { gte: from, lte: to } },
@@ -191,13 +265,15 @@ class FinanceAdapter implements FinanceRepository {
             periodResultCents: periodInCents - periodOutCents,
             byCategory,
             byMonth,
+            byAccount,
         };
     }
 
-    private buildWhere(filters: FinanceTransactionFilters) {
+    private buildWhere(filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>) {
         const where: Record<string, unknown> = { isDeleted: false };
         if (filters.type) where.type = filters.type;
         if (filters.categoryId) where.categoryId = filters.categoryId;
+        if (filters.accountId) where.accountId = filters.accountId;
         if (filters.from || filters.to) {
             where.date = {
                 ...(filters.from ? { gte: filters.from } : {}),

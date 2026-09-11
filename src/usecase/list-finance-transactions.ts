@@ -11,6 +11,7 @@ const querySchema = z.object({
     to: z.preprocess(v => (v === '' || v == null ? undefined : v), z.coerce.date().optional()),
     type: z.enum(['IN', 'OUT']).optional(),
     categoryId: z.preprocess(v => (v === '' ? undefined : v), z.string().uuid().optional()),
+    accountId: z.preprocess(v => (v === '' ? undefined : v), z.string().uuid().optional()),
     search: z.preprocess(v => (v === '' ? undefined : v), z.string().optional()),
 });
 
@@ -35,6 +36,7 @@ export class ListFinanceTransactionsUseCase {
             to,
             type: q.type,
             categoryId: q.categoryId,
+            accountId: q.accountId,
             search: q.search,
             skip: (q.page - 1) * q.limit,
             take: q.limit,

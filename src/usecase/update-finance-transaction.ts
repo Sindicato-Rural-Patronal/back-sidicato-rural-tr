@@ -31,6 +31,11 @@ export class UpdateFinanceTransactionUseCase {
             }
         }
 
+        if (data.accountId) {
+            const acc = await this.repo.findAccountById(data.accountId);
+            if (!acc) return { error: new ValidationError('Caixa inválido') };
+        }
+
         await this.repo.updateTransaction(id, data);
         return {};
     }
