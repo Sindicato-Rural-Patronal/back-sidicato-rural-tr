@@ -41,7 +41,7 @@ export type UserDataUpdateInput = Partial<{
 
     // Membership
     memberClassification: string | null;
-    cadPro: string | null;
+    cadPro: string[];
     familyIncome: string | null;
     memberType: string | null;
     boardPosition: string | null;
