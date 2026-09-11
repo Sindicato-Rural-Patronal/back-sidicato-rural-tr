@@ -12,11 +12,11 @@ export class FinanceSummaryUseCase {
     async execute(query: unknown): Promise<FinanceSummary> {
         const q = querySchema.parse(query ?? {});
         const now = new Date();
-        // Padrão: últimos 12 meses (para o gráfico mensal ter contexto).
-        const from = q.from ?? new Date(now.getFullYear(), now.getMonth() - 11, 1);
-        const rawTo = q.to ?? now;
-        // Inclui o dia inteiro do `to`.
-        const to = new Date(rawTo.getFullYear(), rawTo.getMonth(), rawTo.getDate(), 23, 59, 59, 999);
+        // Padrão: últimos 12 meses. UTC + aritmética por getTime() — consistente
+        // com list/export, sem depender do fuso do servidor.
+        const from = q.from ?? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11, 1));
+        // Inclui o dia inteiro do `to` (mesma conta de list/export). Sem `to` → agora.
+        const to = q.to ? new Date(q.to.getTime() + 24 * 60 * 60 * 1000 - 1) : now;
         return this.repo.summary(from, to);
     }
 }

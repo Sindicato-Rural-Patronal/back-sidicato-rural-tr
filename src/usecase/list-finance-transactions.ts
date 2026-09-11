@@ -6,7 +6,7 @@ import type {
 
 const querySchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
-    limit: z.coerce.number().int().min(1).max(200).default(20),
+    limit: z.coerce.number().int().min(1).max(1000).default(20),
     from: z.preprocess(v => (v === '' || v == null ? undefined : v), z.coerce.date().optional()),
     to: z.preprocess(v => (v === '' || v == null ? undefined : v), z.coerce.date().optional()),
     type: z.enum(['IN', 'OUT']).optional(),
