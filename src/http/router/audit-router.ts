@@ -18,7 +18,18 @@ export async function auditRouter(fastify: FastifyInstance, prisma: PrismaClient
                 tags: ['Admin — Audit'],
                 summary: 'List admin audit trail',
                 security: [{ bearerAuth: [] }],
-                querystring: paginationQuerystring,
+                querystring: {
+                    type: 'object',
+                    properties: {
+                        ...paginationQuerystring.properties,
+                        action: { type: 'string', enum: ['create', 'edit', 'delete'] },
+                        entity: { type: 'string' },
+                        actorId: { type: 'string' },
+                        from: { type: 'string' },
+                        to: { type: 'string' },
+                        q: { type: 'string' },
+                    },
+                },
                 response: {
                     200: pagedResponse({
                         type: 'object',
@@ -42,13 +53,41 @@ nullable: true },
             },
         },
         async (
-            req: FastifyRequest<{ Querystring: { page?: number; limit?: number } }>,
+            req: FastifyRequest<{
+                Querystring: {
+                    page?: number; limit?: number;
+                    action?: 'create' | 'edit' | 'delete';
+                    entity?: string; actorId?: string; from?: string; to?: string; q?: string;
+                };
+            }>,
             res: FastifyReply,
         ) => {
             if (!(await requirePermission(req, res, 'READ_AUDIT', getAdminPermissions))) return;
             const page = Number(req.query.page) || 1;
             const limit = Number(req.query.limit) || 30;
             const skip = (page - 1) * limit;
+
+            // Filtros opcionais.
+            const { action, entity, actorId, from, to, q } = req.query;
+            const where: Record<string, unknown> = {};
+            if (action === 'create') where.method = 'POST';
+            else if (action === 'edit') where.method = { in: ['PATCH', 'PUT'] };
+            else if (action === 'delete') where.method = 'DELETE';
+            if (entity) where.entity = entity;
+            if (actorId) where.actorId = actorId;
+            if (from || to) {
+                where.createdAt = {
+                    ...(from ? { gte: new Date(from) } : {}),
+                    // inclui o dia inteiro do `to`
+                    ...(to ? { lte: new Date(new Date(to).getTime() + 24 * 60 * 60 * 1000 - 1) } : {}),
+                };
+            }
+            if (q && q.trim()) {
+                where.OR = [
+                    { targetLabel: { contains: q.trim(), mode: 'insensitive' } },
+                    { path: { contains: q.trim(), mode: 'insensitive' } },
+                ];
+            }
 
             type AuditRow = {
                 id: string;
@@ -61,10 +100,11 @@ nullable: true },
                 createdAt: Date;
             };
             const [rows, total]: [AuditRow[], number] = await Promise.all([
-                prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' },
+                prisma.auditLog.findMany({ where,
+orderBy: { createdAt: 'desc' },
 skip,
 take: limit }),
-                prisma.auditLog.count(),
+                prisma.auditLog.count({ where }),
             ]);
 
             const ids = [...new Set(rows.map(r => r.actorId).filter(Boolean))] as string[];
