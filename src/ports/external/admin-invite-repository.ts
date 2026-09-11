@@ -11,4 +11,6 @@ export interface AdminInviteRepository {
     }): Promise<AdminInviteModel>;
     findByToken(token: string): Promise<AdminInviteModel | null>;
     markUsed(id: string): Promise<void>;
+    /** Consome o convite de forma atômica (usedAt: null → agora). true se conseguiu. */
+    consume(id: string): Promise<boolean>;
 }

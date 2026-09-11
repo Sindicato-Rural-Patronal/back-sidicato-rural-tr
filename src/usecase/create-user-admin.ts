@@ -4,6 +4,7 @@ import type { RuleRepository } from '../ports/external/rule-repository.js';
 import { hash } from 'bcrypt';
 import { UsernameAlreadyExistsError, AdminAccountAlreadyExistsError } from '../errors/conflict.js';
 import { UserDataNotFoundError, RoleNotFoundError } from '../errors/not-found.js';
+import { isPrismaUniqueViolation } from '../lib/prisma-errors.js';
 
 type CreateUserAdminRequest = {
     username: string;
@@ -25,9 +26,15 @@ export class CreateUserAdminUseCase {
     ) {}
 
     async execute(request: CreateUserAdminRequest): Promise<CreateUserAdminResponse> {
-        const existingAdmin = await this.userAdminRepository.findByUsername(request.username);
-        if (existingAdmin) {
-            return { error: new UsernameAlreadyExistsError() };
+        // Username é unique no banco INCLUINDO soft-deletados. Se um admin ativo
+        // (de outra pessoa) usa o nome → conflito. Se só um apagado o segura,
+        // liberamos renomeando a linha antiga (permite reusar o nome).
+        const holder = await this.userAdminRepository.findByUsernameAny(request.username);
+        if (holder && holder.userDataId !== request.userDataId) {
+            if (!holder.isDeleted) return { error: new UsernameAlreadyExistsError() };
+            await this.userAdminRepository.update(holder.id, {
+                username: `${holder.username}__del_${holder.id.slice(0, 8)}`,
+            });
         }
 
         const userData = await this.userDataRepository.findById(request.userDataId);
@@ -73,6 +80,9 @@ export class CreateUserAdminUseCase {
             });
             return { userAdminId: newAdmin.id };
         } catch (err: unknown) {
+            if (isPrismaUniqueViolation(err)) {
+                return { error: new UsernameAlreadyExistsError() };
+            }
             const msg = err instanceof Error ? err.message : String(err);
             return { error: new Error(`Failed to create admin: ${msg}`) };
         }

@@ -5,6 +5,7 @@ import type { RuleRepository } from '../ports/external/rule-repository.js';
 import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
 import { UserDataNotFoundError, RuleNotFoundError } from '../errors/not-found.js';
 import { AdminAccountAlreadyExistsError } from '../errors/conflict.js';
+import { ForbiddenError } from '../errors/auth.js';
 
 const INVITE_TTL_DAYS = 7;
 
@@ -19,11 +20,19 @@ export class CreateAdminInviteUseCase {
     async execute(
         userDataId: string,
         rulesId: string,
+        actorPermissions: string[],
     ): Promise<{ error?: Error; token?: string; expiresAt?: Date }> {
         const user = await this.userDataRepo.findById(userDataId);
         if (!user) return { error: new UserDataNotFoundError() };
         const rule = await this.ruleRepo.findById(rulesId);
         if (!rule) return { error: new RuleNotFoundError() };
+        // Anti-escalonamento: não conceder uma regra com permissões além das suas.
+        const escalates = (rule.permissions as string[]).some(p => !actorPermissions.includes(p));
+        if (escalates) {
+            return {
+                error: new ForbiddenError('Você não pode conceder uma regra com permissões além das suas.'),
+            };
+        }
         // Se a pessoa já é admin ativo, não faz sentido convidar.
         const existing = await this.userAdminRepo.findByUserDataId(userDataId);
         if (existing) return { error: new AdminAccountAlreadyExistsError() };
