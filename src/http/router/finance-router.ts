@@ -12,6 +12,9 @@ import { CreateFinanceTransactionUseCase } from '../../usecase/create-finance-tr
 import { UpdateFinanceTransactionUseCase } from '../../usecase/update-finance-transaction.js';
 import { DeleteFinanceTransactionUseCase } from '../../usecase/delete-finance-transaction.js';
 import { FinanceSummaryUseCase } from '../../usecase/finance-summary.js';
+import { UploadFinanceAttachmentUseCase } from '../../usecase/upload-finance-attachment.js';
+import { GetFinanceAttachmentUseCase } from '../../usecase/get-finance-attachment.js';
+import { DeleteFinanceAttachmentUseCase } from '../../usecase/delete-finance-attachment.js';
 import { FinanceController } from '../controllers/finance-controller.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
@@ -70,6 +73,9 @@ export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClie
         new UpdateFinanceTransactionUseCase(repo),
         new DeleteFinanceTransactionUseCase(repo),
         new FinanceSummaryUseCase(repo),
+        new UploadFinanceAttachmentUseCase(repo),
+        new GetFinanceAttachmentUseCase(repo),
+        new DeleteFinanceAttachmentUseCase(repo),
         getAdminPermissions,
     );
 
@@ -243,6 +249,69 @@ export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClie
         },
         (req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) =>
             controller.removeTransaction(req, res),
+    );
+
+    // ── Comprovantes (anexos) ─────────────────────────────────────────────────
+    fastify.post(
+        '/admin/finance/transactions/:id/attachments',
+        {
+            schema: {
+                tags,
+                summary: 'Attach a receipt (PDF/image) to a transaction',
+                description: 'multipart/form-data com o arquivo no campo "file". Máx 15MB. PDF, JPG, PNG ou WEBP.',
+                security: sec,
+                consumes: ['multipart/form-data'],
+                params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+                response: {
+                    201: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'string' },
+                            filename: { type: 'string' },
+                            mimeType: { type: 'string' },
+                            size: { type: 'integer' },
+                            createdAt: { type: 'string' },
+                        },
+                    },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) =>
+            controller.uploadAttachment(req, res),
+    );
+
+    fastify.get(
+        '/admin/finance/attachments/:attachmentId',
+        {
+            schema: {
+                tags,
+                summary: 'Download a transaction receipt (inline)',
+                security: sec,
+                params: { type: 'object', required: ['attachmentId'], properties: { attachmentId: { type: 'string' } } },
+                response: { 401: errorResponse, 403: errorResponse, 404: errorResponse },
+            },
+        },
+        (req: FastifyRequest<{ Params: { attachmentId: string } }>, res: FastifyReply) =>
+            controller.downloadAttachment(req, res),
+    );
+
+    fastify.delete(
+        '/admin/finance/attachments/:attachmentId',
+        {
+            schema: {
+                tags,
+                summary: 'Remove a transaction receipt',
+                security: sec,
+                params: { type: 'object', required: ['attachmentId'], properties: { attachmentId: { type: 'string' } } },
+                response: { 204: { type: 'null' }, 401: errorResponse, 403: errorResponse, 404: errorResponse },
+            },
+        },
+        (req: FastifyRequest<{ Params: { attachmentId: string } }>, res: FastifyReply) =>
+            controller.removeAttachment(req, res),
     );
 
     // ── Dashboard ───────────────────────────────────────────────────────────
