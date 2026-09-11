@@ -1,6 +1,8 @@
 import type { CourseRepository } from '../ports/external/course-repository.js';
 import type { StorageRepository, UploadParams } from '../ports/external/storage-repository.js';
 import { CourseNotFoundError } from '../errors/not-found.js';
+import { ValidationError } from '../errors/validation.js';
+import { validateImageUpload } from '../lib/image-upload.js';
 import { buckets } from '../lib/buckets.js';
 
 const BANNER_BUCKET = buckets.courseBanners;
@@ -24,6 +26,9 @@ export class AddCoursePhotoUseCase {
         mimeType: string,
         caption?: string,
     ): Promise<AddCoursePhotoResponse> {
+        const invalid = validateImageUpload(fileBuffer, mimeType);
+        if (invalid) return { error: new ValidationError(invalid) };
+
         const existing = await this.courseRepository.findById(courseId);
         if (!existing) {
             return { error: new CourseNotFoundError() };

@@ -21,7 +21,8 @@ export class UploadBannerCourseController {
         const chunks: Buffer[] = [];
         for await (const chunk of data.file) chunks.push(chunk);
         const fileBuffer = Buffer.concat(chunks);
-        const response = await this.uploadBannerUseCase.execute(courseId, fileBuffer);
+        if (data.file.truncated) return reply.status(400).send({ error: 'Arquivo excede o limite permitido.' });
+        const response = await this.uploadBannerUseCase.execute(courseId, fileBuffer, data.mimetype);
         if (response.error) {
             return reply.status(errorToStatus(response.error)).send({ error: response.error.message });
         }

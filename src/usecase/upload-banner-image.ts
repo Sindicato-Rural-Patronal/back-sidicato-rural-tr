@@ -1,5 +1,7 @@
 import sharp from 'sharp';
 import { BannerNotFoundError } from '../errors/not-found.js';
+import { ValidationError } from '../errors/validation.js';
+import { validateImageUpload } from '../lib/image-upload.js';
 import type { BannerRepository } from '../ports/external/banner-repository.js';
 import type { StorageRepository } from '../ports/external/storage-repository.js';
 
@@ -20,7 +22,10 @@ export class UploadBannerImageUseCase {
         private readonly storage: StorageRepository,
     ) {}
 
-    async execute(id: string, fileBuffer: Buffer): Promise<Response> {
+    async execute(id: string, fileBuffer: Buffer, mimeType: string): Promise<Response> {
+        const invalid = validateImageUpload(fileBuffer, mimeType);
+        if (invalid) return { error: new ValidationError(invalid) };
+
         const banner = await this.repo.findById(id);
         if (!banner) return { error: new BannerNotFoundError() };
 

@@ -1,6 +1,8 @@
 import type { StorageRepository, UploadParams } from '../ports/external/storage-repository.js';
 import type { UserDataRepository } from '../ports/external/user-data-repository.js';
 import { UserDataNotFoundError } from '../errors/not-found.js';
+import { ValidationError } from '../errors/validation.js';
+import { validateImageUpload } from '../lib/image-upload.js';
 import { buckets } from '../lib/buckets.js';
 
 export interface UploadAvatarInput {
@@ -22,6 +24,9 @@ export class UploadAvatarUseCase {
     ) {}
 
     async execute(input: UploadAvatarInput): Promise<UploadAvatarResponse> {
+        const invalid = validateImageUpload(input.file, input.mimeType);
+        if (invalid) return { error: new ValidationError(invalid) };
+
         const user = await this.userDataRepository.findById(input.userId);
         if (!user) return { error: new UserDataNotFoundError() };
 
