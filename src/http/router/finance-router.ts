@@ -83,6 +83,7 @@ const transactionBody = {
         notes: { type: 'string', nullable: true },
         categoryId: { type: 'string', nullable: true },
         accountId: { type: 'string', nullable: true },
+        empenho: { type: 'object', additionalProperties: true, nullable: true },
     },
 };
 

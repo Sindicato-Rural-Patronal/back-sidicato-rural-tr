@@ -355,6 +355,10 @@ model FinancialTransaction {
   // userAdmin.id de quem lançou (histórico; sem FK formal).
   createdBy String?
 
+  // Dados da Nota de Empenho (fornecedor, NF, banco/cheque, desconto). Opcional;
+  // usado para gerar o PDF de quitação do lançamento.
+  empenho Json?
+
   attachments FinancialAttachment[]
 
   isDeleted Boolean   @default(false)

@@ -14,6 +14,25 @@ export const financeTransactionSchema = z.object({
     notes: z.preprocess(v => (v === '' ? null : v), z.string().nullable().optional()),
     categoryId: z.preprocess(v => (v === '' ? null : v), z.string().uuid().nullable().optional()),
     accountId: z.preprocess(v => (v === '' ? null : v), z.string().uuid().nullable().optional()),
+    empenho: z.object({
+        numero: z.string().optional(),
+        notaFiscal: z.string().optional(),
+        nomeFantasia: z.string().optional(),
+        razaoSocial: z.string().optional(),
+        cnpjCpf: z.string().optional(),
+        inscricaoEstadual: z.string().optional(),
+        endereco: z.string().optional(),
+        bairro: z.string().optional(),
+        cep: z.string().optional(),
+        cidade: z.string().optional(),
+        uf: z.string().optional(),
+        telefone: z.string().optional(),
+        descontoCents: z.number().int().min(0).optional(),
+        banco: z.string().optional(),
+        conta: z.string().optional(),
+        agencia: z.string().optional(),
+        cheque: z.string().optional(),
+    }).nullable().optional(),
 });
 
 export class CreateFinanceTransactionUseCase {
