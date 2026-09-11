@@ -294,7 +294,7 @@ export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClie
                     type: 'object',
                     properties: {
                         page: { type: 'integer', minimum: 1, default: 1 },
-                        limit: { type: 'integer', minimum: 1, maximum: 200, default: 20 },
+                        limit: { type: 'integer', minimum: 1, maximum: 1000, default: 20 },
                         from: { type: 'string' },
                         to: { type: 'string' },
                         type: { type: 'string', enum: ['IN', 'OUT'] },
