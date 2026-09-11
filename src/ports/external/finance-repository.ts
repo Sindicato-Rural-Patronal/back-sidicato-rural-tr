@@ -1,8 +1,9 @@
 import type { FinancialCategoryModel } from '../../generated/prisma/models/FinancialCategory.js';
 import type { FinancialTransactionModel } from '../../generated/prisma/models/FinancialTransaction.js';
+import type { FinancialAccountModel } from '../../generated/prisma/models/FinancialAccount.js';
 import type { FinancialType } from '../../generated/prisma/enums.js';
 
-export type { FinancialCategoryModel, FinancialTransactionModel, FinancialType };
+export type { FinancialCategoryModel, FinancialTransactionModel, FinancialAccountModel, FinancialType };
 
 export type FinanceCategoryCreateInput = {
     name: string;
@@ -14,6 +15,15 @@ export type FinanceCategoryCreateInput = {
 
 export type FinanceCategoryUpdateInput = Partial<FinanceCategoryCreateInput>;
 
+export type FinanceAccountCreateInput = {
+    name: string;
+    color?: string;
+    active?: boolean;
+    order?: number;
+};
+
+export type FinanceAccountUpdateInput = Partial<FinanceAccountCreateInput>;
+
 export type FinanceTransactionCreateInput = {
     type: FinancialType;
     amountCents: number;
@@ -22,6 +32,7 @@ export type FinanceTransactionCreateInput = {
     method?: string | null;
     notes?: string | null;
     categoryId?: string | null;
+    accountId?: string | null;
     createdBy?: string | null;
 };
 
@@ -41,9 +52,10 @@ export type FinanceAttachmentMeta = {
 // Comprovante com os bytes, para download.
 export type FinanceAttachmentFile = { data: Buffer; filename: string; mimeType: string };
 
-// Lançamento já com a categoria e os comprovantes (só metadados) embutidos.
+// Lançamento já com categoria, conta e comprovantes (só metadados) embutidos.
 export type FinanceTransactionWithCategory = FinancialTransactionModel & {
     category: FinancialCategoryModel | null;
+    account: FinancialAccountModel | null;
     attachments: FinanceAttachmentMeta[];
 };
 
@@ -52,6 +64,7 @@ export type FinanceTransactionFilters = {
     to?: Date;
     type?: FinancialType;
     categoryId?: string;
+    accountId?: string;
     search?: string;
     skip: number;
     take: number;
@@ -66,6 +79,8 @@ export type FinanceSummary = {
     periodResultCents: number;
     byCategory: { categoryId: string | null; name: string; color: string; type: FinancialType; totalCents: number }[];
     byMonth: { month: string; inCents: number; outCents: number }[];
+    // Saldo acumulado (todas as datas) por conta/caixa.
+    byAccount: { accountId: string | null; name: string; color: string; balanceCents: number }[];
 };
 
 export interface FinanceRepository {
@@ -76,10 +91,21 @@ export interface FinanceRepository {
     updateCategory(id: string, data: FinanceCategoryUpdateInput): Promise<FinancialCategoryModel>;
     softDeleteCategory(id: string): Promise<boolean>;
 
+    // Contas / caixas
+    listAccounts(includeInactive: boolean): Promise<FinancialAccountModel[]>;
+    findAccountById(id: string): Promise<FinancialAccountModel | null>;
+    createAccount(data: FinanceAccountCreateInput): Promise<FinancialAccountModel>;
+    updateAccount(id: string, data: FinanceAccountUpdateInput): Promise<FinancialAccountModel>;
+    softDeleteAccount(id: string): Promise<boolean>;
+
     // Lançamentos
     listTransactions(
         filters: FinanceTransactionFilters,
     ): Promise<{ items: FinanceTransactionWithCategory[]; total: number }>;
+    // Todos os lançamentos que batem com os filtros (sem paginação) — export.
+    listTransactionsForExport(
+        filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>,
+    ): Promise<FinanceTransactionWithCategory[]>;
     findTransactionById(id: string): Promise<FinancialTransactionModel | null>;
     createTransaction(data: FinanceTransactionCreateInput): Promise<FinancialTransactionModel>;
     updateTransaction(id: string, data: FinanceTransactionUpdateInput): Promise<FinancialTransactionModel>;

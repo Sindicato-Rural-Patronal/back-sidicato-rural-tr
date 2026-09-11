@@ -13,6 +13,7 @@ export const financeTransactionSchema = z.object({
     method: z.preprocess(v => (v === '' ? null : v), z.string().nullable().optional()),
     notes: z.preprocess(v => (v === '' ? null : v), z.string().nullable().optional()),
     categoryId: z.preprocess(v => (v === '' ? null : v), z.string().uuid().nullable().optional()),
+    accountId: z.preprocess(v => (v === '' ? null : v), z.string().uuid().nullable().optional()),
 });
 
 export class CreateFinanceTransactionUseCase {
@@ -35,6 +36,12 @@ export class CreateFinanceTransactionUseCase {
             if (cat.type !== data.type) {
                 return { error: new ValidationError('A categoria não corresponde ao tipo (entrada/saída) do lançamento') };
             }
+        }
+
+        // Caixa (se informado) precisa existir.
+        if (data.accountId) {
+            const acc = await this.repo.findAccountById(data.accountId);
+            if (!acc) return { error: new ValidationError('Caixa inválido') };
         }
 
         const transaction = await this.repo.createTransaction({ ...data, createdBy });

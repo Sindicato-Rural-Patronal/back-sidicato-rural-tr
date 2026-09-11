@@ -343,6 +343,9 @@ model FinancialTransaction {
   category   FinancialCategory? @relation(fields: [categoryId], references: [id])
   categoryId String?
 
+  account   FinancialAccount? @relation(fields: [accountId], references: [id])
+  accountId String?
+
   // userAdmin.id de quem lançou (histórico; sem FK formal).
   createdBy String?
 
@@ -356,6 +359,23 @@ model FinancialTransaction {
   @@index([date])
   @@index([type])
   @@index([categoryId])
+  @@index([accountId])
+}
+
+// Multi-caixa: conta/caixa onde o dinheiro está (Caixa geral, Banco, Poupança…).
+// Cada lançamento pode ser atribuído a uma conta; o saldo é apurado por conta.
+model FinancialAccount {
+  id        String   @id @default(uuid())
+  name      String
+  color     String   @default("#64748b")
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions FinancialTransaction[]
 }
 
 // Comprovante/anexo de um lançamento (PDF ou imagem). Guardado no banco

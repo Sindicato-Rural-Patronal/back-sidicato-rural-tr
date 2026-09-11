@@ -7,11 +7,16 @@ import { ListFinanceCategoriesUseCase } from '../../usecase/list-finance-categor
 import { CreateFinanceCategoryUseCase } from '../../usecase/create-finance-category.js';
 import { UpdateFinanceCategoryUseCase } from '../../usecase/update-finance-category.js';
 import { DeleteFinanceCategoryUseCase } from '../../usecase/delete-finance-category.js';
+import { ListFinanceAccountsUseCase } from '../../usecase/list-finance-accounts.js';
+import { CreateFinanceAccountUseCase } from '../../usecase/create-finance-account.js';
+import { UpdateFinanceAccountUseCase } from '../../usecase/update-finance-account.js';
+import { DeleteFinanceAccountUseCase } from '../../usecase/delete-finance-account.js';
 import { ListFinanceTransactionsUseCase } from '../../usecase/list-finance-transactions.js';
 import { CreateFinanceTransactionUseCase } from '../../usecase/create-finance-transaction.js';
 import { UpdateFinanceTransactionUseCase } from '../../usecase/update-finance-transaction.js';
 import { DeleteFinanceTransactionUseCase } from '../../usecase/delete-finance-transaction.js';
 import { FinanceSummaryUseCase } from '../../usecase/finance-summary.js';
+import { ExportFinanceTransactionsUseCase } from '../../usecase/export-finance-transactions.js';
 import { UploadFinanceAttachmentUseCase } from '../../usecase/upload-finance-attachment.js';
 import { GetFinanceAttachmentUseCase } from '../../usecase/get-finance-attachment.js';
 import { DeleteFinanceAttachmentUseCase } from '../../usecase/delete-finance-attachment.js';
@@ -43,6 +48,28 @@ const categoryBody = {
     },
 };
 
+const accountProperties = {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    color: { type: 'string' },
+    active: { type: 'boolean' },
+    order: { type: 'integer' },
+    isDeleted: { type: 'boolean' },
+    createdAt: { type: 'string' },
+    updatedAt: { type: 'string' },
+};
+
+const accountBody = {
+    type: 'object',
+    required: ['name'],
+    properties: {
+        name: { type: 'string', example: 'Banco' },
+        color: { type: 'string', example: '#2563eb' },
+        active: { type: 'boolean' },
+        order: { type: 'integer' },
+    },
+};
+
 const transactionBody = {
     type: 'object',
     required: ['type', 'amountCents', 'date', 'description'],
@@ -54,6 +81,7 @@ const transactionBody = {
         method: { type: 'string', nullable: true, example: 'PIX' },
         notes: { type: 'string', nullable: true },
         categoryId: { type: 'string', nullable: true },
+        accountId: { type: 'string', nullable: true },
     },
 };
 
@@ -68,11 +96,16 @@ export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClie
         new CreateFinanceCategoryUseCase(repo),
         new UpdateFinanceCategoryUseCase(repo),
         new DeleteFinanceCategoryUseCase(repo),
+        new ListFinanceAccountsUseCase(repo),
+        new CreateFinanceAccountUseCase(repo),
+        new UpdateFinanceAccountUseCase(repo),
+        new DeleteFinanceAccountUseCase(repo),
         new ListFinanceTransactionsUseCase(repo),
         new CreateFinanceTransactionUseCase(repo),
         new UpdateFinanceTransactionUseCase(repo),
         new DeleteFinanceTransactionUseCase(repo),
         new FinanceSummaryUseCase(repo),
+        new ExportFinanceTransactionsUseCase(repo),
         new UploadFinanceAttachmentUseCase(repo),
         new GetFinanceAttachmentUseCase(repo),
         new DeleteFinanceAttachmentUseCase(repo),
@@ -164,6 +197,88 @@ export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClie
             controller.removeCategory(req, res),
     );
 
+    // ── Contas / caixas ─────────────────────────────────────────────────────
+    fastify.get(
+        '/admin/finance/accounts',
+        {
+            schema: {
+                tags,
+                summary: 'List cash accounts',
+                description: 'Contas ativas. Use ?all=true para incluir inativas (gestão).',
+                security: sec,
+                querystring: { type: 'object', properties: { all: { type: 'string', enum: ['true', 'false'] } } },
+                response: {
+                    200: { type: 'array', items: { type: 'object', properties: accountProperties } },
+                    401: errorResponse,
+                    403: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Querystring: { all?: string } }>, res: FastifyReply) =>
+            controller.getAccounts(req, res),
+    );
+
+    fastify.post(
+        '/admin/finance/accounts',
+        {
+            schema: {
+                tags,
+                summary: 'Create cash account',
+                security: sec,
+                body: accountBody,
+                response: {
+                    201: { type: 'object', properties: accountProperties },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest, res: FastifyReply) => controller.postAccount(req, res),
+    );
+
+    fastify.patch(
+        '/admin/finance/accounts/:id',
+        {
+            schema: {
+                tags,
+                summary: 'Update cash account',
+                security: sec,
+                params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+                body: { type: 'object', properties: accountBody.properties },
+                response: {
+                    200: { type: 'object', properties: { message: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) =>
+            controller.patchAccount(req, res),
+    );
+
+    fastify.delete(
+        '/admin/finance/accounts/:id',
+        {
+            schema: {
+                tags,
+                summary: 'Delete (soft) cash account',
+                security: sec,
+                params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
+                response: {
+                    204: { type: 'null' },
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) =>
+            controller.removeAccount(req, res),
+    );
+
     // ── Lançamentos ─────────────────────────────────────────────────────────
     fastify.get(
         '/admin/finance/transactions',
@@ -182,6 +297,7 @@ export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClie
                         to: { type: 'string' },
                         type: { type: 'string', enum: ['IN', 'OUT'] },
                         categoryId: { type: 'string' },
+                        accountId: { type: 'string' },
                         search: { type: 'string' },
                     },
                 },
@@ -189,6 +305,31 @@ export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClie
             },
         },
         (req: FastifyRequest, res: FastifyReply) => controller.getTransactions(req, res),
+    );
+
+    fastify.get(
+        '/admin/finance/transactions/export',
+        {
+            schema: {
+                tags,
+                summary: 'Export transactions as CSV',
+                description: 'CSV (;) dos lançamentos que batem com os filtros (from, to, type, categoryId, search).',
+                security: sec,
+                querystring: {
+                    type: 'object',
+                    properties: {
+                        from: { type: 'string' },
+                        to: { type: 'string' },
+                        type: { type: 'string', enum: ['IN', 'OUT'] },
+                        categoryId: { type: 'string' },
+                        accountId: { type: 'string' },
+                        search: { type: 'string' },
+                    },
+                },
+                response: { 401: errorResponse, 403: errorResponse },
+            },
+        },
+        (req: FastifyRequest, res: FastifyReply) => controller.exportTransactions(req, res),
     );
 
     fastify.post(

@@ -45,6 +45,9 @@ select: { name: true } }))?.name ?? null;
             case 'Categoria financeira':
                 return (await prisma.financialCategory.findUnique({ where: { id },
 select: { name: true } }))?.name ?? null;
+            case 'Caixa':
+                return (await prisma.financialAccount.findUnique({ where: { id },
+select: { name: true } }))?.name ?? null;
             case 'Lançamento':
                 return (await prisma.financialTransaction.findUnique({ where: { id },
 select: { description: true } }))?.description ?? null;
