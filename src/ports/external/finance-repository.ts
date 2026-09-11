@@ -24,6 +24,27 @@ export type FinanceAccountCreateInput = {
 
 export type FinanceAccountUpdateInput = Partial<FinanceAccountCreateInput>;
 
+// Dados da Nota de Empenho (fornecedor, NF, banco, desconto) — todos opcionais.
+export type FinanceEmpenho = {
+    numero?: string;
+    notaFiscal?: string;
+    nomeFantasia?: string;
+    razaoSocial?: string;
+    cnpjCpf?: string;
+    inscricaoEstadual?: string;
+    endereco?: string;
+    bairro?: string;
+    cep?: string;
+    cidade?: string;
+    uf?: string;
+    telefone?: string;
+    descontoCents?: number;
+    banco?: string;
+    conta?: string;
+    agencia?: string;
+    cheque?: string;
+};
+
 export type FinanceTransactionCreateInput = {
     type: FinancialType;
     amountCents: number;
@@ -33,6 +54,7 @@ export type FinanceTransactionCreateInput = {
     notes?: string | null;
     categoryId?: string | null;
     accountId?: string | null;
+    empenho?: FinanceEmpenho | null;
     createdBy?: string | null;
 };
 
