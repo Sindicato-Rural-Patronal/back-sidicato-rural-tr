@@ -15,6 +15,7 @@ import { ListFinanceTransactionsUseCase } from '../../usecase/list-finance-trans
 import { CreateFinanceTransactionUseCase } from '../../usecase/create-finance-transaction.js';
 import { UpdateFinanceTransactionUseCase } from '../../usecase/update-finance-transaction.js';
 import { DeleteFinanceTransactionUseCase } from '../../usecase/delete-finance-transaction.js';
+import { CreateFinanceTransferUseCase } from '../../usecase/create-finance-transfer.js';
 import { FinanceSummaryUseCase } from '../../usecase/finance-summary.js';
 import { ExportFinanceTransactionsUseCase } from '../../usecase/export-finance-transactions.js';
 import { UploadFinanceAttachmentUseCase } from '../../usecase/upload-finance-attachment.js';
@@ -104,6 +105,7 @@ export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClie
         new CreateFinanceTransactionUseCase(repo),
         new UpdateFinanceTransactionUseCase(repo),
         new DeleteFinanceTransactionUseCase(repo),
+        new CreateFinanceTransferUseCase(repo),
         new FinanceSummaryUseCase(repo),
         new ExportFinanceTransactionsUseCase(repo),
         new UploadFinanceAttachmentUseCase(repo),
@@ -348,6 +350,37 @@ export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClie
             },
         },
         (req: FastifyRequest, res: FastifyReply) => controller.postTransaction(req, res),
+    );
+
+    fastify.post(
+        '/admin/finance/transfers',
+        {
+            schema: {
+                tags,
+                summary: 'Transfer between cash accounts',
+                description: 'Cria 2 lançamentos ligados (saída na origem, entrada no destino). Não conta como receita/despesa.',
+                security: sec,
+                body: {
+                    type: 'object',
+                    required: ['fromAccountId', 'toAccountId', 'amountCents', 'date'],
+                    properties: {
+                        fromAccountId: { type: 'string' },
+                        toAccountId: { type: 'string' },
+                        amountCents: { type: 'integer', minimum: 1 },
+                        date: { type: 'string', example: '2026-09-01' },
+                        description: { type: 'string', nullable: true },
+                        method: { type: 'string', nullable: true },
+                    },
+                },
+                response: {
+                    201: { type: 'object', properties: { message: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest, res: FastifyReply) => controller.postTransfer(req, res),
     );
 
     fastify.patch(

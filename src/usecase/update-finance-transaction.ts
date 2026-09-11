@@ -18,6 +18,9 @@ export class UpdateFinanceTransactionUseCase {
         }
         const existing = await this.repo.findTransactionById(id);
         if (!existing) return { error: new FinanceTransactionNotFoundError() };
+        if (existing.transferId) {
+            return { error: new ValidationError('Transferências não podem ser editadas — exclua e refaça.') };
+        }
 
         const data = parsed.data as FinanceTransactionUpdateInput;
         // Tipo efetivo após a edição (o que for enviado, senão o atual).

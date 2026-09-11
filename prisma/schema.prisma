@@ -346,6 +346,11 @@ model FinancialTransaction {
   account   FinancialAccount? @relation(fields: [accountId], references: [id])
   accountId String?
 
+  // Transferência entre caixas: os 2 lançamentos (OUT na origem, IN no destino)
+  // compartilham o mesmo transferId. Excluídos dos KPIs de entrada/saída (só movem
+  // dinheiro entre caixas, não são receita/despesa).
+  transferId String?
+
   // userAdmin.id de quem lançou (histórico; sem FK formal).
   createdBy String?
 
@@ -360,6 +365,7 @@ model FinancialTransaction {
   @@index([type])
   @@index([categoryId])
   @@index([accountId])
+  @@index([transferId])
 }
 
 // Multi-caixa: conta/caixa onde o dinheiro está (Caixa geral, Banco, Poupança…).
