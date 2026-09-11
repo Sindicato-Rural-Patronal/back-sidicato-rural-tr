@@ -2,6 +2,8 @@ import sharp from 'sharp';
 import type { StorageRepository, UploadParams } from '../ports/external/storage-repository.js';
 import type { CourseRepository } from '../ports/external/course-repository.js';
 import { CourseNotFoundError } from '../errors/not-found.js';
+import { ValidationError } from '../errors/validation.js';
+import { validateImageUpload } from '../lib/image-upload.js';
 
 import { buckets } from '../lib/buckets.js';
 
@@ -20,7 +22,10 @@ export class UploadCourseBannerUseCase {
         private courseRepository: CourseRepository,
     ) {}
 
-    async execute(courseId: string, fileBuffer: Buffer): Promise<UploadCourseBannerResponse> {
+    async execute(courseId: string, fileBuffer: Buffer, mimeType: string): Promise<UploadCourseBannerResponse> {
+        const invalid = validateImageUpload(fileBuffer, mimeType);
+        if (invalid) return { error: new ValidationError(invalid) };
+
         const course = await this.courseRepository.findById(courseId);
         if (!course) return { error: new CourseNotFoundError() };
 

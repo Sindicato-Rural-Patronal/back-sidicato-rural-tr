@@ -23,6 +23,7 @@ export class AddCoursePhotoController {
         const chunks: Buffer[] = [];
         for await (const chunk of data.file) chunks.push(chunk);
         const fileBuffer = Buffer.concat(chunks);
+        if (data.file.truncated) return reply.status(400).send({ error: 'Arquivo excede o limite permitido.' });
 
         const captionField = (data.fields as Record<string, { value?: string } | undefined>)
             ?.caption;
