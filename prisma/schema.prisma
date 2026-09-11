@@ -312,6 +312,55 @@ model registrationFicha {
   updatedAt DateTime @updatedAt
 }
 
+// Financeiro: categoria de lançamento (Mensalidade, Salário, Material…).
+// Tipada por entrada/saída; cadastrável no painel; soft-delete p/ preservar
+// histórico de lançamentos que a referenciam.
+model FinancialCategory {
+  id        String        @id @default(uuid())
+  name      String
+  type      FinancialType
+  color     String        @default("#64748b")
+  active    Boolean       @default(true)
+  order     Int           @default(0)
+  isDeleted Boolean       @default(false)
+  deletedAt DateTime?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  transactions FinancialTransaction[]
+}
+
+// Financeiro: lançamento de caixa. Valor em CENTAVOS (Int) — nunca float.
+model FinancialTransaction {
+  id          String        @id @default(uuid())
+  type        FinancialType
+  amountCents Int
+  date        DateTime
+  description String
+  method      String?
+  notes       String?
+
+  category   FinancialCategory? @relation(fields: [categoryId], references: [id])
+  categoryId String?
+
+  // userAdmin.id de quem lançou (histórico; sem FK formal).
+  createdBy String?
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([date])
+  @@index([type])
+  @@index([categoryId])
+}
+
+enum FinancialType {
+  IN
+  OUT
+}
+
 enum CourseStatus {
   PUBLIC
   PRIVATE
@@ -364,6 +413,11 @@ enum Permission {
   READ_MARKET_QUOTE
 
   READ_AUDIT
+
+  CREATE_FINANCE
+  UPDATE_FINANCE
+  DELETE_FINANCE
+  READ_FINANCE
 }
 
 enum MaritalStatus {
