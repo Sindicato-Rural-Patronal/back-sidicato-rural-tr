@@ -29,9 +29,22 @@ export type FinanceTransactionUpdateInput = Partial<
     Omit<FinanceTransactionCreateInput, 'createdBy'>
 >;
 
-// Lançamento já com a categoria embutida (para a listagem).
+// Metadados de um comprovante — nunca os bytes (`data`) na listagem.
+export type FinanceAttachmentMeta = {
+    id: string;
+    filename: string;
+    mimeType: string;
+    size: number;
+    createdAt: Date;
+};
+
+// Comprovante com os bytes, para download.
+export type FinanceAttachmentFile = { data: Buffer; filename: string; mimeType: string };
+
+// Lançamento já com a categoria e os comprovantes (só metadados) embutidos.
 export type FinanceTransactionWithCategory = FinancialTransactionModel & {
     category: FinancialCategoryModel | null;
+    attachments: FinanceAttachmentMeta[];
 };
 
 export type FinanceTransactionFilters = {
@@ -71,6 +84,17 @@ export interface FinanceRepository {
     createTransaction(data: FinanceTransactionCreateInput): Promise<FinancialTransactionModel>;
     updateTransaction(id: string, data: FinanceTransactionUpdateInput): Promise<FinancialTransactionModel>;
     softDeleteTransaction(id: string): Promise<boolean>;
+
+    // Comprovantes (anexos)
+    addAttachment(
+        transactionId: string,
+        data: Buffer,
+        filename: string,
+        mimeType: string,
+        size: number,
+    ): Promise<FinanceAttachmentMeta>;
+    getAttachment(id: string): Promise<FinanceAttachmentFile | null>;
+    deleteAttachment(id: string): Promise<boolean>;
 
     // Dashboard
     summary(from: Date, to: Date): Promise<FinanceSummary>;

@@ -8,6 +8,9 @@ import type { CreateFinanceTransactionUseCase } from '../../usecase/create-finan
 import type { UpdateFinanceTransactionUseCase } from '../../usecase/update-finance-transaction.js';
 import type { DeleteFinanceTransactionUseCase } from '../../usecase/delete-finance-transaction.js';
 import type { FinanceSummaryUseCase } from '../../usecase/finance-summary.js';
+import type { UploadFinanceAttachmentUseCase } from '../../usecase/upload-finance-attachment.js';
+import type { GetFinanceAttachmentUseCase } from '../../usecase/get-finance-attachment.js';
+import type { DeleteFinanceAttachmentUseCase } from '../../usecase/delete-finance-attachment.js';
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 
@@ -24,6 +27,9 @@ export class FinanceController {
         private readonly updateTransaction: UpdateFinanceTransactionUseCase,
         private readonly deleteTransaction: DeleteFinanceTransactionUseCase,
         private readonly summaryUseCase: FinanceSummaryUseCase,
+        private readonly uploadAttachmentUseCase: UploadFinanceAttachmentUseCase,
+        private readonly getAttachmentUseCase: GetFinanceAttachmentUseCase,
+        private readonly deleteAttachmentUseCase: DeleteFinanceAttachmentUseCase,
         private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
@@ -79,6 +85,46 @@ export class FinanceController {
     async removeTransaction(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
         if ((await requirePermission(request, reply, 'DELETE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.deleteTransaction.execute(request.params.id);
+        if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
+        return reply.status(204).send();
+    }
+
+    // ── Comprovantes ──────────────────────────────────────────────────────────
+    async uploadAttachment(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
+        if ((await requirePermission(request, reply, 'UPDATE_FINANCE', this.getAdminPermissions)) === null) return;
+
+        const file = await request.file();
+        if (!file) return reply.status(400).send({ error: 'Nenhum arquivo enviado.' });
+
+        const chunks: Buffer[] = [];
+        for await (const chunk of file.file) chunks.push(chunk);
+        const buffer = Buffer.concat(chunks);
+        if (file.file.truncated) {
+            return reply.status(400).send({ error: 'Arquivo excede o limite permitido.' });
+        }
+
+        const res = await this.uploadAttachmentUseCase.execute(
+            request.params.id,
+            buffer,
+            file.filename,
+            file.mimetype,
+        );
+        if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
+        return reply.status(201).send(res.attachment);
+    }
+
+    async downloadAttachment(request: FastifyRequest<{ Params: { attachmentId: string } }>, reply: FastifyReply) {
+        if ((await requirePermission(request, reply, 'READ_FINANCE', this.getAdminPermissions)) === null) return;
+        const file = await this.getAttachmentUseCase.execute(request.params.attachmentId);
+        if (!file) return reply.status(404).send({ error: 'Comprovante não encontrado.' });
+        reply.type(file.mimeType);
+        reply.header('Content-Disposition', `inline; filename="${encodeURIComponent(file.filename)}"`);
+        return reply.send(file.data);
+    }
+
+    async removeAttachment(request: FastifyRequest<{ Params: { attachmentId: string } }>, reply: FastifyReply) {
+        if ((await requirePermission(request, reply, 'UPDATE_FINANCE', this.getAdminPermissions)) === null) return;
+        const res = await this.deleteAttachmentUseCase.execute(request.params.attachmentId);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(204).send();
     }

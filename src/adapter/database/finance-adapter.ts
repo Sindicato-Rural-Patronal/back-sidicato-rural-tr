@@ -9,8 +9,15 @@ import type {
     FinanceTransactionUpdateInput,
     FinanceTransactionFilters,
     FinanceTransactionWithCategory,
+    FinanceAttachmentMeta,
+    FinanceAttachmentFile,
     FinanceSummary,
 } from '../../ports/external/finance-repository.js';
+
+// Só metadados do comprovante — nunca os bytes (`data`) na listagem.
+const attachmentMetaSelect = {
+    select: { id: true, filename: true, mimeType: true, size: true, createdAt: true },
+} as const;
 
 export function createFinanceAdapter(prisma: PrismaClient): FinanceRepository {
     return new FinanceAdapter(prisma);
@@ -55,7 +62,10 @@ class FinanceAdapter implements FinanceRepository {
         const [items, total] = await Promise.all([
             this.prisma.financialTransaction.findMany({
                 where,
-                include: { category: true },
+                include: {
+                    category: true,
+                    attachments: { ...attachmentMetaSelect, orderBy: { createdAt: 'asc' } },
+                },
                 orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
                 skip: filters.skip,
                 take: filters.take,
@@ -83,6 +93,35 @@ class FinanceAdapter implements FinanceRepository {
             data: { isDeleted: true, deletedAt: new Date() },
         });
         return r.count === 1;
+    }
+
+    // ── Comprovantes ──────────────────────────────────────────────────────────
+    async addAttachment(
+        transactionId: string,
+        data: Buffer,
+        filename: string,
+        mimeType: string,
+        size: number,
+    ): Promise<FinanceAttachmentMeta> {
+        return this.prisma.financialAttachment.create({
+            data: { transactionId, data, filename, mimeType, size },
+            ...attachmentMetaSelect,
+        });
+    }
+
+    async getAttachment(id: string): Promise<FinanceAttachmentFile | null> {
+        const row = await this.prisma.financialAttachment.findUnique({ where: { id } });
+        if (!row) return null;
+        return { data: Buffer.from(row.data), filename: row.filename, mimeType: row.mimeType };
+    }
+
+    async deleteAttachment(id: string): Promise<boolean> {
+        try {
+            await this.prisma.financialAttachment.delete({ where: { id } });
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     // ── Dashboard ───────────────────────────────────────────────────────────

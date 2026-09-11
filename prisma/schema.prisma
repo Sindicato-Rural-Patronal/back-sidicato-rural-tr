@@ -346,6 +346,8 @@ model FinancialTransaction {
   // userAdmin.id de quem lançou (histórico; sem FK formal).
   createdBy String?
 
+  attachments FinancialAttachment[]
+
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
   createdAt DateTime  @default(now())
@@ -354,6 +356,21 @@ model FinancialTransaction {
   @@index([date])
   @@index([type])
   @@index([categoryId])
+}
+
+// Comprovante/anexo de um lançamento (PDF ou imagem). Guardado no banco
+// (privado, servido atrás de auth admin) — mesmo padrão da ficha de inscrição.
+model FinancialAttachment {
+  id            String               @id @default(uuid())
+  transaction   FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transactionId String
+  data          Bytes
+  filename      String
+  mimeType      String
+  size          Int
+  createdAt     DateTime             @default(now())
+
+  @@index([transactionId])
 }
 
 enum FinancialType {

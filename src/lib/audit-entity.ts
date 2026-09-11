@@ -4,6 +4,7 @@ export function deriveAuditEntity(path: string): string {
     const p = path.toLowerCase();
     if (p.includes('/finance/categories')) return 'Categoria financeira';
     if (p.includes('/finance/transactions')) return 'Lançamento';
+    if (p.includes('/finance/attachments')) return 'Comprovante';
     if (p.includes('/market-quotes')) return 'Cotação';
     if (p.includes('/rooms')) return 'Sala';
     if (p.includes('/rule')) return 'Regra';
