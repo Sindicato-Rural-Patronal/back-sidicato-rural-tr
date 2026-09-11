@@ -45,6 +45,10 @@ const PERMISSIONS_ENUM = [
     'DELETE_MARKET_QUOTE',
     'READ_MARKET_QUOTE',
     'READ_AUDIT',
+    'CREATE_FINANCE',
+    'UPDATE_FINANCE',
+    'DELETE_FINANCE',
+    'READ_FINANCE',
 ] as const;
 
 export async function ruleRouter(fastify: FastifyInstance, prisma: PrismaClient) {

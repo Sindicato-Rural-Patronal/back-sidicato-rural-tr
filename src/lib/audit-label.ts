@@ -42,6 +42,12 @@ select: { name: true } }))?.name ?? null;
             case 'Usuário':
                 return (await prisma.userData.findUnique({ where: { id },
 select: { name: true } }))?.name ?? null;
+            case 'Categoria financeira':
+                return (await prisma.financialCategory.findUnique({ where: { id },
+select: { name: true } }))?.name ?? null;
+            case 'Lançamento':
+                return (await prisma.financialTransaction.findUnique({ where: { id },
+select: { description: true } }))?.description ?? null;
             default:
                 return null;
         }

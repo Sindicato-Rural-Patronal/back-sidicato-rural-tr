@@ -132,3 +132,17 @@ export class AdminInviteInvalidError extends NotFoundError {
         this.name = 'AdminInviteInvalidError';
     }
 }
+
+export class FinanceCategoryNotFoundError extends NotFoundError {
+    constructor() {
+        super('Categoria financeira não encontrada');
+        this.name = 'FinanceCategoryNotFoundError';
+    }
+}
+
+export class FinanceTransactionNotFoundError extends NotFoundError {
+    constructor() {
+        super('Lançamento não encontrado');
+        this.name = 'FinanceTransactionNotFoundError';
+    }
+}
