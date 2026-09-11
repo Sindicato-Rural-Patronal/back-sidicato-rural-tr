@@ -94,21 +94,24 @@ data: updateData });
     async delete(id: string): Promise<boolean> {
         try {
             const now = new Date();
-            await this.prisma.coursePhoto.updateMany({
-                where: { courseId: id },
-                data: { isDeleted: true,
+            // Atômico: ou apaga tudo (fotos + inscrições + curso) ou nada.
+            await this.prisma.$transaction([
+                this.prisma.coursePhoto.updateMany({
+                    where: { courseId: id },
+                    data: { isDeleted: true,
 deletedAt: now },
-            });
-            await this.prisma.courseUserRegistration.updateMany({
-                where: { courseId: id },
-                data: { isDeleted: true,
+                }),
+                this.prisma.courseUserRegistration.updateMany({
+                    where: { courseId: id },
+                    data: { isDeleted: true,
 deletedAt: now },
-            });
-            await this.prisma.course.update({
-                where: { id },
-                data: { isDeleted: true,
+                }),
+                this.prisma.course.update({
+                    where: { id },
+                    data: { isDeleted: true,
 deletedAt: now },
-            });
+                }),
+            ]);
             return true;
         } catch {
             return false;

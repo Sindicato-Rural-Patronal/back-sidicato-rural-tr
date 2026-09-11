@@ -17,10 +17,16 @@ export class AdminInviteController {
         request: FastifyRequest<{ Body: { userDataId: string; rulesId: string } }>,
         reply: FastifyReply,
     ) {
-        if ((await requirePermission(request, reply, 'CREATE_USER_ADMIN', this.getAdminPermissions)) === null)
-            return;
+        const actorId = await requirePermission(
+            request,
+            reply,
+            'CREATE_USER_ADMIN',
+            this.getAdminPermissions,
+        );
+        if (actorId === null) return;
+        const actorPerms = (await this.getAdminPermissions.execute(actorId)) ?? [];
         const { userDataId, rulesId } = request.body;
-        const r = await this.createUseCase.execute(userDataId, rulesId);
+        const r = await this.createUseCase.execute(userDataId, rulesId, actorPerms);
         if (r.error) return reply.status(errorToStatus(r.error)).send({ error: r.error.message });
         return reply.status(201).send({ token: r.token,
 expiresAt: r.expiresAt });

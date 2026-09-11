@@ -3,7 +3,7 @@ import { decodeToken } from '../../lib/auth.js';
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { NotFoundError } from '../../errors/not-found.js';
 import { ConflictError } from '../../errors/conflict.js';
-import { AuthError } from '../../errors/auth.js';
+import { AuthError, ForbiddenError } from '../../errors/auth.js';
 import { BusinessRuleError } from '../../errors/business-rule.js';
 
 export function errorToStatus(err: Error | undefined): number {
@@ -11,6 +11,7 @@ export function errorToStatus(err: Error | undefined): number {
     if (err instanceof NotFoundError) return 404;
     if (err instanceof ConflictError) return 409;
     if (err instanceof BusinessRuleError) return 409;
+    if (err instanceof ForbiddenError) return 403;
     if (err instanceof AuthError) return 401;
     return 400;
 }

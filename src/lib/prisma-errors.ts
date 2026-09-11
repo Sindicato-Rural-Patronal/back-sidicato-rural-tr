@@ -11,6 +11,16 @@ export function isPrismaUniqueViolation(error: unknown): boolean {
     );
 }
 
+/** Violação de chave estrangeira (P2003) — registro em uso por outro. */
+export function isPrismaFkViolation(error: unknown): boolean {
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: unknown }).code === 'P2003'
+    );
+}
+
 /**
  * Campos/índice envolvidos numa violação de unicidade (P2002). Prisma expõe
  * `meta.target` como array de colunas ou, para índices nomeados, uma string.

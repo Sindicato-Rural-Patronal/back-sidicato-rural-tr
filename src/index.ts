@@ -27,7 +27,12 @@ import { deriveAuditEntity } from './lib/audit-entity.js';
 import { lookupTargetLabel, bodyLabel } from './lib/audit-label.js';
 
 import { loadEnv } from './config/env.js';
-import { isPrismaUniqueViolation } from './lib/prisma-errors.js';
+import { isPrismaUniqueViolation, isPrismaFkViolation } from './lib/prisma-errors.js';
+
+// Não expor o token de convite em logs (ele vai no caminho da URL).
+function safeUrl(url: string): string {
+    return url.startsWith('/invites/') ? '/invites/[redacted]' : url;
+}
 import { hash } from 'bcrypt';
 import { createPrismaClient } from './lib/prisma.js';
 
@@ -44,7 +49,7 @@ const server = fastify({
 server.addHook('onRequest', (request, _reply, done) => {
     request.log.info(
         { method: request.method,
-url: request.url,
+url: safeUrl(request.url),
 remoteAddress: request.ip },
         'incoming request',
     );
@@ -55,7 +60,7 @@ server.addHook('onResponse', (request, reply, done) => {
     request.log.info(
         {
             method: request.method,
-            url: request.url,
+            url: safeUrl(request.url),
             statusCode: reply.statusCode,
             responseTime: reply.elapsedTime,
         },
@@ -140,6 +145,7 @@ server.addHook('onResponse', async (request, reply) => {
     if (reply.statusCode >= 400) return;
     const path = (request.url ?? '').split('?')[0];
     if (path === '/auth/login') return; // ruído + sem ator
+    if (path.startsWith('/invites/')) return; // não persistir o token de convite
     try {
         const token = request.headers['authorization']?.replace('Bearer ', '') ?? '';
         const decoded = decodeToken(token);
@@ -164,7 +170,8 @@ server.register(cors, {
     origin: env.CORS_ORIGIN === '*'
         ? true
         : env.CORS_ORIGIN.split(',').map(o => o.trim()),
-    credentials: true,
+    // Nunca combinar credentials com origin curinga (reflete qualquer origem).
+    credentials: env.CORS_ORIGIN !== '*',
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
 });
 
@@ -230,6 +237,9 @@ server.setErrorHandler(
         }
         if (isPrismaUniqueViolation(error)) {
             return reply.status(409).send({ error: 'Registro já existe (dados únicos em conflito).' });
+        }
+        if (isPrismaFkViolation(error)) {
+            return reply.status(409).send({ error: 'Registro em uso e não pode ser removido.' });
         }
         const status = error.statusCode ?? 500;
         if (status >= 500) {

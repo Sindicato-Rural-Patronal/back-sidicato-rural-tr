@@ -32,6 +32,10 @@ export class AcceptAdminInviteUseCase {
             });
         }
 
+        // Consumo atômico (uso único): se outra requisição já consumiu, cai fora.
+        const consumed = await this.inviteRepo.consume(inv.id);
+        if (!consumed) return { error: new AdminInviteInvalidError() };
+
         const passwordHash = await bcrypt.hash(password, 10);
         const existing = await this.userAdminRepo.findByUserDataIdAny(inv.userDataId);
         if (existing && !existing.isDeleted) return { error: new AdminAccountAlreadyExistsError() };
@@ -50,7 +54,6 @@ export class AcceptAdminInviteUseCase {
                 rulesId: inv.rulesId,
             });
         }
-        await this.inviteRepo.markUsed(inv.id);
         return {};
     }
 }

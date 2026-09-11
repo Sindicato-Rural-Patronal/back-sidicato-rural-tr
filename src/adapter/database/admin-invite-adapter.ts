@@ -26,4 +26,13 @@ class AdminInviteAdapter implements AdminInviteRepository {
         await this.prisma.adminInvite.update({ where: { id },
 data: { usedAt: new Date() } });
     }
+
+    async consume(id: string): Promise<boolean> {
+        const r = await this.prisma.adminInvite.updateMany({
+            where: { id,
+usedAt: null },
+            data: { usedAt: new Date() },
+        });
+        return r.count === 1;
+    }
 }
