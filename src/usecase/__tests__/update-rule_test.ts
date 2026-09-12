@@ -54,9 +54,21 @@ ruleId: '' });
                 name: 'NOVO_NOME',
             } as any);
             const uc = new UpdateRuleUseCase(mockRuleRepo);
-            const result = await uc.execute(validInput);
+            const result = await uc.execute(validInput, ['READ_COURSE']);
             expect(result.error).toBeUndefined();
             expect(result.rule).toBeDefined();
+        });
+
+        it('bloqueia conceder permissão além das do ator (anti-escalonamento)', async () => {
+            vi.mocked(mockRuleRepo.findById).mockResolvedValue({ id: 'rule-001' } as any);
+            const uc = new UpdateRuleUseCase(mockRuleRepo);
+            const result = await uc.execute(
+                { ...validInput, permissions: ['DELETE_USER_ADMIN'] as any },
+                ['READ_COURSE'],
+            );
+            expect(result.error).toBeDefined();
+            expect(result.error?.name).toBe('ForbiddenError');
+            expect(mockRuleRepo.update).not.toHaveBeenCalled();
         });
     });
 });

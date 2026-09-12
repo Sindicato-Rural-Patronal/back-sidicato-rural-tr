@@ -2,6 +2,7 @@ import z from 'zod';
 import type { RuleRepository } from '../ports/external/rule-repository.js';
 import { Permission } from '../generated/prisma/browser.js';
 import { ValidationError } from '../errors/validation.js';
+import { ForbiddenError } from '../errors/auth.js';
 
 export const createRuleRequestSchema = z.object({
     name: z.string().min(1, 'Rule name is required'),
@@ -25,11 +26,17 @@ export type CreateRuleResponse = {
 export class CreateRuleUseCase {
     constructor(private ruleRepository: RuleRepository) {}
 
-    async execute(request: CreateRuleRequest): Promise<CreateRuleResponse> {
+    async execute(request: CreateRuleRequest, actorPermissions: string[] = []): Promise<CreateRuleResponse> {
         const validationResult = createRuleRequestSchema.safeParse(request);
         if (!validationResult.success) {
             const errorMessage = validationResult.error.issues.map(e => e.message).join(', ');
             return { error: new ValidationError(errorMessage) };
+        }
+
+        // Anti-escalonamento: não criar regra com permissões além das do ator.
+        const escalates = request.permissions.some(p => !actorPermissions.includes(p));
+        if (escalates) {
+            return { error: new ForbiddenError('Você não pode conceder permissões além das suas.') };
         }
 
         const rule = await this.ruleRepository.create({

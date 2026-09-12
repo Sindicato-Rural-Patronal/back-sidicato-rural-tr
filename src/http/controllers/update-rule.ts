@@ -11,11 +11,9 @@ export class UpdateRuleController {
     ) {}
 
     async handle(request: FastifyRequest<{ Params: { ruleId: string } }>, reply: FastifyReply) {
-        if (
-            (await requirePermission(request, reply, 'UPDATE_RULE', this.getAdminPermissions)) ===
-            null
-        )
-            return;
+        const actorId = await requirePermission(request, reply, 'UPDATE_RULE', this.getAdminPermissions);
+        if (actorId === null) return;
+        const actorPerms = (await this.getAdminPermissions.execute(actorId)) ?? [];
         const { ruleId } = request.params;
         const {
             name,
@@ -31,7 +29,7 @@ export class UpdateRuleController {
             name,
             permissions: perms,
             description,
-        });
+        }, actorPerms);
         if (response.error) {
             return reply
                 .status(errorToStatus(response.error))

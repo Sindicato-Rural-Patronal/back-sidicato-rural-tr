@@ -57,9 +57,17 @@ permissions: [] });
             };
             vi.mocked(mockRuleRepo.create).mockResolvedValue(fakeRule as any);
             const uc = new CreateRuleUseCase(mockRuleRepo);
-            const result = await uc.execute(validInput);
+            const result = await uc.execute(validInput, ['CREATE_COURSE', 'UPDATE_COURSE']);
             expect(result.error).toBeUndefined();
             expect(result.rule?.id).toBe('rule-001');
+        });
+
+        it('bloqueia conceder permissão além das do ator (anti-escalonamento)', async () => {
+            const uc = new CreateRuleUseCase(mockRuleRepo);
+            const result = await uc.execute(validInput, ['CREATE_COURSE']); // falta UPDATE_COURSE
+            expect(result.error).toBeDefined();
+            expect(result.error?.name).toBe('ForbiddenError');
+            expect(mockRuleRepo.create).not.toHaveBeenCalled();
         });
 
         it('description é opcional — aceita criação sem ela', async () => {
@@ -76,7 +84,7 @@ permissions: [] });
             const result = await uc.execute({
                 name: 'LEITOR',
                 permissions: ['READ_COURSE'] as any,
-            });
+            }, ['READ_COURSE']);
             expect(result.error).toBeUndefined();
         });
     });

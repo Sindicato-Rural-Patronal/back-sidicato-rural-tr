@@ -2,7 +2,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CreateRuleUseCase } from '../../usecase/create-rule.js';
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import type { Permission } from '../../generated/prisma/enums.js';
-import { requirePermission } from '../lib/require-permission.js';
+import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 
 export class CreateRuleController {
     constructor(
@@ -11,11 +11,9 @@ export class CreateRuleController {
     ) {}
 
     async handle(request: FastifyRequest, reply: FastifyReply) {
-        if (
-            (await requirePermission(request, reply, 'CREATE_RULE', this.getAdminPermissions)) ===
-            null
-        )
-            return;
+        const actorId = await requirePermission(request, reply, 'CREATE_RULE', this.getAdminPermissions);
+        if (actorId === null) return;
+        const actorPerms = (await this.getAdminPermissions.execute(actorId)) ?? [];
         const {
             name,
             permissions: perms,
@@ -29,8 +27,8 @@ export class CreateRuleController {
             name,
             permissions: perms,
             description,
-        });
-        if (response.error) return reply.status(400).send({ error: response.error?.message });
+        }, actorPerms);
+        if (response.error) return reply.status(errorToStatus(response.error)).send({ error: response.error?.message });
         return reply.status(201).send(response.rule);
     }
 }
