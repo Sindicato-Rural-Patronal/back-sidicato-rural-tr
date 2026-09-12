@@ -2,7 +2,7 @@ import type { CourseRepository } from '../ports/external/course-repository.js';
 import type { StorageRepository, UploadParams } from '../ports/external/storage-repository.js';
 import { CourseNotFoundError } from '../errors/not-found.js';
 import { ValidationError } from '../errors/validation.js';
-import { validateImageUpload } from '../lib/image-upload.js';
+import { validateImageUpload, safeFilename } from '../lib/image-upload.js';
 import { buckets } from '../lib/buckets.js';
 
 const BANNER_BUCKET = buckets.courseBanners;
@@ -34,7 +34,7 @@ export class AddCoursePhotoUseCase {
             return { error: new CourseNotFoundError() };
         }
 
-        const key = `courses/${courseId}/gallery/${Date.now()}-${originalFilename}`;
+        const key = `courses/${courseId}/gallery/${Date.now()}-${safeFilename(originalFilename)}`;
         // contentType é obrigatório: sem ele o Supabase assume text/plain e o
         // bucket (restrito a imagens) rejeita com 415 Unsupported Media Type.
         const params: UploadParams = { bucket: BANNER_BUCKET,

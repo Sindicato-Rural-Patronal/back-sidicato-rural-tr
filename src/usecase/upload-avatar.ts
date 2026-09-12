@@ -2,7 +2,7 @@ import type { StorageRepository, UploadParams } from '../ports/external/storage-
 import type { UserDataRepository } from '../ports/external/user-data-repository.js';
 import { UserDataNotFoundError } from '../errors/not-found.js';
 import { ValidationError } from '../errors/validation.js';
-import { validateImageUpload } from '../lib/image-upload.js';
+import { validateImageUpload, safeFilename } from '../lib/image-upload.js';
 import { buckets } from '../lib/buckets.js';
 
 export interface UploadAvatarInput {
@@ -31,7 +31,7 @@ export class UploadAvatarUseCase {
         if (!user) return { error: new UserDataNotFoundError() };
 
         const bucket = buckets.avatars;
-        const key = `users/${input.userId}/avatar-${Date.now()}-${input.originalName}`;
+        const key = `users/${input.userId}/avatar-${Date.now()}-${safeFilename(input.originalName)}`;
 
         const uploadParams: UploadParams = {
             bucket,

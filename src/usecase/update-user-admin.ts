@@ -3,6 +3,7 @@ import { hash } from 'bcrypt';
 import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
 import type { RuleRepository } from '../ports/external/rule-repository.js';
 import { ValidationError } from '../errors/validation.js';
+import { ForbiddenError } from '../errors/auth.js';
 import { AdminNotFoundError, RuleNotFoundError } from '../errors/not-found.js';
 import { UsernameAlreadyExistsError } from '../errors/conflict.js';
 
@@ -24,7 +25,7 @@ export class UpdateUserAdminUseCase {
         private readonly ruleRepository: RuleRepository,
     ) {}
 
-    async execute(request: UpdateUserAdminRequest): Promise<UpdateUserAdminResponse> {
+    async execute(request: UpdateUserAdminRequest, actorPermissions: string[] = []): Promise<UpdateUserAdminResponse> {
         const { targetAdminId, ...body } = request;
         const validation = updateUserAdminSchema.safeParse(body);
         if (!validation.success) {
@@ -48,6 +49,11 @@ export class UpdateUserAdminUseCase {
         if (data.rulesId) {
             const rule = await this.ruleRepository.findById(data.rulesId);
             if (!rule) return { error: new RuleNotFoundError() };
+            // Anti-escalonamento: não atribuir uma regra com permissões além das do ator.
+            const escalates = (rule.permissions as string[]).some(p => !actorPermissions.includes(p));
+            if (escalates) {
+                return { error: new ForbiddenError('Você não pode atribuir uma regra com permissões além das suas.') };
+            }
         }
 
         const updatePayload: {

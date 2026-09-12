@@ -20,19 +20,18 @@ export class UpdateUserAdminController {
         }>,
         reply: FastifyReply,
     ) {
-        if (
-            (await requirePermission(
-                request,
-                reply,
-                'UPDATE_USER_ADMIN',
-                this.getAdminPermissions,
-            )) === null
-        )
-            return;
+        const actorId = await requirePermission(
+            request,
+            reply,
+            'UPDATE_USER_ADMIN',
+            this.getAdminPermissions,
+        );
+        if (actorId === null) return;
+        const actorPerms = (await this.getAdminPermissions.execute(actorId)) ?? [];
         const { id } = request.params;
         const body = request.body;
         const result = await this.useCase.execute({ ...body,
-targetAdminId: id });
+targetAdminId: id }, actorPerms);
         if (result.error) {
             return reply.status(errorToStatus(result.error)).send({ error: result.error?.message });
         }
