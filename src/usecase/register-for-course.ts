@@ -7,6 +7,7 @@ import { CourseNotFoundError } from '../errors/not-found.js';
 import { CourseRegistrationAlreadyExistsError } from '../errors/conflict.js';
 import { isValidCpf } from '../lib/cpf.js';
 import { checkCourseAcceptsRegistration } from '../lib/course-registration-rules.js';
+import { CourseFullError } from '../errors/business-rule.js';
 import { isPrismaUniqueViolation } from '../lib/prisma-errors.js';
 
 const schema = z.object({
@@ -75,8 +76,13 @@ export class RegisterForCourseUseCase {
         }
 
         try {
-            const registration = await this.registrationRepository.create(courseId, userData.id);
-            return { registrationId: registration.id,
+            const created = await this.registrationRepository.createWithCapacity(
+                courseId,
+                userData.id,
+                course.room.maxCapacity,
+            );
+            if (created === 'FULL') return { error: new CourseFullError() };
+            return { registrationId: created.id,
 userDataId: userData.id };
         } catch (e) {
             // Corrida: índice único (courseId, userDataId) barra inscrição duplicada.

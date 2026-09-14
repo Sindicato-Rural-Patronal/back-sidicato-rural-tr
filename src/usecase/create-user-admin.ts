@@ -4,6 +4,7 @@ import type { RuleRepository } from '../ports/external/rule-repository.js';
 import { hash } from 'bcrypt';
 import { UsernameAlreadyExistsError, AdminAccountAlreadyExistsError } from '../errors/conflict.js';
 import { UserDataNotFoundError, RoleNotFoundError } from '../errors/not-found.js';
+import { ForbiddenError } from '../errors/auth.js';
 import { isPrismaUniqueViolation } from '../lib/prisma-errors.js';
 
 type CreateUserAdminRequest = {
@@ -25,7 +26,7 @@ export class CreateUserAdminUseCase {
         private ruleRepository: RuleRepository,
     ) {}
 
-    async execute(request: CreateUserAdminRequest): Promise<CreateUserAdminResponse> {
+    async execute(request: CreateUserAdminRequest, actorPermissions: string[] = []): Promise<CreateUserAdminResponse> {
         // Username é unique no banco INCLUINDO soft-deletados. Se um admin ativo
         // (de outra pessoa) usa o nome → conflito. Se só um apagado o segura,
         // liberamos renomeando a linha antiga (permite reusar o nome).
@@ -54,6 +55,11 @@ export class CreateUserAdminUseCase {
         const roleToAssign = await this.ruleRepository.findById(request.userRole);
         if (!roleToAssign) {
             return { error: new RoleNotFoundError() };
+        }
+        // Anti-escalonamento: não atribuir uma regra com permissões além das do ator.
+        const escalates = (roleToAssign.permissions as string[]).some(p => !actorPermissions.includes(p));
+        if (escalates) {
+            return { error: new ForbiddenError('Você não pode atribuir uma regra com permissões além das suas.') };
         }
 
         const hashedPassword = await hash(request.password, 10);

@@ -10,27 +10,29 @@ export class CreateUserAdminController {
     ) {}
 
     async handle(request: FastifyRequest, reply: FastifyReply) {
-        if (
-            (await requirePermission(
-                request,
-                reply,
-                'CREATE_USER_ADMIN',
-                this.getAdminPermissions,
-            )) === null
-        )
-            return;
+        const actorId = await requirePermission(
+            request,
+            reply,
+            'CREATE_USER_ADMIN',
+            this.getAdminPermissions,
+        );
+        if (actorId === null) return;
+        const actorPerms = (await this.getAdminPermissions.execute(actorId)) ?? [];
         const { username, password, userDataId, userRole } = request.body as {
             username: string;
             password: string;
             userDataId: string;
             userRole: string;
         };
-        const response = await this.createUserAdminUseCase.execute({
-            username,
-            password,
-            userDataId,
-            userRole,
-        });
+        const response = await this.createUserAdminUseCase.execute(
+            {
+                username,
+                password,
+                userDataId,
+                userRole,
+            },
+            actorPerms,
+        );
         if (response.error) {
             return reply
                 .status(errorToStatus(response.error))

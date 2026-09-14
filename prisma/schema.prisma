@@ -41,6 +41,8 @@ model UserData {
   email     String   @unique
   phone     String   @unique
   avatar    String?
+  // CPF único entre cadastros ATIVOS (por dígitos) via índice parcial em
+  // migração 20260914120000_userdata_cpf_unique_active — não expressável aqui.
   cpf       String?
   cnpj      String?
   createdAt DateTime @default(now())
@@ -279,6 +281,10 @@ model News {
   updatedAt   DateTime   @updatedAt
 }
 
+// Unicidade (courseId, userDataId) entre inscrições ATIVAS é garantida por
+// índice parcial em migração 20260806160000_registration_unique_active —
+// parcial não é expressável como @@unique aqui (não adicionar @@unique cheio,
+// bloquearia reinscrição após cancelamento).
 model courseUserRegistration {
   id         String   @id @default(uuid())
   course     course   @relation(fields: [courseId], references: [id])

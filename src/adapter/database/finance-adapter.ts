@@ -116,6 +116,7 @@ class FinanceAdapter implements FinanceRepository {
             where: this.buildWhere(filters),
             include: {
                 category: true,
+                account: true,
                 attachments: { ...attachmentMetaSelect, orderBy: { createdAt: 'asc' } },
             },
             orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
@@ -185,7 +186,10 @@ class FinanceAdapter implements FinanceRepository {
     }
 
     async getAttachment(id: string): Promise<FinanceAttachmentFile | null> {
-        const row = await this.prisma.financialAttachment.findUnique({ where: { id } });
+        // Não expor comprovantes de lançamentos soft-deletados.
+        const row = await this.prisma.financialAttachment.findFirst({
+            where: { id, transaction: { isDeleted: false } },
+        });
         if (!row) return null;
         return { data: Buffer.from(row.data), filename: row.filename, mimeType: row.mimeType };
     }
@@ -227,9 +231,13 @@ class FinanceAdapter implements FinanceRepository {
                 _sum: { amountCents: true },
             }),
         ]);
+        // Só as caixas ativas viram linha própria; lançamentos apontando para uma
+        // caixa soft-deletada (ou sem caixa) caem em "Sem caixa" — assim
+        // sum(byAccount) fecha com balanceAllTimeCents.
+        const activeAccountIds = new Set((accounts as FinancialAccountModel[]).map(a => a.id));
         const acctBal = new Map<string, number>();
         for (const g of grouped) {
-            const key = g.accountId ?? '__none';
+            const key = g.accountId && activeAccountIds.has(g.accountId) ? g.accountId : '__none';
             const delta = (g._sum.amountCents ?? 0) * (g.type === 'IN' ? 1 : -1);
             acctBal.set(key, (acctBal.get(key) ?? 0) + delta);
         }

@@ -14,6 +14,7 @@ import {
 } from '../errors/conflict.js';
 import { isValidCpf } from '../lib/cpf.js';
 import { checkCourseAcceptsRegistration } from '../lib/course-registration-rules.js';
+import { CourseFullError } from '../errors/business-rule.js';
 import { isPrismaUniqueViolation, uniqueViolationFields } from '../lib/prisma-errors.js';
 
 const schema = z.object({
@@ -121,12 +122,20 @@ export class RegisterForCourseFullUseCase {
                 const existing = await registrationRepo.findByUserDataAndCourse(userData.id, courseId);
                 if (existing) throw new CourseRegistrationAlreadyExistsError();
 
+                // Capacidade conferida dentro da transação serializável → sem
+                // corrida TOCTOU com inscrições concorrentes.
+                const activeCount = await t.courseUserRegistration.count({
+                    where: { courseId, isDeleted: false },
+                });
+                if (activeCount >= course.room.maxCapacity) throw new CourseFullError();
+
                 const registration = await registrationRepo.create(courseId, userData.id);
                 return { registrationId: registration.id,
 userDataId: userData.id };
-            });
+            }, { isolationLevel: 'Serializable' });
         } catch (e) {
             if (e instanceof CourseRegistrationAlreadyExistsError) return { error: e };
+            if (e instanceof CourseFullError) return { error: e };
             const fields = uniqueViolationFields(e);
             const isRegistrationDup = fields.some(
                 f => f.includes('courseId') || f.includes('userDataId') || f.includes('active'),
