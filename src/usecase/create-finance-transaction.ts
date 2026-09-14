@@ -32,6 +32,9 @@ export const financeTransactionSchema = z.object({
         conta: z.string().optional(),
         agencia: z.string().optional(),
         cheque: z.string().optional(),
+        // Vínculo opcional com um Usuário cadastrado (origem dos dados do
+        // fornecedor). Os campos acima permanecem como snapshot da emissão.
+        usuarioId: z.string().uuid().optional(),
     }).nullable().optional(),
 });
 
