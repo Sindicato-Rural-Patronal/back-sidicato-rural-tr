@@ -604,3 +604,11 @@ model UserRelation {
   source    UserData @relation("RelationSource", fields: [sourceId], references: [id], onDelete: Cascade)
   target    UserData @relation("RelationTarget", fields: [targetId], references: [id], onDelete: Cascade)
 }
+
+// Configurações gerais do site (key/value): redes sociais, e no futuro
+// contato/horários editáveis pelo admin sem novo deploy.
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
