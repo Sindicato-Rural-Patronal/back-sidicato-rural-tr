@@ -43,6 +43,7 @@ export type FinanceEmpenho = {
     conta?: string;
     agencia?: string;
     cheque?: string;
+    usuarioId?: string;
 };
 
 export type FinanceTransactionCreateInput = {
