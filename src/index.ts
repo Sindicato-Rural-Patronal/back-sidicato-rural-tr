@@ -23,6 +23,7 @@ import { marketQuoteRouter } from './http/router/market-quote-router.js';
 import { auditRouter } from './http/router/audit-router.js';
 import { adminInviteRouter } from './http/router/admin-invite-router.js';
 import { financeRouter } from './http/router/finance-router.js';
+import { siteSettingsRouter } from './http/router/site-settings-router.js';
 import { decodeToken } from './lib/auth.js';
 import { deriveAuditEntity } from './lib/audit-entity.js';
 import { lookupTargetLabel, bodyLabel } from './lib/audit-label.js';
@@ -202,6 +203,7 @@ server.register(marketQuoteRouter, prisma);
 server.register(auditRouter, prisma);
 server.register(adminInviteRouter, prisma);
 server.register(financeRouter, prisma);
+server.register(siteSettingsRouter, prisma);
 
 server.get(
     '/',
