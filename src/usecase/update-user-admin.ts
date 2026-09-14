@@ -9,7 +9,7 @@ import { UsernameAlreadyExistsError } from '../errors/conflict.js';
 
 const updateUserAdminSchema = z.object({
     username: z.string().min(1).optional(),
-    password: z.string().min(6).optional(),
+    password: z.string().min(8).optional(),
     rulesId: z.string().uuid().optional(),
     isPublic: z.boolean().optional(),
     publicTitle: z.string().nullable().optional(),

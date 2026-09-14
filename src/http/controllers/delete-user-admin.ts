@@ -1,7 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { DeleteUserAdminUseCase } from '../../usecase/delete-user-admin.js';
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission } from '../lib/require-permission.js';
+import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 
 export class DeleteUserAdminController {
     constructor(
@@ -10,20 +10,18 @@ export class DeleteUserAdminController {
     ) {}
 
     async handle(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
-        if (
-            (await requirePermission(
-                request,
-                reply,
-                'DELETE_USER_ADMIN',
-                this.getAdminPermissions,
-            )) === null
-        )
-            return;
+        const actorId = await requirePermission(
+            request,
+            reply,
+            'DELETE_USER_ADMIN',
+            this.getAdminPermissions,
+        );
+        if (actorId === null) return;
+        const actorPerms = (await this.getAdminPermissions.execute(actorId)) ?? [];
         const { id } = request.params;
-        const result = await this.useCase.execute(id);
+        const result = await this.useCase.execute(id, actorId, actorPerms);
         if (result.error) {
-            const status = result.error?.message === 'Admin not found' ? 404 : 400;
-            return reply.status(status).send({ error: result.error?.message });
+            return reply.status(errorToStatus(result.error)).send({ error: result.error?.message });
         }
         return reply.status(204).send();
     }

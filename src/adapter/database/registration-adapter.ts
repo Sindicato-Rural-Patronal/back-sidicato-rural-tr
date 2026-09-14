@@ -5,6 +5,7 @@ import type {
     RegistrationWithUserData,
     RegistrationFichaFile,
 } from '../../ports/external/registration-repository.js';
+import { isPrismaSerializationError } from '../../lib/prisma-errors.js';
 
 const userDataSelect = {
     id: true,
@@ -42,6 +43,36 @@ class RegistrationAdapter implements RegistrationRepository {
             data: { courseId,
 userDataId },
         });
+    }
+
+    async createWithCapacity(
+        courseId: string,
+        userDataId: string,
+        maxCapacity: number,
+    ): Promise<courseUserRegistrationModel | 'FULL'> {
+        // Serializable + retry: conta e insere na mesma transação para que
+        // inscrições concorrentes não estourem a capacidade da sala.
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                return await this.prisma.$transaction(
+                    async (tx: unknown) => {
+                        const t = tx as PrismaClient;
+                        const count = await t.courseUserRegistration.count({
+                            where: { courseId, isDeleted: false },
+                        });
+                        if (count >= maxCapacity) return 'FULL' as const;
+                        return await t.courseUserRegistration.create({
+                            data: { courseId, userDataId },
+                        });
+                    },
+                    { isolationLevel: 'Serializable' },
+                );
+            } catch (e) {
+                if (isPrismaSerializationError(e) && attempt < 2) continue;
+                throw e;
+            }
+        }
+        return 'FULL';
     }
 
     findById(id: string): Promise<RegistrationWithUserData | null> {

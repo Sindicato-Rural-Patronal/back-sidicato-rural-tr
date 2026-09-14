@@ -32,6 +32,13 @@ export class UpdateFinanceTransactionUseCase {
             if (cat.type !== effectiveType) {
                 return { error: new ValidationError('A categoria não corresponde ao tipo (entrada/saída) do lançamento') };
             }
+        } else if (data.type && data.type !== existing.type && existing.categoryId) {
+            // Trocou o tipo sem reenviar categoria: revalida a categoria atual para
+            // não deixar um lançamento (ex.) de saída com categoria de entrada.
+            const cat = await this.repo.findCategoryById(existing.categoryId);
+            if (cat && cat.type !== effectiveType) {
+                return { error: new ValidationError('A categoria atual não corresponde ao novo tipo — selecione uma categoria compatível.') };
+            }
         }
 
         if (data.accountId) {

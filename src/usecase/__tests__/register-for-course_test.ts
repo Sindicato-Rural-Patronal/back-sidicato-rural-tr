@@ -25,6 +25,7 @@ const mockUserDataRepo = {
 
 const mockRegistrationRepo = {
     create: vi.fn(),
+    createWithCapacity: vi.fn(),
     findById: vi.fn(),
     findByCourseId: vi.fn(),
     findByUserDataAndCourse: vi.fn(),
@@ -112,7 +113,7 @@ courseId: '' });
                 id: 'ud-existing',
             } as any);
             vi.mocked(mockRegistrationRepo.findByUserDataAndCourse).mockResolvedValue(null);
-            vi.mocked(mockRegistrationRepo.create).mockResolvedValue({ id: 'reg-001' } as any);
+            vi.mocked(mockRegistrationRepo.createWithCapacity).mockResolvedValue({ id: 'reg-001' } as any);
             const uc = new RegisterForCourseUseCase(
                 mockCourseRepo,
                 mockUserDataRepo,
@@ -127,7 +128,7 @@ courseId: '' });
             vi.mocked(mockUserDataRepo.findByEmailOrCpf).mockResolvedValue(null);
             vi.mocked(mockUserDataRepo.create).mockResolvedValue({ id: 'ud-new' } as any);
             vi.mocked(mockRegistrationRepo.findByUserDataAndCourse).mockResolvedValue(null);
-            vi.mocked(mockRegistrationRepo.create).mockResolvedValue({ id: 'reg-002' } as any);
+            vi.mocked(mockRegistrationRepo.createWithCapacity).mockResolvedValue({ id: 'reg-002' } as any);
             const uc = new RegisterForCourseUseCase(
                 mockCourseRepo,
                 mockUserDataRepo,
@@ -177,7 +178,7 @@ courseId: '' });
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(publishedCourse as any);
             vi.mocked(mockUserDataRepo.findByEmailOrCpf).mockResolvedValue({ id: 'ud-001' } as any);
             vi.mocked(mockRegistrationRepo.findByUserDataAndCourse).mockResolvedValue(null);
-            vi.mocked(mockRegistrationRepo.create).mockResolvedValue({ id: 'reg-001' } as any);
+            vi.mocked(mockRegistrationRepo.createWithCapacity).mockResolvedValue({ id: 'reg-001' } as any);
             const uc = new RegisterForCourseUseCase(
                 mockCourseRepo,
                 mockUserDataRepo,

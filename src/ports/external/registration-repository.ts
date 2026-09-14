@@ -18,6 +18,16 @@ export type RegistrationFichaFile = { data: Buffer; filename: string; mimeType: 
 
 export interface RegistrationRepository {
     create(courseId: string, userDataId: string): Promise<courseUserRegistrationModel>;
+    /**
+     * Cria a inscrição de forma atômica respeitando a capacidade: conta as
+     * inscrições ativas e insere na mesma transação serializável. Retorna
+     * 'FULL' se a sala já estiver cheia (evita a corrida TOCTOU do pré-check).
+     */
+    createWithCapacity(
+        courseId: string,
+        userDataId: string,
+        maxCapacity: number,
+    ): Promise<courseUserRegistrationModel | 'FULL'>;
     findById(id: string): Promise<RegistrationWithUserData | null>;
     findByCourseId(courseId: string, skip?: number, take?: number): Promise<RegistrationWithUserData[]>;
     countByCourseId(courseId: string): Promise<number>;

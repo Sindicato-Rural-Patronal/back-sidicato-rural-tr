@@ -37,7 +37,7 @@ export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaCl
         getAdminPermissions,
     );
     const deleteUserAdminController = new DeleteUserAdminController(
-        new DeleteUserAdminUseCase(userAdminRepository),
+        new DeleteUserAdminUseCase(userAdminRepository, ruleRepository),
         getAdminPermissions,
     );
     const getCurrentAdminController = new GetCurrentAdminController(
