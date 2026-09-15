@@ -7,6 +7,8 @@ import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapte
 import { CreateAdminInviteUseCase } from '../../usecase/create-admin-invite.js';
 import { GetAdminInviteUseCase } from '../../usecase/get-admin-invite.js';
 import { AcceptAdminInviteUseCase } from '../../usecase/accept-admin-invite.js';
+import { ListAdminInvitesUseCase } from '../../usecase/list-admin-invites.js';
+import { RevokeAdminInviteUseCase } from '../../usecase/revoke-admin-invite.js';
 import { AdminInviteController } from '../controllers/admin-invite-controller.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
@@ -22,6 +24,8 @@ export async function adminInviteRouter(fastify: FastifyInstance, prisma: Prisma
         new CreateAdminInviteUseCase(inviteRepo, userDataRepo, ruleRepo, userAdminRepo),
         new GetAdminInviteUseCase(inviteRepo, userDataRepo, ruleRepo),
         new AcceptAdminInviteUseCase(inviteRepo, userAdminRepo),
+        new ListAdminInvitesUseCase(inviteRepo, userDataRepo, ruleRepo),
+        new RevokeAdminInviteUseCase(inviteRepo),
         getAdminPermissions,
     );
 
@@ -56,6 +60,59 @@ expiresAt: { type: 'string' } },
         },
         (req: FastifyRequest<{ Body: { userDataId: string; rulesId: string } }>, res: FastifyReply) =>
             controller.create(req, res),
+    );
+
+    fastify.get(
+        '/admin/invites',
+        {
+            schema: {
+                tags: ['Admin — Invites'],
+                summary: 'List pending admin invites (no token exposed)',
+                security: [{ bearerAuth: [] }],
+                response: {
+                    200: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                id: { type: 'string' },
+                                userName: { type: 'string' },
+                                ruleName: { type: 'string' },
+                                expiresAt: { type: 'string' },
+                                createdAt: { type: 'string' },
+                                expired: { type: 'boolean' },
+                            },
+                        },
+                    },
+                    401: errorResponse,
+                    403: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest, res: FastifyReply) => controller.list(req, res),
+    );
+
+    fastify.delete(
+        '/admin/invites/:id',
+        {
+            schema: {
+                tags: ['Admin — Invites'],
+                summary: 'Revoke a pending admin invite',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['id'],
+                    properties: { id: { type: 'string' } },
+                },
+                response: {
+                    204: { type: 'null' },
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) => controller.revoke(req, res),
     );
 
     fastify.get(
