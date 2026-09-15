@@ -42,6 +42,21 @@ describe('CreateFinanceTransactionUseCase', () => {
         expect(vi.mocked(repo.createTransaction).mock.calls[0][0].createdBy).toBe('admin-1');
     });
 
+    it('cria "só nota" sem tipo (não vira entrada/saída)', async () => {
+        vi.mocked(repo.createTransaction).mockResolvedValue({ id: 'tx-nota' } as any);
+        const uc = new CreateFinanceTransactionUseCase(repo);
+        const r = await uc.execute({ ...base, type: null }, 'admin-1');
+        expect(r.error).toBeUndefined();
+        expect(vi.mocked(repo.createTransaction).mock.calls[0][0].type).toBeNull();
+    });
+
+    it('rejeita categoria em lançamento sem tipo (só nota)', async () => {
+        const uc = new CreateFinanceTransactionUseCase(repo);
+        const r = await uc.execute({ ...base, type: null, categoryId: '11111111-1111-4111-8111-111111111111' }, null);
+        expect(r.error?.message).toContain('Defina o tipo');
+        expect(repo.createTransaction).not.toHaveBeenCalled();
+    });
+
     it('rejeita categoria inexistente', async () => {
         vi.mocked(repo.findCategoryById).mockResolvedValue(null);
         const uc = new CreateFinanceTransactionUseCase(repo);

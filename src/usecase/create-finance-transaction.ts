@@ -6,7 +6,8 @@ import type {
 import { ValidationError } from '../errors/validation.js';
 
 export const financeTransactionSchema = z.object({
-    type: z.enum(['IN', 'OUT']),
+    // null/ausente = "só nota" (sem lançamento no caixa): não entra em saldo/KPIs.
+    type: z.preprocess(v => (v === '' ? null : v), z.enum(['IN', 'OUT']).nullable().optional()),
     amountCents: z.number().int().positive('O valor deve ser maior que zero'),
     date: z.coerce.date(),
     description: z.string().min(1, 'Informe a descrição'),
@@ -52,7 +53,11 @@ export class CreateFinanceTransactionUseCase {
         const data = parsed.data;
 
         // Categoria (se informada) precisa existir e bater com o tipo do lançamento.
+        // Sem tipo (só nota) não pode ter categoria.
         if (data.categoryId) {
+            if (!data.type) {
+                return { error: new ValidationError('Defina o tipo (entrada/saída) para vincular uma categoria.') };
+            }
             const cat = await this.repo.findCategoryById(data.categoryId);
             if (!cat) return { error: new ValidationError('Categoria inválida') };
             if (cat.type !== data.type) {
@@ -66,7 +71,7 @@ export class CreateFinanceTransactionUseCase {
             if (!acc) return { error: new ValidationError('Caixa inválido') };
         }
 
-        const transaction = await this.repo.createTransaction({ ...data, createdBy });
+        const transaction = await this.repo.createTransaction({ ...data, type: data.type ?? null, createdBy });
         return { transaction };
     }
 }

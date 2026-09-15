@@ -37,6 +37,15 @@ describe('UpdateFinanceTransactionUseCase', () => {
         expect(repo.updateTransaction).not.toHaveBeenCalled();
     });
 
+    it('converte "só nota" (sem tipo) em entrada', async () => {
+        vi.mocked(repo.findTransactionById).mockResolvedValue({ id: 'tx-1', type: null, transferId: null, categoryId: null } as any);
+        vi.mocked(repo.updateTransaction).mockResolvedValue({ id: 'tx-1' } as any);
+        const uc = new UpdateFinanceTransactionUseCase(repo);
+        const r = await uc.execute('tx-1', { type: 'IN' });
+        expect(r.error).toBeUndefined();
+        expect(repo.updateTransaction).toHaveBeenCalled();
+    });
+
     it('atualiza lançamento normal válido', async () => {
         vi.mocked(repo.findTransactionById).mockResolvedValue({ id: 'tx-1', type: 'OUT', transferId: null } as any);
         vi.mocked(repo.updateTransaction).mockResolvedValue({ id: 'tx-1' } as any);

@@ -23,21 +23,31 @@ export class UpdateFinanceTransactionUseCase {
         }
 
         const data = parsed.data as FinanceTransactionUpdateInput;
-        // Tipo efetivo após a edição (o que for enviado, senão o atual).
-        const effectiveType = data.type ?? existing.type;
+        // Tipo efetivo após a edição. `undefined` = não mexeu; `null` = virou "só
+        // nota" (sem lançamento). Por isso não uso `??` (trataria null como ausente).
+        const typeProvided = data.type !== undefined;
+        const effectiveType = typeProvided ? data.type : existing.type;
 
         if (data.categoryId) {
+            if (!effectiveType) {
+                return { error: new ValidationError('Defina o tipo (entrada/saída) para vincular uma categoria.') };
+            }
             const cat = await this.repo.findCategoryById(data.categoryId);
             if (!cat) return { error: new ValidationError('Categoria inválida') };
             if (cat.type !== effectiveType) {
                 return { error: new ValidationError('A categoria não corresponde ao tipo (entrada/saída) do lançamento') };
             }
-        } else if (data.type && data.type !== existing.type && existing.categoryId) {
-            // Trocou o tipo sem reenviar categoria: revalida a categoria atual para
-            // não deixar um lançamento (ex.) de saída com categoria de entrada.
-            const cat = await this.repo.findCategoryById(existing.categoryId);
-            if (cat && cat.type !== effectiveType) {
-                return { error: new ValidationError('A categoria atual não corresponde ao novo tipo — selecione uma categoria compatível.') };
+        } else if (typeProvided && data.type !== existing.type && existing.categoryId) {
+            // Trocou o tipo sem reenviar categoria.
+            if (!effectiveType) {
+                // Virou "só nota" → a categoria não faz mais sentido; limpa.
+                data.categoryId = null;
+            } else {
+                // Revalida a categoria atual contra o novo tipo.
+                const cat = await this.repo.findCategoryById(existing.categoryId);
+                if (cat && cat.type !== effectiveType) {
+                    return { error: new ValidationError('A categoria atual não corresponde ao novo tipo — selecione uma categoria compatível.') };
+                }
             }
         }
 
