@@ -42,7 +42,8 @@ export class CreateRuleUseCase {
         const rule = await this.ruleRepository.create({
             name: request.name,
             permissions: request.permissions,
-            description: request.description,
+            // Coluna é NOT NULL; descrição é opcional na API → default vazio.
+            description: request.description ?? '',
         });
         return {
             rule: {
