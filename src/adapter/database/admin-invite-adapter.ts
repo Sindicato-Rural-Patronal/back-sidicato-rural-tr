@@ -35,4 +35,16 @@ usedAt: null },
         });
         return r.count === 1;
     }
+
+    listPending(): Promise<AdminInviteModel[]> {
+        return this.prisma.adminInvite.findMany({
+            where: { usedAt: null },
+            orderBy: { createdAt: 'desc' },
+        });
+    }
+
+    async deleteById(id: string): Promise<boolean> {
+        const r = await this.prisma.adminInvite.deleteMany({ where: { id } });
+        return r.count > 0;
+    }
 }
