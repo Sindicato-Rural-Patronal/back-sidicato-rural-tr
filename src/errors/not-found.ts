@@ -146,3 +146,10 @@ export class FinanceTransactionNotFoundError extends NotFoundError {
         this.name = 'FinanceTransactionNotFoundError';
     }
 }
+
+export class UnimedBeneficiarioNotFoundError extends NotFoundError {
+    constructor() {
+        super('Beneficiário Unimed não encontrado');
+        this.name = 'UnimedBeneficiarioNotFoundError';
+    }
+}
