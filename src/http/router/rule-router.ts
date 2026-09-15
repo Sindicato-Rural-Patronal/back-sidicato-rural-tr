@@ -87,7 +87,7 @@ export async function ruleRouter(fastify: FastifyInstance, prisma: PrismaClient)
                                     properties: {
                                         id: { type: 'string' },
                                         name: { type: 'string' },
-                                        description: { type: 'string' },
+                                        description: { type: 'string', nullable: true },
                                         permissions: { type: 'array',
 items: { type: 'string' } },
                                         createdAt: { type: 'string' },
@@ -132,7 +132,7 @@ enum: PERMISSIONS_ENUM },
                         properties: {
                             id: { type: 'string' },
                             name: { type: 'string' },
-                            description: { type: 'string' },
+                            description: { type: 'string', nullable: true },
                             permissions: { type: 'array',
 items: { type: 'string' } },
                             createdAt: { type: 'string',
