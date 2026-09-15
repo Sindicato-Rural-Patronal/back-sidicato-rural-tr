@@ -31,7 +31,7 @@ example: '85990000' } },
                         properties: {
                             id: { type: 'string' },
                             type: { type: 'string' },
-                            zipCode: { type: 'string' },
+                            zipCode: { type: 'string', nullable: true },
                             street: { type: 'string',
 nullable: true },
                             neighborhood: { type: 'string',
