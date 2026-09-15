@@ -13,6 +13,8 @@ import { DeleteUserAdminController } from '../controllers/delete-user-admin.js';
 import { DeleteUserAdminUseCase } from '../../usecase/delete-user-admin.js';
 import { GetCurrentAdminController } from '../controllers/get-current-admin.js';
 import { GetCurrentAdminUseCase } from '../../usecase/get-current-admin.js';
+import { UpdateMeController } from '../controllers/update-me.js';
+import { UpdateMeUseCase } from '../../usecase/update-me.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { ListPublicContactsController } from '../controllers/list-public-contacts.js';
 import { ListPublicContactsUseCase } from '../../usecase/list-public-contacts.js';
@@ -41,7 +43,11 @@ export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaCl
         getAdminPermissions,
     );
     const getCurrentAdminController = new GetCurrentAdminController(
-        new GetCurrentAdminUseCase(userAdminRepository, ruleRepository),
+        new GetCurrentAdminUseCase(userAdminRepository, ruleRepository, userDataRepository),
+        getAdminPermissions,
+    );
+    const updateMeController = new UpdateMeController(
+        new UpdateMeUseCase(userAdminRepository, userDataRepository),
         getAdminPermissions,
     );
     const listPublicContactsController = new ListPublicContactsController(
@@ -95,6 +101,8 @@ nullable: true },
                             userId: { type: 'string' },
                             userDataId: { type: 'string' },
                             username: { type: 'string' },
+                            name: { type: 'string' },
+                            avatar: { type: 'string', nullable: true },
                             rulesId: { type: 'string' },
                             ruleName: { type: 'string' },
                             permissions: { type: 'array',
@@ -107,6 +115,33 @@ items: { type: 'string' } },
             },
         },
         (req: FastifyRequest, res: FastifyReply) => getCurrentAdminController.handle(req, res),
+    );
+
+    fastify.patch(
+        '/admin/me',
+        {
+            schema: {
+                tags: ['Admin — Auth'],
+                summary: 'Update own profile (name/username/password)',
+                description: 'Self-service: qualquer admin autenticado edita os próprios dados. Sem permissão de gestão.',
+                security: [{ bearerAuth: [] }],
+                body: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string' },
+                        username: { type: 'string' },
+                        password: { type: 'string' },
+                    },
+                },
+                response: {
+                    200: { type: 'object', properties: { message: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    409: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest, res: FastifyReply) => updateMeController.handle(req, res),
     );
 
     fastify.get(
