@@ -47,7 +47,8 @@ export type FinanceEmpenho = {
 };
 
 export type FinanceTransactionCreateInput = {
-    type: FinancialType;
+    // null = "só nota" (sem lançamento no caixa; fora de saldo/KPIs).
+    type: FinancialType | null;
     amountCents: number;
     date: Date;
     description: string;

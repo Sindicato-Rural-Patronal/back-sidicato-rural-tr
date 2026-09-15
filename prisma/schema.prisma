@@ -340,7 +340,9 @@ model FinancialCategory {
 // Financeiro: lançamento de caixa. Valor em CENTAVOS (Int) — nunca float.
 model FinancialTransaction {
   id          String        @id @default(uuid())
-  type        FinancialType
+  // null = "só nota" (gera a Nota de Empenho sem lançar no caixa; fora de
+  // saldo/KPIs). Editável depois para IN/OUT.
+  type        FinancialType?
   amountCents Int
   date        DateTime
   description String

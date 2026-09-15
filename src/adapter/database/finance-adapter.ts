@@ -270,6 +270,9 @@ class FinanceAdapter implements FinanceRepository {
             // Transferências entre caixas não são receita/despesa — fora dos KPIs,
             // categorias e gráfico mensal (mas contam no saldo por caixa, via groupBy).
             if (t.transferId) continue;
+            // "Só nota" (sem tipo) não é receita/despesa — fora de KPIs, categorias
+            // e gráfico mensal (e já não conta no saldo, que soma só IN/OUT).
+            if (!t.type) continue;
             if (t.type === 'IN') periodInCents += t.amountCents;
             else periodOutCents += t.amountCents;
 
