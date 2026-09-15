@@ -73,9 +73,10 @@ const accountBody = {
 
 const transactionBody = {
     type: 'object',
-    required: ['type', 'amountCents', 'date', 'description'],
+    required: ['amountCents', 'date', 'description'],
     properties: {
-        type: { type: 'string', enum: ['IN', 'OUT'], example: 'OUT' },
+        // null/ausente = "só nota" (gera a Nota de Empenho sem lançar no caixa).
+        type: { type: ['string', 'null'], enum: ['IN', 'OUT', null], example: 'OUT' },
         amountCents: { type: 'integer', minimum: 1, example: 12500, description: 'Valor em centavos' },
         date: { type: 'string', example: '2026-09-01' },
         description: { type: 'string', example: 'Compra de material' },
