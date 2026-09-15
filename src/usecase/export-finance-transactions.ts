@@ -44,7 +44,7 @@ export class ExportFinanceTransactionsUseCase {
         for (const t of rows) {
             lines.push([
                 ddmmyyyy(t.date),
-                t.type === 'IN' ? 'Entrada' : 'Saída',
+                t.type === 'IN' ? 'Entrada' : t.type === 'OUT' ? 'Saída' : 'Nota',
                 cell(t.account?.name ?? ''),
                 cell(t.category?.name ?? ''),
                 cell(t.description),
