@@ -56,6 +56,7 @@ export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaCli
     const uploadAvatarController = new UploadAvatarController(
         new UploadAvatarUseCase(createStorageAdapter(), userRepository),
         getAdminPermissions,
+        userAdminRepository,
     );
     const listPartnersController = new ListPartnersController(new ListPartnersUseCase(userRepository));
     const reorderPartnersController = new ReorderPartnersController(new ReorderPartnersUseCase(userRepository));
@@ -661,5 +662,25 @@ properties: { avatarUrl: { type: 'string' } } },
                 req as Parameters<typeof uploadAvatarController.handle>[0],
                 res,
             ),
+    );
+
+    fastify.post(
+        '/admin/me/avatar',
+        {
+            schema: {
+                tags: ['Admin — Auth'],
+                summary: 'Upload own avatar (self-service)',
+                description: 'O admin logado troca a própria foto. Auth-only, sem permissão de gestão. multipart/form-data no campo `file`.',
+                security: [{ bearerAuth: [] }],
+                consumes: ['multipart/form-data'],
+                response: {
+                    200: { type: 'object', properties: { avatarUrl: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest, res: FastifyReply) => uploadAvatarController.handleMe(req, res),
     );
 }
