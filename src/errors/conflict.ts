@@ -76,3 +76,10 @@ export class InstructorAlreadyAssignedError extends ConflictError {
         this.name = 'InstructorAlreadyAssignedError';
     }
 }
+
+export class UnimedBeneficiarioAlreadyExistsError extends ConflictError {
+    constructor() {
+        super('Este usuário já possui cadastro de beneficiário Unimed.');
+        this.name = 'UnimedBeneficiarioAlreadyExistsError';
+    }
+}

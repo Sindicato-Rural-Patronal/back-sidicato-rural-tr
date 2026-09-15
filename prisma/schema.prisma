@@ -101,6 +101,7 @@ model UserData {
   userAdmin              UserAdmin?
 
   userInstructor UserInstructor?
+  unimed         UnimedBeneficiario?
 
   // Relations to other UserData
   relations        UserRelation[] @relation("RelationSource")
@@ -613,4 +614,36 @@ model SiteSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// Convênio Unimed: cada beneficiário é um UserData (dados pessoais/endereço lá);
+// aqui ficam só os campos específicos do convênio. 1:1 com UserData.
+model UnimedBeneficiario {
+  id         String   @id @default(uuid())
+  userData   UserData @relation(fields: [userDataId], references: [id])
+  userDataId String   @unique
+
+  dataAdesao      DateTime?
+  tipoMovimento   String? // inclusão titular / inclusão dependente / exclusão...
+  tipoDependente  String?
+  grauDependencia String?
+  cns             String? // Cartão Nacional de Saúde
+  nomeMae         String?
+  profissao       String?
+  plano           String?
+  matricula       String?
+  empresa         String?
+  contratante     String?
+  // Titular da família (para dependentes): id de outro UserData; sem FK formal.
+  titularId       String?
+  motivo          String?
+  obs             String?
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  createdBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([titularId])
 }
