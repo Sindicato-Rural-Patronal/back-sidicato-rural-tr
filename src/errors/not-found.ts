@@ -153,3 +153,10 @@ export class UnimedBeneficiarioNotFoundError extends NotFoundError {
         this.name = 'UnimedBeneficiarioNotFoundError';
     }
 }
+
+export class ConvenioNotFoundError extends NotFoundError {
+    constructor() {
+        super('Convênio não encontrado');
+        this.name = 'ConvenioNotFoundError';
+    }
+}

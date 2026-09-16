@@ -83,3 +83,10 @@ export class UnimedBeneficiarioAlreadyExistsError extends ConflictError {
         this.name = 'UnimedBeneficiarioAlreadyExistsError';
     }
 }
+
+export class ConvenioSlugAlreadyExistsError extends ConflictError {
+    constructor() {
+        super('Já existe um convênio com este endereço de página.');
+        this.name = 'ConvenioSlugAlreadyExistsError';
+    }
+}
