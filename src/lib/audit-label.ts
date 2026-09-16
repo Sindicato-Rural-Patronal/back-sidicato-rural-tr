@@ -30,6 +30,9 @@ select: { name: true } }))?.name ?? null;
             case 'Cotação':
                 return (await prisma.marketQuote.findUnique({ where: { id },
 select: { label: true } }))?.label ?? null;
+            case 'Convênio':
+                return (await prisma.convenio.findUnique({ where: { id },
+select: { name: true } }))?.name ?? null;
             case 'Sala':
                 return (await prisma.room.findUnique({ where: { id },
 select: { name: true } }))?.name ?? null;

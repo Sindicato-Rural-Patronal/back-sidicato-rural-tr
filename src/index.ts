@@ -25,6 +25,7 @@ import { adminInviteRouter } from './http/router/admin-invite-router.js';
 import { financeRouter } from './http/router/finance-router.js';
 import { unimedRouter } from './http/router/unimed-router.js';
 import { siteSettingsRouter } from './http/router/site-settings-router.js';
+import { convenioRouter } from './http/router/convenio-router.js';
 import { decodeToken } from './lib/auth.js';
 import { deriveAuditEntity } from './lib/audit-entity.js';
 import { lookupTargetLabel, bodyLabel } from './lib/audit-label.js';
@@ -206,6 +207,7 @@ server.register(adminInviteRouter, prisma);
 server.register(financeRouter, prisma);
 server.register(unimedRouter, prisma);
 server.register(siteSettingsRouter, prisma);
+server.register(convenioRouter, prisma);
 
 server.get(
     '/',
@@ -233,7 +235,10 @@ server.get(
 // Rede de segurança para erros não tratados: mapeia P2002 (unicidade) para 409
 // e nunca vaza stack/detalhe interno num 500.
 server.setErrorHandler(
-    (error: Error & { validation?: unknown; statusCode?: number }, request, reply) => {
+    (error: Error & {
+ validation?: unknown;
+statusCode?: number 
+}, request, reply) => {
         if (error.validation) {
             return reply.status(400).send({ error: error.message });
         }

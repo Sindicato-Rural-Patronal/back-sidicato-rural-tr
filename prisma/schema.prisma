@@ -475,6 +475,11 @@ enum Permission {
   UPDATE_FINANCE
   DELETE_FINANCE
   READ_FINANCE
+
+  CREATE_CONVENIO
+  UPDATE_CONVENIO
+  DELETE_CONVENIO
+  READ_CONVENIO
 }
 
 enum MaritalStatus {
@@ -646,4 +651,39 @@ model UnimedBeneficiario {
   updatedAt DateTime  @updatedAt
 
   @@index([titularId])
+}
+
+// Convênios oferecidos aos associados (Unimed, …). Cada convênio ativo vira uma
+// página pública em /convenios/:slug e aparece no menu "Convênios" do site.
+// Todo o conteúdo é editável no admin; as listas ficam em JSON:
+//   priceRows  → [{ label: "0 a 18 anos", priceCents: 31713 }]
+//   documents  → ["RG", "CPF", …]
+//   highlights → ["Somos 345 cooperativas", …]
+model Convenio {
+  id       String  @id @default(uuid())
+  slug     String  @unique
+  name     String // rótulo no menu: "Unimed"
+  title    String // "Tabela de valores / Unimed"
+  subtitle String?
+  intro    String?
+  logoUrl  String?
+
+  priceLabelHeader String @default("Faixa etária")
+  priceValueHeader String @default("Valor sindicato")
+  priceRows        Json   @default("[]")
+  priceNote        String?
+
+  documentsTitle String @default("Documentos para adesão")
+  documents      Json   @default("[]")
+
+  highlightsTitle String?
+  highlights      Json    @default("[]")
+
+  aboutTitle String?
+  aboutText  String?
+
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
