@@ -56,6 +56,8 @@ export async function cleanDatabase(prisma: PrismaClient): Promise<void> {
             "course",
             "room",
             "Property",
+            "CompanyMember",
+            "Company",
             "UserRelation",
             "UserInstructor",
             "UserAdmin",

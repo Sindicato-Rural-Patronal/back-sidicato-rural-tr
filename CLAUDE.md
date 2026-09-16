@@ -59,7 +59,9 @@ src/
 
 | Modelo                   | Campos principais                                                                                          |
 |--------------------------|------------------------------------------------------------------------------------------------------------|
-| `UserData`               | id, name, email, phone, cpf, cnpj, avatar, nickname, maritalStatus, phone2, phone3, rg, rgIssuer, rgIssuedAt, birthDate, driverLicense, driverLicenseCategory, birthPlace, nationality, gender, ethnicity, educationLevel, functionalCategory, specialNeeds, memberClassification, cadPro, familyIncome, memberType, boardPosition, boardMember, memberStatus, memberSince, memberNotes, memberNotesNumber, addressId (FK), isPartner, partnerLogo, partnerUrl, partnerOrder |
+| `UserData`               | id, name, email, phone, cpf, cnpj, avatar, nickname, maritalStatus, phone2, phone3, rg, rgIssuer, rgIssuedAt, birthDate, driverLicense, driverLicenseCategory, birthPlace, nationality, gender, ethnicity, educationLevel, functionalCategory, specialNeeds, memberClassification, cadPro, familyIncome, memberType, boardPosition, boardMember, memberStatus, memberSince, memberNotes, memberNotesNumber, addressId (FK). **Obsoletos** (mantidos no banco, sem uso): cnpj, isPartner, partnerLogo, partnerUrl, partnerOrder — empresa/parceria agora é `Company` |
+| `Company`                | id, name, cnpj (só dígitos; único entre ativas, índice parcial), stateRegistration, type (PRIVATE/PUBLIC), phone, phone2, phone3, email, website, notes, isPartner, partnerUrl, partnerLogo, partnerOrder, primaryPropertyId, isDeleted (soft delete) |
+| `CompanyMember`          | id, companyId (FK), userDataId (FK), title (texto livre em maiúsculas) — único por (companyId, userDataId) |
 | `UserAdmin`              | id, username, passwordHash, userDataId (FK), rulesId (FK)                                                  |
 | `UserInstructor`         | id, userDataId (FK único), bio, linkedin, instagram, facebook                                              |
 | `Rule`                   | id, name, description, permissions (Permission[])                                                          |
@@ -70,7 +72,7 @@ src/
 | `CoursePhoto`            | id, courseId (FK), url, caption                                                                            |
 | `CourseUserRegistration` | id, courseId (FK), userDataId (FK)                                                                         |
 | `Address`                | id, type (URBAN/RURAL), city, state, zipCode, complement, notes, street, number, neighborhood, localityName, road, km, lot, section |
-| `Property`               | id, userDataId (FK), name, registration, addressId (FK)                                                    |
+| `Property`               | id, userDataId (FK?), companyId (FK?), name, registration, addressId (FK) — CHECK `Property_single_owner`: exatamente um dono (pessoa OU empresa) |
 | `UserRelation`           | id, sourceId (FK→UserData), targetId (FK→UserData), label (texto livre)                                    |
 | `Banner`                 | id, title, subtitle, imageUrl, active, order, buttons (JSON), startDate, endDate                           |
 | `ContactMessage`         | id, name, email, phone, subject, message, read, createdAt                                                  |
@@ -125,12 +127,23 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 | `DELETE` | `/admin/users/:id/properties/:propertyId` | `DeletePropertyUseCase` | `UPDATE_USER` |
 | `POST` | `/admin/users/:id/avatar` | `UploadAvatarUseCase` | `UPDATE_USER` |
 
-### Parceiros
+### Empresas e parceiros (`company-router.ts`, use cases em `usecase/company-usecases.ts`)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
-| `GET` | `/partners` | `ListPartnersUseCase` | Pública |
-| `PATCH` | `/admin/partners/reorder` | `ReorderPartnersUseCase` | `UPDATE_USER` |
-| `POST` | `/admin/users/:id/partner-logo` | `UploadPartnerLogoUseCase` | `UPDATE_USER` |
+| `GET` | `/admin/companies` | `ListCompaniesUseCase` (search, type, isPartner) | `READ_USER` |
+| `GET` | `/admin/companies/titles` | `ListMemberTitlesUseCase` | `READ_USER` |
+| `GET` | `/admin/companies/:id` | `GetCompanyUseCase` (members + properties) | `READ_USER` |
+| `POST` | `/admin/companies` | `CreateCompanyUseCase` | `CREATE_USER` |
+| `PATCH` | `/admin/companies/:id` | `UpdateCompanyUseCase` (dados, parceria, primaryPropertyId) | `UPDATE_USER` |
+| `DELETE` | `/admin/companies/:id` | `DeleteCompanyUseCase` (soft) | `DELETE_USER` |
+| `POST` | `/admin/companies/:id/members` | `AddCompanyMemberUseCase` | `UPDATE_USER` |
+| `PATCH` | `/admin/companies/:id/members/:memberId` | `UpdateCompanyMemberUseCase` | `UPDATE_USER` |
+| `DELETE` | `/admin/companies/:id/members/:memberId` | `RemoveCompanyMemberUseCase` | `UPDATE_USER` |
+| `POST` | `/admin/companies/:id/properties` | `AddCompanyPropertyUseCase` | `UPDATE_USER` |
+| `DELETE` | `/admin/companies/:id/properties/:propertyId` | `RemoveCompanyPropertyUseCase` | `UPDATE_USER` |
+| `POST` | `/admin/companies/:id/partner-logo` | `UploadCompanyPartnerLogoUseCase` | `UPDATE_USER` |
+| `GET` | `/partners` | `ListPartnersUseCase` (empresas parceiras ativas) | Pública |
+| `PATCH` | `/admin/partners/reorder` | `ReorderPartnersUseCase` (`{ order: companyId[] }`) | `UPDATE_USER` |
 
 ### Administradores (UserAdmin)
 | Método | Path | Use Case | Autenticação |
@@ -268,6 +281,7 @@ Todas as rotas de listagem suportam paginação via `?page=1&limit=20`.
 | `createAddressAdapter` | `adapter/database/address-adapter.ts` | `AddressRepository` |
 | `createUserRelationAdapter` | `adapter/database/user-relation-adapter.ts` | `UserRelationRepository` |
 | `createPropertyAdapter` | `adapter/database/property-adapter.ts` | `PropertyRepository` |
+| `createCompanyAdapter` | `adapter/database/company-adapter.ts` | `CompanyRepository` |
 | `createInstructorAdapter` | `adapter/database/instructor-adapter.ts` | `InstructorRepository` |
 | `createBannerAdapter` | `adapter/database/banner-adapter.ts` | `BannerRepository` |
 | `createContactMessageAdapter` | `adapter/database/contact-message-adapter.ts` | `ContactMessageRepository` |

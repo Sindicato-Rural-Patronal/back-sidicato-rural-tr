@@ -4,7 +4,6 @@ import type {
     UserDataRepository,
     UserDataUpdateInput,
     UserDataWithRelations,
-    PartnerItem,
     UserListFilters,
 } from '../../ports/external/user-data-repository.js';
 
@@ -46,6 +45,19 @@ cpf: true },
                     },
                 },
                 userInstructor: true,
+                companyMemberships: {
+                    where: { company: { isDeleted: false } },
+                    select: {
+                        id: true,
+                        title: true,
+                        company: { select: { id: true,
+name: true,
+cnpj: true,
+type: true,
+isPartner: true } },
+                    },
+                    orderBy: { company: { name: 'asc' } },
+                },
             },
         }) as Promise<UserDataWithRelations | null>;
     }
@@ -165,35 +177,5 @@ data });
             data: { isDeleted: true,
 deletedAt: new Date() },
         });
-    }
-
-    async findAllPartners(): Promise<PartnerItem[]> {
-        const rows = await this.prisma.userData.findMany({
-            where: { isDeleted: false,
-isPartner: true },
-            select: { id: true,
-name: true,
-avatar: true,
-partnerLogo: true,
-partnerUrl: true,
-cnpj: true },
-            orderBy: [{ partnerOrder: { sort: 'asc',
-nulls: 'last' } }, { name: 'asc' }],
-        });
-        return rows.map((r: typeof rows[0]) => ({ id: r.id,
-name: r.name,
-avatarUrl: r.avatar,
-partnerLogoUrl: r.partnerLogo,
-partnerUrl: r.partnerUrl,
-cnpj: r.cnpj }));
-    }
-
-    async reorderPartners(ids: string[]): Promise<void> {
-        await this.prisma.$transaction(
-            ids.map((id, index) =>
-                this.prisma.userData.update({ where: { id },
-data: { partnerOrder: index } }),
-            ),
-        );
     }
 }

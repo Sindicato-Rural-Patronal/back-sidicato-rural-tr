@@ -7,6 +7,8 @@ export function deriveAuditEntity(path: string): string {
     if (p.includes('/finance/transfers')) return 'Transferência';
     if (p.includes('/finance/transactions')) return 'Lançamento';
     if (p.includes('/finance/attachments')) return 'Comprovante';
+    // Antes de /properties: endereço/vínculo de empresa aparece como Empresa.
+    if (p.includes('/companies') || p.includes('/partners/reorder')) return 'Empresa';
     if (p.includes('/market-quotes')) return 'Cotação';
     if (p.includes('/convenios')) return 'Convênio';
     if (p.includes('/rooms')) return 'Sala';

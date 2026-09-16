@@ -10,7 +10,8 @@ export class PropertyAdapter implements PropertyRepository {
     constructor(private prisma: PrismaClient) {}
 
     create(data: {
-        userDataId: string;
+        userDataId?: string;
+        companyId?: string;
         name: string;
         registration?: string;
         addressId?: string;

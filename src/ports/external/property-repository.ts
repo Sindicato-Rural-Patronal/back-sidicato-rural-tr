@@ -4,8 +4,10 @@ import type { AddressModel } from '../../generated/prisma/models/Address.js';
 export type PropertyWithAddress = Property & { address: AddressModel | null };
 
 export interface PropertyRepository {
+    // Dona: uma pessoa OU uma empresa (constraint Property_single_owner no banco).
     create(data: {
-        userDataId: string;
+        userDataId?: string;
+        companyId?: string;
         name: string;
         registration?: string;
         addressId: string;

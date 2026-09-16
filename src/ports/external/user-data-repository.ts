@@ -55,21 +55,7 @@ export type UserDataUpdateInput = Partial<{
     // Primary property (id de uma Property do próprio usuário)
     primaryPropertyId: string | null;
 
-    // Partner
-    isPartner: boolean;
-    partnerUrl: string | null;
-    partnerLogo: string | null;
-    partnerOrder: number | null;
 }>;
-
-export type PartnerItem = {
-    id: string;
-    name: string;
-    avatarUrl: string | null;
-    partnerLogoUrl: string | null;
-    partnerUrl: string | null;
-    cnpj: string | null;
-};
 
 export type UserInstructorProfile = {
     id: string;
@@ -89,6 +75,17 @@ export type UserDataWithRelations = UserDataModel & {
     })[];
     properties: (Property & { address: AddressModel | null })[];
     userInstructor: UserInstructorProfile | null;
+    companyMemberships: {
+        id: string;
+        title: string;
+        company: {
+ id: string;
+name: string;
+cnpj: string | null;
+type: string;
+isPartner: boolean 
+};
+    }[];
 };
 
 export type UserListFilters = {
@@ -112,6 +109,4 @@ export interface UserDataRepository {
     findByEmailOrCpf(email: string, cpf: string): Promise<UserDataModel | null>;
     update(id: string, data: UserDataUpdateInput): Promise<UserDataModel | null>;
     delete(id: string): Promise<void>;
-    findAllPartners(): Promise<PartnerItem[]>;
-    reorderPartners(ids: string[]): Promise<void>;
 }

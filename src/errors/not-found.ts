@@ -160,3 +160,17 @@ export class ConvenioNotFoundError extends NotFoundError {
         this.name = 'ConvenioNotFoundError';
     }
 }
+
+export class CompanyNotFoundError extends NotFoundError {
+    constructor() {
+        super('Empresa não encontrada');
+        this.name = 'CompanyNotFoundError';
+    }
+}
+
+export class CompanyMemberNotFoundError extends NotFoundError {
+    constructor() {
+        super('Vínculo com a empresa não encontrado');
+        this.name = 'CompanyMemberNotFoundError';
+    }
+}

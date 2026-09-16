@@ -90,3 +90,17 @@ export class ConvenioSlugAlreadyExistsError extends ConflictError {
         this.name = 'ConvenioSlugAlreadyExistsError';
     }
 }
+
+export class CompanyCnpjAlreadyExistsError extends ConflictError {
+    constructor() {
+        super('Já existe uma empresa ativa com este CNPJ.');
+        this.name = 'CompanyCnpjAlreadyExistsError';
+    }
+}
+
+export class CompanyMemberAlreadyExistsError extends ConflictError {
+    constructor() {
+        super('Esta pessoa já está vinculada a esta empresa. Edite o título no vínculo existente.');
+        this.name = 'CompanyMemberAlreadyExistsError';
+    }
+}
