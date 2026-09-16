@@ -28,6 +28,13 @@ export class RuleInUseError extends ConflictError {
     }
 }
 
+export class RoomNameAlreadyExistsError extends ConflictError {
+    constructor() {
+        super('Essa sala já está cadastrada.');
+        this.name = 'RoomNameAlreadyExistsError';
+    }
+}
+
 export class RoomHasCoursesError extends ConflictError {
     constructor() {
         super('Sala vinculada a cursos e não pode ser removida.');

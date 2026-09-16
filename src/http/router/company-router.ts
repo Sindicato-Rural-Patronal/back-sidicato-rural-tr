@@ -67,6 +67,9 @@ address: addressSchema },
 const companyProperties = {
     id: str,
     name: str,
+    tradeName: nstr,
+    addressId: nstr,
+    address: addressSchema,
     cnpj: nstr,
     stateRegistration: nstr,
     type: { type: 'string',
@@ -123,7 +126,24 @@ const companyBody = {
     type: 'object',
     properties: {
         name: { type: 'string',
-example: 'COOPERATIVA AGROINDUSTRIAL' },
+description: 'Razão social',
+example: 'COOPERATIVA AGROINDUSTRIAL LTDA' },
+        tradeName: { type: 'string',
+nullable: true,
+description: 'Nome fantasia',
+example: 'COOPERATIVA AGRO' },
+        address: {
+            type: 'object',
+            nullable: true,
+            description: 'Endereço da sede; null ou tudo vazio remove',
+            properties: { zipCode: nstr,
+street: nstr,
+number: nstr,
+complement: nstr,
+neighborhood: nstr,
+city: nstr,
+state: nstr },
+        },
         cnpj: { type: 'string',
 nullable: true,
 example: '11.222.333/0001-81' },
@@ -161,18 +181,19 @@ const tags = ['Empresas'];
 export async function companyRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const repo = createCompanyAdapter(prisma);
     const propertyRepo = createPropertyAdapter(prisma);
+    const addressRepo = createAddressAdapter(prisma);
     const controller = new CompanyController(
         {
             list: new ListCompaniesUseCase(repo),
             get: new GetCompanyUseCase(repo),
-            create: new CreateCompanyUseCase(repo),
-            update: new UpdateCompanyUseCase(repo),
+            create: new CreateCompanyUseCase(repo, addressRepo),
+            update: new UpdateCompanyUseCase(repo, addressRepo),
             remove: new DeleteCompanyUseCase(repo),
             addMember: new AddCompanyMemberUseCase(repo, createUserDataAdapter(prisma)),
             updateMember: new UpdateCompanyMemberUseCase(repo),
             removeMember: new RemoveCompanyMemberUseCase(repo),
             titles: new ListMemberTitlesUseCase(repo),
-            addProperty: new AddCompanyPropertyUseCase(repo, propertyRepo, createAddressAdapter(prisma)),
+            addProperty: new AddCompanyPropertyUseCase(repo, propertyRepo, addressRepo),
             removeProperty: new RemoveCompanyPropertyUseCase(repo, propertyRepo),
             uploadPartnerLogo: new UploadCompanyPartnerLogoUseCase(createStorageAdapter(), repo),
             listPartners: new ListPartnersUseCase(repo),

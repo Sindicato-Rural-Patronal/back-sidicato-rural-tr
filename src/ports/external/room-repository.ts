@@ -9,6 +9,7 @@ description: string;
 maxCapacity: number
 }): Promise<roomModel>;
     findById(id: string): Promise<roomModel | null>;
+    findByName(name: string): Promise<roomModel | null>;
     findAll(skip?: number, take?: number): Promise<roomModel[]>;
     count(): Promise<number>;
     update(

@@ -154,6 +154,20 @@ export class UnimedBeneficiarioNotFoundError extends NotFoundError {
     }
 }
 
+export class GalleryAlbumNotFoundError extends NotFoundError {
+    constructor() {
+        super('Galeria não encontrada');
+        this.name = 'GalleryAlbumNotFoundError';
+    }
+}
+
+export class GalleryPhotoNotFoundError extends NotFoundError {
+    constructor() {
+        super('Foto não encontrada');
+        this.name = 'GalleryPhotoNotFoundError';
+    }
+}
+
 export class ConvenioNotFoundError extends NotFoundError {
     constructor() {
         super('Convênio não encontrado');

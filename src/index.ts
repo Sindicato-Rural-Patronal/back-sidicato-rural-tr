@@ -27,6 +27,7 @@ import { unimedRouter } from './http/router/unimed-router.js';
 import { siteSettingsRouter } from './http/router/site-settings-router.js';
 import { convenioRouter } from './http/router/convenio-router.js';
 import { companyRouter } from './http/router/company-router.js';
+import { galleryRouter } from './http/router/gallery-router.js';
 import { decodeToken } from './lib/auth.js';
 import { deriveAuditEntity } from './lib/audit-entity.js';
 import { lookupTargetLabel, bodyLabel } from './lib/audit-label.js';
@@ -210,6 +211,7 @@ server.register(unimedRouter, prisma);
 server.register(siteSettingsRouter, prisma);
 server.register(convenioRouter, prisma);
 server.register(companyRouter, prisma);
+server.register(galleryRouter, prisma);
 
 server.get(
     '/',

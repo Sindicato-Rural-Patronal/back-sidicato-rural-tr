@@ -4,11 +4,12 @@ import type {
     CompanyDetail,
     CompanyListItem,
     CompanyMemberModel,
+    CompanyUpdateInput,
     PartnerItem,
 } from '../ports/external/company-repository.js';
 import type { UserDataRepository } from '../ports/external/user-data-repository.js';
 import type { PropertyRepository } from '../ports/external/property-repository.js';
-import type { AddressRepository } from '../ports/external/address-repository.js';
+import type { AddressRepository, AddressCreateInput } from '../ports/external/address-repository.js';
 import type { Property } from '../generated/prisma/client.js';
 import { ValidationError } from '../errors/validation.js';
 import {
@@ -28,6 +29,8 @@ import {
     companyListQuerySchema,
     reorderPartnersSchema,
     firstIssue,
+    hasAddressValue,
+    type CompanyAddressFields,
 } from './company-schema.js';
 
 // Casos de uso das empresas. Finos e no mesmo arquivo, como os de convênios.
@@ -59,25 +62,52 @@ export class GetCompanyUseCase {
     }
 }
 
+// Campos do endereço da sede como o AddressRepository grava (null limpa).
+function addressFields(a: CompanyAddressFields) {
+    return {
+        zipCode: a.zipCode ?? null,
+        street: a.street ?? null,
+        number: a.number ?? null,
+        complement: a.complement ?? null,
+        neighborhood: a.neighborhood ?? null,
+        city: a.city ?? null,
+        state: a.state ?? null,
+    };
+}
+
+function newAddressInput(a: CompanyAddressFields): AddressCreateInput {
+    const filled = Object.entries(addressFields(a)).filter(([, v]) => v != null);
+    return { type: 'URBAN',
+...Object.fromEntries(filled) };
+}
+
 export class CreateCompanyUseCase {
-    constructor(private readonly repo: CompanyRepository) {}
+    constructor(
+        private readonly repo: CompanyRepository,
+        private readonly addresses: AddressRepository,
+    ) {}
     async execute(input: unknown, createdBy?: string | null): Promise<Result<{ company?: CompanyModel }>> {
         const parsed = companySchema.safeParse(input);
         if (!parsed.success) return { error: new ValidationError(firstIssue(parsed.error)) };
         // Propriedade principal só existe depois de criar a empresa.
-        const { primaryPropertyId: _ignored, ...data } = parsed.data;
+        const { primaryPropertyId: _ignored, address, ...data } = parsed.data;
 
         if (data.cnpj && (await this.repo.findByCnpj(data.cnpj))) {
             return { error: new CompanyCnpjAlreadyExistsError() };
         }
+        const addressId = hasAddressValue(address) ? (await this.addresses.create(newAddressInput(address))).id : null;
         const company = await this.repo.create({ ...data,
+addressId,
 createdBy: createdBy ?? null });
         return { company };
     }
 }
 
 export class UpdateCompanyUseCase {
-    constructor(private readonly repo: CompanyRepository) {}
+    constructor(
+        private readonly repo: CompanyRepository,
+        private readonly addresses: AddressRepository,
+    ) {}
     async execute(id: string, input: unknown): Promise<Result<{ company?: CompanyModel }>> {
         const parsed = companyUpdateSchema.safeParse(input);
         if (!parsed.success) return { error: new ValidationError(firstIssue(parsed.error)) };
@@ -85,7 +115,8 @@ export class UpdateCompanyUseCase {
         const existing = await this.repo.findDetail(id);
         if (!existing) return { error: new CompanyNotFoundError() };
 
-        const { cnpj, primaryPropertyId } = parsed.data;
+        const { address, ...data } = parsed.data;
+        const { cnpj, primaryPropertyId } = data;
         if (cnpj && cnpj !== existing.cnpj) {
             const other = await this.repo.findByCnpj(cnpj);
             if (other && other.id !== id) return { error: new CompanyCnpjAlreadyExistsError() };
@@ -93,7 +124,24 @@ export class UpdateCompanyUseCase {
         if (primaryPropertyId && !existing.properties.some(p => p.id === primaryPropertyId)) {
             return { error: new ValidationError('A propriedade principal precisa ser desta empresa') };
         }
-        const company = await this.repo.update(id, parsed.data);
+
+        // `address` ausente = não mexe; vazio/null = remove; preenchido = cria ou atualiza.
+        let removeAddressId: string | null = null;
+        const update: CompanyUpdateInput = { ...data };
+        if (address !== undefined) {
+            if (!hasAddressValue(address)) {
+                if (existing.addressId) {
+                    update.addressId = null;
+                    removeAddressId = existing.addressId;
+                }
+            } else if (existing.addressId) {
+                await this.addresses.update(existing.addressId, addressFields(address));
+            } else {
+                update.addressId = (await this.addresses.create(newAddressInput(address))).id;
+            }
+        }
+        const company = await this.repo.update(id, update);
+        if (removeAddressId) await this.addresses.delete(removeAddressId);
         return { company };
     }
 }

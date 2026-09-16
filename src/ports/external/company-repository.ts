@@ -1,6 +1,7 @@
 import type { CompanyModel } from '../../generated/prisma/models/Company.js';
 import type { CompanyMemberModel } from '../../generated/prisma/models/CompanyMember.js';
 import type { CompanyType } from '../../generated/prisma/enums.js';
+import type { Address } from '../../generated/prisma/client.js';
 import type { PropertyWithAddress } from './property-repository.js';
 
 export type { CompanyModel, CompanyMemberModel, CompanyType };
@@ -11,7 +12,10 @@ export type CompanyListFilters = {
     isPartner?: boolean;
 };
 
-export type CompanyListItem = CompanyModel & { membersCount: number };
+export type CompanyListItem = CompanyModel & {
+ membersCount: number;
+address: Address | null 
+};
 
 /** Pessoa vinculada, com o essencial pra listar e abrir o cadastro. */
 export type CompanyMemberWithPerson = CompanyMemberModel & {
@@ -25,12 +29,15 @@ email: string
 };
 
 export type CompanyDetail = CompanyModel & {
+    address: Address | null;
     members: CompanyMemberWithPerson[];
     properties: PropertyWithAddress[];
 };
 
 export type CompanyInput = {
     name: string;
+    tradeName?: string | null;
+    addressId?: string | null;
     cnpj?: string | null;
     stateRegistration?: string | null;
     type?: CompanyType;

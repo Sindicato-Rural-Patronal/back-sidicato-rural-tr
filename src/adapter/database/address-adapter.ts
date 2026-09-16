@@ -16,7 +16,7 @@ export class AddressAdapter implements AddressRepository {
         return this.prisma.address.create({ data });
     }
 
-    update(id: string, data: Partial<AddressCreateInput>): Promise<Address | null> {
+    update(id: string, data: { [K in keyof AddressCreateInput]?: AddressCreateInput[K] | null }): Promise<Address | null> {
         return this.prisma.address.update({ where: { id },
 data });
     }
