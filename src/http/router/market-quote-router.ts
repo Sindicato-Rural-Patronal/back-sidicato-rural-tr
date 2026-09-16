@@ -4,9 +4,7 @@ import { createMarketQuoteAdapter } from '../../adapter/database/market-quote-ad
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
 import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { ListMarketQuotesUseCase } from '../../usecase/list-market-quotes.js';
-import { CreateMarketQuoteUseCase } from '../../usecase/create-market-quote.js';
-import { UpdateMarketQuoteUseCase } from '../../usecase/update-market-quote.js';
-import { DeleteMarketQuoteUseCase } from '../../usecase/delete-market-quote.js';
+import { SaveDailyQuotesUseCase } from '../../usecase/save-daily-quotes.js';
 import { MarketQuoteController } from '../controllers/market-quote-controller.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
@@ -14,7 +12,16 @@ import { errorResponse } from '../lib/swagger-schemas.js';
 const marketQuoteProperties = {
     id: { type: 'string' },
     label: { type: 'string' },
-    value: { type: 'string' },
+    value: { type: 'string',
+description: 'Texto pronto, ex.: "R$ 120,00 /sc 60kg" (vazio antes do 1º lançamento)' },
+    priceCents: { type: 'integer',
+nullable: true },
+    unit: { type: 'string',
+nullable: true,
+description: 'Unidade fixa do produto (sc 60kg, t…); null no dólar' },
+    period: { type: 'string',
+nullable: true,
+description: 'MORNING (manhã) | AFTERNOON (tarde)' },
     variation: { type: 'string',
 nullable: true },
     referenceDate: { type: 'string',
@@ -25,33 +32,17 @@ nullable: true },
     updatedAt: { type: 'string' },
 };
 
-const marketQuoteBody = {
-    type: 'object',
-    required: ['label', 'value'],
-    properties: {
-        label: { type: 'string',
-example: 'Soja' },
-        value: { type: 'string',
-example: 'R$ 128,50 /sc 60kg' },
-        referenceDate: { type: 'string',
-nullable: true,
-example: '2026-09-01' },
-        isActive: { type: 'boolean' },
-        order: { type: 'integer' },
-    },
-};
+const quoteList = { type: 'array',
+items: { type: 'object',
+properties: marketQuoteProperties } };
 
 export async function marketQuoteRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const repo = createMarketQuoteAdapter(prisma);
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
+    const getAdminPermissions = new GetAdminPermissionsUseCase(createUserAdminAdapter(prisma), createRuleAdapter(prisma));
 
     const controller = new MarketQuoteController(
         new ListMarketQuotesUseCase(repo),
-        new CreateMarketQuoteUseCase(repo),
-        new UpdateMarketQuoteUseCase(repo),
-        new DeleteMarketQuoteUseCase(repo),
+        new SaveDailyQuotesUseCase(repo),
         getAdminPermissions,
     );
 
@@ -60,13 +51,9 @@ export async function marketQuoteRouter(fastify: FastifyInstance, prisma: Prisma
         {
             schema: {
                 tags: ['Market Quotes'],
-                summary: 'List active market quotes (public)',
-                description: 'Cotações ativas (dólar, soja, milho…) exibidas na home, ordenadas.',
-                response: {
-                    200: { type: 'array',
-items: { type: 'object',
-properties: marketQuoteProperties } },
-                },
+                summary: 'Cotações da home (público)',
+                description: 'Produtos fixos com preço já lançado (soja, milho, trigo, mandioca, dólar), na ordem da home.',
+                response: { 200: quoteList },
             },
         },
         (req: FastifyRequest, res: FastifyReply) => controller.listPublic(req, res),
@@ -77,12 +64,10 @@ properties: marketQuoteProperties } },
         {
             schema: {
                 tags: ['Market Quotes'],
-                summary: 'List all market quotes (admin)',
+                summary: 'Produtos da cotação (admin)',
                 security: [{ bearerAuth: [] }],
                 response: {
-                    200: { type: 'array',
-items: { type: 'object',
-properties: marketQuoteProperties } },
+                    200: quoteList,
                     401: errorResponse,
                     403: errorResponse,
                 },
@@ -91,43 +76,41 @@ properties: marketQuoteProperties } },
         (req: FastifyRequest, res: FastifyReply) => controller.listAdmin(req, res),
     );
 
-    fastify.post(
-        '/market-quotes',
+    fastify.put(
+        '/admin/market-quotes/daily',
         {
             schema: {
                 tags: ['Market Quotes'],
-                summary: 'Create market quote',
-                security: [{ bearerAuth: [] }],
-                body: marketQuoteBody,
-                response: {
-                    201: { type: 'object',
-properties: marketQuoteProperties },
-                    400: errorResponse,
-                    401: errorResponse,
-                    403: errorResponse,
-                },
-            },
-        },
-        (req: FastifyRequest, res: FastifyReply) => controller.create(req, res),
-    );
+                summary: 'Lançar as cotações do dia',
+                description: `Grava o preço dos produtos informados no período (manhã/tarde).
 
-    fastify.patch(
-        '/market-quotes/:id',
-        {
-            schema: {
-                tags: ['Market Quotes'],
-                summary: 'Update market quote',
+- A data de referência é sempre **hoje** (horário de Brasília).
+- Produto que não vier no corpo mantém o último preço.
+- Relançar o mesmo dia/período substitui o lançamento anterior.
+- A variação é calculada contra o lançamento anterior do produto.`,
                 security: [{ bearerAuth: [] }],
-                params: {
+                body: {
                     type: 'object',
-                    required: ['id'],
-                    properties: { id: { type: 'string' } },
+                    required: ['period', 'prices'],
+                    properties: {
+                        period: { type: 'string',
+enum: ['MORNING', 'AFTERNOON'] },
+                        prices: {
+                            type: 'array',
+                            items: {
+                                type: 'object',
+                                required: ['id', 'priceCents'],
+                                properties: {
+                                    id: { type: 'string' },
+                                    priceCents: { type: 'integer',
+example: 12050 },
+                                },
+                            },
+                        },
+                    },
                 },
-                body: { type: 'object',
-properties: marketQuoteBody.properties },
                 response: {
-                    200: { type: 'object',
-properties: { message: { type: 'string' } } },
+                    200: quoteList,
                     400: errorResponse,
                     401: errorResponse,
                     403: errorResponse,
@@ -135,31 +118,6 @@ properties: { message: { type: 'string' } } },
                 },
             },
         },
-        (req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) =>
-            controller.update(req, res),
-    );
-
-    fastify.delete(
-        '/market-quotes/:id',
-        {
-            schema: {
-                tags: ['Market Quotes'],
-                summary: 'Delete market quote',
-                security: [{ bearerAuth: [] }],
-                params: {
-                    type: 'object',
-                    required: ['id'],
-                    properties: { id: { type: 'string' } },
-                },
-                response: {
-                    204: { type: 'null' },
-                    401: errorResponse,
-                    403: errorResponse,
-                    404: errorResponse,
-                },
-            },
-        },
-        (req: FastifyRequest<{ Params: { id: string } }>, res: FastifyReply) =>
-            controller.remove(req, res),
+        (req: FastifyRequest, res: FastifyReply) => controller.saveDaily(req, res),
     );
 }

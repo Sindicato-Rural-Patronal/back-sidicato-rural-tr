@@ -14,8 +14,34 @@ const optionalPhone = z.preprocess(
     z.string().refine(isValidBrPhone, 'Telefone inválido: use DDD + número').nullable().optional(),
 );
 
+// Endereço da sede (urbano). Tudo vazio = sem endereço.
+export const companyAddressSchema = z.object({
+    zipCode: z.preprocess(
+        v => (typeof v === 'string' ? v.replace(/\D/g, '') || null : v),
+        z.string().length(8, 'CEP deve ter 8 dígitos').nullable().optional(),
+    ),
+    street: optionalText(160),
+    number: optionalText(20),
+    complement: optionalText(160),
+    neighborhood: optionalText(120),
+    city: optionalText(120),
+    state: z.preprocess(
+        v => (typeof v === 'string' ? v.trim().toUpperCase() || null : v),
+        z.string().regex(/^[A-Z]{2}$/, 'UF inválida: use a sigla, ex.: PR').nullable().optional(),
+    ),
+});
+
+export type CompanyAddressFields = z.infer<typeof companyAddressSchema>;
+
+export function hasAddressValue(a: CompanyAddressFields | null | undefined): a is CompanyAddressFields {
+    return !!a && Object.values(a).some(v => v != null && v !== '');
+}
+
 export const companySchema = z.object({
-    name: z.string().trim().min(1, 'Informe o nome da empresa').max(160, 'Nome muito longo'),
+    // Razão social.
+    name: z.string().trim().min(1, 'Informe a razão social').max(160, 'Razão social muito longa'),
+    tradeName: optionalText(160),
+    address: companyAddressSchema.nullable().optional(),
     // Guardado só com dígitos.
     cnpj: z.preprocess(
         v => (typeof v === 'string' ? v.replace(/\D/g, '') || null : v),

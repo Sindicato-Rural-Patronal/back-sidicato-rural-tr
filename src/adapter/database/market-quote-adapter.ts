@@ -2,9 +2,9 @@ import type { PrismaClient } from '@prisma/client/extension';
 import type { MarketQuoteModel } from '../../generated/prisma/models/MarketQuote.js';
 import type {
     MarketQuoteRepository,
-    MarketQuoteCreateInput,
-    MarketQuoteUpdateInput,
+    DailyQuoteEntry,
 } from '../../ports/external/market-quote-repository.js';
+import type { QuotePeriod } from '../../lib/quote-products.js';
 
 export function createMarketQuoteAdapter(prisma: PrismaClient): MarketQuoteRepository {
     return new MarketQuoteAdapter(prisma);
@@ -13,9 +13,10 @@ export function createMarketQuoteAdapter(prisma: PrismaClient): MarketQuoteRepos
 class MarketQuoteAdapter implements MarketQuoteRepository {
     constructor(private prisma: PrismaClient) {}
 
-    findAll(activeOnly: boolean): Promise<MarketQuoteModel[]> {
+    findAll(publicOnly: boolean): Promise<MarketQuoteModel[]> {
         return this.prisma.marketQuote.findMany({
-            where: activeOnly ? { isActive: true } : {},
+            where: publicOnly ? { isActive: true,
+priceCents: { not: null } } : {},
             orderBy: [{ order: 'asc' },
 { createdAt: 'asc' }],
         });
@@ -25,36 +26,60 @@ class MarketQuoteAdapter implements MarketQuoteRepository {
         return this.prisma.marketQuote.findUnique({ where: { id } });
     }
 
-    create(data: MarketQuoteCreateInput): Promise<MarketQuoteModel> {
-        return this.prisma.marketQuote.create({ data });
-    }
-
-    update(id: string, data: MarketQuoteUpdateInput): Promise<MarketQuoteModel> {
-        return this.prisma.marketQuote.update({ where: { id },
-data });
-    }
-
-    async delete(id: string): Promise<boolean> {
-        try {
-            await this.prisma.marketQuote.delete({ where: { id } });
-            return true;
-        } catch {
-            return false;
-        }
-    }
-
-    async addHistory(marketQuoteId: string, value: string, numeric: number | null): Promise<void> {
-        await this.prisma.marketQuoteHistory.create({ data: { marketQuoteId,
-value,
-numeric } });
-    }
-
-    async getLastNumeric(marketQuoteId: string): Promise<number | null> {
+    async getPreviousNumeric(marketQuoteId: string, referenceDate: Date, period: QuotePeriod): Promise<number | null> {
         const row = await this.prisma.marketQuoteHistory.findFirst({
-            where: { marketQuoteId },
-            orderBy: { createdAt: 'desc' },
+            where: {
+                marketQuoteId,
+                numeric: { not: null },
+                // Só lançamentos ANTERIORES: dias antes, a manhã do mesmo dia (se
+                // agora é tarde) e linhas antigas sem data.
+                OR: [
+                    { referenceDate: null },
+                    { referenceDate: { lt: referenceDate } },
+                    ...(period === 'AFTERNOON' ? [{ referenceDate,
+period: 'MORNING' }] : []),
+                ],
+            },
+            orderBy: [
+                { referenceDate: { sort: 'desc',
+nulls: 'last' } },
+                { period: { sort: 'desc',
+nulls: 'last' } },
+                { createdAt: 'desc' },
+            ],
             select: { numeric: true },
         });
         return row?.numeric ?? null;
+    }
+
+    async saveDaily(entries: DailyQuoteEntry[]): Promise<void> {
+        await this.prisma.$transaction(
+            entries.flatMap(e => [
+                this.prisma.marketQuote.update({
+                    where: { id: e.id },
+                    data: {
+                        priceCents: e.priceCents,
+                        value: e.value,
+                        variation: e.variation,
+                        referenceDate: e.referenceDate,
+                        period: e.period,
+                    },
+                }),
+                this.prisma.marketQuoteHistory.deleteMany({
+                    where: { marketQuoteId: e.id,
+referenceDate: e.referenceDate,
+period: e.period },
+                }),
+                this.prisma.marketQuoteHistory.create({
+                    data: {
+                        marketQuoteId: e.id,
+                        value: e.value,
+                        numeric: e.priceCents / 100,
+                        referenceDate: e.referenceDate,
+                        period: e.period,
+                    },
+                }),
+            ]),
+        );
     }
 }

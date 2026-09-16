@@ -6,7 +6,7 @@ import type {
 export class ListMarketQuotesUseCase {
     constructor(private readonly repo: MarketQuoteRepository) {}
 
-    execute(activeOnly: boolean): Promise<MarketQuoteModel[]> {
-        return this.repo.findAll(activeOnly);
+    execute(publicOnly: boolean): Promise<MarketQuoteModel[]> {
+        return this.repo.findAll(publicOnly);
     }
 }

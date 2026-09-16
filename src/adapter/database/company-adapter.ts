@@ -34,6 +34,8 @@ class CompanyAdapter implements CompanyRepository {
             const or: Record<string, unknown>[] = [
                 { name: { contains: q,
 mode: 'insensitive' } },
+                { tradeName: { contains: q,
+mode: 'insensitive' } },
                 { email: { contains: q,
 mode: 'insensitive' } },
             ];
@@ -49,7 +51,10 @@ mode: 'insensitive' } },
             orderBy: { name: 'asc' },
             skip,
             take,
-            include: { _count: { select: { members: { where: { userData: { isDeleted: false } } } } } },
+            include: {
+                address: true,
+                _count: { select: { members: { where: { userData: { isDeleted: false } } } } },
+            },
         });
         return rows.map(({ _count, ...c }: { _count: { members: number } } & CompanyModel) => ({
             ...c,
@@ -71,6 +76,7 @@ isDeleted: false } });
             where: { id,
 isDeleted: false },
             include: {
+                address: true,
                 members: {
                     where: { userData: { isDeleted: false } },
                     include: { userData: { select: personSelect } },
@@ -147,6 +153,7 @@ data: { title } });
 isPartner: true },
             select: { id: true,
 name: true,
+tradeName: true,
 partnerLogo: true,
 partnerUrl: true,
 cnpj: true },
@@ -156,12 +163,14 @@ nulls: 'last' } }, { name: 'asc' }],
         return rows.map((r: {
  id: string;
 name: string;
+tradeName: string | null;
 partnerLogo: string | null;
 partnerUrl: string | null;
 cnpj: string | null 
 }) => ({
             id: r.id,
-            name: r.name,
+            // Na home aparece o nome fantasia, quando houver.
+            name: r.tradeName || r.name,
             avatarUrl: null,
             partnerLogoUrl: r.partnerLogo,
             partnerUrl: r.partnerUrl,

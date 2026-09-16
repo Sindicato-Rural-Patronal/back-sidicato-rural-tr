@@ -59,15 +59,15 @@ src/
 
 | Modelo                   | Campos principais                                                                                          |
 |--------------------------|------------------------------------------------------------------------------------------------------------|
-| `UserData`               | id, name, email, phone, cpf, cnpj, avatar, nickname, maritalStatus, phone2, phone3, rg, rgIssuer, rgIssuedAt, birthDate, driverLicense, driverLicenseCategory, birthPlace, nationality, gender, ethnicity, educationLevel, functionalCategory, specialNeeds, memberClassification, cadPro, familyIncome, memberType, boardPosition, boardMember, memberStatus, memberSince, memberNotes, memberNotesNumber, addressId (FK). **Obsoletos** (mantidos no banco, sem uso): cnpj, isPartner, partnerLogo, partnerUrl, partnerOrder — empresa/parceria agora é `Company` |
-| `Company`                | id, name, cnpj (só dígitos; único entre ativas, índice parcial), stateRegistration, type (PRIVATE/PUBLIC), phone, phone2, phone3, email, website, notes, isPartner, partnerUrl, partnerLogo, partnerOrder, primaryPropertyId, isDeleted (soft delete) |
+| `UserData`               | id, name, email, phone, cpf, cnpj, avatar, nickname, maritalStatus, phone2, phone3, rg, rgIssuer, rgIssuedAt, birthDate, driverLicense, driverLicenseCategory, birthPlace, nationality, gender, ethnicity, educationLevel, functionalCategory, specialNeeds, memberClassification, cadPro (até 5), familyIncome, memberType (painel usa lista fixa: ALUNO, PRODUTOR RURAL, TRABALHADOR RURAL ASSALARIADO, TRABALHADOR RURAL AUTONOMO; o backend aceita texto), boardPosition, boardMember, memberStatus, memberSince, memberNotes, memberNotesNumber, addressId (FK). **Obsoletos** (mantidos no banco, sem uso): cnpj, isPartner, partnerLogo, partnerUrl, partnerOrder — empresa/parceria agora é `Company` |
+| `Company`                | id, name (razão social), tradeName (nome fantasia), addressId (FK→Address, sede; SetNull), cnpj (só dígitos; único entre ativas, índice parcial), stateRegistration, type (PRIVATE/PUBLIC), phone, phone2, phone3, email, website, notes, isPartner, partnerUrl, partnerLogo, partnerOrder, primaryPropertyId, isDeleted (soft delete) |
 | `CompanyMember`          | id, companyId (FK), userDataId (FK), title (texto livre em maiúsculas) — único por (companyId, userDataId) |
 | `UserAdmin`              | id, username, passwordHash, userDataId (FK), rulesId (FK)                                                  |
 | `UserInstructor`         | id, userDataId (FK único), bio, linkedin, instagram, facebook                                              |
 | `Rule`                   | id, name, description, permissions (Permission[])                                                          |
 | `Course`                 | id, name, description, roomId (FK), startTime, endTime, status, price, workloadHours, coverImage, eventNumber, minStudents, preEnrolled, waitlist, registrationDeadline, observations |
 | `CourseInstructor`       | id, courseId (FK), instructorId (FK→UserInstructor), title, category                                      |
-| `Room`                   | id, name, description, maxCapacity, addressId (FK)                                                         |
+| `Room`                   | id, name (lista fixa em `lib/room-names.ts`: AUDITORIO, COZINHA, SALA DE VIDEO CONFERENCIA, SALA 1, SALA 2, SALA APL; único), description, maxCapacity, addressId (FK) |
 | `News`                   | id, title, content, summary, bannerUrl, status, publishedAt                                                |
 | `CoursePhoto`            | id, courseId (FK), url, caption                                                                            |
 | `CourseUserRegistration` | id, courseId (FK), userDataId (FK)                                                                         |
@@ -76,6 +76,10 @@ src/
 | `UserRelation`           | id, sourceId (FK→UserData), targetId (FK→UserData), label (texto livre)                                    |
 | `Banner`                 | id, title, subtitle, imageUrl, active, order, buttons (JSON), startDate, endDate                           |
 | `ContactMessage`         | id, name, email, phone, subject, message, read, createdAt                                                  |
+| `MarketQuote`            | id, label (único; produtos fixos SOJA, MILHO, TRIGO, MANDIOCA, DOLAR criados na migration), value (texto pronto), priceCents, unit, period (MORNING/AFTERNOON), variation, referenceDate (dia do lançamento), isActive, order |
+| `MarketQuoteHistory`     | id, marketQuoteId (FK), value, numeric, referenceDate, period — um por produto/dia/período (relançar substitui) |
+| `GalleryAlbum`           | id, title, description, linkUrl, isActive, order — galerias da home (História do Sindicato, FAEP, Patrulha Rural) |
+| `GalleryPhoto`           | id, albumId (FK, cascade), url, storageKey, caption, order |
 
 ## Enums
 
@@ -133,8 +137,8 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 | `GET` | `/admin/companies` | `ListCompaniesUseCase` (search, type, isPartner) | `READ_USER` |
 | `GET` | `/admin/companies/titles` | `ListMemberTitlesUseCase` | `READ_USER` |
 | `GET` | `/admin/companies/:id` | `GetCompanyUseCase` (members + properties) | `READ_USER` |
-| `POST` | `/admin/companies` | `CreateCompanyUseCase` | `CREATE_USER` |
-| `PATCH` | `/admin/companies/:id` | `UpdateCompanyUseCase` (dados, parceria, primaryPropertyId) | `UPDATE_USER` |
+| `POST` | `/admin/companies` | `CreateCompanyUseCase` (aceita `tradeName` e `address` da sede) | `CREATE_USER` |
+| `PATCH` | `/admin/companies/:id` | `UpdateCompanyUseCase` (dados, parceria, primaryPropertyId; `address` null/vazio remove) | `UPDATE_USER` |
 | `DELETE` | `/admin/companies/:id` | `DeleteCompanyUseCase` (soft) | `DELETE_USER` |
 | `POST` | `/admin/companies/:id/members` | `AddCompanyMemberUseCase` | `UPDATE_USER` |
 | `PATCH` | `/admin/companies/:id/members/:memberId` | `UpdateCompanyMemberUseCase` | `UPDATE_USER` |
@@ -190,7 +194,29 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
 | `GET` | `/rooms` | `ListRoomsUseCase` | Pública |
-| `POST` | `/rooms` | `CreateRoomUseCase` | `CREATE_COURSE` |
+| `POST` | `/rooms` | `CreateRoomUseCase` (nome da lista fixa, normalizado; repetido → 409) | `CREATE_COURSE` |
+| `PATCH` | `/rooms/:roomId` | `UpdateRoomUseCase` (pode manter nome antigo; trocar exige nome da lista) | `UPDATE_COURSE` |
+
+### Cotações (`market-quote-router.ts`)
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/market-quotes` | `ListMarketQuotesUseCase` (ativos com preço lançado) | Pública |
+| `GET` | `/admin/market-quotes` | `ListMarketQuotesUseCase` (os 5 produtos) | `READ_MARKET_QUOTE` |
+| `PUT` | `/admin/market-quotes/daily` | `SaveDailyQuotesUseCase` — `{ period, prices: [{ id, priceCents }] }`; data = hoje (America/Sao_Paulo); variação vs lançamento anterior | `UPDATE_MARKET_QUOTE` |
+
+Não há mais criar/excluir cotação: os produtos são fixos.
+
+### Galerias da home (`gallery-router.ts`, use cases em `usecase/gallery-usecases.ts`)
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/galleries` | `ListGalleriesUseCase` (ativas com foto) | Pública |
+| `GET` | `/admin/galleries` | `ListGalleriesUseCase` | `READ_BANNER` |
+| `POST` | `/admin/galleries` | `CreateGalleryUseCase` | `CREATE_BANNER` |
+| `PATCH` | `/admin/galleries/reorder` · `/admin/galleries/:id` | `ReorderGalleriesUseCase` · `UpdateGalleryUseCase` | `UPDATE_BANNER` |
+| `DELETE` | `/admin/galleries/:id` | `DeleteGalleryUseCase` (apaga os arquivos) | `DELETE_BANNER` |
+| `POST` | `/admin/galleries/:id/photos` | `UploadGalleryPhotoUseCase` (multipart; reduz p/ 1600px, JPEG; máx. 60) | `UPDATE_BANNER` |
+| `PATCH` | `/admin/galleries/:id/photos/reorder` · `/admin/galleries/:id/photos/:photoId` (legenda) | `ReorderGalleryPhotosUseCase` · `UpdateGalleryPhotoUseCase` | `UPDATE_BANNER` |
+| `DELETE` | `/admin/galleries/:id/photos/:photoId` | `DeleteGalleryPhotoUseCase` | `UPDATE_BANNER` |
 
 ### Inscrições
 | Método | Path | Use Case | Autenticação |
@@ -282,6 +308,8 @@ Todas as rotas de listagem suportam paginação via `?page=1&limit=20`.
 | `createUserRelationAdapter` | `adapter/database/user-relation-adapter.ts` | `UserRelationRepository` |
 | `createPropertyAdapter` | `adapter/database/property-adapter.ts` | `PropertyRepository` |
 | `createCompanyAdapter` | `adapter/database/company-adapter.ts` | `CompanyRepository` |
+| `createGalleryAdapter` | `adapter/database/gallery-adapter.ts` | `GalleryRepository` |
+| `createMarketQuoteAdapter` | `adapter/database/market-quote-adapter.ts` | `MarketQuoteRepository` |
 | `createInstructorAdapter` | `adapter/database/instructor-adapter.ts` | `InstructorRepository` |
 | `createBannerAdapter` | `adapter/database/banner-adapter.ts` | `BannerRepository` |
 | `createContactMessageAdapter` | `adapter/database/contact-message-adapter.ts` | `ContactMessageRepository` |

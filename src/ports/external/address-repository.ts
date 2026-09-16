@@ -19,7 +19,8 @@ export type AddressCreateInput = {
 
 export interface AddressRepository {
     create(data: AddressCreateInput): Promise<Address>;
-    update(id: string, data: Partial<AddressCreateInput>): Promise<Address | null>;
+    /** `null` limpa o campo. */
+    update(id: string, data: { [K in keyof AddressCreateInput]?: AddressCreateInput[K] | null }): Promise<Address | null>;
     findById(id: string): Promise<Address | null>;
     findByCep(zipCode: string): Promise<Address | null>;
     delete(id: string): Promise<void>;

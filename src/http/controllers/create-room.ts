@@ -1,7 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CreateRoomUseCase } from '../../usecase/create-room.js';
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission } from '../lib/require-permission.js';
+import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 
 type CreateRoomBody = {
     name: string;
@@ -23,7 +23,7 @@ export class CreateRoomController {
             return;
         const body = request.body as CreateRoomBody;
         const response = await this.useCase.execute(body);
-        if (response.error) return reply.status(400).send({ error: response.error?.message });
+        if (response.error) return reply.status(errorToStatus(response.error)).send({ error: response.error.message });
         return reply.status(201).send({ id: response.roomId });
     }
 }

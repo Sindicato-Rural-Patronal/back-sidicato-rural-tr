@@ -75,7 +75,7 @@ model UserData {
 
   // Membership
   memberClassification String?
-  // CAD/PRO do associado — até 3 por usuário (validado na aplicação).
+  // CAD/PRO do associado — até 5 por usuário (validado na aplicação).
   cadPro           String[]
   familyIncome     String?
   memberType       String?
@@ -212,16 +212,26 @@ model room {
   address    Address? @relation(fields: [addressId], references: [id])
 }
 
-// Cotações/ativos exibidos na home (dólar, soja, milho…). Valor é texto livre
-// (formato varia por ativo/unidade), preenchido manualmente no painel admin.
+enum QuotePeriod {
+  MORNING
+  AFTERNOON
+}
+
+// Cotações exibidas na home. Produtos FIXOS (SOJA, MILHO, TRIGO, MANDIOCA, DOLAR),
+// criados na migration; no painel só se lança o preço e o período (manhã/tarde).
+// A data de referência é o dia do lançamento. `value` é o texto pronto
+// ("R$ 120,00 /sc 60kg"), montado a partir de `priceCents` + `unit`.
 model MarketQuote {
-  id            String    @id @default(uuid())
-  label         String
+  id            String       @id @default(uuid())
+  label         String       @unique
   value         String
+  priceCents    Int?
+  unit          String? // "sc 60kg", "t"… (null = só o preço, ex.: dólar)
+  period        QuotePeriod?
   variation     String?
   referenceDate DateTime?
-  isActive      Boolean   @default(true)
-  order         Int       @default(0)
+  isActive      Boolean      @default(true)
+  order         Int          @default(0)
 
   history MarketQuoteHistory[]
 
@@ -237,6 +247,9 @@ model MarketQuoteHistory {
   marketQuoteId String
   value         String
   numeric       Float?
+  // Dia + período do lançamento. Relançar o mesmo dia/período substitui a linha.
+  referenceDate DateTime?
+  period        QuotePeriod?
   createdAt     DateTime    @default(now())
 
   @@index([marketQuoteId, createdAt])
@@ -557,6 +570,7 @@ model Address {
 
   properties   Property[]
   rooms        room[]
+  companies    Company[]
 }
 
 // Propriedade/endereço. Pertence a UMA pessoa OU a UMA empresa — garantido pela
@@ -709,7 +723,8 @@ enum CompanyType {
 // empresa. CNPJ único entre empresas ativas via índice parcial na migration.
 model Company {
   id                String      @id @default(uuid())
-  name              String
+  name              String // razão social
+  tradeName         String? // nome fantasia
   cnpj              String? // só dígitos
   stateRegistration String? // inscrição estadual (ou "ISENTO")
   type              CompanyType @default(PRIVATE)
@@ -724,6 +739,10 @@ model Company {
   partnerUrl   String?
   partnerLogo  String?
   partnerOrder Int?
+
+  // Endereço da empresa (sede). Outros endereços ficam em `properties`.
+  addressId String?
+  address   Address? @relation(fields: [addressId], references: [id], onDelete: SetNull)
 
   // Propriedade principal (endereço preferencial). Sem FK formal, como em UserData.
   primaryPropertyId String?
@@ -753,4 +772,33 @@ model CompanyMember {
 
   @@unique([companyId, userDataId])
   @@index([userDataId])
+}
+
+// Galerias de imagens da home (no lugar dos números "associados/cursos/anos/
+// alunos"): ex. História do Sindicato, FAEP, Patrulha Rural. Cada galeria tem
+// várias fotos; na home só aparecem as ativas que têm pelo menos uma foto.
+model GalleryAlbum {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  linkUrl     String? // "Saiba mais" opcional (ex.: site da FAEP)
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  photos GalleryPhoto[]
+}
+
+model GalleryPhoto {
+  id         String       @id @default(uuid())
+  albumId    String
+  album      GalleryAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  url        String
+  storageKey String
+  caption    String?
+  order      Int          @default(0)
+  createdAt  DateTime     @default(now())
+
+  @@index([albumId, order])
 }

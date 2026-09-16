@@ -81,6 +81,7 @@ export type UserDataWithRelations = UserDataModel & {
         company: {
  id: string;
 name: string;
+tradeName: string | null;
 cnpj: string | null;
 type: string;
 isPartner: boolean 

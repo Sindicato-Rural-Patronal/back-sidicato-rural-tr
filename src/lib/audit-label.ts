@@ -33,6 +33,9 @@ select: { label: true } }))?.label ?? null;
             case 'Empresa':
                 return (await prisma.company.findUnique({ where: { id },
 select: { name: true } }))?.name ?? null;
+            case 'Galeria':
+                return (await prisma.galleryAlbum.findUnique({ where: { id },
+select: { title: true } }))?.title ?? null;
             case 'Convênio':
                 return (await prisma.convenio.findUnique({ where: { id },
 select: { name: true } }))?.name ?? null;

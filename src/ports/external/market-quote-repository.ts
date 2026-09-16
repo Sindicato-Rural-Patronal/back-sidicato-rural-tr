@@ -1,25 +1,27 @@
 import type { MarketQuoteModel } from '../../generated/prisma/models/MarketQuote.js';
+import type { QuotePeriod } from '../../lib/quote-products.js';
 
 export type { MarketQuoteModel };
 
-export type MarketQuoteCreateInput = {
-    label: string;
+/** Lançamento de um produto num dia/período. */
+export type DailyQuoteEntry = {
+    id: string;
+    priceCents: number;
     value: string;
-    variation?: string | null;
-    referenceDate?: Date | null;
-    isActive?: boolean;
-    order?: number;
+    variation: string | null;
+    referenceDate: Date;
+    period: QuotePeriod;
 };
 
-export type MarketQuoteUpdateInput = Partial<MarketQuoteCreateInput>;
-
 export interface MarketQuoteRepository {
-    findAll(activeOnly: boolean): Promise<MarketQuoteModel[]>;
+    /** Produtos na ordem da home. `publicOnly` = só ativos e com preço lançado. */
+    findAll(publicOnly: boolean): Promise<MarketQuoteModel[]>;
     findById(id: string): Promise<MarketQuoteModel | null>;
-    create(data: MarketQuoteCreateInput): Promise<MarketQuoteModel>;
-    update(id: string, data: MarketQuoteUpdateInput): Promise<MarketQuoteModel>;
-    delete(id: string): Promise<boolean>;
-    // Histórico de valores → cálculo automático da variação.
-    addHistory(marketQuoteId: string, value: string, numeric: number | null): Promise<void>;
-    getLastNumeric(marketQuoteId: string): Promise<number | null>;
+    /**
+     * Último preço (em reais) lançado ANTES do dia/período informado — base da
+     * variação. Relançar o mesmo dia/período não compara o preço com ele mesmo.
+     */
+    getPreviousNumeric(marketQuoteId: string, referenceDate: Date, period: QuotePeriod): Promise<number | null>;
+    /** Grava preço no produto e no histórico (substitui o mesmo dia/período), numa transação. */
+    saveDaily(entries: DailyQuoteEntry[]): Promise<void>;
 }
