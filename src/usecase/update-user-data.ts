@@ -62,10 +62,7 @@ const updateUserDataSchema = z.object({
     // Primary property
     primaryPropertyId: z.string().nullable().optional(),
 
-    // Partner
-    isPartner: z.boolean().optional(),
-    partnerUrl: z.string().url().max(500).nullable().optional(),
-    partnerOrder: z.number().int().min(0).nullable().optional(),
+    // Parceria saiu da pessoa: agora é da empresa (Company).
 });
 
 export type UpdateUserDataRequest = z.infer<typeof updateUserDataSchema> & { userId: string };

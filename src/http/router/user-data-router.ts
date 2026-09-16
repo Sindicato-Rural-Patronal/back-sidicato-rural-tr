@@ -18,12 +18,6 @@ import { UploadAvatarController } from '../controllers/upload-avatar.js';
 import { UploadAvatarUseCase } from '../../usecase/upload-avatar.js';
 import { createStorageAdapter } from '../../adapter/storage/factory.js';
 import { requirePermission } from '../lib/require-permission.js';
-import { ListPartnersController } from '../controllers/list-partners.js';
-import { ListPartnersUseCase } from '../../usecase/list-partners.js';
-import { ReorderPartnersController } from '../controllers/reorder-partners.js';
-import { ReorderPartnersUseCase } from '../../usecase/reorder-partners.js';
-import { UploadPartnerLogoController } from '../controllers/upload-partner-logo.js';
-import { UploadPartnerLogoUseCase } from '../../usecase/upload-partner-logo.js';
 import { createInstructorAdapter } from '../../adapter/database/instructor-adapter.js';
 import { UpdateInstructorUseCase } from '../../usecase/update-instructor.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
@@ -57,11 +51,6 @@ export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaCli
         new UploadAvatarUseCase(createStorageAdapter(), userRepository),
         getAdminPermissions,
         userAdminRepository,
-    );
-    const listPartnersController = new ListPartnersController(new ListPartnersUseCase(userRepository));
-    const reorderPartnersController = new ReorderPartnersController(new ReorderPartnersUseCase(userRepository));
-    const uploadPartnerLogoController = new UploadPartnerLogoController(
-        new UploadPartnerLogoUseCase(createStorageAdapter(), userRepository),
     );
 
     fastify.get(
@@ -220,13 +209,6 @@ nullable: true },
 nullable: true },
                             primaryPropertyId: { type: 'string',
 nullable: true },
-                            isPartner: { type: 'boolean' },
-                            partnerUrl: { type: 'string',
-nullable: true },
-                            partnerLogo: { type: 'string',
-nullable: true },
-                            partnerOrder: { type: 'integer',
-nullable: true },
                             createdAt: { type: 'string' },
                             updatedAt: { type: 'string' },
                             relations: {
@@ -289,6 +271,28 @@ nullable: true },
 nullable: true },
                                                 section: { type: 'string',
 nullable: true },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            // Empresas às quais a pessoa está vinculada, com o título dela em cada uma.
+                            companyMemberships: {
+                                type: 'array',
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        id: { type: 'string' },
+                                        title: { type: 'string' },
+                                        company: {
+                                            type: 'object',
+                                            properties: {
+                                                id: { type: 'string' },
+                                                name: { type: 'string' },
+                                                cnpj: { type: 'string',
+nullable: true },
+                                                type: { type: 'string' },
+                                                isPartner: { type: 'boolean' },
                                             },
                                         },
                                     },
@@ -465,15 +469,6 @@ nullable: true },
                         primaryPropertyId: { type: 'string',
 nullable: true,
 description: 'Id de uma propriedade do usuário marcada como principal' },
-                        isPartner: { type: 'boolean',
-description: 'Mark as public partner' },
-                        partnerUrl: { type: 'string',
-nullable: true,
-description: 'Partner website URL' },
-                        partnerOrder: { type: 'integer',
-minimum: 0,
-nullable: true,
-description: 'Display order in partner list' },
                         bio: { type: 'string',
 nullable: true,
 description: 'Instructor bio (only saved if user is an instructor)' },
@@ -530,104 +525,6 @@ properties: { message: { type: 'string' } } },
             ),
     );
 
-    fastify.get(
-        '/partners',
-        {
-            schema: {
-                tags: ['Parceiros'],
-                summary: 'Listar parceiros públicos',
-                description: 'Retorna UserData marcados como isPartner=true, ordenados por partnerOrder ASC (nulls last) depois name ASC. Sem autenticação.',
-                response: {
-                    200: {
-                        type: 'array',
-                        items: {
-                            type: 'object',
-                            properties: {
-                                id: { type: 'string' },
-                                name: { type: 'string' },
-                                avatarUrl: { type: 'string',
-nullable: true },
-                                partnerLogoUrl: { type: 'string',
-nullable: true },
-                                partnerUrl: { type: 'string',
-nullable: true },
-                                cnpj: { type: 'string',
-nullable: true },
-                            },
-                        },
-                    },
-                },
-            },
-        },
-        (req: FastifyRequest, res: FastifyReply) => listPartnersController.handle(req, res),
-    );
-
-    fastify.patch(
-        '/admin/partners/reorder',
-        {
-            schema: {
-                tags: ['Parceiros'],
-                summary: 'Reordenar parceiros',
-                security: [{ bearerAuth: [] }],
-                body: {
-                    type: 'object',
-                    required: ['order'],
-                    properties: {
-                        order: { type: 'array',
-items: { type: 'string' },
-description: 'Array de UserData IDs na nova ordem' },
-                    },
-                },
-                response: {
-                    200: { type: 'object',
-properties: { message: { type: 'string' } } },
-                    400: errorResponse,
-                    401: errorResponse,
-                    403: errorResponse,
-                },
-            },
-        },
-        async (req: FastifyRequest, res: FastifyReply) => {
-            const userId = await requirePermission(req, res, 'UPDATE_USER', getAdminPermissions);
-            if (!userId) return;
-            return reorderPartnersController.handle(req, res);
-        },
-    );
-
-    fastify.post(
-        '/admin/users/:id/partner-logo',
-        {
-            schema: {
-                tags: ['Parceiros'],
-                summary: 'Upload da logo do parceiro (300×150px)',
-                description: 'Aceita multipart/form-data com campo "file". PNG/JPG/WebP, max 5MB. Redimensiona para 300×150px com fundo transparente.',
-                security: [{ bearerAuth: [] }],
-                consumes: ['multipart/form-data'],
-                params: {
-                    type: 'object',
-                    required: ['id'],
-                    properties: { id: { type: 'string' } },
-                },
-                response: {
-                    200: { type: 'object',
-properties: { partnerLogoUrl: { type: 'string' } } },
-                    400: errorResponse,
-                    401: errorResponse,
-                    403: errorResponse,
-                    404: errorResponse,
-                },
-            },
-        },
-        async (req: FastifyRequest, res: FastifyReply) => {
-            const userId = await requirePermission(req, res, 'UPDATE_USER', getAdminPermissions);
-            if (!userId) return;
-            return uploadPartnerLogoController.handle(
-                req as Parameters<typeof uploadPartnerLogoController.handle>[0],
-                res,
-            );
-        },
-    );
-
     fastify.post(
         '/admin/users/:id/avatar',
         {
@@ -674,7 +571,8 @@ properties: { avatarUrl: { type: 'string' } } },
                 security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
                 response: {
-                    200: { type: 'object', properties: { avatarUrl: { type: 'string' } } },
+                    200: { type: 'object',
+properties: { avatarUrl: { type: 'string' } } },
                     400: errorResponse,
                     401: errorResponse,
                     404: errorResponse,

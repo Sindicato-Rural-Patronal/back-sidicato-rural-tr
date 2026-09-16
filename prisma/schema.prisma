@@ -88,7 +88,9 @@ model UserData {
   memberNotes      String?
   memberNotesNumber String?
 
-  // Partner (corporate members shown publicly)
+  // OBSOLETO desde a criação de Company: parceria agora é da empresa.
+  // Colunas mantidas só para não perder dados antigos (migradas para Company);
+  // o código não grava mais aqui. Remover numa limpeza futura.
   isPartner    Boolean @default(false)
   partnerUrl   String?
   partnerLogo  String?
@@ -109,6 +111,8 @@ model UserData {
 
   // Properties owned
   properties       Property[]
+  // Empresas às quais a pessoa está vinculada (com título/cargo)
+  companyMemberships CompanyMember[]
   // Propriedade marcada como principal (endereço usado na ficha). Sem FK formal:
   // guarda o id de uma Property do próprio usuário.
   primaryPropertyId String?
@@ -555,9 +559,12 @@ model Address {
   rooms        room[]
 }
 
+// Propriedade/endereço. Pertence a UMA pessoa OU a UMA empresa — garantido pela
+// constraint "Property_single_owner" (CHECK), criada na migration de Company.
 model Property {
   id            String    @id @default(uuid())
-  userDataId    String
+  userDataId    String?
+  companyId     String?
   name          String
   registration  String?
   addressId     String
@@ -566,8 +573,11 @@ model Property {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  userData  UserData @relation(fields: [userDataId], references: [id], onDelete: Cascade)
-  address   Address  @relation(fields: [addressId], references: [id])
+  userData  UserData? @relation(fields: [userDataId], references: [id], onDelete: Cascade)
+  company   Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  address   Address   @relation(fields: [addressId], references: [id])
+
+  @@index([companyId])
 }
 
 model Banner {
@@ -686,4 +696,61 @@ model Convenio {
   order     Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum CompanyType {
+  PRIVATE
+  PUBLIC
+}
+
+// Empresa (pessoa jurídica). Separada do cadastro de pessoas (UserData): uma
+// empresa se relaciona com várias pessoas, cada uma com um título/cargo, e tem
+// suas próprias propriedades/endereços. Parceria pública (logo na home) é da
+// empresa. CNPJ único entre empresas ativas via índice parcial na migration.
+model Company {
+  id                String      @id @default(uuid())
+  name              String
+  cnpj              String? // só dígitos
+  stateRegistration String? // inscrição estadual (ou "ISENTO")
+  type              CompanyType @default(PRIVATE)
+  phone             String? // telefone fixo 1
+  phone2            String?
+  phone3            String?
+  email             String?
+  website           String?
+  notes             String?
+
+  isPartner    Boolean @default(false)
+  partnerUrl   String?
+  partnerLogo  String?
+  partnerOrder Int?
+
+  // Propriedade principal (endereço preferencial). Sem FK formal, como em UserData.
+  primaryPropertyId String?
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  createdBy String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  members    CompanyMember[]
+  properties Property[]
+}
+
+// Vínculo pessoa ↔ empresa com o título da pessoa naquela empresa
+// ("SÓCIO", "GERENTE", "CONTADOR"…). Uma pessoa aparece uma vez por empresa.
+model CompanyMember {
+  id         String   @id @default(uuid())
+  companyId  String
+  userDataId String
+  title      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userData UserData @relation(fields: [userDataId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userDataId])
+  @@index([userDataId])
 }
