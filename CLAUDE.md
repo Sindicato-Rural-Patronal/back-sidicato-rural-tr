@@ -59,10 +59,12 @@ src/
 
 | Modelo                   | Campos principais                                                                                          |
 |--------------------------|------------------------------------------------------------------------------------------------------------|
-| `UserData`               | id, name, email, phone, cpf, cnpj, avatar, nickname, maritalStatus, phone2, phone3, rg, rgIssuer, rgIssuedAt, birthDate, driverLicense, driverLicenseCategory, birthPlace, nationality, gender, ethnicity, educationLevel, functionalCategory, specialNeeds, memberClassification, cadPro (até 5), familyIncome, memberType (painel usa lista fixa: ALUNO, PRODUTOR RURAL, TRABALHADOR RURAL ASSALARIADO, TRABALHADOR RURAL AUTONOMO; o backend aceita texto), boardPosition, boardMember, memberStatus, memberSince, memberNotes, memberNotesNumber, addressId (FK). **Obsoletos** (mantidos no banco, sem uso): cnpj, isPartner, partnerLogo, partnerUrl, partnerOrder — empresa/parceria agora é `Company` |
+| `UserData`               | id, name, email, phone, cpf, avatar, nickname, maritalStatus, phone2, phone3, rg, rgIssuer, rgIssuedAt, birthDate, driverLicense, driverLicenseCategory, birthPlace, nationality, gender, ethnicity, educationLevel, functionalCategory, specialNeeds, memberClassification, cadPro (até 5), familyIncome, memberType (lista fixa em `lib/member-types.ts`: ALUNO, PRODUTOR RURAL, TRABALHADOR RURAL ASSALARIADO, TRABALHADOR RURAL AUTONOMO; fora da lista → 400), boardPosition, boardMember, memberStatus, memberSince, memberNotes, memberNotesNumber, addressId (FK). Colunas cnpj/isPartner/partner* foram removidas (migration `20260917140000`): CNPJ antigo e tipo de membro fora da lista (ex.: SOCIO) foram copiados para `memberNotes` — empresa/parceria é `Company` |
 | `Company`                | id, name (razão social), tradeName (nome fantasia), addressId (FK→Address, sede; SetNull), cnpj (só dígitos; único entre ativas, índice parcial), stateRegistration, type (PRIVATE/PUBLIC), phone, phone2, phone3, email, website, notes, isPartner, partnerUrl, partnerLogo, partnerOrder, primaryPropertyId, isDeleted (soft delete) |
 | `CompanyMember`          | id, companyId (FK), userDataId (FK), title (texto livre em maiúsculas) — único por (companyId, userDataId) |
 | `UserAdmin`              | id, username, passwordHash, userDataId (FK), rulesId (FK)                                                  |
+| `PublicContact`          | id, userDataId (FK único, cascade), title (cargo exibido), order — contatos da página Contato; qualquer pessoa, com ou sem login |
+| `SiteSetting`            | key, value — chaves `social.*`, `org.*` (telefone, e-mail, endereço, horário, busca do mapa), `about.text`, `quotes.source` |
 | `UserInstructor`         | id, userDataId (FK único), bio, linkedin, instagram, facebook                                              |
 | `Rule`                   | id, name, description, permissions (Permission[])                                                          |
 | `Course`                 | id, name, description, roomId (FK), startTime, endTime, status, price, workloadHours, coverImage, eventNumber, minStudents, preEnrolled, waitlist, registrationDeadline, observations |
@@ -152,7 +154,6 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 ### Administradores (UserAdmin)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
-| `GET` | `/contacts` | `ListPublicContactsUseCase` | Pública |
 | `GET` | `/admin/me` | `GetCurrentAdminUseCase` | JWT (qualquer admin) |
 | `GET` | `/admin/users/admins` | `ListUserAdminsUseCase` | `READ_USER_ADMIN` |
 | `POST` | `/admin/users` | `CreateUserAdminUseCase` | `CREATE_USER_ADMIN` |
@@ -161,6 +162,21 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 
 > `GET /admin/me` retorna `{ userId, userDataId, username, rulesId, ruleName, permissions[] }`.
 > `userId` = UserAdmin.id (igual ao JWT). `userDataId` = UserData.id vinculado.
+
+### Contatos públicos (`public-contact-router.ts`, use cases em `usecase/public-contact-usecases.ts`)
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/contacts` | `ListPublicContactsUseCase.listPublic` (`{ publicTitle, userData: { name, email, phone, avatar } }`, na ordem) | Pública |
+| `GET` | `/admin/public-contacts` | `ListPublicContactsUseCase` | `READ_USER` |
+| `POST` | `/admin/public-contacts` | `AddPublicContactUseCase` — `{ userDataId, title }`; entra no fim; pessoa inexistente → 404, repetida → 409 | `UPDATE_USER` |
+| `PATCH` | `/admin/public-contacts/reorder` | `ReorderPublicContactsUseCase` — `{ order: id[] }` com todos os ids | `UPDATE_USER` |
+| `PATCH` · `DELETE` | `/admin/public-contacts/:id` | `UpdatePublicContactUseCase` (cargo) · `RemovePublicContactUseCase` | `UPDATE_USER` |
+
+### Configurações do site (`site-settings-router.ts`)
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/site-settings` | `GetSiteSettingsUseCase` (todas as chaves; ausente = '') | Pública |
+| `GET` · `PATCH` | `/admin/site-settings` | `GetSiteSettingsUseCase` · `UpdateSiteSettingsUseCase` (só grava o que veio; valida URLs, e-mail, UF) | `READ_BANNER` · `UPDATE_BANNER` |
 
 ### Instrutores
 | Método | Path | Use Case | Autenticação |
@@ -203,6 +219,8 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 | `GET` | `/market-quotes` | `ListMarketQuotesUseCase` (ativos com preço lançado) | Pública |
 | `GET` | `/admin/market-quotes` | `ListMarketQuotesUseCase` (os 5 produtos) | `READ_MARKET_QUOTE` |
 | `PUT` | `/admin/market-quotes/daily` | `SaveDailyQuotesUseCase` — `{ period, prices: [{ id, priceCents }] }`; data = hoje (America/Sao_Paulo); variação vs lançamento anterior | `UPDATE_MARKET_QUOTE` |
+| `GET` | `/market-quotes/history?days=` | `ListQuoteHistoryUseCase` — `[{ id, label, unit, points: [{ date, period, priceCents }] }]` dos produtos ativos com ponto na janela (7–365 dias, padrão 90) | Pública |
+| `PUT` | `/admin/market-quotes/source` | `UpdateQuotesSourceUseCase` — `{ source }` (fonte exibida; vazio esconde) | `UPDATE_MARKET_QUOTE` |
 
 Não há mais criar/excluir cotação: os produtos são fixos.
 
@@ -223,7 +241,7 @@ Não há mais criar/excluir cotação: os produtos são fixos.
 |--------|------|----------|--------------|
 | `POST` | `/courses/:courseId/register` | `RegisterForCourseUseCase` | Pública |
 | `POST` | `/courses/:courseId/register-by-cpf` | `RegisterForCourseByCpfUseCase` | Pública |
-| `GET` | `/admin/courses/:courseId/registrations` | `ListCourseRegistrationsUseCase` | `READ_COURSE` |
+| `GET` | `/admin/courses/:courseId/registrations` | `ListCourseRegistrationsUseCase` (userData traz memberStatus, membershipValidUntil, boardPosition, `publicContact.title` e `companyMemberships` só de empresas parceiras ativas — selos do painel) | `READ_COURSE` |
 | `DELETE` | `/admin/registrations/:registrationId` | `CancelRegistrationUseCase` | `UPDATE_COURSE` |
 
 ### Notícias
@@ -374,10 +392,11 @@ export async function fooRouter(fastify: FastifyInstance, prisma: PrismaClient) 
 }
 ```
 
-### 6. Registrar em index.ts
+### 6. Registrar em `http/register-routers.ts`
 ```ts
-server.register(fooRouter, prisma);
+app.register(fooRouter, prisma);
 ```
+`registerRouters` e `apiErrorHandler` (`http/error-handler.ts`) são usados pelo servidor e pelo app dos testes E2E — rota nova registrada ali já aparece nos dois.
 
 ## Sistema de erros tipados
 
@@ -525,6 +544,11 @@ npm run start        # iniciar build compilado
 npm run prisma:migrate   # criar/aplicar migrations
 npm run prisma:generate  # regenerar tipos do Prisma
 npm run prisma:studio    # interface visual do banco
+npx vitest run           # testes unitários
+DATABASE_TEST_URL=postgresql://USER:SENHA@localhost:PORTA/BANCO npm run test:e2e
+# E2E: banco LOCAL descartável (recusa host que não seja localhost); aplica as
+# migrations com `migrate deploy` e limpa as tabelas entre testes. O CI
+# (.github/workflows/ci.yml) roda lint, tsc, unitários e E2E com Postgres 16.
 ```
 
 ## Observações importantes

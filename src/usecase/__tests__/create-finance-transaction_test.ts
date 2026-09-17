@@ -20,14 +20,16 @@ describe('CreateFinanceTransactionUseCase', () => {
 
     it('rejeita valor zero ou negativo', async () => {
         const uc = new CreateFinanceTransactionUseCase(repo);
-        const r = await uc.execute({ ...base, amountCents: 0 }, null);
+        const r = await uc.execute({ ...base,
+amountCents: 0 }, null);
         expect(r.error).toBeDefined();
         expect(repo.createTransaction).not.toHaveBeenCalled();
     });
 
     it('rejeita sem descrição', async () => {
         const uc = new CreateFinanceTransactionUseCase(repo);
-        const r = await uc.execute({ ...base, description: '' }, null);
+        const r = await uc.execute({ ...base,
+description: '' }, null);
         expect(r.error).toBeDefined();
     });
 
@@ -45,14 +47,17 @@ describe('CreateFinanceTransactionUseCase', () => {
     it('cria "só nota" sem tipo (não vira entrada/saída)', async () => {
         vi.mocked(repo.createTransaction).mockResolvedValue({ id: 'tx-nota' } as any);
         const uc = new CreateFinanceTransactionUseCase(repo);
-        const r = await uc.execute({ ...base, type: null }, 'admin-1');
+        const r = await uc.execute({ ...base,
+type: null }, 'admin-1');
         expect(r.error).toBeUndefined();
         expect(vi.mocked(repo.createTransaction).mock.calls[0][0].type).toBeNull();
     });
 
     it('rejeita categoria em lançamento sem tipo (só nota)', async () => {
         const uc = new CreateFinanceTransactionUseCase(repo);
-        const r = await uc.execute({ ...base, type: null, categoryId: '11111111-1111-4111-8111-111111111111' }, null);
+        const r = await uc.execute({ ...base,
+type: null,
+categoryId: '11111111-1111-4111-8111-111111111111' }, null);
         expect(r.error?.message).toContain('Defina o tipo');
         expect(repo.createTransaction).not.toHaveBeenCalled();
     });
@@ -60,15 +65,19 @@ describe('CreateFinanceTransactionUseCase', () => {
     it('rejeita categoria inexistente', async () => {
         vi.mocked(repo.findCategoryById).mockResolvedValue(null);
         const uc = new CreateFinanceTransactionUseCase(repo);
-        const r = await uc.execute({ ...base, categoryId: '11111111-1111-4111-8111-111111111111' }, null);
+        const r = await uc.execute({ ...base,
+categoryId: '11111111-1111-4111-8111-111111111111' }, null);
         expect(r.error?.message).toContain('Categoria inválida');
         expect(repo.createTransaction).not.toHaveBeenCalled();
     });
 
     it('rejeita categoria de tipo diferente do lançamento', async () => {
-        vi.mocked(repo.findCategoryById).mockResolvedValue({ id: 'c1', type: 'IN' } as any);
+        vi.mocked(repo.findCategoryById).mockResolvedValue({ id: 'c1',
+type: 'IN' } as any);
         const uc = new CreateFinanceTransactionUseCase(repo);
-        const r = await uc.execute({ ...base, type: 'OUT', categoryId: '11111111-1111-4111-8111-111111111111' }, null);
+        const r = await uc.execute({ ...base,
+type: 'OUT',
+categoryId: '11111111-1111-4111-8111-111111111111' }, null);
         expect(r.error?.message).toContain('não corresponde ao tipo');
         expect(repo.createTransaction).not.toHaveBeenCalled();
     });
@@ -76,13 +85,15 @@ describe('CreateFinanceTransactionUseCase', () => {
     it('rejeita caixa inexistente', async () => {
         vi.mocked(repo.findAccountById).mockResolvedValue(null);
         const uc = new CreateFinanceTransactionUseCase(repo);
-        const r = await uc.execute({ ...base, accountId: '22222222-2222-4222-8222-222222222222' }, null);
+        const r = await uc.execute({ ...base,
+accountId: '22222222-2222-4222-8222-222222222222' }, null);
         expect(r.error?.message).toContain('Caixa inválido');
         expect(repo.createTransaction).not.toHaveBeenCalled();
     });
 
     it('aceita categoria/caixa válidos', async () => {
-        vi.mocked(repo.findCategoryById).mockResolvedValue({ id: 'c1', type: 'OUT' } as any);
+        vi.mocked(repo.findCategoryById).mockResolvedValue({ id: 'c1',
+type: 'OUT' } as any);
         vi.mocked(repo.findAccountById).mockResolvedValue({ id: 'a1' } as any);
         vi.mocked(repo.createTransaction).mockResolvedValue({ id: 'tx-2' } as any);
         const uc = new CreateFinanceTransactionUseCase(repo);

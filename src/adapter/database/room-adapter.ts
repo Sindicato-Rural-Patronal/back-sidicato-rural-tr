@@ -37,7 +37,11 @@ take });
 
     update(
         id: string,
-        data: { name: string; description: string; maxCapacity: number },
+        data: {
+ name: string;
+description: string;
+maxCapacity: number 
+},
     ): Promise<roomModel> {
         return this.prisma.room.update({ where: { id },
 data });

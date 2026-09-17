@@ -125,7 +125,8 @@ export class RegisterForCourseFullUseCase {
                 // Capacidade conferida dentro da transação serializável → sem
                 // corrida TOCTOU com inscrições concorrentes.
                 const activeCount = await t.courseUserRegistration.count({
-                    where: { courseId, isDeleted: false },
+                    where: { courseId,
+isDeleted: false },
                 });
                 if (activeCount >= course.room.maxCapacity) throw new CourseFullError();
 

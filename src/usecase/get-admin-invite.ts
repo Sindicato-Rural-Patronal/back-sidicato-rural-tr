@@ -12,7 +12,13 @@ export class GetAdminInviteUseCase {
 
     async execute(
         token: string,
-    ): Promise<{ error?: Error; invite?: { userName: string; ruleName: string } }> {
+    ): Promise<{
+ error?: Error;
+invite?: {
+ userName: string;
+ruleName: string 
+} 
+}> {
         const inv = await this.inviteRepo.findByToken(token);
         if (!inv || inv.usedAt || inv.expiresAt.getTime() < Date.now()) {
             return { error: new AdminInviteInvalidError() };

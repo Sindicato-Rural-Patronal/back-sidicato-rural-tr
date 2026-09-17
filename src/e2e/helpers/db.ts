@@ -1,40 +1,14 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../generated/prisma/client.js';
 import { hash } from 'bcrypt';
-import type { Permission } from '../../generated/prisma/enums.js';
+import { Permission } from '../../generated/prisma/enums.js';
 import type { FastifyInstance } from 'fastify';
 
 export const E2E_ADMIN_USERNAME = 'e2eadmin';
 export const E2E_ADMIN_PASSWORD = 'e2ePassword123!';
 
-const ALL_PERMISSIONS: Permission[] = [
-    'CREATE_USER',
-    'UPDATE_USER',
-    'DELETE_USER',
-    'READ_USER',
-    'CREATE_COURSE',
-    'UPDATE_COURSE',
-    'DELETE_COURSE',
-    'READ_COURSE',
-    'CREATE_RULE',
-    'UPDATE_RULE',
-    'DELETE_RULE',
-    'READ_RULE',
-    'CREATE_USER_ADMIN',
-    'UPDATE_USER_ADMIN',
-    'DELETE_USER_ADMIN',
-    'READ_USER_ADMIN',
-    'CREATE_NEWS',
-    'UPDATE_NEWS',
-    'DELETE_NEWS',
-    'READ_NEWS',
-    'READ_CONTACT',
-    'UPDATE_CONTACT',
-    'CREATE_BANNER',
-    'UPDATE_BANNER',
-    'DELETE_BANNER',
-    'READ_BANNER',
-];
+// Todas as permissões que existem no enum (inclusive as criadas depois dos testes).
+const ALL_PERMISSIONS = Object.values(Permission);
 
 export function createTestPrisma(): PrismaClient {
     const url = process.env.DATABASE_URL;
@@ -56,6 +30,7 @@ export async function cleanDatabase(prisma: PrismaClient): Promise<void> {
             "course",
             "room",
             "Property",
+            "PublicContact",
             "GalleryPhoto",
             "GalleryAlbum",
             "CompanyMember",

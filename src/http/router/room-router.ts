@@ -151,7 +151,11 @@ properties: { message: { type: 'string' } } },
         (
             req: FastifyRequest<{
                 Params: { roomId: string };
-                Body: { name: string; description: string; maxCapacity: number };
+                Body: {
+ name: string;
+description: string;
+maxCapacity: number 
+};
             }>,
             res: FastifyReply,
         ) => updateRoomController.handle(req, res),

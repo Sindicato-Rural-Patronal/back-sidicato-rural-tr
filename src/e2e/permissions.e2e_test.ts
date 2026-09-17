@@ -78,14 +78,21 @@ describe('No token → 401', () => {
 url: '/admin/users' },
         { method: 'GET' as const,
 url: '/admin/users/some-id' },
+        // Corpo válido: sem ele o Fastify responde 400 (validação) antes da auth.
         { method: 'PATCH' as const,
-url: '/users/some-id' },
+url: '/users/some-id',
+payload: { name: 'X' } },
         { method: 'DELETE' as const,
 url: '/users/some-id' },
         { method: 'GET' as const,
 url: '/admin/courses' },
         { method: 'POST' as const,
-url: '/courses' },
+url: '/courses',
+payload: { name: 'X',
+description: 'X',
+roomId: '00000000-0000-0000-0000-000000000000',
+startTime: '2026-10-01T10:00:00.000Z',
+endTime: '2026-10-01T12:00:00.000Z' } },
         { method: 'GET' as const,
 url: '/admin/me' },
         { method: 'GET' as const,
@@ -94,10 +101,15 @@ url: '/admin/rules' },
 url: '/admin/news' },
     ];
 
-    for (const { method, url } of protectedRoutes) {
+    for (const { method, url, payload } of protectedRoutes as {
+ method: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+url: string;
+payload?: object 
+}[]) {
         it(`${method} ${url} returns 401`, async () => {
             const res = await app.inject({ method,
-url });
+url,
+payload });
             expect(res.statusCode).toBe(401);
         });
     }
@@ -169,7 +181,7 @@ describe('Valid token, insufficient permission → 403', () => {
             payload: { name: 'Perm Target',
 email: 'permtarget@test.com',
 phone: '44911110080',
-cpf: '11122233380' },
+cpf: '52223338097' },
         });
         const { id } = JSON.parse(createRes.body) as { id: string };
 
@@ -197,7 +209,7 @@ cpf: '11122233380' },
             headers: bearer(limitedToken),
             payload: { name: 'Bad Rule',
 description: 'test',
-permissions: [] },
+permissions: ['READ_USER'] },
         });
         expect(res.statusCode).toBe(403);
     });

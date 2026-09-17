@@ -45,51 +45,63 @@ async function main() {
 
     await run('userData', await prisma.userData.findMany(),
         ['name', 'nickname', 'birthPlace', 'nationality', 'functionalCategory', 'memberClassification', 'memberType', 'boardPosition', 'memberNotes', 'rgIssuer'],
-        (id, data) => prisma.userData.update({ where: { id }, data: data as never }));
+        (id, data) => prisma.userData.update({ where: { id },
+data: data as never }));
 
     await run('address', await prisma.address.findMany(),
         ['city', 'state', 'complement', 'notes', 'street', 'neighborhood', 'localityName', 'road'],
-        (id, data) => prisma.address.update({ where: { id }, data: data as never }));
+        (id, data) => prisma.address.update({ where: { id },
+data: data as never }));
 
     await run('course', await prisma.course.findMany(),
         ['name', 'observations'],
-        (id, data) => prisma.course.update({ where: { id }, data: data as never }));
+        (id, data) => prisma.course.update({ where: { id },
+data: data as never }));
 
     await run('news', await prisma.news.findMany(),
         ['title', 'summary'],
-        (id, data) => prisma.news.update({ where: { id }, data: data as never }));
+        (id, data) => prisma.news.update({ where: { id },
+data: data as never }));
 
     await run('banner', await prisma.banner.findMany(),
         ['title', 'subtitle'],
-        (id, data) => prisma.banner.update({ where: { id }, data: data as never }));
+        (id, data) => prisma.banner.update({ where: { id },
+data: data as never }));
 
     await run('room', await prisma.room.findMany(),
         ['name', 'description'],
-        (id, data) => prisma.room.update({ where: { id }, data: data as never }));
+        (id, data) => prisma.room.update({ where: { id },
+data: data as never }));
 
     await run('property', await prisma.property.findMany(),
         ['name'],
-        (id, data) => prisma.property.update({ where: { id }, data: data as never }));
+        (id, data) => prisma.property.update({ where: { id },
+data: data as never }));
 
     await run('financialCategory', await prisma.financialCategory.findMany(),
         ['name'],
-        (id, data) => prisma.financialCategory.update({ where: { id }, data: data as never }));
+        (id, data) => prisma.financialCategory.update({ where: { id },
+data: data as never }));
 
     await run('financialAccount', await prisma.financialAccount.findMany(),
         ['name'],
-        (id, data) => prisma.financialAccount.update({ where: { id }, data: data as never }));
+        (id, data) => prisma.financialAccount.update({ where: { id },
+data: data as never }));
 
     await run('userRelation', await prisma.userRelation.findMany(),
         ['label'],
-        (id, data) => prisma.userRelation.update({ where: { id }, data: data as never }));
+        (id, data) => prisma.userRelation.update({ where: { id },
+data: data as never }));
 
     await run('marketQuote', await prisma.marketQuote.findMany(),
         ['label'],
-        (id, data) => prisma.marketQuote.update({ where: { id }, data: data as never }));
+        (id, data) => prisma.marketQuote.update({ where: { id },
+data: data as never }));
 
     await run('courseInstructor', await prisma.courseInstructor.findMany(),
         ['title', 'category'],
-        (id, data) => prisma.courseInstructor.update({ where: { id }, data: data as never }));
+        (id, data) => prisma.courseInstructor.update({ where: { id },
+data: data as never }));
 
     // FinancialTransaction: campos planos + empenho (JSON).
     const empKeys = ['nomeFantasia', 'razaoSocial', 'endereco', 'bairro', 'cidade', 'uf', 'banco'];
@@ -114,7 +126,8 @@ async function main() {
         }
         if (Object.keys(data).length > 0) {
             if (data.description || data.notes) txPlain++;
-            await prisma.financialTransaction.update({ where: { id: t.id }, data: data as never });
+            await prisma.financialTransaction.update({ where: { id: t.id },
+data: data as never });
         }
     }
     console.log(`  financialTransaction   ${txPlain} campos + ${txEmp} empenho atualizados`);

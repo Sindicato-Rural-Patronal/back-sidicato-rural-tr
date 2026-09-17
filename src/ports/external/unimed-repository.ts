@@ -3,7 +3,11 @@ import type { UnimedBeneficiarioModel } from '../../generated/prisma/models/Unim
 export type { UnimedBeneficiarioModel };
 
 // Dados básicos do UserData embutidos (para a tabela / detalhe do beneficiário).
-export type UnimedUserDataBasic = { id: string; name: string; cpf: string | null };
+export type UnimedUserDataBasic = {
+ id: string;
+name: string;
+cpf: string | null 
+};
 
 // Beneficiário já com o UserData básico embutido.
 export type UnimedWithUser = UnimedBeneficiarioModel & { userData: UnimedUserDataBasic };
@@ -30,7 +34,11 @@ export type UnimedCreateInput = {
 // Atualização parcial — não muda o vínculo com o usuário nem o autor do cadastro.
 export type UnimedUpdateInput = Partial<Omit<UnimedCreateInput, 'userDataId' | 'createdBy'>>;
 
-export type UnimedListFilters = { page: number; limit: number; search?: string };
+export type UnimedListFilters = {
+ page: number;
+limit: number;
+search?: string 
+};
 
 export interface UnimedRepository {
     create(input: UnimedCreateInput): Promise<UnimedBeneficiarioModel>;
@@ -38,5 +46,8 @@ export interface UnimedRepository {
     softDelete(id: string): Promise<boolean>;
     findById(id: string): Promise<UnimedWithUser | null>;
     findByUserDataId(userDataId: string): Promise<UnimedBeneficiarioModel | null>;
-    list(filters: UnimedListFilters): Promise<{ items: UnimedWithUser[]; total: number }>;
+    list(filters: UnimedListFilters): Promise<{
+ items: UnimedWithUser[];
+total: number 
+}>;
 }

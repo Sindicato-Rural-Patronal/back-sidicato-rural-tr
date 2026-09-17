@@ -42,7 +42,6 @@ const fakeUserWithRelations = {
     email: 'joao@example.com',
     phone: '44999990001',
     cpf: '11122233344',
-    cnpj: null,
     avatar: null,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),

@@ -16,7 +16,10 @@ export class UploadFinanceAttachmentUseCase {
         data: Buffer,
         filename: string,
         mimeType: string,
-    ): Promise<{ error?: Error; attachment?: FinanceAttachmentMeta }> {
+    ): Promise<{
+ error?: Error;
+attachment?: FinanceAttachmentMeta 
+}> {
         const tx = await this.repo.findTransactionById(transactionId);
         if (!tx) return { error: new FinanceTransactionNotFoundError() };
         if (!ALLOWED.has(mimeType)) {

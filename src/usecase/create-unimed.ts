@@ -41,7 +41,10 @@ export class CreateUnimedUseCase {
     async execute(
         input: unknown,
         createdBy: string | null,
-    ): Promise<{ error?: Error; beneficiario?: UnimedBeneficiarioModel }> {
+    ): Promise<{
+ error?: Error;
+beneficiario?: UnimedBeneficiarioModel 
+}> {
         const parsed = unimedSchema.safeParse(input);
         if (!parsed.success) {
             return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Dados inválidos') };

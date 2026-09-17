@@ -27,7 +27,6 @@ const fakeUser = {
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
     avatar: null,
-    cnpj: null,
 };
 
 describe('CreateUserUseCase', () => {

@@ -9,19 +9,32 @@ import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.
 import { SiteSettingsController } from '../controllers/site-settings-controller.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
 
-const socialProperties = {
-    facebook: { type: 'string' },
-    instagram: { type: 'string' },
-    whatsapp: { type: 'string' },
-};
+// Todos os campos são texto (vazio = não preenchido).
+const settingFields = [
+    'facebook',
+    'instagram',
+    'whatsapp',
+    'orgPhone',
+    'orgEmail',
+    'orgStreet',
+    'orgDistrict',
+    'orgCity',
+    'orgState',
+    'orgZip',
+    'orgHours',
+    'orgMapQuery',
+    'aboutText',
+    'quotesSource',
+] as const;
 
-const socialBody = {
+const settingsProperties = Object.fromEntries(settingFields.map(k => [k, { type: 'string' }]));
+
+// quotesSource tem endpoint próprio (PUT /admin/market-quotes/source).
+const settingsBody = {
     type: 'object',
-    properties: {
-        facebook: { type: 'string', nullable: true },
-        instagram: { type: 'string', nullable: true },
-        whatsapp: { type: 'string', nullable: true },
-    },
+    properties: Object.fromEntries(
+        settingFields.filter(k => k !== 'quotesSource').map(k => [k, { type: 'string' }]),
+    ),
 };
 
 export async function siteSettingsRouter(fastify: FastifyInstance, prisma: PrismaClient) {
@@ -41,8 +54,9 @@ export async function siteSettingsRouter(fastify: FastifyInstance, prisma: Prism
         {
             schema: {
                 tags: ['Site Settings'],
-                summary: 'Public site settings (social links)',
-                response: { 200: { type: 'object', properties: socialProperties } },
+                summary: 'Configurações públicas do site (redes sociais, dados do sindicato, Sobre, fonte das cotações)',
+                response: { 200: { type: 'object',
+properties: settingsProperties } },
             },
         },
         (req: FastifyRequest, res: FastifyReply) => controller.getPublic(req, res),
@@ -56,7 +70,8 @@ export async function siteSettingsRouter(fastify: FastifyInstance, prisma: Prism
                 summary: 'Site settings (admin)',
                 security: [{ bearerAuth: [] }],
                 response: {
-                    200: { type: 'object', properties: socialProperties },
+                    200: { type: 'object',
+properties: settingsProperties },
                     401: errorResponse,
                     403: errorResponse,
                 },
@@ -72,9 +87,10 @@ export async function siteSettingsRouter(fastify: FastifyInstance, prisma: Prism
                 tags: ['Site Settings'],
                 summary: 'Update site settings (admin)',
                 security: [{ bearerAuth: [] }],
-                body: socialBody,
+                body: settingsBody,
                 response: {
-                    200: { type: 'object', properties: { message: { type: 'string' } } },
+                    200: { type: 'object',
+properties: { message: { type: 'string' } } },
                     400: errorResponse,
                     401: errorResponse,
                     403: errorResponse,

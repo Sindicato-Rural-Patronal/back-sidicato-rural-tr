@@ -4,36 +4,13 @@ import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
-import { userDataRouter } from './http/router/user-data-router.js';
-import { authRouter } from './http/router/auth-router.js';
-import { userAdminRouter } from './http/router/user-admin.js';
-import { courseRouter } from './http/router/course-router.js';
-import { ruleRouter } from './http/router/rule-router.js';
-import { roomRouter } from './http/router/room-router.js';
-import { dashboardRouter } from './http/router/dashboard-router.js';
-import { registrationRouter } from './http/router/registration-router.js';
-import { newsRouter } from './http/router/news-router.js';
-import { addressRouter } from './http/router/address-router.js';
-import { instructorRouter } from './http/router/instructor-router.js';
-import { contactRouter } from './http/router/contact-router.js';
-import { bannerRouter } from './http/router/banner-router.js';
-import { userRelationRouter } from './http/router/user-relation-router.js';
-import { userPropertyRouter } from './http/router/user-property-router.js';
-import { marketQuoteRouter } from './http/router/market-quote-router.js';
-import { auditRouter } from './http/router/audit-router.js';
-import { adminInviteRouter } from './http/router/admin-invite-router.js';
-import { financeRouter } from './http/router/finance-router.js';
-import { unimedRouter } from './http/router/unimed-router.js';
-import { siteSettingsRouter } from './http/router/site-settings-router.js';
-import { convenioRouter } from './http/router/convenio-router.js';
-import { companyRouter } from './http/router/company-router.js';
-import { galleryRouter } from './http/router/gallery-router.js';
+import { registerRouters } from './http/register-routers.js';
 import { decodeToken } from './lib/auth.js';
 import { deriveAuditEntity } from './lib/audit-entity.js';
 import { lookupTargetLabel, bodyLabel } from './lib/audit-label.js';
 
 import { loadEnv } from './config/env.js';
-import { isPrismaUniqueViolation, isPrismaFkViolation } from './lib/prisma-errors.js';
+import { apiErrorHandler } from './http/error-handler.js';
 
 // Não expor o token de convite em logs (ele vai no caminho da URL).
 function safeUrl(url: string): string {
@@ -188,30 +165,7 @@ server.register(rateLimit, {
     timeWindow: '1 minute',
 });
 
-server.register(userDataRouter, prisma);
-server.register(authRouter, prisma);
-server.register(userAdminRouter, prisma);
-server.register(courseRouter, prisma);
-server.register(roomRouter, prisma);
-server.register(ruleRouter, prisma);
-server.register(dashboardRouter, prisma);
-server.register(registrationRouter, prisma);
-server.register(newsRouter, prisma);
-server.register(addressRouter, prisma);
-server.register(instructorRouter, prisma);
-server.register(contactRouter, prisma);
-server.register(bannerRouter, prisma);
-server.register(userRelationRouter, prisma);
-server.register(userPropertyRouter, prisma);
-server.register(marketQuoteRouter, prisma);
-server.register(auditRouter, prisma);
-server.register(adminInviteRouter, prisma);
-server.register(financeRouter, prisma);
-server.register(unimedRouter, prisma);
-server.register(siteSettingsRouter, prisma);
-server.register(convenioRouter, prisma);
-server.register(companyRouter, prisma);
-server.register(galleryRouter, prisma);
+registerRouters(server, prisma);
 
 server.get(
     '/',
@@ -236,30 +190,7 @@ server.get(
     }),
 );
 
-// Rede de segurança para erros não tratados: mapeia P2002 (unicidade) para 409
-// e nunca vaza stack/detalhe interno num 500.
-server.setErrorHandler(
-    (error: Error & {
- validation?: unknown;
-statusCode?: number 
-}, request, reply) => {
-        if (error.validation) {
-            return reply.status(400).send({ error: error.message });
-        }
-        if (isPrismaUniqueViolation(error)) {
-            return reply.status(409).send({ error: 'Registro já existe (dados únicos em conflito).' });
-        }
-        if (isPrismaFkViolation(error)) {
-            return reply.status(409).send({ error: 'Registro em uso e não pode ser removido.' });
-        }
-        const status = error.statusCode ?? 500;
-        if (status >= 500) {
-            request.log.error(error);
-            return reply.status(500).send({ error: 'Erro interno do servidor.' });
-        }
-        return reply.status(status).send({ error: error.message });
-    },
-);
+server.setErrorHandler(apiErrorHandler);
 
 server.listen({ port: env.PORT,
 host: '0.0.0.0' }, (err, address) => {

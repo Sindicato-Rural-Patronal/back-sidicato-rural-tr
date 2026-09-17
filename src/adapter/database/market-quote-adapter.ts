@@ -3,6 +3,7 @@ import type { MarketQuoteModel } from '../../generated/prisma/models/MarketQuote
 import type {
     MarketQuoteRepository,
     DailyQuoteEntry,
+    QuoteHistoryRow,
 } from '../../ports/external/market-quote-repository.js';
 import type { QuotePeriod } from '../../lib/quote-products.js';
 
@@ -50,6 +51,20 @@ nulls: 'last' } },
             select: { numeric: true },
         });
         return row?.numeric ?? null;
+    }
+
+    historySince(since: Date): Promise<QuoteHistoryRow[]> {
+        return this.prisma.marketQuoteHistory.findMany({
+            where: { referenceDate: { gte: since },
+numeric: { not: null } },
+            select: { marketQuoteId: true,
+referenceDate: true,
+period: true,
+numeric: true },
+            orderBy: [{ referenceDate: 'asc' },
+{ period: 'asc' },
+{ createdAt: 'asc' }],
+        });
     }
 
     async saveDaily(entries: DailyQuoteEntry[]): Promise<void> {

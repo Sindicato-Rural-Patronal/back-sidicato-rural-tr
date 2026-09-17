@@ -39,7 +39,7 @@ describe('POST /users', () => {
                 name: 'João Silva',
                 email: 'joao.silva@test.com',
                 phone: '44911110001',
-                cpf: '11122233301',
+                cpf: '52223330193',
             },
         });
         expect(res.statusCode).toBe(201);
@@ -58,7 +58,7 @@ email: string
             payload: { name: 'First',
 email: 'dup@test.com',
 phone: '44911110002',
-cpf: '11122233302' },
+cpf: '52223330274' },
         });
         const res = await app.inject({
             method: 'POST',
@@ -66,7 +66,7 @@ cpf: '11122233302' },
             payload: { name: 'Second',
 email: 'dup@test.com',
 phone: '44911110003',
-cpf: '11122233303' },
+cpf: '52223330355' },
         });
         expect(res.statusCode).toBe(409);
     });
@@ -78,7 +78,7 @@ cpf: '11122233303' },
             payload: { name: 'Phone First',
 email: 'phone1@test.com',
 phone: '44911110004',
-cpf: '11122233304' },
+cpf: '52223330436' },
         });
         const res = await app.inject({
             method: 'POST',
@@ -86,7 +86,7 @@ cpf: '11122233304' },
             payload: { name: 'Phone Second',
 email: 'phone2@test.com',
 phone: '44911110004',
-cpf: '11122233305' },
+cpf: '52223330517' },
         });
         expect(res.statusCode).toBe(409);
     });
@@ -107,7 +107,7 @@ cpf: '11122233305' },
             payload: { name: 'Bad Email',
 email: 'not-an-email',
 phone: '44911110006',
-cpf: '11122233306' },
+cpf: '52223330606' },
         });
         expect(res.statusCode).toBeGreaterThanOrEqual(400);
     });
@@ -158,7 +158,7 @@ describe('GET /admin/users/:id', () => {
             payload: { name: 'Detail User',
 email: 'detail@test.com',
 phone: '44911110010',
-cpf: '11122233310' },
+cpf: '52223331084' },
         });
         userId = (JSON.parse(res.body) as { id: string }).id;
     });
@@ -205,7 +205,7 @@ describe('PATCH /users/:id', () => {
             payload: { name: 'Update Target',
 email: 'update@test.com',
 phone: '44911110020',
-cpf: '11122233320' },
+cpf: '52223332056' },
         });
         userId = (JSON.parse(res.body) as { id: string }).id;
     });
@@ -286,7 +286,7 @@ describe('DELETE /users/:id', () => {
             payload: { name: 'To Delete',
 email: 'todelete@test.com',
 phone: '44911110030',
-cpf: '11122233330' },
+cpf: '52223333028' },
         });
         const { id } = JSON.parse(createRes.body) as { id: string };
 
@@ -305,7 +305,7 @@ cpf: '11122233330' },
             payload: { name: 'Ghost User',
 email: 'ghost@test.com',
 phone: '44911110031',
-cpf: '11122233331' },
+cpf: '52223333109' },
         });
         const { id } = JSON.parse(createRes.body) as { id: string };
 
@@ -328,7 +328,7 @@ headers: bearer(token) });
             payload: { name: 'Vanish User',
 email: 'vanish@test.com',
 phone: '44911110032',
-cpf: '11122233332' },
+cpf: '52223333290' },
         });
         const { id } = JSON.parse(createRes.body) as { id: string };
 
@@ -357,9 +357,9 @@ headers: bearer(token) });
 });
 
 // ---------------------------------------------------------------------------
-// PUT /admin/users/:id/address
+// POST /admin/users/:id/properties (endereço da pessoa fica na propriedade)
 // ---------------------------------------------------------------------------
-describe('PUT /admin/users/:id/address', () => {
+describe('POST /admin/users/:id/properties', () => {
     let userId: string;
 
     beforeAll(async () => {
@@ -369,42 +369,39 @@ describe('PUT /admin/users/:id/address', () => {
             payload: { name: 'Addr User',
 email: 'addruser@test.com',
 phone: '44911110040',
-cpf: '11122233340' },
+cpf: '52223334008' },
         });
         userId = (JSON.parse(res.body) as { id: string }).id;
     });
 
-    it('creates address when user has none and returns addressId', async () => {
+    it('creates a property with address and lists it', async () => {
         const res = await app.inject({
-            method: 'PUT',
-            url: `/admin/users/${userId}/address`,
+            method: 'POST',
+            url: `/admin/users/${userId}/properties`,
             headers: bearer(token),
             payload: {
-                type: 'URBAN',
-                city: 'Terra Roxa',
-                state: 'PR',
-                zipCode: '85990-000',
-                street: 'Av da Saudade',
-                number: '991',
-                neighborhood: 'Centro',
+                name: 'SITIO BOA VISTA',
+                address: { type: 'URBAN',
+city: 'TERRA ROXA',
+state: 'PR',
+zipCode: '85990000',
+street: 'AV DA SAUDADE',
+number: '991' },
             },
         });
-        expect(res.statusCode).toBe(200);
-        const body = JSON.parse(res.body) as { addressId: string };
-        expect(body.addressId).toBeTruthy();
-    });
+        expect(res.statusCode, res.body).toBe(201);
 
-    it('upserts address on second call (returns same or new addressId)', async () => {
-        const res = await app.inject({
-            method: 'PUT',
-            url: `/admin/users/${userId}/address`,
-            headers: bearer(token),
-            payload: { city: 'Nova Cidade',
-state: 'SP' },
-        });
-        expect(res.statusCode).toBe(200);
-        const body = JSON.parse(res.body) as { addressId: string };
-        expect(body.addressId).toBeTruthy();
+        const list = await app.inject({ method: 'GET',
+url: `/admin/users/${userId}/properties`,
+headers: bearer(token) });
+        expect(list.statusCode).toBe(200);
+        const body = JSON.parse(list.body) as {
+ data: {
+ name: string;
+address: { city: string } 
+}[] 
+};
+        expect(body.data.some(p => p.name === 'SITIO BOA VISTA' && p.address.city === 'TERRA ROXA')).toBe(true);
     });
 });
 
@@ -422,7 +419,7 @@ describe('POST /admin/users/:id/relations', () => {
             payload: { name: 'Rel User A',
 email: 'relA@test.com',
 phone: '44911110050',
-cpf: '11122233350' },
+cpf: '52223335071' },
         });
         const resB = await app.inject({
             method: 'POST',
@@ -430,7 +427,7 @@ cpf: '11122233350' },
             payload: { name: 'Rel User B',
 email: 'relB@test.com',
 phone: '44911110051',
-cpf: '11122233351' },
+cpf: '52223335152' },
         });
         userAId = (JSON.parse(resA.body) as { id: string }).id;
         userBId = (JSON.parse(resB.body) as { id: string }).id;

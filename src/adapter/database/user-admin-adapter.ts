@@ -3,7 +3,6 @@ import type {
     UserAdminRepository,
     UserAdminWithDetails,
     UserAdminUpdateInput,
-    PublicContactItem,
     UserAdminListFilters,
 } from '../../ports/external/user-admin-repository.js';
 import type {
@@ -77,7 +76,6 @@ mode: 'insensitive' as const } } },
                     ],
                 }),
                 ...(filters?.rulesId && { rulesId: filters.rulesId }),
-                ...(filters?.isPublic !== undefined && { isPublic: filters.isPublic }),
             },
             include: {
                 userData: { select: { name: true,
@@ -108,7 +106,6 @@ mode: 'insensitive' as const } } },
                     ],
                 }),
                 ...(filters?.rulesId && { rulesId: filters.rulesId }),
-                ...(filters?.isPublic !== undefined && { isPublic: filters.isPublic }),
             },
         });
     }
@@ -124,19 +121,5 @@ data });
             data: { isDeleted: true,
 deletedAt: new Date() },
         });
-    }
-
-    findAllPublic(): Promise<PublicContactItem[]> {
-        return this.prisma.userAdmin.findMany({
-            where: { isDeleted: false,
-isPublic: true },
-            select: {
-                publicTitle: true,
-                userData: { select: { name: true,
-email: true,
-phone: true } },
-            },
-            orderBy: { userData: { name: 'asc' } },
-        }) as Promise<PublicContactItem[]>;
     }
 }

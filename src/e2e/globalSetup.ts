@@ -14,21 +14,31 @@ override: true });
                 '  (use a SEPARATE test database — it will be wiped on every run)',
         );
     }
+    // O banco é apagado a cada rodada: só aceita banco local (máquina ou CI).
+    const host = new URL(dbUrl).hostname;
+    if (!['localhost', '127.0.0.1'].includes(host)) {
+        throw new Error(`DATABASE_TEST_URL precisa apontar para localhost (recebido: ${host}).`);
+    }
 
-    console.log('\n🔄 Resetting E2E test database...');
+    console.log('\n🔄 Preparing E2E test database...');
     try {
-        execSync('npx prisma db push --force-reset --skip-generate', {
+        // `migrate deploy` aplica as migrations de verdade (índices parciais,
+        // CHECKs e dados iniciais que o schema.prisma não expressa) sem apagar
+        // nada; cada arquivo de teste limpa as tabelas no beforeAll.
+        execSync('npx prisma migrate deploy', {
             env: { ...process.env,
 DATABASE_URL: dbUrl },
             stdio: 'pipe',
         });
         console.log('✅ E2E test database ready\n');
-    } catch (err: any) {
-        const stderr = err.stderr?.toString() ?? '';
-        const stdout = err.stdout?.toString() ?? '';
-        console.error('❌ Failed to reset test database');
-        if (stderr) console.error(stderr);
-        if (stdout) console.error(stdout);
+    } catch (err) {
+        const { stderr, stdout } = err as {
+ stderr?: Buffer;
+stdout?: Buffer 
+};
+        console.error('❌ Failed to prepare test database');
+        if (stderr) console.error(stderr.toString());
+        if (stdout) console.error(stdout.toString());
         throw err;
     }
 }

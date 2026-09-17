@@ -16,8 +16,6 @@ import { GetCurrentAdminUseCase } from '../../usecase/get-current-admin.js';
 import { UpdateMeController } from '../controllers/update-me.js';
 import { UpdateMeUseCase } from '../../usecase/update-me.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { ListPublicContactsController } from '../controllers/list-public-contacts.js';
-import { ListPublicContactsUseCase } from '../../usecase/list-public-contacts.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
 
 export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaClient) {
@@ -50,41 +48,6 @@ export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaCl
         new UpdateMeUseCase(userAdminRepository, userDataRepository),
         getAdminPermissions,
     );
-    const listPublicContactsController = new ListPublicContactsController(
-        new ListPublicContactsUseCase(userAdminRepository),
-    );
-
-    fastify.get(
-        '/contacts',
-        {
-            schema: {
-                tags: ['Contatos Públicos'],
-                summary: 'Listar contatos públicos',
-                description: 'Retorna administradores marcados como públicos. Sem autenticação.',
-                response: {
-                    200: {
-                        type: 'array',
-                        items: {
-                            type: 'object',
-                            properties: {
-                                publicTitle: { type: 'string',
-nullable: true },
-                                userData: {
-                                    type: 'object',
-                                    properties: {
-                                        name: { type: 'string' },
-                                        email: { type: 'string' },
-                                        phone: { type: 'string' },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        },
-        (req: FastifyRequest, res: FastifyReply) => listPublicContactsController.handle(req, res),
-    );
 
     fastify.get(
         '/admin/me',
@@ -102,7 +65,8 @@ nullable: true },
                             userDataId: { type: 'string' },
                             username: { type: 'string' },
                             name: { type: 'string' },
-                            avatar: { type: 'string', nullable: true },
+                            avatar: { type: 'string',
+nullable: true },
                             rulesId: { type: 'string' },
                             ruleName: { type: 'string' },
                             permissions: { type: 'array',
@@ -134,7 +98,8 @@ items: { type: 'string' } },
                     },
                 },
                 response: {
-                    200: { type: 'object', properties: { message: { type: 'string' } } },
+                    200: { type: 'object',
+properties: { message: { type: 'string' } } },
                     400: errorResponse,
                     401: errorResponse,
                     409: errorResponse,
@@ -165,8 +130,6 @@ default: 20 },
 description: 'Busca por username, nome ou email' },
                         rulesId: { type: 'string',
 description: 'Filtrar por ID da regra de permissão' },
-                        isPublic: { type: 'boolean',
-description: 'Filtrar por visibilidade pública (true/false)' },
                     },
                 },
                 response: {
@@ -177,9 +140,6 @@ description: 'Filtrar por visibilidade pública (true/false)' },
                                         username: { type: 'string' },
                                         userDataId: { type: 'string' },
                                         rulesId: { type: 'string' },
-                                        isPublic: { type: 'boolean' },
-                                        publicTitle: { type: 'string',
-nullable: true },
                                         createdAt: { type: 'string' },
                                         updatedAt: { type: 'string' },
                                         userData: {
@@ -300,11 +260,6 @@ example: '550e8400-e29b-41d4-a716-446655440000' },
                         },
                         rulesId: { type: 'string',
 description: 'ID of the Rule to assign' },
-                        isPublic: { type: 'boolean',
-description: 'Show this admin on the public contacts page' },
-                        publicTitle: { type: 'string',
-nullable: true,
-description: 'Title shown on contact page (e.g. Executivo, Estagiário)' },
                     },
                 },
                 response: {

@@ -19,7 +19,8 @@ describe('DeleteFinanceTransactionUseCase', () => {
     });
 
     it('lançamento normal → soft-delete só dele', async () => {
-        vi.mocked(repo.findTransactionById).mockResolvedValue({ id: 'tx-1', transferId: null } as any);
+        vi.mocked(repo.findTransactionById).mockResolvedValue({ id: 'tx-1',
+transferId: null } as any);
         vi.mocked(repo.softDeleteTransaction).mockResolvedValue(true);
         const uc = new DeleteFinanceTransactionUseCase(repo);
         const r = await uc.execute('tx-1');
@@ -29,7 +30,8 @@ describe('DeleteFinanceTransactionUseCase', () => {
     });
 
     it('transferência → apaga os dois lados pelo transferId', async () => {
-        vi.mocked(repo.findTransactionById).mockResolvedValue({ id: 'tx-1', transferId: 'trf-9' } as any);
+        vi.mocked(repo.findTransactionById).mockResolvedValue({ id: 'tx-1',
+transferId: 'trf-9' } as any);
         vi.mocked(repo.softDeleteTransfer).mockResolvedValue(true);
         const uc = new DeleteFinanceTransactionUseCase(repo);
         const r = await uc.execute('tx-1');

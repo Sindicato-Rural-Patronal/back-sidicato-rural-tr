@@ -22,7 +22,8 @@ export async function auditRouter(fastify: FastifyInstance, prisma: PrismaClient
                     type: 'object',
                     properties: {
                         ...paginationQuerystring.properties,
-                        action: { type: 'string', enum: ['create', 'edit', 'delete'] },
+                        action: { type: 'string',
+enum: ['create', 'edit', 'delete'] },
                         entity: { type: 'string' },
                         actorId: { type: 'string' },
                         from: { type: 'string' },
@@ -55,9 +56,14 @@ nullable: true },
         async (
             req: FastifyRequest<{
                 Querystring: {
-                    page?: number; limit?: number;
+                    page?: number;
+limit?: number;
                     action?: 'create' | 'edit' | 'delete';
-                    entity?: string; actorId?: string; from?: string; to?: string; q?: string;
+                    entity?: string;
+actorId?: string;
+from?: string;
+to?: string;
+q?: string;
                 };
             }>,
             res: FastifyReply,
@@ -84,8 +90,10 @@ nullable: true },
             }
             if (q && q.trim()) {
                 where.OR = [
-                    { targetLabel: { contains: q.trim(), mode: 'insensitive' } },
-                    { path: { contains: q.trim(), mode: 'insensitive' } },
+                    { targetLabel: { contains: q.trim(),
+mode: 'insensitive' } },
+                    { path: { contains: q.trim(),
+mode: 'insensitive' } },
                 ];
             }
 
@@ -108,7 +116,10 @@ take: limit }),
             ]);
 
             const ids = [...new Set(rows.map(r => r.actorId).filter(Boolean))] as string[];
-            const admins: { id: string; username: string }[] = ids.length
+            const admins: {
+ id: string;
+username: string 
+}[] = ids.length
                 ? await prisma.userAdmin.findMany({
                       where: { id: { in: ids } },
                       select: { id: true,

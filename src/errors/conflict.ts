@@ -105,6 +105,13 @@ export class CompanyCnpjAlreadyExistsError extends ConflictError {
     }
 }
 
+export class PublicContactAlreadyExistsError extends ConflictError {
+    constructor() {
+        super('Esta pessoa já é um contato público.');
+        this.name = 'PublicContactAlreadyExistsError';
+    }
+}
+
 export class CompanyMemberAlreadyExistsError extends ConflictError {
     constructor() {
         super('Esta pessoa já está vinculada a esta empresa. Edite o título no vínculo existente.');

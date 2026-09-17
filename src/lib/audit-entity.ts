@@ -12,6 +12,7 @@ export function deriveAuditEntity(path: string): string {
     if (p.includes('/market-quotes')) return 'Cotação';
     if (p.includes('/convenios')) return 'Convênio';
     if (p.includes('/galleries')) return 'Galeria';
+    if (p.includes('/public-contacts')) return 'Contato público';
     if (p.includes('/rooms')) return 'Sala';
     if (p.includes('/rule')) return 'Regra';
     if (p.includes('/instructor')) return 'Instrutor';

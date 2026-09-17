@@ -58,7 +58,12 @@ expiresAt: { type: 'string' } },
                 },
             },
         },
-        (req: FastifyRequest<{ Body: { userDataId: string; rulesId: string } }>, res: FastifyReply) =>
+        (req: FastifyRequest<{
+ Body: {
+ userDataId: string;
+rulesId: string 
+} 
+}>, res: FastifyReply) =>
             controller.create(req, res),
     );
 
@@ -169,7 +174,13 @@ properties: { message: { type: 'string' } } },
             },
         },
         (
-            req: FastifyRequest<{ Params: { token: string }; Body: { username: string; password: string } }>,
+            req: FastifyRequest<{
+ Params: { token: string };
+Body: {
+ username: string;
+password: string 
+} 
+}>,
             res: FastifyReply,
         ) => controller.accept(req, res),
     );

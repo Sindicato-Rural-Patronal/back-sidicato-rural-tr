@@ -182,6 +182,13 @@ export class CompanyNotFoundError extends NotFoundError {
     }
 }
 
+export class PublicContactNotFoundError extends NotFoundError {
+    constructor() {
+        super('Contato público não encontrado');
+        this.name = 'PublicContactNotFoundError';
+    }
+}
+
 export class CompanyMemberNotFoundError extends NotFoundError {
     constructor() {
         super('Vínculo com a empresa não encontrado');

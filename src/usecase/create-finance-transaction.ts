@@ -45,7 +45,10 @@ export class CreateFinanceTransactionUseCase {
     async execute(
         input: unknown,
         createdBy: string | null,
-    ): Promise<{ error?: Error; transaction?: FinancialTransactionModel }> {
+    ): Promise<{
+ error?: Error;
+transaction?: FinancialTransactionModel 
+}> {
         const parsed = financeTransactionSchema.safeParse(input);
         if (!parsed.success) {
             return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Dados inválidos') };
@@ -71,7 +74,9 @@ export class CreateFinanceTransactionUseCase {
             if (!acc) return { error: new ValidationError('Caixa inválido') };
         }
 
-        const transaction = await this.repo.createTransaction({ ...data, type: data.type ?? null, createdBy });
+        const transaction = await this.repo.createTransaction({ ...data,
+type: data.type ?? null,
+createdBy });
         return { transaction };
     }
 }

@@ -10,14 +10,18 @@ class SiteSettingsAdapter implements SiteSettingsRepository {
 
     async getAll(): Promise<Record<string, string>> {
         const rows = await this.prisma.siteSetting.findMany();
-        return Object.fromEntries(rows.map((r: { key: string; value: string }) => [r.key, r.value]));
+        return Object.fromEntries(rows.map((r: {
+ key: string;
+value: string 
+}) => [r.key, r.value]));
     }
 
     async upsertMany(entries: Record<string, string>): Promise<void> {
         const ops = Object.entries(entries).map(([key, value]) =>
             this.prisma.siteSetting.upsert({
                 where: { key },
-                create: { key, value },
+                create: { key,
+value },
                 update: { value },
             }),
         );

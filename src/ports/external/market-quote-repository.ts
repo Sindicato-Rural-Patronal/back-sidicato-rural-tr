@@ -24,4 +24,13 @@ export interface MarketQuoteRepository {
     getPreviousNumeric(marketQuoteId: string, referenceDate: Date, period: QuotePeriod): Promise<number | null>;
     /** Grava preço no produto e no histórico (substitui o mesmo dia/período), numa transação. */
     saveDaily(entries: DailyQuoteEntry[]): Promise<void>;
+    /** Lançamentos com data a partir de `since`, em ordem cronológica (dia, depois manhã/tarde). */
+    historySince(since: Date): Promise<QuoteHistoryRow[]>;
 }
+
+export type QuoteHistoryRow = {
+    marketQuoteId: string;
+    referenceDate: Date;
+    period: QuotePeriod | null;
+    numeric: number;
+};

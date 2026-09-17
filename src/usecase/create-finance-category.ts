@@ -16,7 +16,10 @@ export const financeCategorySchema = z.object({
 export class CreateFinanceCategoryUseCase {
     constructor(private readonly repo: FinanceRepository) {}
 
-    async execute(input: unknown): Promise<{ error?: Error; category?: FinancialCategoryModel }> {
+    async execute(input: unknown): Promise<{
+ error?: Error;
+category?: FinancialCategoryModel 
+}> {
         const parsed = financeCategorySchema.safeParse(input);
         if (!parsed.success) {
             return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Dados inválidos') };

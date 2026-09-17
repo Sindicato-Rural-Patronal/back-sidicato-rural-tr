@@ -11,8 +11,6 @@ const updateUserAdminSchema = z.object({
     username: z.string().min(1).optional(),
     password: z.string().min(8).optional(),
     rulesId: z.string().uuid().optional(),
-    isPublic: z.boolean().optional(),
-    publicTitle: z.string().nullable().optional(),
 });
 
 export type UpdateUserAdminRequest = z.infer<typeof updateUserAdminSchema> & {targetAdminId: string;};
@@ -60,14 +58,10 @@ export class UpdateUserAdminUseCase {
             username?: string;
             passwordHash?: string;
             rulesId?: string;
-            isPublic?: boolean;
-            publicTitle?: string | null;
         } = {};
         if (data.username) updatePayload.username = data.username;
         if (data.rulesId) updatePayload.rulesId = data.rulesId;
         if (data.password) updatePayload.passwordHash = await hash(data.password, 10);
-        if (data.isPublic !== undefined) updatePayload.isPublic = data.isPublic;
-        if (data.publicTitle !== undefined) updatePayload.publicTitle = data.publicTitle;
 
         const updated = await this.userAdminRepository.update(targetAdminId, updatePayload);
         if (!updated) return { error: new Error('Failed to update admin') };

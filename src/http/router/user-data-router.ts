@@ -17,7 +17,6 @@ import { GetUserDetailUseCase } from '../../usecase/get-user-detail.js';
 import { UploadAvatarController } from '../controllers/upload-avatar.js';
 import { UploadAvatarUseCase } from '../../usecase/upload-avatar.js';
 import { createStorageAdapter } from '../../adapter/storage/factory.js';
-import { requirePermission } from '../lib/require-permission.js';
 import { createInstructorAdapter } from '../../adapter/database/instructor-adapter.js';
 import { UpdateInstructorUseCase } from '../../usecase/update-instructor.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
@@ -99,8 +98,6 @@ description: 'true = só cadastros incompletos (sem avatar, sem propriedades, cp
                                         phone: { type: 'string' },
                                         cpf: { type: 'string',
 nullable: true },
-                                        cnpj: { type: 'string',
-nullable: true },
                                         avatar: { type: 'string',
 nullable: true },
                                         rg: { type: 'string',
@@ -147,8 +144,6 @@ nullable: true },
                             email: { type: 'string' },
                             phone: { type: 'string' },
                             cpf: { type: 'string',
-nullable: true },
-                            cnpj: { type: 'string',
 nullable: true },
                             avatar: { type: 'string',
 nullable: true },
@@ -342,7 +337,7 @@ nullable: true },
 - \`cpf\` must be unique per user — returns 409 if the CPF is already registered
 - \`email\` and \`phone\` may be shared across multiple users
 - This record represents the rural worker; to have admin access, a \`UserAdmin\` linked to this record must be created (via \`POST /admin/users\`)
-- The \`cnpj\` field is optional (for legal-entity rural producers)`,
+- Companies (CNPJ) are registered separately, in \`/admin/companies\``,
                 body: {
                     type: 'object',
                     required: ['name', 'email', 'phone', 'cpf'],
@@ -408,8 +403,6 @@ format: 'date-time' },
 format: 'email' },
                         phone: { type: 'string' },
                         cpf: { type: 'string',
-nullable: true },
-                        cnpj: { type: 'string',
 nullable: true },
                         avatar: { type: 'string',
 nullable: true },

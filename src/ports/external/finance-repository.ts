@@ -84,7 +84,11 @@ export type FinanceAttachmentMeta = {
 };
 
 // Comprovante com os bytes, para download.
-export type FinanceAttachmentFile = { data: Buffer; filename: string; mimeType: string };
+export type FinanceAttachmentFile = {
+ data: Buffer;
+filename: string;
+mimeType: string 
+};
 
 // Lançamento já com categoria, conta e comprovantes (só metadados) embutidos.
 export type FinanceTransactionWithCategory = FinancialTransactionModel & {
@@ -111,10 +115,25 @@ export type FinanceSummary = {
     periodInCents: number;
     periodOutCents: number;
     periodResultCents: number;
-    byCategory: { categoryId: string | null; name: string; color: string; type: FinancialType; totalCents: number }[];
-    byMonth: { month: string; inCents: number; outCents: number }[];
+    byCategory: {
+ categoryId: string | null;
+name: string;
+color: string;
+type: FinancialType;
+totalCents: number 
+}[];
+    byMonth: {
+ month: string;
+inCents: number;
+outCents: number 
+}[];
     // Saldo acumulado (todas as datas) por conta/caixa.
-    byAccount: { accountId: string | null; name: string; color: string; balanceCents: number }[];
+    byAccount: {
+ accountId: string | null;
+name: string;
+color: string;
+balanceCents: number 
+}[];
 };
 
 export interface FinanceRepository {
@@ -135,7 +154,10 @@ export interface FinanceRepository {
     // Lançamentos
     listTransactions(
         filters: FinanceTransactionFilters,
-    ): Promise<{ items: FinanceTransactionWithCategory[]; total: number }>;
+    ): Promise<{
+ items: FinanceTransactionWithCategory[];
+total: number 
+}>;
     // Todos os lançamentos que batem com os filtros (sem paginação) — export.
     listTransactionsForExport(
         filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>,
