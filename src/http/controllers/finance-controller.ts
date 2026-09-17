@@ -112,8 +112,8 @@ export class FinanceController {
         const csv = await this.exportUseCase.execute(request.query);
         reply.header('Content-Type', 'text/csv; charset=utf-8');
         reply.header('Content-Disposition', 'attachment; filename="lancamentos.csv"');
-        // BOM p/ o Excel reconhecer UTF-8 (acentos).
-        return reply.send(String.fromCharCode(0xfeff) + csv);
+        // toCsv já inclui o BOM (acentos no Excel).
+        return reply.send(csv);
     }
 
     async postTransaction(request: FastifyRequest, reply: FastifyReply) {

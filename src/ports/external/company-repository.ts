@@ -59,10 +59,8 @@ export type CompanyUpdateInput = Partial<CompanyInput> & { partnerLogo?: string 
 export type PartnerItem = {
     id: string;
     name: string;
-    avatarUrl: string | null;
     partnerLogoUrl: string | null;
     partnerUrl: string | null;
-    cnpj: string | null;
 };
 
 export interface CompanyRepository {

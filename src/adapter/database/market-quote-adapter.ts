@@ -53,6 +53,11 @@ nulls: 'last' } },
         return row?.numeric ?? null;
     }
 
+    async updateVariation(id: string, variation: string | null): Promise<void> {
+        await this.prisma.marketQuote.update({ where: { id },
+data: { variation } });
+    }
+
     updateUnit(id: string, unit: string | null, value: string): Promise<MarketQuoteModel> {
         return this.prisma.marketQuote.update({ where: { id },
 data: { unit,
@@ -76,7 +81,7 @@ numeric: true },
     async saveDaily(entries: DailyQuoteEntry[]): Promise<void> {
         await this.prisma.$transaction(
             entries.flatMap(e => [
-                this.prisma.marketQuote.update({
+                ...(e.updateCurrent ? [this.prisma.marketQuote.update({
                     where: { id: e.id },
                     data: {
                         priceCents: e.priceCents,
@@ -85,7 +90,7 @@ numeric: true },
                         referenceDate: e.referenceDate,
                         period: e.period,
                     },
-                }),
+                })] : []),
                 this.prisma.marketQuoteHistory.deleteMany({
                     where: { marketQuoteId: e.id,
 referenceDate: e.referenceDate,

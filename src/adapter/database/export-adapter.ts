@@ -25,6 +25,8 @@ export function createExportAdapter(prisma: PrismaClient): ExportRepository {
     return new ExportAdapter(prisma);
 }
 
+export const AUDIT_EXPORT_LIMIT = 20_000;
+
 // Com ids, só o que foi selecionado (ainda respeitando exclusão lógica).
 const byIds = (ids: string[] | undefined) => (ids?.length ? { id: { in: ids } } : null);
 
@@ -226,6 +228,8 @@ name: true } })
         const rows: Row[] = await this.prisma.auditLog.findMany({
             where: buildAuditLogWhere(filters),
             orderBy: { createdAt: 'desc' },
+            // A trilha só cresce: sai no máximo o período mais recente.
+            take: AUDIT_EXPORT_LIMIT,
         });
         const actorIds = [...new Set(rows.map(r => r.actorId).filter(Boolean))] as string[];
         const admins: {

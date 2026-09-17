@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Permission } from '../generated/prisma/enums.js';
+import { EducationLevel, Ethnicity, Gender, type Permission } from '../generated/prisma/enums.js';
 import type {
     AdminExportRow,
     AuditLogExportRow,
@@ -16,7 +16,8 @@ import type {
     UnimedExportRow,
 } from '../ports/external/export-repository.js';
 import { ValidationError } from '../errors/validation.js';
-import { csvDate, csvDateTime, csvList, csvMoney, toCsv, type CsvColumn } from '../lib/csv.js';
+import { stripAccents } from '../lib/text.js';
+import { csvDate, csvDateTime, csvList, csvMoney, csvWallClock, toCsv, type CsvColumn } from '../lib/csv.js';
 import {
     ADDRESS_TYPE_LABEL,
     AUDIT_METHOD_LABEL,
@@ -92,11 +93,25 @@ export type ExportResult = {
 
 const empty = (v: unknown) => (v === '' || v == null ? undefined : v);
 const text = z.preprocess(empty, z.string().trim().max(200).optional());
-const bool = z.preprocess(v => (v === 'true' ? true : v === 'false' ? false : undefined), z.boolean().optional());
-// "a,b,c" → ['a','b','c']
+const bool = z.preprocess(
+    v => (v === true || v === 'true' ? true : v === false || v === 'false' ? false : undefined),
+    z.boolean().optional(),
+);
+const enumOf = <T extends Record<string, string>>(e: T) =>
+    z.preprocess(empty, z.enum(Object.values(e) as [T[keyof T], ...T[keyof T][]], { message: 'Filtro inválido' }).optional());
+const day = z.preprocess(empty, z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida: use AAAA-MM-DD').optional());
+// "a,b,c" (GET) ou ['a','b'] (POST). Lista enviada vazia é erro: exportaria tudo sem querer.
 const idList = z.preprocess(
-    v => (typeof v === 'string' && v.trim() ? v.split(',').map(s => s.trim()).filter(Boolean) : undefined),
-    z.array(z.string().max(64)).max(5000, 'Selecione no máximo 5000 registros').optional(),
+    v => {
+        if (v == null) return undefined;
+        const list = Array.isArray(v) ? v : typeof v === 'string' ? v.split(',') : v;
+        return Array.isArray(list) ? list.map(s => String(s).trim()).filter(Boolean) : list;
+    },
+    z
+        .array(z.string().max(64))
+        .min(1, 'Nenhum registro selecionado')
+        .max(5000, 'Selecione no máximo 5000 registros')
+        .optional(),
 );
 
 const schemas = {
@@ -105,9 +120,9 @@ const schemas = {
         search: text,
         memberType: text,
         memberClassification: text,
-        gender: text,
-        ethnicity: text,
-        educationLevel: text,
+        gender: enumOf(Gender),
+        ethnicity: enumOf(Ethnicity),
+        educationLevel: enumOf(EducationLevel),
         incompleteRegistration: bool,
     }),
     companies: z.object({
@@ -137,8 +152,8 @@ search: text }),
         action: z.preprocess(empty, z.enum(['create', 'edit', 'delete', 'export']).optional()),
         entity: text,
         actorId: text,
-        from: text,
-        to: text,
+        from: day,
+        to: day,
         q: text,
     }),
 } satisfies Record<ExportDataset, z.ZodTypeAny>;
@@ -227,9 +242,7 @@ function ageOn(birth: Date | null, today: Date): number | null {
 }
 
 function slug(value: string): string {
-    return value
-        .normalize('NFD')
-        .replace(/[̀-ͯ]/g, '')
+    return stripAccents(value)
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
@@ -427,11 +440,11 @@ value: c => c.eventNumber },
     { header: 'Status',
 value: c => label(COURSE_STATUS_LABEL, c.status) },
     { header: 'Início',
-value: c => csvDateTime(c.startTime) },
+value: c => csvWallClock(c.startTime) },
     { header: 'Término',
-value: c => csvDateTime(c.endTime) },
+value: c => csvWallClock(c.endTime) },
     { header: 'Inscrições até',
-value: c => csvDateTime(c.registrationDeadline) },
+value: c => csvWallClock(c.registrationDeadline) },
     { header: 'Sala',
 value: c => c.room.name },
     { header: 'Capacidade da sala',
@@ -469,7 +482,7 @@ value: r => r.course.name },
         { header: 'Nº do evento',
 value: r => r.course.eventNumber },
         { header: 'Início do curso',
-value: r => csvDateTime(r.course.startTime) },
+value: r => csvWallClock(r.course.startTime) },
         { header: 'Nome',
 value: r => r.userData.name },
         { header: 'CPF',

@@ -1,3 +1,4 @@
+import { httpUrl } from './company-schema.js';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { z } from 'zod';
@@ -30,7 +31,7 @@ export const galleryAlbumSchema = z.object({
     description: z.preprocess(emptyToNull, z.string().trim().max(500, 'Descrição muito longa').nullable().optional()),
     linkUrl: z.preprocess(
         emptyToNull,
-        z.string().trim().url('Link inválido: comece com https://').max(500).nullable().optional(),
+        z.string().trim().max(500).pipe(httpUrl('Link inválido: comece com https://')).nullable().optional(),
     ),
     isActive: z.boolean().optional(),
 });

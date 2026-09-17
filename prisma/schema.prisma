@@ -243,6 +243,7 @@ model MarketQuoteHistory {
   createdAt     DateTime    @default(now())
 
   @@index([marketQuoteId, createdAt])
+  @@unique([marketQuoteId, referenceDate, period])
 }
 
 // Trilha de auditoria: registra mutações (POST/PATCH/PUT/DELETE bem-sucedidas)

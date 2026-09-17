@@ -255,6 +255,26 @@ describe('Super admin token → 200/201 on all routes', () => {
         expect(res.statusCode).toBe(200);
     });
 
+    it('regra aceita todas as permissões do enum (inclusive convênios)', async () => {
+        const created = await app.inject({
+            method: 'POST',
+            url: '/rules',
+            headers: bearer(superToken),
+            payload: { name: 'CONVENIOS',
+description: null,
+permissions: ['READ_CONVENIO', 'UPDATE_CONVENIO'] },
+        });
+        expect(created.statusCode, created.body).toBe(201);
+        const { id } = JSON.parse(created.body) as { id: string };
+        const updated = await app.inject({
+            method: 'PATCH',
+            url: `/rules/${id}`,
+            headers: bearer(superToken),
+            payload: { permissions: ['READ_CONVENIO', 'CREATE_CONVENIO', 'DELETE_CONVENIO', 'READ_FINANCE'] },
+        });
+        expect(updated.statusCode, updated.body).toBe(200);
+    });
+
     it('GET /admin/dashboard/stats → 200', async () => {
         const res = await app.inject({
             method: 'GET',

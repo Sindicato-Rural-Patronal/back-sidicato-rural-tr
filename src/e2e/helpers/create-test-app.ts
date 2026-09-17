@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { registerRouters } from '../../http/register-routers.js';
 import { apiErrorHandler } from '../../http/error-handler.js';
+import { registerAuditHooks } from '../../http/audit-hooks.js';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { FastifyInstance } from 'fastify';
 
@@ -34,6 +35,7 @@ ajv: { customOptions: { keywords: ['example'] } } });
     });
     app.register(multipart);
 
+    registerAuditHooks(app, prisma);
     registerRouters(app, prisma);
     app.setErrorHandler(apiErrorHandler);
 

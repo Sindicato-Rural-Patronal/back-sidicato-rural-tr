@@ -10,6 +10,7 @@ const repo = {
     findById: vi.fn(),
     getPreviousNumeric: vi.fn(),
     saveDaily: vi.fn(),
+    updateVariation: vi.fn(),
 } as unknown as MarketQuoteRepository;
 
 // 17/09/2026 01:30 UTC ainda é 16/09 em Brasília.
@@ -54,14 +55,36 @@ priceCents: 12050,
 value: 'R$ 120,50 /sc 60kg',
 variation: '+20,5%',
 referenceDate: date,
-period: 'AFTERNOON' },
+period: 'AFTERNOON',
+updateCurrent: true },
             { id: 'dolar',
 priceCents: 523,
 value: 'R$ 5,23',
 variation: null,
 referenceDate: date,
-period: 'AFTERNOON' },
+period: 'AFTERNOON',
+updateCurrent: true },
         ]);
+        expect(repo.updateVariation).not.toHaveBeenCalled();
+    });
+
+    it('corrigir a manhã depois da tarde só muda o histórico e recalcula a variação da tarde', async () => {
+        const date = new Date('2026-09-16T00:00:00.000Z');
+        vi.mocked(repo.findById).mockResolvedValue({ id: 'soja',
+unit: 'sc 60kg',
+priceCents: 12000,
+referenceDate: date,
+period: 'AFTERNOON' } as never);
+        // antes da manhã: 110 (dia anterior); antes da tarde, já com a manhã corrigida: 118
+        vi.mocked(repo.getPreviousNumeric).mockImplementation(async (_id, _d, p) => (p === 'MORNING' ? 110 : 118));
+        const r = await new SaveDailyQuotesUseCase(repo, now).execute({ period: 'MORNING',
+prices: [{ id: 'soja',
+priceCents: 11800 }] });
+        expect(r.error).toBeUndefined();
+        expect(repo.saveDaily).toHaveBeenCalledWith([expect.objectContaining({ period: 'MORNING',
+priceCents: 11800,
+updateCurrent: false })]);
+        expect(repo.updateVariation).toHaveBeenCalledWith('soja', '+1,7%');
     });
 
     it.each([

@@ -61,8 +61,6 @@ export const convenioUpdateSchema = convenioSchema.partial().extend({
     logoUrl: z.null().optional(),
 });
 
-export type ConvenioParsed = z.infer<typeof convenioSchema>;
-
 export function firstIssue(error: z.ZodError): string {
     return error.issues[0]?.message ?? 'Dados inválidos';
 }

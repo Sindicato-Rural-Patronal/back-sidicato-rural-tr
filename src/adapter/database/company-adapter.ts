@@ -139,8 +139,7 @@ isPartner: true },
 name: true,
 tradeName: true,
 partnerLogo: true,
-partnerUrl: true,
-cnpj: true },
+partnerUrl: true },
             orderBy: [{ partnerOrder: { sort: 'asc',
 nulls: 'last' } }, { name: 'asc' }],
         });
@@ -149,16 +148,13 @@ nulls: 'last' } }, { name: 'asc' }],
 name: string;
 tradeName: string | null;
 partnerLogo: string | null;
-partnerUrl: string | null;
-cnpj: string | null 
+partnerUrl: string | null 
 }) => ({
             id: r.id,
             // Na home aparece o nome fantasia, quando houver.
             name: r.tradeName || r.name,
-            avatarUrl: null,
             partnerLogoUrl: r.partnerLogo,
             partnerUrl: r.partnerUrl,
-            cnpj: r.cnpj,
         }));
     }
 

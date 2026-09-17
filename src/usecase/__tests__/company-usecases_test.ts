@@ -265,7 +265,7 @@ describe('DeleteCompanyUseCase', () => {
 describe('vínculos pessoa ↔ empresa', () => {
     beforeEach(() => vi.clearAllMocks());
 
-    it('vincula com título', async () => {
+    it('vincula com título em maiúsculas e sem acento (padrão do painel)', async () => {
         vi.mocked(repo.findById).mockResolvedValue(company);
         vi.mocked(people.findById).mockResolvedValue({ id: 'u1' } as never);
         vi.mocked(repo.findMemberByPerson).mockResolvedValue(null);
@@ -275,7 +275,7 @@ title: ' SÓCIO ' });
         expect(r.error).toBeUndefined();
         expect(repo.addMember).toHaveBeenCalledWith({ companyId: 'c1',
 userDataId: 'u1',
-title: 'SÓCIO' });
+title: 'SOCIO' });
     });
 
     it('exige título', async () => {
@@ -345,14 +345,17 @@ companyId: 'c1' } as never);
 describe('parceiros', () => {
     beforeEach(() => vi.clearAllMocks());
 
-    it('só reordena empresas parceiras ativas', async () => {
-        vi.mocked(repo.findById).mockResolvedValueOnce({ id: 'c1',
-isPartner: true } as never);
-        vi.mocked(repo.findById).mockResolvedValueOnce({ id: 'c2',
-isPartner: false } as never);
-        const r = await new ReorderPartnersUseCase(repo).execute({ order: ['c1', 'c2'] });
-        expect(r.error).toBeInstanceOf(ValidationError);
+    it('reordena só com todas as parceiras ativas, uma vez cada', async () => {
+        vi.mocked(repo.findPartners).mockResolvedValue([{ id: 'c1' }, { id: 'c3' }] as never);
+        const uc = new ReorderPartnersUseCase(repo);
+        // não parceira, faltando uma e repetida
+        expect((await uc.execute({ order: ['c1', 'c2'] })).error).toBeInstanceOf(ValidationError);
+        expect((await uc.execute({ order: ['c1'] })).error).toBeInstanceOf(ValidationError);
+        expect((await uc.execute({ order: ['c1', 'c1'] })).error).toBeInstanceOf(ValidationError);
         expect(repo.reorderPartners).not.toHaveBeenCalled();
+
+        expect((await uc.execute({ order: ['c3', 'c1'] })).error).toBeUndefined();
+        expect(repo.reorderPartners).toHaveBeenCalledWith(['c3', 'c1']);
     });
 });
 
