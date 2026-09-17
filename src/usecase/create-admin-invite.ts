@@ -21,7 +21,11 @@ export class CreateAdminInviteUseCase {
         userDataId: string,
         rulesId: string,
         actorPermissions: string[],
-    ): Promise<{ error?: Error; token?: string; expiresAt?: Date }> {
+    ): Promise<{
+ error?: Error;
+token?: string;
+expiresAt?: Date 
+}> {
         const user = await this.userDataRepo.findById(userDataId);
         if (!user) return { error: new UserDataNotFoundError() };
         const rule = await this.ruleRepo.findById(rulesId);
@@ -43,6 +47,7 @@ export class CreateAdminInviteUseCase {
 userDataId,
 rulesId,
 expiresAt });
-        return { token, expiresAt };
+        return { token,
+expiresAt };
     }
 }

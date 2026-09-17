@@ -10,6 +10,21 @@ jobs:
   ci:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sind
+          POSTGRES_PASSWORD: sind
+          POSTGRES_DB: sindicato_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sind"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v4
 
@@ -30,5 +45,12 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
-      - name: Tests
+      - name: Unit tests
         run: npm run test:run
+
+      # Aplica todas as migrations num Postgres descartável e roda a API de
+      # verdade (rotas, validação, permissões) contra ele.
+      - name: E2E tests
+        env:
+          DATABASE_TEST_URL: postgresql://sind:sind@localhost:5432/sindicato_e2e
+        run: npm run test:e2e

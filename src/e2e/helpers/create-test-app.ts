@@ -1,24 +1,15 @@
 import fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
-import { userDataRouter } from '../../http/router/user-data-router.js';
-import { authRouter } from '../../http/router/auth-router.js';
-import { userAdminRouter } from '../../http/router/user-admin.js';
-import { courseRouter } from '../../http/router/course-router.js';
-import { ruleRouter } from '../../http/router/rule-router.js';
-import { roomRouter } from '../../http/router/room-router.js';
-import { dashboardRouter } from '../../http/router/dashboard-router.js';
-import { registrationRouter } from '../../http/router/registration-router.js';
-import { newsRouter } from '../../http/router/news-router.js';
-import { addressRouter } from '../../http/router/address-router.js';
-import { instructorRouter } from '../../http/router/instructor-router.js';
-import { contactRouter } from '../../http/router/contact-router.js';
-import { bannerRouter } from '../../http/router/banner-router.js';
+import { registerRouters } from '../../http/register-routers.js';
+import { apiErrorHandler } from '../../http/error-handler.js';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { FastifyInstance } from 'fastify';
 
 export async function createTestApp(prisma: PrismaClient): Promise<FastifyInstance> {
-    const app = fastify({ logger: false });
+    // Mesmas opções de AJV do servidor real (as rotas documentam `example`).
+    const app = fastify({ logger: false,
+ajv: { customOptions: { keywords: ['example'] } } });
 
     app.addContentTypeParser(
         'application/json',
@@ -43,19 +34,8 @@ export async function createTestApp(prisma: PrismaClient): Promise<FastifyInstan
     });
     app.register(multipart);
 
-    app.register(userDataRouter, prisma);
-    app.register(authRouter, prisma);
-    app.register(userAdminRouter, prisma);
-    app.register(courseRouter, prisma);
-    app.register(roomRouter, prisma);
-    app.register(ruleRouter, prisma);
-    app.register(dashboardRouter, prisma);
-    app.register(registrationRouter, prisma);
-    app.register(newsRouter, prisma);
-    app.register(addressRouter, prisma);
-    app.register(instructorRouter, prisma);
-    app.register(contactRouter, prisma);
-    app.register(bannerRouter, prisma);
+    registerRouters(app, prisma);
+    app.setErrorHandler(apiErrorHandler);
 
     await app.ready();
     return app;

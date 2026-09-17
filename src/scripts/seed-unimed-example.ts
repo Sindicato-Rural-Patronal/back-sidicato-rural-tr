@@ -16,8 +16,10 @@ async function main() {
 
     // Já existe um exemplo? Só mostra.
     const existing = await prisma.unimedBeneficiario.findFirst({
-        where: { isDeleted: false, obs: { startsWith: 'EXEMPLO' } },
-        include: { userData: { select: { id: true, name: true } } },
+        where: { isDeleted: false,
+obs: { startsWith: 'EXEMPLO' } },
+        include: { userData: { select: { id: true,
+name: true } } },
     });
     if (existing) {
         console.log('Exemplo Unimed já existe:');
@@ -29,9 +31,11 @@ async function main() {
 
     // Primeiro usuário sem cadastro Unimed (relação 1:1).
     const user = await prisma.userData.findFirst({
-        where: { isDeleted: false, unimed: null },
+        where: { isDeleted: false,
+unimed: null },
         orderBy: { createdAt: 'asc' },
-        select: { id: true, name: true },
+        select: { id: true,
+name: true },
     });
     if (!user) {
         console.log('Nenhum usuário disponível sem Unimed. Cadastre um usuário primeiro.');

@@ -15,7 +15,10 @@ export const financeAccountSchema = z.object({
 export class CreateFinanceAccountUseCase {
     constructor(private readonly repo: FinanceRepository) {}
 
-    async execute(input: unknown): Promise<{ error?: Error; account?: FinancialAccountModel }> {
+    async execute(input: unknown): Promise<{
+ error?: Error;
+account?: FinancialAccountModel 
+}> {
         const parsed = financeAccountSchema.safeParse(input);
         if (!parsed.success) {
             return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Dados inválidos') };

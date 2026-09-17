@@ -9,7 +9,9 @@ import type {
 } from '../../ports/external/unimed-repository.js';
 
 // Só os campos básicos do UserData — nunca a ficha inteira na listagem/detalhe.
-const userDataSelect = { select: { id: true, name: true, cpf: true } } as const;
+const userDataSelect = { select: { id: true,
+name: true,
+cpf: true } } as const;
 
 export function createUnimedAdapter(prisma: PrismaClient): UnimedRepository {
     return new UnimedAdapter(prisma);
@@ -23,31 +25,39 @@ class UnimedAdapter implements UnimedRepository {
     }
 
     update(id: string, input: UnimedUpdateInput): Promise<UnimedBeneficiarioModel> {
-        return this.prisma.unimedBeneficiario.update({ where: { id }, data: input });
+        return this.prisma.unimedBeneficiario.update({ where: { id },
+data: input });
     }
 
     async softDelete(id: string): Promise<boolean> {
         const r = await this.prisma.unimedBeneficiario.updateMany({
-            where: { id, isDeleted: false },
-            data: { isDeleted: true, deletedAt: new Date() },
+            where: { id,
+isDeleted: false },
+            data: { isDeleted: true,
+deletedAt: new Date() },
         });
         return r.count === 1;
     }
 
     findById(id: string): Promise<UnimedWithUser | null> {
         return this.prisma.unimedBeneficiario.findFirst({
-            where: { id, isDeleted: false },
+            where: { id,
+isDeleted: false },
             include: { userData: userDataSelect },
         });
     }
 
     findByUserDataId(userDataId: string): Promise<UnimedBeneficiarioModel | null> {
         return this.prisma.unimedBeneficiario.findFirst({
-            where: { userDataId, isDeleted: false },
+            where: { userDataId,
+isDeleted: false },
         });
     }
 
-    async list(filters: UnimedListFilters): Promise<{ items: UnimedWithUser[]; total: number }> {
+    async list(filters: UnimedListFilters): Promise<{
+ items: UnimedWithUser[];
+total: number 
+}> {
         const { page, limit, search } = filters;
         // Busca filtra pelo UserData vinculado (nome ou CPF).
         const where = {
@@ -56,7 +66,8 @@ class UnimedAdapter implements UnimedRepository {
                 ? {
                       userData: {
                           OR: [
-                              { name: { contains: search, mode: 'insensitive' as const } },
+                              { name: { contains: search,
+mode: 'insensitive' as const } },
                               { cpf: { contains: search } },
                           ],
                       },
@@ -73,6 +84,7 @@ class UnimedAdapter implements UnimedRepository {
             }),
             this.prisma.unimedBeneficiario.count({ where }),
         ]);
-        return { items, total };
+        return { items,
+total };
     }
 }

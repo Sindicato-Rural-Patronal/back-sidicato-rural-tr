@@ -16,7 +16,8 @@ function cell(v: string): string {
 }
 
 function brl(cents: number): string {
-    return (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2,
+maximumFractionDigits: 2 });
 }
 
 function ddmmyyyy(d: Date): string {

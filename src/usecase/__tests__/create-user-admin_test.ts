@@ -107,7 +107,8 @@ describe('CreateUserAdminUseCase', () => {
             vi.mocked(mockUserAdminRepo.findByUsernameAny).mockResolvedValue(null);
             vi.mocked(mockUserDataRepo.findById).mockResolvedValue({ id: 'ud-001' } as any);
             vi.mocked(mockUserAdminRepo.findByUserDataIdAny).mockResolvedValue(null);
-            vi.mocked(mockRuleRepo.findById).mockResolvedValue({ id: 'role-001', permissions: [] } as any);
+            vi.mocked(mockRuleRepo.findById).mockResolvedValue({ id: 'role-001',
+permissions: [] } as any);
             vi.mocked(mockUserAdminRepo.create).mockResolvedValue({ id: 'new-admin-001' } as any);
             const uc = new CreateUserAdminUseCase(
                 mockUserAdminRepo,

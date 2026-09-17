@@ -63,7 +63,8 @@ ruleId: '' });
             vi.mocked(mockRuleRepo.findById).mockResolvedValue({ id: 'rule-001' } as any);
             const uc = new UpdateRuleUseCase(mockRuleRepo);
             const result = await uc.execute(
-                { ...validInput, permissions: ['DELETE_USER_ADMIN'] as any },
+                { ...validInput,
+permissions: ['DELETE_USER_ADMIN'] as any },
                 ['READ_COURSE'],
             );
             expect(result.error).toBeDefined();

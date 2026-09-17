@@ -4,7 +4,11 @@ import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permiss
 import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 
 type Params = { roomId: string };
-type Body = { name: string; description: string; maxCapacity: number };
+type Body = {
+ name: string;
+description: string;
+maxCapacity: number 
+};
 
 export class UpdateRoomController {
     constructor(
@@ -12,7 +16,10 @@ export class UpdateRoomController {
         private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
-    async handle(request: FastifyRequest<{ Params: Params; Body: Body }>, reply: FastifyReply) {
+    async handle(request: FastifyRequest<{
+ Params: Params;
+Body: Body 
+}>, reply: FastifyReply) {
         if (
             (await requirePermission(request, reply, 'UPDATE_COURSE', this.getAdminPermissions)) === null
         )

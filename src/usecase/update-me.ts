@@ -35,7 +35,10 @@ export class UpdateMeUseCase {
             if (conflict && conflict.id !== adminId) return { error: new UsernameAlreadyExistsError() };
         }
 
-        const adminPayload: { username?: string; passwordHash?: string } = {};
+        const adminPayload: {
+ username?: string;
+passwordHash?: string 
+} = {};
         if (d.username) adminPayload.username = d.username;
         if (d.password) adminPayload.passwordHash = await hash(d.password, 10);
         if (Object.keys(adminPayload).length > 0) {

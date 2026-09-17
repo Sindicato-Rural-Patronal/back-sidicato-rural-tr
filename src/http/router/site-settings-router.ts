@@ -18,9 +18,12 @@ const socialProperties = {
 const socialBody = {
     type: 'object',
     properties: {
-        facebook: { type: 'string', nullable: true },
-        instagram: { type: 'string', nullable: true },
-        whatsapp: { type: 'string', nullable: true },
+        facebook: { type: 'string',
+nullable: true },
+        instagram: { type: 'string',
+nullable: true },
+        whatsapp: { type: 'string',
+nullable: true },
     },
 };
 
@@ -42,7 +45,8 @@ export async function siteSettingsRouter(fastify: FastifyInstance, prisma: Prism
             schema: {
                 tags: ['Site Settings'],
                 summary: 'Public site settings (social links)',
-                response: { 200: { type: 'object', properties: socialProperties } },
+                response: { 200: { type: 'object',
+properties: socialProperties } },
             },
         },
         (req: FastifyRequest, res: FastifyReply) => controller.getPublic(req, res),
@@ -56,7 +60,8 @@ export async function siteSettingsRouter(fastify: FastifyInstance, prisma: Prism
                 summary: 'Site settings (admin)',
                 security: [{ bearerAuth: [] }],
                 response: {
-                    200: { type: 'object', properties: socialProperties },
+                    200: { type: 'object',
+properties: socialProperties },
                     401: errorResponse,
                     403: errorResponse,
                 },
@@ -74,7 +79,8 @@ export async function siteSettingsRouter(fastify: FastifyInstance, prisma: Prism
                 security: [{ bearerAuth: [] }],
                 body: socialBody,
                 response: {
-                    200: { type: 'object', properties: { message: { type: 'string' } } },
+                    200: { type: 'object',
+properties: { message: { type: 'string' } } },
                     400: errorResponse,
                     401: errorResponse,
                     403: errorResponse,

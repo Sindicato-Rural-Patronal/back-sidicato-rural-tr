@@ -32,7 +32,12 @@ export class AdminInviteController {
     }
 
     async create(
-        request: FastifyRequest<{ Body: { userDataId: string; rulesId: string } }>,
+        request: FastifyRequest<{
+ Body: {
+ userDataId: string;
+rulesId: string 
+} 
+}>,
         reply: FastifyReply,
     ) {
         const actorId = await requirePermission(
@@ -57,7 +62,13 @@ expiresAt: r.expiresAt });
     }
 
     async accept(
-        request: FastifyRequest<{ Params: { token: string }; Body: { username: string; password: string } }>,
+        request: FastifyRequest<{
+ Params: { token: string };
+Body: {
+ username: string;
+password: string 
+} 
+}>,
         reply: FastifyReply,
     ) {
         const r = await this.acceptUseCase.execute(

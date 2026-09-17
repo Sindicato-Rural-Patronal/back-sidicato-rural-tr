@@ -14,7 +14,11 @@ maxCapacity: number
     count(): Promise<number>;
     update(
         id: string,
-        data: { name: string; description: string; maxCapacity: number },
+        data: {
+ name: string;
+description: string;
+maxCapacity: number 
+},
     ): Promise<roomModel>;
     delete(id: string): Promise<boolean>;
     countCourses(roomId: string): Promise<number>;

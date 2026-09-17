@@ -17,7 +17,6 @@ import { GetUserDetailUseCase } from '../../usecase/get-user-detail.js';
 import { UploadAvatarController } from '../controllers/upload-avatar.js';
 import { UploadAvatarUseCase } from '../../usecase/upload-avatar.js';
 import { createStorageAdapter } from '../../adapter/storage/factory.js';
-import { requirePermission } from '../lib/require-permission.js';
 import { createInstructorAdapter } from '../../adapter/database/instructor-adapter.js';
 import { UpdateInstructorUseCase } from '../../usecase/update-instructor.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';

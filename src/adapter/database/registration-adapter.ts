@@ -58,11 +58,13 @@ userDataId },
                     async (tx: unknown) => {
                         const t = tx as PrismaClient;
                         const count = await t.courseUserRegistration.count({
-                            where: { courseId, isDeleted: false },
+                            where: { courseId,
+isDeleted: false },
                         });
                         if (count >= maxCapacity) return 'FULL' as const;
                         return await t.courseUserRegistration.create({
-                            data: { courseId, userDataId },
+                            data: { courseId,
+userDataId },
                         });
                     },
                     { isolationLevel: 'Serializable' },

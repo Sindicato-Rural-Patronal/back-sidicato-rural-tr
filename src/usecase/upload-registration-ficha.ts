@@ -11,7 +11,10 @@ export class UploadRegistrationFichaUseCase {
         data: Buffer,
         filename: string,
         mimeType: string,
-    ): Promise<{ error?: Error; filename?: string }> {
+    ): Promise<{
+ error?: Error;
+filename?: string 
+}> {
         const reg = await this.registrationRepository.findById(registrationId);
         if (!reg) return { error: new RegistrationNotFoundError() };
         if (mimeType !== 'application/pdf') {

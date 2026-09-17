@@ -11,10 +11,18 @@ userAdmin: {
 isPublic: boolean
 } | null;
 };
-    ficha: { id: string; filename: string; createdAt: Date } | null;
+    ficha: {
+ id: string;
+filename: string;
+createdAt: Date 
+} | null;
 };
 
-export type RegistrationFichaFile = { data: Buffer; filename: string; mimeType: string };
+export type RegistrationFichaFile = {
+ data: Buffer;
+filename: string;
+mimeType: string 
+};
 
 export interface RegistrationRepository {
     create(courseId: string, userDataId: string): Promise<courseUserRegistrationModel>;

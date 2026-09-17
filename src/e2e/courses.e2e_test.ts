@@ -18,12 +18,20 @@ let roomId: string;
 const COURSE_PAYLOAD = {
     name: 'Curso de Irrigação',
     description: 'Técnicas avançadas de irrigação',
-    startTime: '2026-09-01T08:00:00.000Z',
-    endTime: '2026-09-01T17:00:00.000Z',
     status: 'PUBLIC',
     price: 0,
     workloadHours: 8,
 };
+
+// A sala não pode ter dois cursos no mesmo período: cada curso criado nos
+// testes ganha um dia próprio.
+let slotDay = 0;
+function nextSlot() {
+    const day = new Date(Date.UTC(2030, 0, 1 + slotDay++));
+    const ymd = day.toISOString().slice(0, 10);
+    return { startTime: `${ymd}T08:00:00.000Z`,
+endTime: `${ymd}T17:00:00.000Z` };
+}
 
 beforeAll(async () => {
     prisma = createTestPrisma();
@@ -37,7 +45,7 @@ beforeAll(async () => {
         method: 'POST',
         url: '/rooms',
         headers: bearer(token),
-        payload: { name: 'Sala Principal',
+        payload: { name: 'AUDITORIO',
 description: 'Sala de testes E2E',
 maxCapacity: 50 },
     });
@@ -59,7 +67,7 @@ describe('POST /rooms', () => {
             method: 'POST',
             url: '/rooms',
             headers: bearer(token),
-            payload: { name: 'Sala Extra',
+            payload: { name: 'SALA 1',
 description: 'Extra room',
 maxCapacity: 20 },
         });
@@ -72,7 +80,7 @@ maxCapacity: 20 },
         const res = await app.inject({
             method: 'POST',
             url: '/rooms',
-            payload: { name: 'No Auth Room',
+            payload: { name: 'SALA 2',
 description: 'Test',
 maxCapacity: 10 },
         });
@@ -88,7 +96,7 @@ describe('GET /rooms', () => {
         const res = await app.inject({ method: 'GET',
 url: '/rooms' });
         expect(res.statusCode).toBe(200);
-        expect(Array.isArray(JSON.parse(res.body))).toBe(true);
+        expect(Array.isArray((JSON.parse(res.body) as { data: unknown }).data)).toBe(true);
     });
 });
 
@@ -102,6 +110,7 @@ describe('POST /courses', () => {
             url: '/courses',
             headers: bearer(token),
             payload: { ...COURSE_PAYLOAD,
+...nextSlot(),
 roomId },
         });
         expect(res.statusCode).toBe(201);
@@ -115,6 +124,7 @@ roomId },
             url: '/courses',
             headers: bearer(token),
             payload: { ...COURSE_PAYLOAD,
+...nextSlot(),
 name: 'Curso Rascunho',
 status: 'UNPUBLISHED',
 roomId },
@@ -127,6 +137,7 @@ roomId },
             method: 'POST',
             url: '/courses',
             payload: { ...COURSE_PAYLOAD,
+...nextSlot(),
 roomId },
         });
         expect(res.statusCode).toBe(401);
@@ -138,9 +149,11 @@ roomId },
             url: '/courses',
             headers: bearer(token),
             payload: { ...COURSE_PAYLOAD,
+...nextSlot(),
 roomId: '00000000-0000-0000-0000-000000000000' },
         });
-        expect(res.statusCode).toBe(404);
+        // Sala inexistente no corpo é erro de validação.
+        expect(res.statusCode).toBe(400);
     });
 });
 
@@ -155,6 +168,7 @@ describe('GET /courses', () => {
             url: '/courses',
             headers: bearer(token),
             payload: { ...COURSE_PAYLOAD,
+...nextSlot(),
 name: 'Public Visible',
 status: 'PUBLIC',
 roomId },
@@ -164,6 +178,7 @@ roomId },
             url: '/courses',
             headers: bearer(token),
             payload: { ...COURSE_PAYLOAD,
+...nextSlot(),
 name: 'Hidden Draft',
 status: 'UNPUBLISHED',
 roomId },
@@ -218,6 +233,7 @@ describe('GET /courses/:courseId', () => {
             url: '/courses',
             headers: bearer(token),
             payload: { ...COURSE_PAYLOAD,
+...nextSlot(),
 name: 'Detail Public',
 status: 'PUBLIC',
 roomId },
@@ -229,6 +245,7 @@ roomId },
             url: '/courses',
             headers: bearer(token),
             payload: { ...COURSE_PAYLOAD,
+...nextSlot(),
 name: 'Detail Unpublished',
 status: 'UNPUBLISHED',
 roomId },
@@ -242,12 +259,13 @@ roomId },
             url: `/courses/${publicCourseId}`,
         });
         expect(res.statusCode).toBe(200);
+        // A rota de detalhe devolve `title` (não `name`).
         const body = JSON.parse(res.body) as {
  id: string;
-name: string 
+title: string 
 };
         expect(body.id).toBe(publicCourseId);
-        expect(body.name).toBe('Detail Public');
+        expect(body.title).toBe('Detail Public');
     });
 
     it('returns 404 for UNPUBLISHED course via public route', async () => {
@@ -279,6 +297,7 @@ describe('PATCH /courses/:courseId', () => {
             url: '/courses',
             headers: bearer(token),
             payload: { ...COURSE_PAYLOAD,
+...nextSlot(),
 name: 'To Update',
 status: 'UNPUBLISHED',
 roomId },
@@ -318,6 +337,7 @@ describe('DELETE /courses/:courseId', () => {
             url: '/courses',
             headers: bearer(token),
             payload: { ...COURSE_PAYLOAD,
+...nextSlot(),
 name: 'Disposable Course',
 roomId },
         });
@@ -354,6 +374,7 @@ describe('POST /courses/:courseId/register', () => {
             url: '/courses',
             headers: bearer(token),
             payload: { ...COURSE_PAYLOAD,
+...nextSlot(),
 name: 'Reg Public Course',
 status: 'PUBLIC',
 roomId },
@@ -365,6 +386,7 @@ roomId },
             url: '/courses',
             headers: bearer(token),
             payload: { ...COURSE_PAYLOAD,
+...nextSlot(),
 name: 'Reg Unpublished Course',
 status: 'UNPUBLISHED',
 roomId },
@@ -380,7 +402,7 @@ roomId },
                 name: 'Inscrito Silva',
                 email: 'inscrito@test.com',
                 phone: '44911110060',
-                cpf: '11122233360',
+                cpf: '52223336043',
             },
         });
         expect(res.statusCode).toBe(201);
@@ -394,7 +416,7 @@ roomId },
                 name: 'Double Reg',
                 email: 'doublereg@test.com',
                 phone: '44911110061',
-                cpf: '11122233361',
+                cpf: '52223336124',
             },
         });
         const res = await app.inject({
@@ -404,7 +426,7 @@ roomId },
                 name: 'Double Reg',
                 email: 'doublereg@test.com',
                 phone: '44911110061',
-                cpf: '11122233361',
+                cpf: '52223336124',
             },
         });
         expect(res.statusCode).toBe(409);
@@ -418,7 +440,7 @@ roomId },
                 name: 'Blocked User',
                 email: 'blocked@test.com',
                 phone: '44911110062',
-                cpf: '11122233362',
+                cpf: '52223336205',
             },
         });
         // UNPUBLISHED blocks registrations — should be 409 (RegistrationsUnavailableError)
@@ -433,7 +455,7 @@ roomId },
                 name: 'Ghost Reg',
                 email: 'ghost@test.com',
                 phone: '44911110063',
-                cpf: '11122233363',
+                cpf: '52223336396',
             },
         });
         expect(res.statusCode).toBe(404);
@@ -452,6 +474,7 @@ describe('GET /admin/courses/:courseId/registrations', () => {
             url: '/courses',
             headers: bearer(token),
             payload: { ...COURSE_PAYLOAD,
+...nextSlot(),
 name: 'List Reg Course',
 status: 'PUBLIC',
 roomId },
@@ -464,7 +487,7 @@ roomId },
             payload: { name: 'Reg 1',
 email: 'reg1@test.com',
 phone: '44911110070',
-cpf: '11122233370' },
+cpf: '52223337015' },
         });
         await app.inject({
             method: 'POST',
@@ -472,7 +495,7 @@ cpf: '11122233370' },
             payload: { name: 'Reg 2',
 email: 'reg2@test.com',
 phone: '44911110071',
-cpf: '11122233371' },
+cpf: '52223337104' },
         });
     });
 
@@ -483,9 +506,12 @@ cpf: '11122233371' },
             headers: bearer(token),
         });
         expect(res.statusCode).toBe(200);
-        const body = JSON.parse(res.body) as unknown[];
-        expect(Array.isArray(body)).toBe(true);
-        expect(body.length).toBeGreaterThanOrEqual(2);
+        const body = JSON.parse(res.body) as {
+ data: unknown[];
+total: number 
+};
+        expect(Array.isArray(body.data)).toBe(true);
+        expect(body.total).toBeGreaterThanOrEqual(2);
     });
 
     it('returns 401 without token', async () => {
