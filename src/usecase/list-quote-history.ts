@@ -22,7 +22,8 @@ const querySchema = z.object({
 });
 
 // Histórico público das cotações: um ponto por lançamento (dia + período) dos
-// produtos ativos, dentro da janela pedida (padrão 90 dias).
+// produtos ativos, dentro da janela pedida (padrão 90 dias). Não depende do
+// preço atual: um produto com histórico aparece mesmo sem lançamento recente.
 export class ListQuoteHistoryUseCase {
     constructor(
         private readonly repo: MarketQuoteRepository,
@@ -40,7 +41,7 @@ series?: QuoteHistorySeries[]
         const since = todayInBrazil(this.now());
         since.setUTCDate(since.getUTCDate() - (parsed.data.days - 1));
 
-        const [products, rows] = await Promise.all([this.repo.findAll(true), this.repo.historySince(since)]);
+        const [products, rows] = await Promise.all([this.repo.findAll(false), this.repo.historySince(since)]);
         const byProduct = new Map<string, QuoteHistoryPoint[]>();
         for (const r of rows) {
             const list = byProduct.get(r.marketQuoteId) ?? [];
@@ -53,6 +54,7 @@ series?: QuoteHistorySeries[]
         }
 
         const series = products
+            .filter(p => p.isActive)
             .map(p => ({ id: p.id,
 label: p.label,
 unit: p.unit,

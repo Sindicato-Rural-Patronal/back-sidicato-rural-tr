@@ -61,14 +61,21 @@ describe('Histórico das cotações', () => {
 
     beforeEach(() => vi.clearAllMocks());
 
-    it('agrupa por produto, pula quem não tem ponto e usa a janela a partir de hoje em Brasília', async () => {
+    it('agrupa por produto, pula quem não tem ponto ou está inativo e usa a janela a partir de hoje em Brasília', async () => {
         vi.mocked(quotes.findAll).mockResolvedValue([
             { id: 'soja',
 label: 'SOJA',
-unit: 'sc 60kg' },
+unit: 'sc 60kg',
+isActive: true,
+priceCents: null },
             { id: 'trigo',
 label: 'TRIGO',
-unit: 'sc 60kg' },
+unit: 'sc 60kg',
+isActive: true },
+            { id: 'milho',
+label: 'MILHO',
+unit: 'sc 60kg',
+isActive: false },
         ] as never);
         vi.mocked(quotes.historySince).mockResolvedValue([
             { marketQuoteId: 'soja',
@@ -79,8 +86,13 @@ numeric: 120.5 },
 referenceDate: new Date('2026-09-16T00:00:00.000Z'),
 period: 'AFTERNOON',
 numeric: 121.1 },
+            { marketQuoteId: 'milho',
+referenceDate: new Date('2026-09-16T00:00:00.000Z'),
+period: 'MORNING',
+numeric: 60 },
         ] as never);
         const r = await new ListQuoteHistoryUseCase(quotes, now).execute({ days: '7' });
+        expect(quotes.findAll).toHaveBeenCalledWith(false);
         expect(quotes.historySince).toHaveBeenCalledWith(new Date('2026-09-10T00:00:00.000Z'));
         expect(r.series).toEqual([
             {
