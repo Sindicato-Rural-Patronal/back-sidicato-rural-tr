@@ -79,8 +79,10 @@ export class UpdatePublicContactUseCase {
     async execute(id: string, input: unknown): Promise<Result<{ contact?: PublicContactModel }>> {
         const parsed = updateSchema.safeParse(input);
         if (!parsed.success) return { error: new ValidationError(firstIssue(parsed.error)) };
-        if (!(await this.repo.findById(id))) return { error: new PublicContactNotFoundError() };
-        const contact = await this.repo.updateTitle(id, parsed.data.title ?? null);
+        const existing = await this.repo.findById(id);
+        if (!existing) return { error: new PublicContactNotFoundError() };
+        if (parsed.data.title === undefined) return { contact: existing };
+        const contact = await this.repo.updateTitle(id, parsed.data.title);
         return { contact };
     }
 }

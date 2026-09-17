@@ -220,6 +220,48 @@ priceCents: number
         expect(sojaSeries?.points.at(-1)).toMatchObject({ period: 'MORNING',
 priceCents: 13250 });
     });
+
+    it('corrigir a manhã depois de lançar a tarde mantém a tarde como preço atual', async () => {
+        const admin = JSON.parse((await app.inject({ method: 'GET',
+url: '/admin/market-quotes',
+headers: bearer(token) })).body) as {
+            id: string;
+label: string;
+priceCents: number | null;
+period: string | null;
+        }[];
+        const milho = admin.find(q => q.label === 'MILHO')!;
+        const save = (period: string, priceCents: number) =>
+            app.inject({ method: 'PUT',
+url: '/admin/market-quotes/daily',
+headers: bearer(token),
+payload: { period,
+prices: [{ id: milho.id,
+priceCents }] } });
+        expect((await save('MORNING', 6000)).statusCode).toBe(200);
+        expect((await save('AFTERNOON', 6200)).statusCode).toBe(200);
+        const after = JSON.parse((await save('MORNING', 6100)).body) as typeof admin;
+        const current = after.find(q => q.id === milho.id)!;
+        expect(current).toMatchObject({ priceCents: 6200,
+period: 'AFTERNOON' });
+        expect((current as unknown as { variation: string }).variation).toBe('+1,6%');
+
+        const hist = JSON.parse((await app.inject({ method: 'GET',
+url: '/market-quotes/history?days=7' })).body) as {
+            label: string;
+points: {
+ period: string;
+priceCents: number 
+}[];
+        }[];
+        const points = hist.find(s => s.label === 'MILHO')!.points;
+        expect(points.slice(-2)).toEqual([
+            expect.objectContaining({ period: 'MORNING',
+priceCents: 6100 }),
+            expect.objectContaining({ period: 'AFTERNOON',
+priceCents: 6200 }),
+        ]);
+    });
 });
 
 describe('Selos da lista de inscritos', () => {

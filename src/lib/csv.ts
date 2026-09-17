@@ -42,6 +42,15 @@ export function csvDate(d: Date | null | undefined): string {
     return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
 }
 
+/**
+ * dd/mm/aaaa hh:mm lendo os campos UTC como estão. Para horários que o painel
+ * grava "no relógio local" com Z (início/fim de curso, prazo de inscrição).
+ */
+export function csvWallClock(d: Date | null | undefined): string {
+    if (!d) return '';
+    return `${csvDate(d)} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+}
+
 /** dd/mm/aaaa hh:mm no horário de Brasília (momentos, ex.: criado em). */
 export function csvDateTime(d: Date | null | undefined): string {
     if (!d) return '';

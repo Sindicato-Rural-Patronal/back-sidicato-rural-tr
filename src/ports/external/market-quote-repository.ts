@@ -11,6 +11,8 @@ export type DailyQuoteEntry = {
     variation: string | null;
     referenceDate: Date;
     period: QuotePeriod;
+    /** false quando é correção de um lançamento anterior ao preço atual: só o histórico muda. */
+    updateCurrent: boolean;
 };
 
 export interface MarketQuoteRepository {
@@ -22,6 +24,8 @@ export interface MarketQuoteRepository {
      * variação. Relançar o mesmo dia/período não compara o preço com ele mesmo.
      */
     getPreviousNumeric(marketQuoteId: string, referenceDate: Date, period: QuotePeriod): Promise<number | null>;
+    /** Recalcula a variação do preço atual (depois de corrigir um lançamento anterior). */
+    updateVariation(id: string, variation: string | null): Promise<void>;
     /** Troca a unidade do produto e o texto pronto do preço atual. */
     updateUnit(id: string, unit: string | null, value: string): Promise<MarketQuoteModel>;
     /** Grava preço no produto e no histórico (substitui o mesmo dia/período), numa transação. */

@@ -140,6 +140,14 @@ mode: 'insensitive' as const } },
 }
 
 
+function brazilDay(value: string, edge: 'start' | 'end'): Date | null {
+    const iso = /^\d{4}-\d{2}-\d{2}$/.test(value)
+        ? `${value}T${edge === 'start' ? '00:00:00.000' : '23:59:59.999'}-03:00`
+        : value;
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function buildAuditLogWhere({ action, entity, actorId, from, to, q }: AuditLogFilters) {
     const where: Record<string, unknown> = {};
     if (action === 'create') where.method = 'POST';
@@ -148,11 +156,13 @@ export function buildAuditLogWhere({ action, entity, actorId, from, to, q }: Aud
     else if (action === 'export') where.method = 'EXPORT';
     if (entity) where.entity = entity;
     if (actorId) where.actorId = actorId;
-    if (from || to) {
+    // "AAAA-MM-DD" é um dia em Brasília; data inválida é ignorada.
+    const start = from ? brazilDay(from, 'start') : null;
+    const end = to ? brazilDay(to, 'end') : null;
+    if (start || end) {
         where.createdAt = {
-            ...(from ? { gte: new Date(from) } : {}),
-            // inclui o dia inteiro do `to`
-            ...(to ? { lte: new Date(new Date(to).getTime() + 24 * 60 * 60 * 1000 - 1) } : {}),
+            ...(start ? { gte: start } : {}),
+            ...(end ? { lte: end } : {}),
         };
     }
     if (q && q.trim()) {

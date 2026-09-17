@@ -31,14 +31,19 @@ partnerLogoUrl?: string
         const company = await this.repo.findById(companyId);
         if (!company) return { error: new CompanyNotFoundError() };
 
-        const processed = await sharp(file)
-            .resize(WIDTH, HEIGHT, { fit: 'contain',
-background: { r: 0,
-g: 0,
-b: 0,
-alpha: 0 } })
-            .png({ compressionLevel: 8 })
-            .toBuffer();
+        let processed: Buffer;
+        try {
+            processed = await sharp(file)
+                .resize(WIDTH, HEIGHT, { fit: 'contain',
+    background: { r: 0,
+    g: 0,
+    b: 0,
+    alpha: 0 } })
+                .png({ compressionLevel: 8 })
+                .toBuffer();
+        } catch {
+            return { error: new ValidationError('Imagem inválida ou corrompida.') };
+        }
 
         const bucket = buckets.avatars;
         const key = `partner-logos/companies/${companyId}/logo.png`;

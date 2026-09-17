@@ -265,11 +265,13 @@ export class ReorderPartnersUseCase {
     async execute(input: unknown): Promise<Result<object>> {
         const parsed = reorderPartnersSchema.safeParse(input);
         if (!parsed.success) return { error: new ValidationError(firstIssue(parsed.error)) };
-        for (const id of parsed.data.order) {
-            const c = await this.repo.findById(id);
-            if (!c || !c.isPartner) return { error: new ValidationError('A ordem só pode conter empresas parceiras ativas') };
+        const partners = await this.repo.findPartners();
+        const partnerIds = new Set(partners.map(p => p.id));
+        const order = parsed.data.order;
+        if (order.length !== partnerIds.size || order.some(id => !partnerIds.has(id))) {
+            return { error: new ValidationError('A ordem precisa ter todas as empresas parceiras ativas, uma vez cada') };
         }
-        await this.repo.reorderPartners(parsed.data.order);
+        await this.repo.reorderPartners(order);
         return {};
     }
 }

@@ -141,6 +141,38 @@ describe('Exportação CSV', () => {
         expect(regs[1][regs[0].indexOf('Curso')]).toBe('CURSO EXPORT');
         expect(regs[1][regs[0].indexOf('Confirmada')]).toBe('Sim');
         expect(regs[0]).toEqual(expect.arrayContaining(['Idade', 'Contato público']));
+        // Horário do curso é o do relógio gravado (não converte fuso).
+        expect(regs[1][regs[0].indexOf('Início do curso')]).toBe('01/01/2032 11:00');
+    });
+
+    it('POST com corpo JSON (seleção grande) e validações', async () => {
+        const post = (url: string, payload: object) => app.inject({ method: 'POST',
+url,
+headers: bearer(token),
+payload });
+        const selected = await post('/admin/export/people', { ids: [ids.ana, ids.bruno] });
+        expect(selected.statusCode, selected.body).toBe(200);
+        expect(selected.headers['x-export-count']).toBe('2');
+
+        const filtered = await post('/admin/export/people', { search: 'bruno',
+incompleteRegistration: true });
+        expect(filtered.headers['x-export-count']).toBe('1');
+
+        expect((await post('/admin/export/people', { ids: [] })).statusCode).toBe(400);
+        expect((await get('/admin/export/people?ids=,')).statusCode).toBe(400);
+        expect((await get('/admin/export/people?gender=QUALQUER')).statusCode).toBe(400);
+        expect((await get('/admin/export/audit-logs?from=ontem')).statusCode).toBe(400);
+
+        // Exportar por POST não gera uma segunda linha "Criou" na auditoria.
+        const created = await prisma.auditLog.count({ where: { path: '/admin/export/people',
+method: 'POST' } });
+        expect(created).toBe(0);
+    });
+
+    it('detalhe da pessoa traz o nome fantasia da empresa', async () => {
+        const res = await get(`/admin/users/${ids.ana}`);
+        const body = JSON.parse(res.body) as { companyMemberships: { company: { tradeName: string | null } }[] };
+        expect(body.companyMemberships[0].company.tradeName).toBe('AGRO EXPORT');
     });
 
     it('permissão por conjunto, token obrigatório e conjunto desconhecido', async () => {

@@ -79,7 +79,7 @@ src/
 | `Banner`                 | id, title, subtitle, imageUrl, active, order, buttons (JSON), startDate, endDate                           |
 | `ContactMessage`         | id, name, email, phone, subject, message, read, createdAt                                                  |
 | `MarketQuote`            | id, label (único; produtos fixos SOJA, MILHO, TRIGO, MANDIOCA, DOLAR criados na migration), value (texto pronto), priceCents, unit (configurável no painel), period (MORNING/AFTERNOON), variation, referenceDate (dia do lançamento), isActive, order |
-| `MarketQuoteHistory`     | id, marketQuoteId (FK), value, numeric, referenceDate, period — um por produto/dia/período (relançar substitui) |
+| `MarketQuoteHistory`     | id, marketQuoteId (FK), value, numeric, referenceDate, period — único por produto/dia/período (`@@unique`; relançar substitui) |
 | `GalleryAlbum`           | id, title, description, linkUrl, isActive, order — galerias da home (História do Sindicato, FAEP, Patrulha Rural) |
 | `GalleryPhoto`           | id, albumId (FK, cascade), url, storageKey, caption, order |
 
@@ -181,12 +181,14 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 ### Exportação CSV (`export-router.ts`, `usecase/export-data.ts`, `adapter/database/export-adapter.ts`)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
-| `GET` | `/admin/export/:dataset` | `ExportDataUseCase` — CSV (`;`, BOM, tudo entre aspas, fórmula neutralizada com `'`) | por conjunto (abaixo) |
+| `GET` · `POST` | `/admin/export/:dataset` | `ExportDataUseCase` — CSV (`;`, BOM, tudo entre aspas, fórmula neutralizada com `'`). POST recebe os parâmetros no corpo JSON (listas como array; é o que o painel usa, seleção grande não cabe na URL) | por conjunto (abaixo) |
 
 - Conjuntos: `people`, `companies`, `properties`, `unimed` (READ_USER), `admins` (READ_USER_ADMIN), `courses`, `registrations` (READ_COURSE), `contact-messages` (READ_CONTACT), `audit-logs` (READ_AUDIT).
-- `ids=a,b` exporta só esses (seleção ou um registro); sem `ids`, os mesmos filtros da listagem (`adapter/database/list-filters.ts`, compartilhado com os adapters das listas). `properties` aceita `ownerIds`; `registrations` aceita `courseIds`.
+- `ids` exporta só esses (seleção ou um registro; lista vazia → 400); sem `ids`, os mesmos filtros da listagem (`adapter/database/list-filters.ts`, compartilhado com os adapters das listas). `properties` aceita `ownerIds`; `registrations` aceita `courseIds`.
 - Headers: `Content-Disposition` (`pessoas-AAAA-MM-DD.csv`, ou `pessoa-<nome>-AAAA-MM-DD.csv` para um registro) e `X-Export-Count`.
-- Cada exportação grava um AuditLog com `method: 'EXPORT'` e entity "Exportação" (filtro `action=export` na auditoria).
+- Filtros validados como na listagem (enums de sexo/etnia/escolaridade; datas `AAAA-MM-DD`, dia em Brasília). `audit-logs` sai com no máximo 20.000 linhas mais recentes.
+- Horários de curso saem como gravados (`csvWallClock`: o painel grava o relógio local com Z); momentos como "criado em" saem no horário de Brasília (`csvDateTime`).
+- Cada exportação grava um AuditLog com `method: 'EXPORT'` e entity "Exportação" (filtro `action=export` na auditoria); o hook de auditoria ignora `/admin/export/*` para não duplicar.
 
 ### Instrutores
 | Método | Path | Use Case | Autenticação |
@@ -228,7 +230,7 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 |--------|------|----------|--------------|
 | `GET` | `/market-quotes` | `ListMarketQuotesUseCase` (ativos com preço lançado) | Pública |
 | `GET` | `/admin/market-quotes` | `ListMarketQuotesUseCase` (os 5 produtos) | `READ_MARKET_QUOTE` |
-| `PUT` | `/admin/market-quotes/daily` | `SaveDailyQuotesUseCase` — `{ period, prices: [{ id, priceCents }] }`; data = hoje (America/Sao_Paulo); variação vs lançamento anterior | `UPDATE_MARKET_QUOTE` |
+| `PUT` | `/admin/market-quotes/daily` | `SaveDailyQuotesUseCase` — `{ period, prices: [{ id, priceCents }] }`; data = hoje (America/Sao_Paulo); variação vs lançamento anterior. Corrigir a manhã depois de lançar a tarde só muda o histórico (o preço atual continua o da tarde, com a variação recalculada) | `UPDATE_MARKET_QUOTE` |
 | `GET` | `/market-quotes/history?days=` | `ListQuoteHistoryUseCase` — `[{ id, label, unit, points: [{ date, period, priceCents }] }]` dos produtos ativos com ponto na janela (7–365 dias, padrão 90) | Pública |
 | `PATCH` | `/admin/market-quotes/:id` | `UpdateQuoteUnitUseCase` — `{ unit }` de `QUOTE_UNITS` (sc 60kg, sc 50kg, sc 40kg, t, kg, @) ou null; refaz o texto do preço atual | `UPDATE_MARKET_QUOTE` |
 | `PUT` | `/admin/market-quotes/source` | `UpdateQuotesSourceUseCase` — `{ source }` (fonte exibida; vazio esconde) | `UPDATE_MARKET_QUOTE` |
@@ -407,7 +409,9 @@ export async function fooRouter(fastify: FastifyInstance, prisma: PrismaClient) 
 ```ts
 app.register(fooRouter, prisma);
 ```
-`registerRouters` e `apiErrorHandler` (`http/error-handler.ts`) são usados pelo servidor e pelo app dos testes E2E — rota nova registrada ali já aparece nos dois.
+`registerRouters`, `registerAuditHooks` (`http/audit-hooks.ts`, trilha de auditoria) e `apiErrorHandler` (`http/error-handler.ts`) são usados pelo servidor e pelo app dos testes E2E — rota nova registrada ali já aparece nos dois.
+
+Permissões das regras (`rule-router.ts`) vêm de `Object.values(Permission)`: permissão nova no enum do Prisma já é aceita. Texto de cadastro (títulos, salas) é normalizado com `lib/text.ts` (`upperNoAccents`); links salvos aceitam só http/https (`httpUrl` em `company-schema.ts`).
 
 ## Sistema de erros tipados
 

@@ -1,10 +1,15 @@
 import { z } from 'zod';
 import { isValidCnpj } from '../lib/cnpj.js';
+import { upperNoAccents } from '../lib/text.js';
 import { isValidBrPhone } from '../lib/br-validators.js';
 
 // Validação das empresas (criação, edição, vínculos e propriedades).
 
 const emptyToNull = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? null : v);
+
+/** URL só http(s): javascript:, data: etc. são recusados. */
+export const httpUrl = (message: string) => z.url({ protocol: /^https?$/,
+message });
 
 const optionalText = (max: number) =>
     z.preprocess(emptyToNull, z.string().trim().max(max, `Máximo de ${max} caracteres`).nullable().optional());
@@ -55,13 +60,13 @@ export const companySchema = z.object({
     email: z.preprocess(emptyToNull, z.string().trim().email('E-mail inválido').max(160).nullable().optional()),
     website: z.preprocess(
         emptyToNull,
-        z.string().trim().url('Site inválido: comece com https://').max(300).nullable().optional(),
+        z.string().trim().max(300).pipe(httpUrl('Site inválido: comece com https://')).nullable().optional(),
     ),
     notes: optionalText(4000),
     isPartner: z.boolean().optional(),
     partnerUrl: z.preprocess(
         emptyToNull,
-        z.string().trim().url('Site do parceiro inválido: comece com https://').max(500).nullable().optional(),
+        z.string().trim().max(500).pipe(httpUrl('Site do parceiro inválido: comece com https://')).nullable().optional(),
     ),
     partnerOrder: z.number().int().min(0).max(9999).nullable().optional(),
     primaryPropertyId: z.string().trim().min(1, 'Propriedade inválida').max(64).nullable().optional(),
@@ -74,7 +79,10 @@ export const companyUpdateSchema = companySchema.partial().extend({
 
 export const memberSchema = z.object({
     userDataId: z.string().trim().min(1, 'Pessoa inválida').max(64),
-    title: z.string().trim().min(1, 'Informe o título da pessoa na empresa').max(80, 'Título muito longo'),
+    title: z
+        .string()
+        .transform(upperNoAccents)
+        .pipe(z.string().min(1, 'Informe o título da pessoa na empresa').max(80, 'Título muito longo')),
 });
 
 export const memberUpdateSchema = memberSchema.pick({ title: true });
@@ -111,7 +119,10 @@ export const companyListQuerySchema = z.object({
 });
 
 export const reorderPartnersSchema = z.object({
-    order: z.array(z.string().trim().min(1, 'Id de empresa inválido').max(64)).min(1, 'Informe a ordem'),
+    order: z
+        .array(z.string().trim().min(1, 'Id de empresa inválido').max(64))
+        .min(1, 'Informe a ordem')
+        .refine(ids => new Set(ids).size === ids.length, 'Empresa repetida na ordem'),
 });
 
 export function firstIssue(error: z.ZodError): string {
