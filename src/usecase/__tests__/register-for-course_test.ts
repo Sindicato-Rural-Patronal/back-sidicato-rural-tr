@@ -41,6 +41,7 @@ const validInput = {
 };
 
 const courseBase = {
+    endTime: new Date('2099-01-01T17:00:00.000Z'),
     registrationDeadline: null,
     room: { maxCapacity: 100 },
     _count: { courseUserRegistration: 0 },
@@ -103,6 +104,22 @@ courseId: '' });
             const result = await uc.execute(validInput);
             expect(result.error).toBeDefined();
             expect(result.error?.message).toBe('Registrations unavailable for this course');
+        });
+
+        it('recusa curso que já terminou, sem cadastrar ninguém', async () => {
+            vi.mocked(mockCourseRepo.findById).mockResolvedValue({
+                ...publishedCourse,
+                endTime: new Date('2020-01-10T17:00:00.000Z'),
+            } as any);
+            const uc = new RegisterForCourseUseCase(
+                mockCourseRepo,
+                mockUserDataRepo,
+                mockRegistrationRepo,
+            );
+            const result = await uc.execute(validInput);
+            expect(result.error?.message).toBe('Este curso já terminou e não aceita mais inscrições.');
+            expect(mockUserDataRepo.create).not.toHaveBeenCalled();
+            expect(mockRegistrationRepo.createWithCapacity).not.toHaveBeenCalled();
         });
     });
 

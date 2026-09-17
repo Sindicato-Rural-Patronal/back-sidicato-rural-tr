@@ -59,6 +59,27 @@ describe('GetCourseDetailUseCase', () => {
             expect(result.course?.location).toBe('Sala A');
             expect(result.course?.maxStudents).toBe(30);
             expect(result.course?.enrolled).toBe(10);
+            expect(result.course?.registrationDeadline).toBeNull();
+            expect(result.course?.registrationDeadlineTime).toBeNull();
+        });
+
+        it('separa dia e hora do prazo (00:00 = sem hora)', async () => {
+            const uc = new GetCourseDetailUseCase(mockCourseRepo);
+            vi.mocked(mockCourseRepo.findById).mockResolvedValue({
+                ...fakeCourse,
+                registrationDeadline: new Date('2026-06-30T18:00:00.000Z'),
+            } as any);
+            let result = await uc.execute('course-001');
+            expect(result.course?.registrationDeadline).toBe('2026-06-30');
+            expect(result.course?.registrationDeadlineTime).toBe('18:00');
+
+            vi.mocked(mockCourseRepo.findById).mockResolvedValue({
+                ...fakeCourse,
+                registrationDeadline: new Date('2026-06-30T00:00:00.000Z'),
+            } as any);
+            result = await uc.execute('course-001');
+            expect(result.course?.registrationDeadline).toBe('2026-06-30');
+            expect(result.course?.registrationDeadlineTime).toBeNull();
         });
 
         it('retorna instructor vazio se curso não tiver instrutor', async () => {

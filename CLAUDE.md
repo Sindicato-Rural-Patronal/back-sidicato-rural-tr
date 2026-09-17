@@ -59,15 +59,15 @@ src/
 
 | Modelo                   | Campos principais                                                                                          |
 |--------------------------|------------------------------------------------------------------------------------------------------------|
-| `UserData`               | id, name, email, phone, cpf, avatar, nickname, maritalStatus, phone2, phone3, rg, rgIssuer, rgIssuedAt, birthDate, driverLicense, driverLicenseCategory, birthPlace, nationality, gender, ethnicity, educationLevel, functionalCategory, specialNeeds, memberClassification, cadPro (até 5), familyIncome, memberType (lista fixa em `lib/member-types.ts`: ALUNO, PRODUTOR RURAL, TRABALHADOR RURAL ASSALARIADO, TRABALHADOR RURAL AUTONOMO; fora da lista → 400), boardPosition, boardMember, memberStatus, memberSince, memberNotes, memberNotesNumber, addressId (FK). Colunas cnpj/isPartner/partner* foram removidas (migration `20260917140000`): CNPJ antigo e tipo de membro fora da lista (ex.: SOCIO) foram copiados para `memberNotes` — empresa/parceria é `Company` |
-| `Company`                | id, name (razão social), tradeName (nome fantasia), addressId (FK→Address, sede; SetNull), cnpj (só dígitos; único entre ativas, índice parcial), stateRegistration, type (PRIVATE/PUBLIC), phone, phone2, phone3, email, website, notes, isPartner, partnerUrl, partnerLogo, partnerOrder, primaryPropertyId, isDeleted (soft delete) |
+| `UserData`               | id, name, email, phone, cpf (só dígitos; vazio = null — `UserDataAdapter` normaliza em create/update), nameSearch (busca, preenchida por trigger), avatar, nickname, maritalStatus, phone2, phone3, rg, rgIssuer, rgIssuedAt, birthDate, driverLicense, driverLicenseCategory, birthPlace, nationality, gender, ethnicity, educationLevel, functionalCategory, specialNeeds, memberClassification, cadPro (até 5), familyIncome, memberType (lista fixa em `lib/member-types.ts`: ALUNO, PRODUTOR RURAL, TRABALHADOR RURAL ASSALARIADO, TRABALHADOR RURAL AUTONOMO; fora da lista → 400), boardPosition, boardMember, memberStatus, memberSince, memberNotes, memberNotesNumber, addressId (FK). Colunas cnpj/isPartner/partner* foram removidas (migration `20260917140000`): CNPJ antigo e tipo de membro fora da lista (ex.: SOCIO) foram copiados para `memberNotes` — empresa/parceria é `Company` |
+| `Company`                | id, name (razão social), tradeName (nome fantasia), nameSearch/tradeNameSearch (busca, preenchidas por trigger), addressId (FK→Address, sede; SetNull), cnpj (só dígitos; único entre ativas, índice parcial), stateRegistration, type (PRIVATE/PUBLIC), phone, phone2, phone3, email, website, notes, isPartner, partnerUrl, partnerLogo, partnerOrder, primaryPropertyId, isDeleted (soft delete) |
 | `CompanyMember`          | id, companyId (FK), userDataId (FK), title (texto livre em maiúsculas) — único por (companyId, userDataId) |
 | `UserAdmin`              | id, username, passwordHash, userDataId (FK), rulesId (FK)                                                  |
 | `PublicContact`          | id, userDataId (FK único, cascade), title (cargo exibido), order — contatos da página Contato; qualquer pessoa, com ou sem login |
 | `SiteSetting`            | key, value — chaves `social.*`, `org.*` (telefone, e-mail, endereço, horário, busca do mapa), `about.text`, `quotes.source` |
 | `UserInstructor`         | id, userDataId (FK único), bio, linkedin, instagram, facebook                                              |
 | `Rule`                   | id, name, description, permissions (Permission[])                                                          |
-| `Course`                 | id, name, description, roomId (FK), startTime, endTime, status, price, workloadHours, coverImage, eventNumber, minStudents, preEnrolled, waitlist, registrationDeadline, observations |
+| `Course`                 | id, name, description, roomId (FK), startTime, endTime, status, price, workloadHours, coverImage (coluna `bannerUrl`, JPEG 1920×1080), coverImageThumb (coluna `bannerThumbUrl`, WebP 640×360 para os cards; migration `20260919110000`; null em cursos antigos → front usa a capa), eventNumber, minStudents, preEnrolled, waitlist, registrationDeadline, observations |
 | `CourseInstructor`       | id, courseId (FK), instructorId (FK→UserInstructor), title, category                                      |
 | `Room`                   | id, name (lista fixa em `lib/room-names.ts`: AUDITORIO, COZINHA, SALA DE VIDEO CONFERENCIA, SALA 1, SALA 2, SALA APL; único), description, maxCapacity, addressId (FK) |
 | `News`                   | id, title, content, summary, bannerUrl, status, publishedAt                                                |
@@ -115,6 +115,7 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
 | `POST` | `/auth/login` | `LoginUserAdminUseCase` | Pública |
+| `POST` | `/auth/refresh` | `RefreshAdminTokenUseCase` (token atual válido + admin ainda existe → token novo, mesmo payload) | JWT (qualquer admin) |
 
 ### Usuários (UserData)
 | Método | Path | Use Case | Autenticação |
@@ -205,16 +206,18 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 |--------|------|----------|--------------|
 | `GET` | `/courses` | `ListCoursesUseCase` | Pública |
 | `GET` | `/courses/:courseId` | `GetCourseDetailUseCase` | Pública |
-| `POST` | `/courses` | `CreateCourseUseCase` | `CREATE_COURSE` |
+| `POST` | `/courses` | `CreateCourseUseCase` (aceita `eventNumber`, `minStudents`) + `CopyCourseExtrasUseCase` ao duplicar: `copyCoverFromCourseId` baixa a capa e envia de novo pelo upload de capa (arquivo próprio — a capa fica em `courses/<id>/banner.jpg` e trocar a de um curso mudaria a do outro), `copyInstructorsFromCourseId` + `instructorAssignmentIds` copiam instrutores; resposta `{ id, coverCopied?, instructorsCopied? }`; falha na cópia não desfaz o curso (responde 201 dizendo o que não veio); a capa só é baixada do próprio storage (`lib/download-image.ts`: origem do `SUPABASE_URL`, sem redirecionamento); galeria não é copiada | `CREATE_COURSE` (+ `UPDATE_COURSE` para copiar capa/instrutores) |
 | `PATCH` | `/courses/:courseId` | `UpdateCourseUseCase` | `UPDATE_COURSE` |
 | `DELETE` | `/courses/:courseId` | `DeleteCourseUseCase` | `DELETE_COURSE` |
-| `POST` | `/courses/:courseId/banner` | `UploadCourseBannerUseCase` | `UPDATE_COURSE` |
+| `POST` | `/courses/:courseId/banner` | `UploadCourseBannerUseCase` (capa `courses/:id/banner.jpg` + miniatura `banner-thumb.webp`, gravadas juntas; miniatura que falha vira null sem impedir a capa → `{ url, thumbUrl }`) | `UPDATE_COURSE` |
 | `POST` | `/courses/:courseId/gallery` | `AddCoursePhotoUseCase` | `UPDATE_COURSE` |
 | `DELETE` | `/courses/:courseId/gallery/:photoId` | `DeleteCoursePhotoUseCase` | `UPDATE_COURSE` |
 | `GET` | `/admin/courses` | `ListAllCoursesUseCase` | `READ_COURSE` |
 | `GET` | `/admin/courses/:courseId` | `GetAdminCourseDetailUseCase` | `READ_COURSE` |
 
-> Cursos com status `PRIVATE` aparecem apenas para admins (`/admin/courses`), mas aceitam inscrições via link direto. Apenas `UNPUBLISHED` bloqueia inscrições.
+> Cursos com status `PRIVATE` aparecem apenas para admins (`/admin/courses`), mas aceitam inscrições via link direto.
+>
+> Regras da inscrição pública (`lib/course-registration-rules.ts`, usada pelos três use cases `register-for-course*`), todas → 409: status `UNPUBLISHED`/`IN_PROGRESS` → `RegistrationsUnavailableError`; dia do fim do curso já passou (em Brasília; no último dia ainda aceita) → `CourseEndedError`; prazo `registrationDeadline` em Brasília: gravado com hora 00:00 (painel sem hora) vale **até o fim do dia**; com hora, fecha quando o relógio de Brasília passa de dia + hora. `GET /courses`, `/courses/:id` e `/admin/courses/:id` mandam `registrationDeadline` (dia, AAAA-MM-DD) e `registrationDeadlineTime` ("HH:MM" ou null = dia inteiro) → `RegistrationDeadlinePassedError`; lotado → `CourseFullError`. As datas do curso são hora "de parede" gravada com Z, então o dia é `toISOString().slice(0, 10)`; hoje vem de `todayInBrazil`. O site usa a mesma regra (`utils/course-status.ts` no front).
 >
 > `GET /courses/:courseId` e `GET /admin/courses/:courseId` retornam `instructors[]` com os campos: `id`, `title`, `category`, `name`, `bio`, `avatar`, `linkedin`, `instagram`, `facebook`. O campo `instructorName` (primeiro instrutor) ainda é retornado para compatibilidade.
 
@@ -237,6 +240,8 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 
 Não há mais criar/excluir cotação: os produtos são fixos.
 
+No painel, a unidade trocada só vai para o site no "Salvar cotações", junto com os preços: primeiro um `PATCH /admin/market-quotes/:id` por unidade alterada, depois o `PUT /admin/market-quotes/daily` (só se houver preço preenchido). Preço mais de 20% diferente do último lançado pede confirmação no painel.
+
 ### Galerias da home (`gallery-router.ts`, use cases em `usecase/gallery-usecases.ts`)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
@@ -256,6 +261,8 @@ Não há mais criar/excluir cotação: os produtos são fixos.
 | `POST` | `/courses/:courseId/register-by-cpf` | `RegisterForCourseByCpfUseCase` | Pública |
 | `GET` | `/admin/courses/:courseId/registrations` | `ListCourseRegistrationsUseCase` (userData traz memberStatus, membershipValidUntil, boardPosition, `publicContact.title` e `companyMemberships` só de empresas parceiras ativas — selos do painel) | `READ_COURSE` |
 | `DELETE` | `/admin/registrations/:registrationId` | `CancelRegistrationUseCase` | `UPDATE_COURSE` |
+| `POST` | `/admin/courses/:courseId/registrations` | `AdminRegisterPersonUseCase` (`usecase/admin-course-registrations.ts`) — `{ userDataId }`; inscrição pela equipe, já confirmada; ignora prazo, status e fim do curso; só respeita a lotação (`createWithCapacity`). Já inscrita → 409 "Pessoa já inscrita neste curso"; lotado → 409; pessoa/curso inexistente → 404 | `UPDATE_COURSE` |
+| `PATCH` | `/admin/courses/:courseId/registrations/confirm-all` | `ConfirmAllRegistrationsUseCase` — confirma as pendentes; responde `{ confirmed }` (quantas) | `UPDATE_COURSE` |
 
 ### Notícias
 | Método | Path | Use Case | Autenticação |
@@ -280,13 +287,25 @@ Não há mais criar/excluir cotação: os produtos são fixos.
 | `POST` | `/admin/banners/:id/image` | `UploadBannerImageUseCase` | `UPDATE_BANNER` |
 | `PATCH` | `/admin/banners/reorder` | `ReorderBannersUseCase` | `UPDATE_BANNER` |
 
+`startDate`/`endDate` são instantes; o painel manda o dia escolhido em Brasília (`AAAA-MM-DDT00:00:00.000-03:00` e `…T23:59:59.999-03:00`). `GET /banners` mostra os ativos com início ≤ agora ≤ término (vazio não limita). A migration `20260919120000_banner_dates_brasilia` somou 3h às datas antigas gravadas como 00:00:00.000Z / 23:59:59.999Z.
+
 ### Contatos (Formulário público)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
 | `POST` | `/contacts/message` | `CreateContactMessageUseCase` | Pública |
 | `GET` | `/admin/contacts/messages` | `ListContactMessagesUseCase` | `READ_CONTACT` |
-| `PATCH` | `/admin/contacts/messages/:messageId` | `MarkContactMessageReadUseCase` | `UPDATE_CONTACT` |
+| `PATCH` | `/admin/contacts/messages/:messageId` | `MarkContactMessageReadUseCase` (sempre marca como lida) | `UPDATE_CONTACT` |
+| `PATCH` | `/admin/contacts/messages/:messageId/unread` | `MarkContactMessageReadUseCase` com `read = false` — rota própria para a auditoria saber qual das duas foi | `UPDATE_CONTACT` |
 | `DELETE` | `/admin/contacts/messages/:messageId` | `DeleteContactMessageUseCase` | `UPDATE_CONTACT` |
+
+### Auditoria (`audit-router.ts`, hook em `http/audit-hooks.ts`)
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/admin/audit-logs` | lista paginada (filtros `action`, `entity`, `actorId`, `from`, `to`, `q`); cada linha traz `summary`, a frase pronta | `READ_AUDIT` |
+
+- O hook grava toda mutação com sucesso (método, caminho, `entity`, `targetLabel`); fora da trilha (`skipAudit` em `lib/audit-entity.ts`): `/auth/login`, `/auth/refresh`, `/invites/*`, `/admin/export/*` (a exportação grava a própria linha).
+- `entity` vem do caminho (`deriveAuditEntity`, mesma lista do filtro "Tipo" no painel). `targetLabel` = nome do alvo buscado antes da ação (`lookupTargetLabel`: edição, exclusão e POST sobre item existente, ex.: iniciar curso, foto da galeria) ou o nome do corpo.
+- `summary` (`lib/audit-sentence.ts`, `describeAuditAction`): rotas especiais por método + caminho com ids trocados por `:id` ("Iniciou o curso", "Adicionou foto à galeria", "Marcou mensagem como lida", "Editou as configurações do site", "Lançou as cotações do dia"…); as demais viram verbo + artigo pelo gênero + entidade ("Editou a galeria "FAEP""). Rota nova com ação diferente de criar/editar/excluir → acrescentar em `SPECIAL`; entidade nova → `AUDIT_ENTITY_NOUNS` e a lista do filtro no painel. A planilha `audit-logs` usa a mesma frase (sem o nome) na coluna "Ação".
 
 ### Regras
 | Método | Path | Use Case | Autenticação |
@@ -299,6 +318,13 @@ Não há mais criar/excluir cotação: os produtos são fixos.
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
 | `GET` | `/admin/dashboard/stats` | `DashboardStatsUseCase` | `READ_COURSE` |
+
+### Financeiro (`finance-router.ts`)
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/admin/finance/transactions` | `ListFinanceTransactionsUseCase` — paginado + filtros (from, to, type, categoryId, accountId, search); `totals: { incomeCents, expenseCents }` soma todos os lançamentos filtrados (não só a página), sem transferências entre caixas nem "só nota" (mesma regra do `/admin/finance/summary`) | `READ_FINANCE` |
+
+Demais rotas (categorias, caixas, lançamentos, transferências, comprovantes, export, summary) em `finance-router.ts`.
 
 ### Endereço
 | Método | Path | Use Case | Autenticação |
@@ -319,7 +345,7 @@ Todas as rotas de listagem suportam paginação via `?page=1&limit=20`.
 
 | Endpoint | Query params de filtro |
 |----------|------------------------|
-| `GET /admin/users` | `search` (nome/email/CPF), `memberType`, `memberClassification`, `gender`, `ethnicity`, `educationLevel` |
+| `GET /admin/users` | `search` (nome/email sem diferenciar acento e maiúscula; CPF com ou sem máscara), `memberType`, `memberClassification`, `gender`, `ethnicity`, `educationLevel` |
 | `GET /admin/users/admins` | `search` (username) |
 | `GET /admin/courses` | `status` (PUBLIC/PRIVATE/UNPUBLISHED), `search` (nome) |
 | `GET /admin/news` | `status` (PUBLISHED/UNPUBLISHED) |
@@ -484,7 +510,7 @@ O `StorageRepository` é instanciado via `createStorageAdapter()` (sem parâmetr
 
 ## Autenticação
 
-O JWT é gerado no `LoginUserAdminUseCase` com payload `{ userId, username, role }` e expiração de 1h. `userId` no payload = `UserAdmin.id`.
+O JWT é gerado por `signAdminToken` (em `usecase/login-user-admin.ts`) com payload `{ userId, username, role, authTime }` e expiração de 8h (`ADMIN_TOKEN_TTL`); `authTime` = momento do login (segundos), preservado na renovação. `userId` no payload = `UserAdmin.id`. `POST /auth/refresh` (`RefreshAdminTokenUseCase`) troca um token ainda válido por um novo de 8h se o admin continua existindo (não excluído, com regra) e o login foi há no máximo 24h (`ADMIN_SESSION_MAX_SECONDS`; token sem `authTime` conta do `iat`); senão → 401. Login e refresh têm rate limit de 10 por 5 minutos, contado por IP de quem acessa (`trustProxy: 1` em `index.ts`: em produção a API só é acessível pelo proxy do Coolify). O painel renova sozinho enquanto está em uso.
 
 Para rotas protegidas, verificar o token e checar a permissão na `Rule` do admin:
 ```ts
@@ -573,3 +599,4 @@ DATABASE_TEST_URL=postgresql://USER:SENHA@localhost:PORTA/BANCO npm run test:e2e
 - O `PrismaClient` é importado de `../generated/prisma/client.js` (não do pacote padrão)
 - O `StorageAdapter` é instanciado via factory `createStorageAdapter()` (Supabase Storage; buckets devem existir e ser públicos: `avatars`, `course-banners`, `news-banners`)
 - Todos os métodos de busca por email/CPF/telefone no `UserDataAdapter` filtram `isDeleted: false` — soft-deleted users não retornam em conflict checks
+- **Busca sem acento** (`list-filters.ts`, pessoas/empresas/Unimed/admins e as exportações): "joao" acha "João" e vice-versa. Os nomes são comparados nas colunas `UserData.nameSearch`, `Company.nameSearch`/`tradeNameSearch` com `searchKey(termo)` (minúsculo, sem acento). Essas colunas são preenchidas por trigger (`*_fill_search`, função SQL `immutable_unaccent_lower`, migração `20260919100000_search_normalized`) — a aplicação nunca grava nelas; trigger em vez de coluna GENERATED para o `migrate dev` não acusar diferença. CPF/CNPJ só entram na busca quando o termo parece documento (só números, `.`, `-`, `/`), comparando os dígitos.

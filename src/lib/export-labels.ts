@@ -56,14 +56,6 @@ export const COURSE_STATUS_LABEL: Record<string, string> = {
     IN_PROGRESS: 'Em andamento',
 };
 
-export const AUDIT_METHOD_LABEL: Record<string, string> = {
-    POST: 'Criou',
-    PATCH: 'Editou',
-    PUT: 'Editou',
-    DELETE: 'Excluiu',
-    EXPORT: 'Exportou',
-};
-
 /** Rótulo do enum; valor desconhecido volta como veio, nulo vira vazio. */
 export function label(map: Record<string, string>, value: string | null | undefined): string {
     if (!value) return '';

@@ -56,6 +56,7 @@ userDataId },
         courseId: string,
         userDataId: string,
         maxCapacity: number,
+        options?: { confirmed?: boolean },
     ): Promise<courseUserRegistrationModel | 'FULL'> {
         // Serializable + retry: conta e insere na mesma transação para que
         // inscrições concorrentes não estourem a capacidade da sala.
@@ -71,7 +72,8 @@ isDeleted: false },
                         if (count >= maxCapacity) return 'FULL' as const;
                         return await t.courseUserRegistration.create({
                             data: { courseId,
-userDataId },
+userDataId,
+confirmed: options?.confirmed ?? false },
                         });
                     },
                     { isolationLevel: 'Serializable' },
@@ -139,6 +141,16 @@ data: { confirmed } });
 isDeleted: false,
 confirmed: false },
         });
+    }
+
+    async confirmAll(courseId: string): Promise<number> {
+        const { count } = await this.prisma.courseUserRegistration.updateMany({
+            where: { courseId,
+isDeleted: false,
+confirmed: false },
+            data: { confirmed: true },
+        });
+        return count;
     }
 
     async delete(id: string): Promise<boolean> {

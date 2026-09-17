@@ -16,6 +16,8 @@ export type CourseCardItem = {
     maxStudents: number;
     price: number;
     coverImage: string | null;
+    /** Miniatura WebP da capa; null → usar coverImage. */
+    coverImageThumb: string | null;
     photoCount: number;
 };
 
@@ -30,6 +32,7 @@ export function mapToCard(course: CourseWithDetails): CourseCardItem {
         maxStudents: course.room.maxCapacity,
         price: course.price,
         coverImage: course.bannerUrl ?? null,
+        coverImageThumb: course.bannerThumbUrl ?? null,
         photoCount: course.photos.length,
     };
 }

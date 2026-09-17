@@ -6,6 +6,7 @@ import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.
 import { requirePermission } from '../lib/require-permission.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 import { buildAuditLogWhere } from '../../adapter/database/list-filters.js';
+import { describeAuditAction } from '../../lib/audit-sentence.js';
 
 export async function auditRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userAdminRepository = createUserAdminAdapter(prisma);
@@ -45,6 +46,8 @@ nullable: true },
                             entity: { type: 'string' },
                             targetLabel: { type: 'string',
 nullable: true },
+                            // Frase pronta ("Iniciou o curso "HORTA"") — lib/audit-sentence.ts
+                            summary: { type: 'string' },
                             statusCode: { type: 'integer' },
                             createdAt: { type: 'string' },
                         },
@@ -110,6 +113,7 @@ username: true },
             const data = rows.map(r => ({
                 ...r,
                 actorName: r.actorId ? (nameById.get(r.actorId) ?? '—') : 'Público',
+                summary: describeAuditAction(r),
             }));
 
             return res.send({

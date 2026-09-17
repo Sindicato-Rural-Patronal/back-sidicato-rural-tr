@@ -40,7 +40,11 @@ model UserData {
   avatar    String?
   // CPF único entre cadastros ATIVOS (por dígitos) via índice parcial em
   // migração 20260914120000_userdata_cpf_unique_active — não expressável aqui.
+  // Gravado só com dígitos (o adapter normaliza em create/update).
   cpf       String?
+  // Nome minúsculo e sem acento, para a busca. Preenchido por trigger no banco
+  // (migração 20260919100000_search_normalized) — a aplicação nunca grava.
+  nameSearch String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -156,6 +160,8 @@ model course {
 
   status               CourseStatus @default(UNPUBLISHED)
   bannerUrl            String?
+  /// Miniatura WebP (~640px) da capa, para os cards; null = cards usam a capa inteira.
+  bannerThumbUrl       String?
   price                Float        @default(0)
   workloadHours        Int          @default(0)
   registrationDeadline DateTime?
@@ -716,6 +722,10 @@ model Company {
   id                String      @id @default(uuid())
   name              String // razão social
   tradeName         String? // nome fantasia
+  // name/tradeName minúsculos e sem acento, para a busca. Preenchidos por trigger
+  // no banco (migração 20260919100000_search_normalized) — a aplicação nunca grava.
+  nameSearch        String?
+  tradeNameSearch   String?
   cnpj              String? // só dígitos
   stateRegistration String? // inscrição estadual (ou "ISENTO")
   type              CompanyType @default(PRIVATE)

@@ -4,24 +4,73 @@ import type { CourseListFilters } from '../../ports/external/course-repository.j
 import type { UserAdminListFilters } from '../../ports/external/user-admin-repository.js';
 import type { ContactMessageFilters } from '../../ports/external/contact-message-repository.js';
 import type { AuditLogFilters } from '../../ports/external/export-repository.js';
+import { stripAccents } from '../../lib/text.js';
 
 // Filtros das listagens do painel. Ficam aqui para a exportação usar exatamente
 // os mesmos filtros da tela (o que se vê na lista é o que sai na planilha).
 
+// ── Busca por texto ──────────────────────────────────────────────────────────
+// Sem diferenciar acento nem maiúscula: "joao" acha "João" e "João" acha "JOAO".
+// Nomes são comparados nas colunas *Search (nameSearch, tradeNameSearch), que um
+// trigger do banco preenche com immutable_unaccent_lower() — a mesma regra do
+// searchKey(). O nome original também entra no OR (letra fora da tabela de
+// acentos do SQL ainda casa quando digitada igual).
+
+/** Termo da busca como fica nas colunas *Search: minúsculo e sem acento. */
+export function searchKey(value: string): string {
+    return stripAccents(value).toLowerCase();
+}
+
+type TextSearch = {
+    term: string;
+    key: string;
+    /** Dígitos do termo quando ele parece um documento (só números, ponto, traço, barra); senão ''. */
+    docDigits: string;
+};
+
+/** Termo aparado + chave sem acento + dígitos de documento; null se a busca está vazia. */
+function textSearch(search: string | undefined): TextSearch | null {
+    const term = search?.trim();
+    if (!term) return null;
+    // "joao 1" não vira busca por CPF/CNPJ contendo "1".
+    const docDigits = /^[\d.\-/\s]+$/.test(term) ? term.replace(/\D/g, '') : '';
+    return { term,
+key: searchKey(term),
+docDigits };
+}
+
+const insensitive = (value: string) => ({ contains: value,
+mode: 'insensitive' as const });
+
+/** Nome (coluna *Search sem acento + coluna original). */
+function nameConditions(s: TextSearch, field: string, searchField: string) {
+    return [{ [searchField]: { contains: s.key } }, { [field]: insensitive(s.term) }];
+}
+
+/** E-mail com o termo digitado e, se diferente, sem acento ("joão" acha joao@…). */
+function emailConditions(s: TextSearch) {
+    const conds: Record<string, unknown>[] = [{ email: insensitive(s.term) }];
+    if (s.key !== s.term.toLowerCase()) conds.push({ email: insensitive(s.key) });
+    return conds;
+}
+
+/** CPF é gravado só com dígitos: "123.456" e "123456" acham o mesmo cadastro. */
+function cpfConditions(s: TextSearch) {
+    return s.docDigits ? [{ cpf: { contains: s.docDigits } }] : [];
+}
+
+/** Busca de pessoa (nome, e-mail, CPF) — usada nas pessoas e dentro do Unimed. */
+function personSearchOr(s: TextSearch) {
+    return [...nameConditions(s, 'name', 'nameSearch'), ...emailConditions(s), ...cpfConditions(s)];
+}
+
 export function buildUserListWhere(filters?: UserListFilters) {
     const { search, memberType, memberClassification, gender, ethnicity, educationLevel, incompleteRegistration } =
         filters ?? {};
+    const s = textSearch(search);
     return {
         isDeleted: false,
-        ...(search && {
-            OR: [
-                { name: { contains: search,
-mode: 'insensitive' as const } },
-                { email: { contains: search,
-mode: 'insensitive' as const } },
-                { cpf: { contains: search } },
-            ],
-        }),
+        ...(s && { OR: personSearchOr(s) }),
         ...(memberType && { memberType }),
         ...(memberClassification && { memberClassification }),
         ...(gender && { gender }),
@@ -59,18 +108,14 @@ export function buildCompanyListWhere(filters: CompanyListFilters) {
     const where: Record<string, unknown> = { isDeleted: false };
     if (filters.type) where.type = filters.type;
     if (filters.isPartner !== undefined) where.isPartner = filters.isPartner;
-    const q = filters.search?.trim();
-    if (q) {
-        const digits = q.replace(/\D/g, '');
+    const s = textSearch(filters.search);
+    if (s) {
         const or: Record<string, unknown>[] = [
-            { name: { contains: q,
-mode: 'insensitive' } },
-            { tradeName: { contains: q,
-mode: 'insensitive' } },
-            { email: { contains: q,
-mode: 'insensitive' } },
+            ...nameConditions(s, 'name', 'nameSearch'),
+            ...nameConditions(s, 'tradeName', 'tradeNameSearch'),
+            ...emailConditions(s),
         ];
-        if (digits.length >= 2) or.push({ cnpj: { contains: digits } });
+        if (s.docDigits.length >= 2) or.push({ cnpj: { contains: s.docDigits } });
         where.OR = or;
     }
     return where;
@@ -88,16 +133,13 @@ mode: 'insensitive' as const },
 }
 
 export function buildAdminListWhere(filters?: UserAdminListFilters) {
+    const s = textSearch(filters?.search);
     return {
         isDeleted: false,
-        ...(filters?.search && {
+        ...(s && {
             OR: [
-                { username: { contains: filters.search,
-mode: 'insensitive' as const } },
-                { userData: { name: { contains: filters.search,
-mode: 'insensitive' as const } } },
-                { userData: { email: { contains: filters.search,
-mode: 'insensitive' as const } } },
+                { username: insensitive(s.term) },
+                ...[...nameConditions(s, 'name', 'nameSearch'), ...emailConditions(s)].map(userData => ({ userData })),
             ],
         }),
         ...(filters?.rulesId && { rulesId: filters.rulesId }),
@@ -123,19 +165,10 @@ mode: 'insensitive' as const } },
 
 // Busca filtra pelo UserData vinculado (nome ou CPF).
 export function buildUnimedListWhere(search?: string) {
+    const s = textSearch(search);
     return {
         isDeleted: false,
-        ...(search
-            ? {
-                  userData: {
-                      OR: [
-                          { name: { contains: search,
-mode: 'insensitive' as const } },
-                          { cpf: { contains: search } },
-                      ],
-                  },
-              }
-            : {}),
+        ...(s && { userData: { OR: [...nameConditions(s, 'name', 'nameSearch'), ...cpfConditions(s)] } }),
     };
 }
 

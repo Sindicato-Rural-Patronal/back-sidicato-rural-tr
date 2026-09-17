@@ -27,6 +27,14 @@ import { StartCourseController } from '../controllers/start-course.js';
 import { UploadRegistrationFichaController } from '../controllers/upload-registration-ficha.js';
 import { DownloadRegistrationFichaController } from '../controllers/download-registration-ficha.js';
 import { DeleteRegistrationFichaController } from '../controllers/delete-registration-ficha.js';
+import {
+    AdminRegisterPersonUseCase,
+    ConfirmAllRegistrationsUseCase,
+} from '../../usecase/admin-course-registrations.js';
+import {
+    AdminRegisterPersonController,
+    ConfirmAllRegistrationsController,
+} from '../controllers/admin-course-registrations.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 
@@ -76,6 +84,14 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
     );
     const deleteFichaController = new DeleteRegistrationFichaController(
         new DeleteRegistrationFichaUseCase(registrationRepository),
+        getAdminPermissions,
+    );
+    const adminRegisterController = new AdminRegisterPersonController(
+        new AdminRegisterPersonUseCase(courseRepository, userDataRepository, registrationRepository),
+        getAdminPermissions,
+    );
+    const confirmAllController = new ConfirmAllRegistrationsController(
+        new ConfirmAllRegistrationsUseCase(courseRepository, registrationRepository),
         getAdminPermissions,
     );
 
@@ -358,6 +374,71 @@ limit?: number
             }>,
             res: FastifyReply,
         ) => listController.handle(req, res),
+    );
+
+    fastify.post(
+        '/admin/courses/:courseId/registrations',
+        {
+            schema: {
+                tags: ['Admin — Registrations'],
+                summary: 'Register a person from the admin panel',
+                description:
+                    'Inscreve uma pessoa já cadastrada. Ignora prazo, status e data de término do curso; só respeita a lotação da sala. A inscrição já nasce confirmada. Pessoa já inscrita → 409; curso lotado → 409.',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['courseId'],
+                    properties: { courseId: { type: 'string' } },
+                },
+                body: {
+                    type: 'object',
+                    required: ['userDataId'],
+                    properties: { userDataId: { type: 'string' } },
+                },
+                response: {
+                    201: { type: 'object',
+properties: { registrationId: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                    409: errorResponse,
+                },
+            },
+        },
+        (
+            req: FastifyRequest<{
+                Params: { courseId: string };
+                Body: { userDataId: string };
+            }>,
+            res: FastifyReply,
+        ) => adminRegisterController.handle(req, res),
+    );
+
+    fastify.patch(
+        '/admin/courses/:courseId/registrations/confirm-all',
+        {
+            schema: {
+                tags: ['Admin — Registrations'],
+                summary: 'Confirm all unconfirmed registrations of a course',
+                description: 'Retorna `confirmed`: quantas inscrições foram confirmadas agora.',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['courseId'],
+                    properties: { courseId: { type: 'string' } },
+                },
+                response: {
+                    200: { type: 'object',
+properties: { confirmed: { type: 'integer' } } },
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { courseId: string } }>, res: FastifyReply) =>
+            confirmAllController.handle(req, res),
     );
 
     fastify.delete(

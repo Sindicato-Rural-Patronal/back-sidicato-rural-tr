@@ -50,6 +50,7 @@ export interface RegistrationRepository {
         courseId: string,
         userDataId: string,
         maxCapacity: number,
+        options?: { confirmed?: boolean },
     ): Promise<courseUserRegistrationModel | 'FULL'>;
     findById(id: string): Promise<RegistrationWithUserData | null>;
     findByCourseId(courseId: string, skip?: number, take?: number): Promise<RegistrationWithUserData[]>;
@@ -61,6 +62,8 @@ export interface RegistrationRepository {
     count(filter?: { since?: Date }): Promise<number>;
     setConfirmed(id: string, confirmed: boolean): Promise<courseUserRegistrationModel | null>;
     countUnconfirmed(courseId: string): Promise<number>;
+    /** Confirma todas as inscrições ativas ainda não confirmadas do curso; retorna quantas mudaram. */
+    confirmAll(courseId: string): Promise<number>;
     delete(id: string): Promise<boolean>;
     setFicha(registrationId: string, data: Buffer, filename: string, mimeType: string): Promise<void>;
     getFicha(registrationId: string): Promise<RegistrationFichaFile | null>;

@@ -133,6 +133,7 @@ format: 'date-time' },
             schema: {
                 tags: ['Contatos — Admin'],
                 summary: 'Marcar mensagem como lida',
+                description: 'Sempre marca como lida (o corpo é ignorado). Para voltar a "não lida" use `PATCH /admin/contacts/messages/:messageId/unread` — rota própria para a auditoria registrar qual das duas foi.',
                 security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
@@ -156,6 +157,34 @@ properties: { message: { type: 'string' } } },
             const userId = await requirePermission(req, res, 'UPDATE_CONTACT', getAdminPermissions);
             if (!userId) return;
             return markReadController.handle(req as Parameters<typeof markReadController.handle>[0], res);
+        },
+    );
+
+    fastify.patch(
+        '/admin/contacts/messages/:messageId/unread',
+        {
+            schema: {
+                tags: ['Contatos — Admin'],
+                summary: 'Marcar mensagem como não lida',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['messageId'],
+                    properties: { messageId: { type: 'string' } },
+                },
+                response: {
+                    200: { type: 'object',
+properties: { message: { type: 'string' } } },
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        async (req: FastifyRequest, res: FastifyReply) => {
+            const userId = await requirePermission(req, res, 'UPDATE_CONTACT', getAdminPermissions);
+            if (!userId) return;
+            return markReadController.handle(req as Parameters<typeof markReadController.handle>[0], res, false);
         },
     );
 

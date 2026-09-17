@@ -13,6 +13,7 @@ import type {
     FinanceTransactionUpdateInput,
     FinanceTransferInput,
     FinanceTransactionFilters,
+    FinanceTransactionSum,
     FinanceTransactionWithCategory,
     FinanceAttachmentMeta,
     FinanceAttachmentFile,
@@ -141,6 +142,30 @@ orderBy: { createdAt: 'asc' } },
             },
             orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
         });
+    }
+
+    async sumTransactions(
+        filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>,
+    ): Promise<FinanceTransactionSum[]> {
+        const where = this.buildWhere(filters);
+        // Soma por tipo só dos lançamentos comuns: transferência entre caixas não
+        // entra em receita/despesa (mesma regra do dashboard).
+        const plain = await this.prisma.financialTransaction.groupBy({
+            by: ['type'],
+            where: { ...where,
+transferId: null },
+            _sum: { amountCents: true },
+        });
+        type Group = {
+            type: FinanceTransactionSum['type'];
+            _sum: { amountCents: number | null };
+        };
+        const toSum = (transfer: boolean) => (g: Group): FinanceTransactionSum => ({
+            type: g.type,
+            transfer,
+            amountCents: g._sum.amountCents ?? 0,
+        });
+        return plain.map(toSum(false));
     }
 
     findTransactionById(id: string): Promise<FinancialTransactionModel | null> {

@@ -11,11 +11,24 @@ import type {
 export function createUserDataAdapter(prisma: PrismaClient): UserDataRepository {
     return new UserDataAdapter(prisma);
 }
+
+/** CPF é gravado só com dígitos (o painel mandava com e sem máscara); vazio vira null. */
+export function cpfForStorage(cpf: string | null): string | null {
+    return cpf?.replace(/\D/g, '') || null;
+}
+
+// Todo INSERT/UPDATE de UserData passa por aqui: normaliza o CPF num lugar só
+// (cadastro e edição no painel, inscrição pública em curso). Sem `cpf` no data, não mexe.
+function withStoredCpf<T extends { cpf?: string | null }>(data: T): T {
+    return data.cpf === undefined ? data : { ...data,
+cpf: cpfForStorage(data.cpf) };
+}
+
 export class UserDataAdapter implements UserDataRepository {
     constructor(private prisma: PrismaClient) {}
     create(data: UserDataUncheckedCreateInput): Promise<UserDataModel | null> {
         return this.prisma.userData.create({
-            data,
+            data: withStoredCpf(data),
         });
     }
     findById(id: string): Promise<UserDataModel | null> {
@@ -127,7 +140,7 @@ rg } });
 
     update(id: string, data: UserDataUpdateInput): Promise<UserDataModel | null> {
         return this.prisma.userData.update({ where: { id },
-data });
+data: withStoredCpf(data) });
     }
 
     async delete(id: string): Promise<void> {

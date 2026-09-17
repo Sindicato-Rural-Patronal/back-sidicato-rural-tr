@@ -20,7 +20,6 @@ import { stripAccents } from '../lib/text.js';
 import { csvDate, csvDateTime, csvList, csvMoney, csvWallClock, toCsv, type CsvColumn } from '../lib/csv.js';
 import {
     ADDRESS_TYPE_LABEL,
-    AUDIT_METHOD_LABEL,
     COMPANY_TYPE_LABEL,
     COURSE_STATUS_LABEL,
     EDUCATION_LABEL,
@@ -31,6 +30,7 @@ import {
     label,
 } from '../lib/export-labels.js';
 import { todayInBrazil } from '../lib/quote-products.js';
+import { describeAuditAction } from '../lib/audit-sentence.js';
 
 
 // ── Conjuntos exportáveis ────────────────────────────────────────────────────
@@ -160,10 +160,12 @@ search: text }),
 
 // ── Formatação ───────────────────────────────────────────────────────────────
 
+// CPF sempre como 000.000.000-00 (gravado só com dígitos). Valor antigo que não
+// tem 11 dígitos sai só com os dígitos, sem máscara pela metade.
 function formatCpf(cpf: string | null): string {
     if (!cpf) return '';
     const d = cpf.replace(/\D/g, '');
-    return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : cpf;
+    return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : d;
 }
 
 function formatCnpj(cnpj: string | null): string {
@@ -579,8 +581,10 @@ const auditColumns: CsvColumn<AuditLogExportRow>[] = [
 value: a => csvDateTime(a.createdAt) },
     { header: 'Quem',
 value: a => a.actorName },
+    // Mesma frase da tela de auditoria, sem o nome (que vai em "Alvo").
     { header: 'Ação',
-value: a => label(AUDIT_METHOD_LABEL, a.method) },
+value: a => describeAuditAction({ ...a,
+targetLabel: null }) },
     { header: 'Área',
 value: a => a.entity },
     { header: 'Alvo',

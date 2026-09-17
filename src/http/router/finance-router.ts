@@ -333,7 +333,7 @@ properties: { id: { type: 'string' } } },
             schema: {
                 tags,
                 summary: 'List financial transactions',
-                description: 'Paginado, com filtros: from, to, type, categoryId, search.',
+                description: 'Paginado, com filtros: from, to, type, categoryId, accountId, search. `totals` soma entradas e saídas de todos os lançamentos filtrados (sem transferências entre caixas nem "só nota").',
                 security: sec,
                 querystring: {
                     type: 'object',
@@ -354,8 +354,30 @@ enum: ['IN', 'OUT'] },
                         search: { type: 'string' },
                     },
                 },
-                response: { 401: errorResponse,
-403: errorResponse },
+                response: {
+                    200: {
+                        type: 'object',
+                        properties: {
+                            // Lançamento com categoria, caixa, empenho e comprovantes: vai inteiro.
+                            data: { type: 'array',
+items: { type: 'object',
+additionalProperties: true } },
+                            total: { type: 'integer' },
+                            page: { type: 'integer' },
+                            limit: { type: 'integer' },
+                            totalPages: { type: 'integer' },
+                            totals: {
+                                type: 'object',
+                                properties: {
+                                    incomeCents: { type: 'integer' },
+                                    expenseCents: { type: 'integer' },
+                                },
+                            },
+                        },
+                    },
+                    401: errorResponse,
+                    403: errorResponse,
+                },
             },
         },
         (req: FastifyRequest, res: FastifyReply) => controller.getTransactions(req, res),
