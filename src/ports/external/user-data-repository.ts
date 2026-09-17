@@ -11,7 +11,6 @@ export type UserDataUpdateInput = Partial<{
     email: string;
     phone: string;
     cpf: string | null;
-    cnpj: string | null;
     avatar: string | null;
 
     // Identity

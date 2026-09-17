@@ -8,6 +8,10 @@ import { SaveDailyQuotesUseCase } from '../../usecase/save-daily-quotes.js';
 import { MarketQuoteController } from '../controllers/market-quote-controller.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { ListQuoteHistoryUseCase } from '../../usecase/list-quote-history.js';
+import { UpdateQuotesSourceUseCase } from '../../usecase/update-site-settings.js';
+import { createSiteSettingsAdapter } from '../../adapter/database/site-settings-adapter.js';
+import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 
 const marketQuoteProperties = {
     id: { type: 'string' },
@@ -57,6 +61,55 @@ export async function marketQuoteRouter(fastify: FastifyInstance, prisma: Prisma
             },
         },
         (req: FastifyRequest, res: FastifyReply) => controller.listPublic(req, res),
+    );
+
+    const history = new ListQuoteHistoryUseCase(repo);
+    fastify.get(
+        '/market-quotes/history',
+        {
+            schema: {
+                tags: ['Market Quotes'],
+                summary: 'Histórico das cotações (público)',
+                description: 'Um ponto por lançamento (dia + manhã/tarde) de cada produto ativo, nos últimos N dias (7 a 365; padrão 90).',
+                querystring: { type: 'object',
+properties: { days: { type: 'integer',
+minimum: 7,
+maximum: 365 } } },
+                response: {
+                    200: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                id: { type: 'string' },
+                                label: { type: 'string' },
+                                unit: { type: 'string',
+nullable: true },
+                                points: {
+                                    type: 'array',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            date: { type: 'string',
+description: 'YYYY-MM-DD' },
+                                            period: { type: 'string',
+nullable: true },
+                                            priceCents: { type: 'integer' },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    400: errorResponse,
+                },
+            },
+        },
+        async (req: FastifyRequest, reply: FastifyReply) => {
+            const r = await history.execute(req.query);
+            if (r.error) return reply.status(errorToStatus(r.error)).send({ error: r.error.message });
+            return reply.send(r.series);
+        },
     );
 
     fastify.get(
@@ -119,5 +172,33 @@ example: 12050 },
             },
         },
         (req: FastifyRequest, res: FastifyReply) => controller.saveDaily(req, res),
+    );
+
+    const updateSource = new UpdateQuotesSourceUseCase(createSiteSettingsAdapter(prisma));
+    fastify.put(
+        '/admin/market-quotes/source',
+        {
+            schema: {
+                tags: ['Market Quotes'],
+                summary: 'Fonte exibida na faixa de cotações (ex.: Cvale)',
+                security: [{ bearerAuth: [] }],
+                body: { type: 'object',
+required: ['source'],
+properties: { source: { type: 'string' } } },
+                response: {
+                    200: { type: 'object',
+properties: { message: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                },
+            },
+        },
+        async (req: FastifyRequest, reply: FastifyReply) => {
+            if ((await requirePermission(req, reply, 'UPDATE_MARKET_QUOTE', getAdminPermissions)) === null) return;
+            const r = await updateSource.execute(req.body);
+            if (r.error) return reply.status(errorToStatus(r.error)).send({ error: r.error.message });
+            return reply.send({ message: 'ok' });
+        },
     );
 }

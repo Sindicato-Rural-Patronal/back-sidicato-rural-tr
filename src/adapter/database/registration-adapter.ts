@@ -13,14 +13,21 @@ const userDataSelect = {
     email: true,
     phone: true,
     cpf: true,
-    cnpj: true,
     avatar: true,
     birthDate: true,
-    isPartner: true,
     boardMember: true,
     boardPosition: true,
-    userAdmin: { select: { publicTitle: true,
-isPublic: true } },
+    // Selo "Associado" na lista de inscritos.
+    memberStatus: true,
+    membershipValidUntil: true,
+    publicContact: { select: { title: true } },
+    // Selo "Parceira": empresas parceiras às quais a pessoa está vinculada.
+    companyMemberships: {
+        where: { company: { isPartner: true,
+isDeleted: false } },
+        select: { company: { select: { name: true,
+tradeName: true } } },
+    },
 } as const;
 
 // Só metadados da ficha — nunca os bytes (`data`) na listagem.

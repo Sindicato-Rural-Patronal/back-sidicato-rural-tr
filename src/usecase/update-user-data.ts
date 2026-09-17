@@ -4,7 +4,7 @@ import { ValidationError } from '../errors/validation.js';
 import { UserNotFoundError } from '../errors/not-found.js';
 import { EmailOrCpfAlreadyInUseError, RgAlreadyInUseError } from '../errors/conflict.js';
 import { isValidCpf } from '../lib/cpf.js';
-import { isValidCnpj } from '../lib/cnpj.js';
+import { MEMBER_TYPES } from '../lib/member-types.js';
 import { isValidBrPhone, isValidRg, isValidCnh } from '../lib/br-validators.js';
 
 const updateUserDataSchema = z.object({
@@ -12,7 +12,6 @@ const updateUserDataSchema = z.object({
     email: z.string().email().optional(),
     phone: z.string().refine(v => isValidBrPhone(v), 'Telefone inválido (DDD + 8 ou 9 dígitos)').optional(),
     cpf: z.string().refine(v => isValidCpf(v), 'CPF inválido').nullable().optional(),
-    cnpj: z.string().refine(v => isValidCnpj(v), 'CNPJ inválido').nullable().optional(),
     avatar: z.string().nullable().optional(),
 
     // Identity
@@ -50,7 +49,10 @@ const updateUserDataSchema = z.object({
         z.array(z.string()).max(5).optional(),
     ),
     familyIncome: z.string().nullable().optional(),
-    memberType: z.string().nullable().optional(),
+    memberType: z.preprocess(
+        v => (v === '' ? null : v),
+        z.enum(MEMBER_TYPES, { message: `Tipo de membro inválido. Use: ${MEMBER_TYPES.join(', ')}` }).nullable().optional(),
+    ),
     boardPosition: z.string().nullable().optional(),
     boardMember: z.boolean().optional(),
     memberStatus: z.enum(['ACTIVE', 'INACTIVE']).nullable().optional(),

@@ -22,7 +22,6 @@ const fakeUser = {
     phone: '44999990001',
     cpf: '11144477735',
     rg: null,
-    cnpj: null,
     avatar: null,
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),

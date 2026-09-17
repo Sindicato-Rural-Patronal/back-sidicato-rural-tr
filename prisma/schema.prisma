@@ -19,9 +19,6 @@ model UserAdmin {
   username     String @unique
   passwordHash String
 
-  isPublic    Boolean @default(false)
-  publicTitle String?
-
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
@@ -44,7 +41,6 @@ model UserData {
   // CPF único entre cadastros ATIVOS (por dígitos) via índice parcial em
   // migração 20260914120000_userdata_cpf_unique_active — não expressável aqui.
   cpf       String?
-  cnpj      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -88,14 +84,6 @@ model UserData {
   memberNotes      String?
   memberNotesNumber String?
 
-  // OBSOLETO desde a criação de Company: parceria agora é da empresa.
-  // Colunas mantidas só para não perder dados antigos (migradas para Company);
-  // o código não grava mais aqui. Remover numa limpeza futura.
-  isPartner    Boolean @default(false)
-  partnerUrl   String?
-  partnerLogo  String?
-  partnerOrder Int?
-
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
@@ -113,6 +101,8 @@ model UserData {
   properties       Property[]
   // Empresas às quais a pessoa está vinculada (com título/cargo)
   companyMemberships CompanyMember[]
+  // Aparece em "Nossa Equipe" na página Contato
+  publicContact      PublicContact?
   // Propriedade marcada como principal (endereço usado na ficha). Sem FK formal:
   // guarda o id de uma Property do próprio usuário.
   primaryPropertyId String?
@@ -801,4 +791,16 @@ model GalleryPhoto {
   createdAt  DateTime     @default(now())
 
   @@index([albumId, order])
+}
+
+// Contatos da página Contato ("Nossa Equipe"). Qualquer pessoa do cadastro,
+// com ou sem acesso ao painel; nome, e-mail e telefone vêm do cadastro.
+model PublicContact {
+  id         String   @id @default(uuid())
+  userDataId String   @unique
+  userData   UserData @relation(fields: [userDataId], references: [id], onDelete: Cascade)
+  title      String? // cargo exibido: Presidente, Secretária…
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

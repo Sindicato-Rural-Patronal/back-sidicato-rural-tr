@@ -4,13 +4,28 @@ import type { UserDataModel } from '../../generated/prisma/models/UserData.js';
 export type RegistrationWithUserData = courseUserRegistrationModel & {
     userData: Pick<
         UserDataModel,
-        'id' | 'name' | 'email' | 'phone' | 'cpf' | 'cnpj' | 'avatar' | 'birthDate' | 'isPartner' | 'boardMember' | 'boardPosition'
+        | 'id'
+        | 'name'
+        | 'email'
+        | 'phone'
+        | 'cpf'
+        | 'avatar'
+        | 'birthDate'
+        | 'boardMember'
+        | 'boardPosition'
+        | 'memberStatus'
+        | 'membershipValidUntil'
     > & {
-userAdmin: {
- publicTitle: string | null;
-isPublic: boolean
-} | null;
-};
+        /** Cargo em "Nossa Equipe", se a pessoa for contato público. */
+        publicContact: { title: string | null } | null;
+        /** Só vínculos com empresas parceiras ativas (selo na lista de inscritos). */
+        companyMemberships: {
+ company: {
+ name: string;
+tradeName: string | null 
+} 
+}[];
+    };
     ficha: {
  id: string;
 filename: string;
