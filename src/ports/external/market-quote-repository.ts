@@ -22,6 +22,8 @@ export interface MarketQuoteRepository {
      * variação. Relançar o mesmo dia/período não compara o preço com ele mesmo.
      */
     getPreviousNumeric(marketQuoteId: string, referenceDate: Date, period: QuotePeriod): Promise<number | null>;
+    /** Troca a unidade do produto e o texto pronto do preço atual. */
+    updateUnit(id: string, unit: string | null, value: string): Promise<MarketQuoteModel>;
     /** Grava preço no produto e no histórico (substitui o mesmo dia/período), numa transação. */
     saveDaily(entries: DailyQuoteEntry[]): Promise<void>;
     /** Lançamentos com data a partir de `since`, em ordem cronológica (dia, depois manhã/tarde). */

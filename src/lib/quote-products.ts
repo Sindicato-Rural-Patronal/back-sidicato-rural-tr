@@ -2,6 +2,12 @@
 
 export type QuotePeriod = 'MORNING' | 'AFTERNOON';
 
+/**
+ * Unidades que o painel pode escolher para cada produto (null = sem unidade,
+ * caso do dólar). Saca, tonelada, quilo e arroba (15 kg).
+ */
+export const QUOTE_UNITS = ['sc 60kg', 'sc 50kg', 'sc 40kg', 't', 'kg', '@'] as const;
+
 /** "R$ 1.234,50 /sc 60kg" (sem unidade: "R$ 5,23"). */
 export function formatQuoteValue(priceCents: number, unit: string | null): string {
     const reais = Math.floor(priceCents / 100)

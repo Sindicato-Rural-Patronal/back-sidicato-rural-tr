@@ -53,6 +53,12 @@ nulls: 'last' } },
         return row?.numeric ?? null;
     }
 
+    updateUnit(id: string, unit: string | null, value: string): Promise<MarketQuoteModel> {
+        return this.prisma.marketQuote.update({ where: { id },
+data: { unit,
+value } });
+    }
+
     historySince(since: Date): Promise<QuoteHistoryRow[]> {
         return this.prisma.marketQuoteHistory.findMany({
             where: { referenceDate: { gte: since },
