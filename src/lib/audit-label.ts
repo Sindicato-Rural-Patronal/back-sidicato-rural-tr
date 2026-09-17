@@ -16,6 +16,13 @@ export function bodyLabel(body: unknown): string | null {
     return typeof v === 'string' && v.trim() ? v.trim().slice(0, 140) : null;
 }
 
+/** Usuário digitado no login, até 60 caracteres. Só lê `username` — a senha nunca. */
+export function loginUsername(body: unknown): string | null {
+    if (!body || typeof body !== 'object') return null;
+    const v = (body as { username?: unknown }).username;
+    return typeof v === 'string' && v.trim() ? v.trim().slice(0, 60) : null;
+}
+
 // Inscrição pública (/courses/:id/register*): o nome vem do corpo, não do curso.
 const PUBLIC_REGISTER_RE = /^\/courses\/[^/]+\/register/i;
 

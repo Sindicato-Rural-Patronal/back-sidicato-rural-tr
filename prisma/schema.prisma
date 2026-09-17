@@ -35,8 +35,11 @@ model UserAdmin {
 model UserData {
   id        String   @id @default(uuid())
   name      String
-  email     String   @unique
-  phone     String   @unique
+  // E-mail opcional e telefone obrigatório, ambos podem repetir entre pessoas
+  // (casal, pais e filhos). A identidade é o CPF. E-mail vazio é gravado como
+  // null (o adapter normaliza). Migração 20260920090000_userdata_contact_not_unique.
+  email     String?
+  phone     String
   avatar    String?
   // CPF único entre cadastros ATIVOS (por dígitos) via índice parcial em
   // migração 20260914120000_userdata_cpf_unique_active — não expressável aqui.
@@ -253,7 +256,8 @@ model MarketQuoteHistory {
 }
 
 // Trilha de auditoria: registra mutações (POST/PATCH/PUT/DELETE bem-sucedidas)
-// feitas via API — quem (actorId), o quê (método/entidade/rota) e quando.
+// feitas via API — quem (actorId), o quê (método/entidade/rota) e quando — e as
+// tentativas de login (method LOGIN / LOGIN_FAILED / LOGIN_BLOCKED).
 model AuditLog {
   id          String   @id @default(uuid())
   actorId     String?
@@ -262,10 +266,19 @@ model AuditLog {
   entity      String
   targetLabel String?
   statusCode  Int
+  // De onde veio: IP do cliente, User-Agent bruto (até 300 caracteres) e local
+  // aproximado do IP ("Terra Roxa, PR, Brasil", via ipwho.is). Migração
+  // 20260920110000_audit_request_context.
+  ip          String?
+  userAgent   String?
+  location    String?
+  // Campos alterados: [{ field, before, after }] (lib/audit-diff.ts).
+  changes     Json?
   createdAt   DateTime @default(now())
 
   @@index([createdAt])
   @@index([actorId])
+  @@index([ip])
 }
 
 // Convite para criar um admin: o gestor escolhe a pessoa (userData) + a regra e
@@ -307,8 +320,11 @@ model courseUserRegistration {
   userData   UserData @relation(fields: [userDataId], references: [id])
   userDataId String
 
-  // Inscrição confirmada pelo admin (pré-requisito p/ iniciar o curso).
+  // Inscrição confirmada pelo admin.
   confirmed Boolean @default(false)
+
+  // Presença marcada pela equipe: null = sem marcar, true = presente, false = faltou.
+  attended Boolean?
 
   // Ficha de inscrição escaneada e preenchida, anexada pelo admin.
   ficha registrationFicha?
@@ -437,6 +453,7 @@ enum CourseStatus {
   PRIVATE
   UNPUBLISHED
   IN_PROGRESS
+  COMPLETED
 }
 
 enum NewsStatus {

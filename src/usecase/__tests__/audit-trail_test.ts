@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { deriveAuditEntity, skipAudit } from '../../lib/audit-entity.js';
+import { deriveAuditEntity, loginAuditMethod, skipAudit } from '../../lib/audit-entity.js';
 import { AUDIT_ENTITY_NOUNS, auditRouteKey, describeAuditAction } from '../../lib/audit-sentence.js';
-import { shouldLookupTargetLabel } from '../../lib/audit-label.js';
+import { loginUsername, shouldLookupTargetLabel } from '../../lib/audit-label.js';
+import { addressText, shouldSnapshot } from '../../lib/audit-snapshot.js';
 
 const ID = '3f2b8c1e-4a5d-4e6f-8a9b-0c1d2e3f4a5b';
 const ID2 = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
@@ -52,7 +53,7 @@ describe('auditoria: entidade pelo caminho', () => {
             '/admin/convenios', '/admin/galleries', '/admin/public-contacts', '/admin/site-settings', '/admin/invites',
             '/admin/unimed', '/rooms', '/rules', '/admin/users/x/instructor', '/news', '/admin/banners',
             '/admin/contacts/messages/x', '/admin/registrations/x', '/admin/users/x/properties',
-            '/admin/users/x/relations', '/admin/users', '/users', '/courses', '/address/cep/1', '/qualquer',
+            '/admin/users/x/relations', '/admin/users', '/users', '/courses', '/address/cep/1', '/qualquer', '/auth/login',
         ];
         for (const path of paths) {
             expect(AUDIT_ENTITY_NOUNS[deriveAuditEntity(path)], path).toBeDefined();
@@ -122,5 +123,75 @@ targetLabel: 'Pessoas: 3 registros' }))
 path: '/x',
 entity: 'Coisa',
 targetLabel: null })).toBe('Excluiu um coisa');
+    });
+});
+
+describe('auditoria: login', () => {
+    it('status da resposta vira o tipo da tentativa', () => {
+        expect(loginAuditMethod(200)).toBe('LOGIN');
+        expect(loginAuditMethod(401)).toBe('LOGIN_FAILED');
+        expect(loginAuditMethod(429)).toBe('LOGIN_BLOCKED');
+        expect(loginAuditMethod(400)).toBeNull();
+        expect(loginAuditMethod(500)).toBeNull();
+    });
+
+    it('guarda só o usuário digitado (até 60 caracteres), nunca a senha', () => {
+        expect(loginUsername({ username: '  bali  ',
+password: 'segredo' })).toBe('bali');
+        expect(loginUsername({ username: 'x'.repeat(100) })).toHaveLength(60);
+        expect(loginUsername({ password: 'segredo' })).toBeNull();
+        expect(loginUsername(null)).toBeNull();
+    });
+
+    it('entidade "Login" e frases das tentativas', () => {
+        expect(deriveAuditEntity('/auth/login')).toBe('Login');
+        expect(sentence('LOGIN', '/auth/login', 'bali')).toBe('Entrou no painel');
+        expect(sentence('LOGIN_FAILED', '/auth/login', 'bali')).toBe('Tentativa de login falhou (usuário "bali")');
+        expect(sentence('LOGIN_FAILED', '/auth/login')).toBe('Tentativa de login falhou');
+        expect(sentence('LOGIN_FAILED', '/auth/login', '(usuário inexistente)')).toBe('Tentativa de login falhou (usuário inexistente)');
+        expect(sentence('LOGIN_BLOCKED', '/auth/login', 'bali')).toBe('Login bloqueado por excesso de tentativas (usuário "bali")');
+    });
+});
+
+describe('auditoria: presença e conclusão do curso', () => {
+    it('frases das novas rotas', () => {
+        expect(sentence('PATCH', `/admin/registrations/${ID}/attendance`)).toBe('Marcou presença na inscrição');
+        expect(sentence('PATCH', `/admin/registrations/${ID}/attendance`, 'MARIA')).toBe('Marcou presença na inscrição de "MARIA"');
+        expect(sentence('PATCH', `/admin/courses/${ID}/registrations/attendance`)).toBe('Marcou presença de todos os confirmados');
+        expect(sentence('PATCH', `/admin/courses/${ID}/complete`, 'HORTA')).toBe('Concluiu o curso "HORTA"');
+        expect(deriveAuditEntity(`/admin/registrations/${ID}/attendance`)).toBe('Inscrição');
+        expect(deriveAuditEntity(`/admin/courses/${ID}/complete`)).toBe('Curso');
+    });
+});
+
+describe('auditoria: leitura de antes/depois', () => {
+    it('edições e exclusões de um registro identificável', () => {
+        expect(shouldSnapshot('PATCH', `/users/${ID}`)).toBe(true);
+        expect(shouldSnapshot('DELETE', `/admin/companies/${ID}/members/${ID2}`)).toBe(true);
+        expect(shouldSnapshot('PATCH', `/admin/registrations/${ID}/attendance`)).toBe(true);
+        expect(shouldSnapshot('PATCH', `/admin/courses/${ID}/complete`)).toBe(true);
+        expect(shouldSnapshot('PATCH', '/admin/site-settings')).toBe(true);
+        expect(shouldSnapshot('PUT', '/admin/market-quotes/daily')).toBe(true);
+        expect(shouldSnapshot('PATCH', '/admin/me')).toBe(true);
+    });
+
+    it('criação, reordenação e ações em lote ficam de fora', () => {
+        expect(shouldSnapshot('POST', '/admin/banners')).toBe(false);
+        expect(shouldSnapshot('POST', `/admin/courses/${ID}/start`)).toBe(false);
+        expect(shouldSnapshot('PATCH', '/admin/banners/reorder')).toBe(false);
+        expect(shouldSnapshot('PATCH', `/admin/courses/${ID}/registrations/attendance`)).toBe(false);
+        expect(shouldSnapshot('PATCH', `/admin/courses/${ID}/registrations/confirm-all`)).toBe(false);
+    });
+
+    it('endereço em uma linha', () => {
+        expect(addressText({ street: 'RUA JOSÉ TONDATO',
+number: '80',
+neighborhood: 'CENTRO',
+city: 'TERRA ROXA',
+state: 'PR',
+zipCode: '85990000' }))
+            .toBe('RUA JOSÉ TONDATO, 80 - CENTRO - TERRA ROXA/PR - CEP 85990000');
+        expect(addressText(null)).toBeNull();
+        expect(addressText({})).toBeNull();
     });
 });

@@ -47,6 +47,8 @@ g: 'f' },
 g: 'm' },
     'Lançamento': { noun: 'lançamento',
 g: 'm' },
+    'Login': { noun: 'login',
+g: 'm' },
     'Mensagem': { noun: 'mensagem',
 g: 'f' },
     'Notícia': { noun: 'notícia',
@@ -84,11 +86,27 @@ const fixed = (text: string, withLabel?: string): Sentence => label =>
 
 // Rotas cuja ação não é "criar/editar/excluir <entidade>". Chave: método + caminho
 // com os ids trocados por ":id" (ver `auditRouteKey`).
+// Usuário digitado no login: o hook grava "(usuário inexistente)" quando não há
+// admin com esse nome (pode ser a senha digitada no campo errado).
+const UNKNOWN_LOGIN_USER = '(usuário inexistente)';
+function loginWho(label: string | null | undefined): string {
+    if (!label) return '';
+    return label === UNKNOWN_LOGIN_USER ? ' (usuário inexistente)' : ` (usuário "${label}")`;
+}
+
 const SPECIAL: Record<string, Sentence> = {
+    // Acesso ao painel (rótulo = usuário digitado)
+    'LOGIN /auth/login': () => 'Entrou no painel',
+    'LOGIN_FAILED /auth/login': l => `Tentativa de login falhou${loginWho(l)}`,
+    'LOGIN_BLOCKED /auth/login': l => `Login bloqueado por excesso de tentativas${loginWho(l)}`,
+
     // Cursos e inscrições
     'POST /admin/courses/:id/start': fixed('Iniciou o curso'),
     'POST /admin/courses/:id/registrations': fixed('Inscreveu uma pessoa no curso'),
     'PATCH /admin/courses/:id/registrations/confirm-all': fixed('Confirmou todas as inscrições', 'Confirmou todas as inscrições do curso'),
+    'PATCH /admin/courses/:id/registrations/attendance': fixed('Marcou presença de todos os confirmados', 'Marcou presença de todos os confirmados do curso'),
+    'PATCH /admin/courses/:id/complete': fixed('Concluiu o curso'),
+    'PATCH /admin/registrations/:id/attendance': fixed('Marcou presença na inscrição', 'Marcou presença na inscrição de'),
     'POST /courses/:id/banner': fixed('Trocou a imagem do curso'),
     'POST /courses/:id/gallery': fixed('Adicionou foto ao curso'),
     'DELETE /courses/:id/gallery/:id': fixed('Excluiu foto do curso'),

@@ -181,14 +181,18 @@ function brazilDay(value: string, edge: 'start' | 'end'): Date | null {
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
-export function buildAuditLogWhere({ action, entity, actorId, from, to, q }: AuditLogFilters) {
+export function buildAuditLogWhere({ action, entity, actorId, ip, from, to, q }: AuditLogFilters) {
     const where: Record<string, unknown> = {};
     if (action === 'create') where.method = 'POST';
     else if (action === 'edit') where.method = { in: ['PATCH', 'PUT'] };
     else if (action === 'delete') where.method = 'DELETE';
     else if (action === 'export') where.method = 'EXPORT';
+    else if (action === 'login') where.method = 'LOGIN';
+    // Falhas: senha/usuário errado e bloqueio por excesso de tentativas.
+    else if (action === 'login_failed') where.method = { in: ['LOGIN_FAILED', 'LOGIN_BLOCKED'] };
     if (entity) where.entity = entity;
     if (actorId) where.actorId = actorId;
+    if (ip && ip.trim()) where.ip = ip.trim();
     // "AAAA-MM-DD" é um dia em Brasília; data inválida é ignorada.
     const start = from ? brazilDay(from, 'start') : null;
     const end = to ? brazilDay(to, 'end') : null;

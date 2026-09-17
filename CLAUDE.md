@@ -25,6 +25,7 @@ SUPABASE_SECRET_KEY=         # sb_secret_... (server-side, acesso total)
 STORAGE_BUCKET=avatars
 BANNER_BUCKET=course-banners
 NEWS_BANNER_BUCKET=news-banners
+GEOIP_DISABLED=              # 1 = não consulta o local do IP na auditoria (ipwho.is)
 ```
 
 ## Arquitetura (Hexagonal / Ports & Adapters)
@@ -59,7 +60,7 @@ src/
 
 | Modelo                   | Campos principais                                                                                          |
 |--------------------------|------------------------------------------------------------------------------------------------------------|
-| `UserData`               | id, name, email, phone, cpf (só dígitos; vazio = null — `UserDataAdapter` normaliza em create/update), nameSearch (busca, preenchida por trigger), avatar, nickname, maritalStatus, phone2, phone3, rg, rgIssuer, rgIssuedAt, birthDate, driverLicense, driverLicenseCategory, birthPlace, nationality, gender, ethnicity, educationLevel, functionalCategory, specialNeeds, memberClassification, cadPro (até 5), familyIncome, memberType (lista fixa em `lib/member-types.ts`: ALUNO, PRODUTOR RURAL, TRABALHADOR RURAL ASSALARIADO, TRABALHADOR RURAL AUTONOMO; fora da lista → 400), boardPosition, boardMember, memberStatus, memberSince, memberNotes, memberNotesNumber, addressId (FK). Colunas cnpj/isPartner/partner* foram removidas (migration `20260917140000`): CNPJ antigo e tipo de membro fora da lista (ex.: SOCIO) foram copiados para `memberNotes` — empresa/parceria é `Company` |
+| `UserData`               | id, name, email (opcional; vazio = null), phone (obrigatório) — e-mail e telefone podem repetir entre pessoas (casal, família; índices únicos removidos na migration `20260920090000_userdata_contact_not_unique`), cpf (a identidade: único entre ativos; só dígitos; vazio = null — `UserDataAdapter` normaliza CPF e e-mail em create/update), nameSearch (busca, preenchida por trigger), avatar, nickname, maritalStatus, phone2, phone3, rg, rgIssuer, rgIssuedAt, birthDate, driverLicense, driverLicenseCategory, birthPlace, nationality, gender, ethnicity, educationLevel, functionalCategory, specialNeeds, memberClassification, cadPro (até 5), familyIncome, memberType (lista fixa em `lib/member-types.ts`: ALUNO, PRODUTOR RURAL, TRABALHADOR RURAL ASSALARIADO, TRABALHADOR RURAL AUTONOMO; fora da lista → 400), boardPosition, boardMember, memberStatus, memberSince, memberNotes, memberNotesNumber, addressId (FK). Colunas cnpj/isPartner/partner* foram removidas (migration `20260917140000`): CNPJ antigo e tipo de membro fora da lista (ex.: SOCIO) foram copiados para `memberNotes` — empresa/parceria é `Company` |
 | `Company`                | id, name (razão social), tradeName (nome fantasia), nameSearch/tradeNameSearch (busca, preenchidas por trigger), addressId (FK→Address, sede; SetNull), cnpj (só dígitos; único entre ativas, índice parcial), stateRegistration, type (PRIVATE/PUBLIC), phone, phone2, phone3, email, website, notes, isPartner, partnerUrl, partnerLogo, partnerOrder, primaryPropertyId, isDeleted (soft delete) |
 | `CompanyMember`          | id, companyId (FK), userDataId (FK), title (texto livre em maiúsculas) — único por (companyId, userDataId) |
 | `UserAdmin`              | id, username, passwordHash, userDataId (FK), rulesId (FK)                                                  |
@@ -72,7 +73,7 @@ src/
 | `Room`                   | id, name (lista fixa em `lib/room-names.ts`: AUDITORIO, COZINHA, SALA DE VIDEO CONFERENCIA, SALA 1, SALA 2, SALA APL; único), description, maxCapacity, addressId (FK) |
 | `News`                   | id, title, content, summary, bannerUrl, status, publishedAt                                                |
 | `CoursePhoto`            | id, courseId (FK), url, caption                                                                            |
-| `CourseUserRegistration` | id, courseId (FK), userDataId (FK)                                                                         |
+| `CourseUserRegistration` | id, courseId (FK), userDataId (FK), confirmed, attended (presença: null = sem marcar, true = presente, false = faltou; migration `20260920100000_course_completed_attendance`), isDeleted |
 | `Address`                | id, type (URBAN/RURAL), city, state, zipCode, complement, notes, street, number, neighborhood, localityName, road, km, lot, section |
 | `Property`               | id, userDataId (FK?), companyId (FK?), name, registration, addressId (FK) — CHECK `Property_single_owner`: exatamente um dono (pessoa OU empresa) |
 | `UserRelation`           | id, sourceId (FK→UserData), targetId (FK→UserData), label (texto livre)                                    |
@@ -87,7 +88,7 @@ src/
 
 | Enum | Valores |
 |------|---------|
-| `CourseStatus` | `PUBLIC`, `PRIVATE`, `UNPUBLISHED` |
+| `CourseStatus` | `PUBLIC`, `PRIVATE`, `UNPUBLISHED`, `IN_PROGRESS` (iniciado pelo painel), `COMPLETED` (concluído à mão pelo painel) |
 | `NewsStatus` | `PUBLISHED`, `UNPUBLISHED` |
 | `Permission` | `CREATE_USER`, `UPDATE_USER`, `DELETE_USER`, `READ_USER`, `CREATE_COURSE`, `UPDATE_COURSE`, `DELETE_COURSE`, `READ_COURSE`, `CREATE_RULE`, `UPDATE_RULE`, `DELETE_RULE`, `READ_RULE`, `CREATE_USER_ADMIN`, `UPDATE_USER_ADMIN`, `DELETE_USER_ADMIN`, `READ_USER_ADMIN`, `CREATE_NEWS`, `UPDATE_NEWS`, `DELETE_NEWS`, `READ_NEWS`, `READ_CONTACT`, `UPDATE_CONTACT`, `CREATE_BANNER`, `UPDATE_BANNER`, `DELETE_BANNER`, `READ_BANNER` |
 | `MaritalStatus` | `SINGLE`, `MARRIED`, `DIVORCED`, `WIDOWED`, `DOMESTIC_PARTNERSHIP` |
@@ -133,6 +134,8 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 | `POST` | `/admin/users/:id/properties` | `AddPropertyUseCase` | `UPDATE_USER` |
 | `DELETE` | `/admin/users/:id/properties/:propertyId` | `DeletePropertyUseCase` | `UPDATE_USER` |
 | `POST` | `/admin/users/:id/avatar` | `UploadAvatarUseCase` | `UPDATE_USER` |
+
+> Cadastro e edição de pessoa (`POST /users`, `PATCH /users/:id`): nome, telefone e CPF obrigatórios no cadastro; e-mail opcional (vazio ou null = sem e-mail; preenchido precisa ser válido — `lib/person-email.ts`). E-mail e telefone podem repetir; só o CPF de outra pessoa ativa dá 409 `CpfAlreadyInUseError` ("CPF já cadastrado para outra pessoa."). RG repetido continua 409. As respostas com `email` de pessoa o declaram `nullable`.
 
 ### Empresas e parceiros (`company-router.ts`, use cases em `usecase/company-usecases.ts`)
 | Método | Path | Use Case | Autenticação |
@@ -189,7 +192,8 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 - Headers: `Content-Disposition` (`pessoas-AAAA-MM-DD.csv`, ou `pessoa-<nome>-AAAA-MM-DD.csv` para um registro) e `X-Export-Count`.
 - Filtros validados como na listagem (enums de sexo/etnia/escolaridade; datas `AAAA-MM-DD`, dia em Brasília). `audit-logs` sai com no máximo 20.000 linhas mais recentes.
 - Horários de curso saem como gravados (`csvWallClock`: o painel grava o relógio local com Z); momentos como "criado em" saem no horário de Brasília (`csvDateTime`).
-- Cada exportação grava um AuditLog com `method: 'EXPORT'` e entity "Exportação" (filtro `action=export` na auditoria); o hook de auditoria ignora `/admin/export/*` para não duplicar.
+- Cada exportação grava um AuditLog com `method: 'EXPORT'` e entity "Exportação" (filtro `action=export` na auditoria), com IP e User-Agent; o hook de auditoria ignora `/admin/export/*` para não duplicar e só preenche o local depois da resposta.
+- `audit-logs` tem também as colunas IP, Local, Aparelho e Alterações ("Campo: antes → depois; …").
 
 ### Instrutores
 | Método | Path | Use Case | Autenticação |
@@ -217,7 +221,7 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 
 > Cursos com status `PRIVATE` aparecem apenas para admins (`/admin/courses`), mas aceitam inscrições via link direto.
 >
-> Regras da inscrição pública (`lib/course-registration-rules.ts`, usada pelos três use cases `register-for-course*`), todas → 409: status `UNPUBLISHED`/`IN_PROGRESS` → `RegistrationsUnavailableError`; dia do fim do curso já passou (em Brasília; no último dia ainda aceita) → `CourseEndedError`; prazo `registrationDeadline` em Brasília: gravado com hora 00:00 (painel sem hora) vale **até o fim do dia**; com hora, fecha quando o relógio de Brasília passa de dia + hora. `GET /courses`, `/courses/:id` e `/admin/courses/:id` mandam `registrationDeadline` (dia, AAAA-MM-DD) e `registrationDeadlineTime` ("HH:MM" ou null = dia inteiro) → `RegistrationDeadlinePassedError`; lotado → `CourseFullError`. As datas do curso são hora "de parede" gravada com Z, então o dia é `toISOString().slice(0, 10)`; hoje vem de `todayInBrazil`. O site usa a mesma regra (`utils/course-status.ts` no front).
+> Regras da inscrição pública (`lib/course-registration-rules.ts`, usada pelos três use cases `register-for-course*`), todas → 409: status `UNPUBLISHED`/`IN_PROGRESS` → `RegistrationsUnavailableError`; status `COMPLETED` ou dia do fim do curso já passou (em Brasília; no último dia ainda aceita) → `CourseEndedError`; prazo `registrationDeadline` em Brasília: gravado com hora 00:00 (painel sem hora) vale **até o fim do dia**; com hora, fecha quando o relógio de Brasília passa de dia + hora. `GET /courses`, `/courses/:id` e `/admin/courses/:id` mandam `registrationDeadline` (dia, AAAA-MM-DD) e `registrationDeadlineTime` ("HH:MM" ou null = dia inteiro) → `RegistrationDeadlinePassedError`; lotado → `CourseFullError`. As datas do curso são hora "de parede" gravada com Z, então o dia é `toISOString().slice(0, 10)`; hoje vem de `todayInBrazil`. O site usa a mesma regra (`utils/course-status.ts` no front).
 >
 > `GET /courses/:courseId` e `GET /admin/courses/:courseId` retornam `instructors[]` com os campos: `id`, `title`, `category`, `name`, `bio`, `avatar`, `linkedin`, `instagram`, `facebook`. O campo `instructorName` (primeiro instrutor) ainda é retornado para compatibilidade.
 
@@ -259,10 +263,19 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 |--------|------|----------|--------------|
 | `POST` | `/courses/:courseId/register` | `RegisterForCourseUseCase` | Pública |
 | `POST` | `/courses/:courseId/register-by-cpf` | `RegisterForCourseByCpfUseCase` | Pública |
+| `POST` | `/courses/:courseId/register-full` | `RegisterForCourseFullUseCase` (cria a pessoa com rg, nascimento e endereço como propriedade principal) | Pública |
 | `GET` | `/admin/courses/:courseId/registrations` | `ListCourseRegistrationsUseCase` (userData traz memberStatus, membershipValidUntil, boardPosition, `publicContact.title` e `companyMemberships` só de empresas parceiras ativas — selos do painel) | `READ_COURSE` |
 | `DELETE` | `/admin/registrations/:registrationId` | `CancelRegistrationUseCase` | `UPDATE_COURSE` |
 | `POST` | `/admin/courses/:courseId/registrations` | `AdminRegisterPersonUseCase` (`usecase/admin-course-registrations.ts`) — `{ userDataId }`; inscrição pela equipe, já confirmada; ignora prazo, status e fim do curso; só respeita a lotação (`createWithCapacity`). Já inscrita → 409 "Pessoa já inscrita neste curso"; lotado → 409; pessoa/curso inexistente → 404 | `UPDATE_COURSE` |
 | `PATCH` | `/admin/courses/:courseId/registrations/confirm-all` | `ConfirmAllRegistrationsUseCase` — confirma as pendentes; responde `{ confirmed }` (quantas) | `UPDATE_COURSE` |
+| `POST` | `/admin/courses/:courseId/start` | `StartCourseUseCase` — status → `IN_PROGRESS`; só exige ao menos uma inscrição (sem inscrições → 400). Inscrições não confirmadas **não** impedem (o painel só avisa quantas) | `UPDATE_COURSE` |
+| `PATCH` | `/admin/courses/:courseId/complete` | `CompleteCourseUseCase` (`usecase/complete-course.ts`) — status → `COMPLETED`, sempre manual; só a partir de `IN_PROGRESS` (outro status → 409 "Só é possível concluir um curso que está em andamento."); responde `{ id, status }`. A edição do curso (`PATCH /courses/:id`) também aceita `COMPLETED`/`IN_PROGRESS`, para desfazer | `UPDATE_COURSE` |
+| `PATCH` | `/admin/registrations/:registrationId/attendance` | `SetRegistrationAttendanceUseCase` (`usecase/course-attendance.ts`) — `{ attended: true \| false \| null }` (presente, faltou, desmarcar) → `{ id, attended }`; inscrição inexistente/cancelada → 404 | `UPDATE_COURSE` |
+| `PATCH` | `/admin/courses/:courseId/registrations/attendance` | `SetUnmarkedAttendanceUseCase` — `{ attended: boolean }` (null → 400) em todas as inscrições **confirmadas**, ativas e ainda sem marcar (quem já foi marcado e as não confirmadas ficam como estão) → `{ updated }` | `UPDATE_COURSE` |
+
+> Presença: `attended` vem em `GET /admin/courses/:courseId/registrations` e na planilha `registrations` (coluna "Presença": Presente / Faltou / vazio). O painel mostra os botões Presente/Faltou quando o curso já começou (em andamento, concluído ou chegou o dia do início) e emite certificado só para inscrição confirmada que não foi marcada como falta. `COMPLETED` se comporta como `IN_PROGRESS` na visibilidade (fora de `GET /courses`, página abre pelo link) e nunca aceita inscrição.
+
+> Inscrição pública (`register` e `register-full`): e-mail opcional; a pessoa é achada **só pelo CPF** (`findByCpf`) — e-mail/telefone iguais aos de outra pessoa não vinculam, criam cadastro próprio. CPF criado ao mesmo tempo por outra inscrição → 409 "CPF já cadastrado para outra pessoa.".
 
 ### Notícias
 | Método | Path | Use Case | Autenticação |
@@ -301,9 +314,13 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 ### Auditoria (`audit-router.ts`, hook em `http/audit-hooks.ts`)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
-| `GET` | `/admin/audit-logs` | lista paginada (filtros `action`, `entity`, `actorId`, `from`, `to`, `q`); cada linha traz `summary`, a frase pronta | `READ_AUDIT` |
+| `GET` | `/admin/audit-logs` | lista paginada (filtros `action` = create, edit, delete, export, login, login_failed (LOGIN_FAILED + LOGIN_BLOCKED); `entity`, `actorId`, `ip` (exato), `from`, `to`, `q`); cada linha traz `summary` (frase pronta), `ip`, `location`, `device` ("Chrome no Windows", `lib/user-agent.ts`), `userAgent` e `changes` | `READ_AUDIT` |
 
-- O hook grava toda mutação com sucesso (método, caminho, `entity`, `targetLabel`); fora da trilha (`skipAudit` em `lib/audit-entity.ts`): `/auth/login`, `/auth/refresh`, `/invites/*`, `/admin/export/*` (a exportação grava a própria linha).
+- O hook grava toda mutação com sucesso (método, caminho, `entity`, `targetLabel`); fora da trilha (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (a exportação grava a própria linha) e `/auth/login` (registro próprio, abaixo).
+- De onde veio (toda linha, inclusive EXPORT e login): `ip` (`request.ip`, real por causa do `trustProxy: 1`), `userAgent` bruto (até 300 caracteres) e `location` "Cidade, UF, País" (`lib/geoip.ts`). **O IP do cliente é enviado ao ipwho.is** (HTTPS, gratuito, sem chave, `lang=pt-BR`; tem limite de uso no plano gratuito): timeout 2 s, cache em memória por IP (24 h; falha 10 min; até 1000 IPs), IP local/reservado não consulta, nunca lança (falha → null). A consulta roda no `onResponse`, depois da resposta; a exportação grava a linha antes de responder e o hook preenche o local depois (`fillAuditLocationLater`). Desligada com `NODE_ENV=test` ou `GEOIP_DISABLED=1`.
+- O que mudou (`changes` = `[{ field, before, after }]`, `lib/audit-snapshot.ts` + `lib/audit-diff.ts`): em PATCH/PUT/DELETE autenticados de um registro identificável pelo caminho (pessoa, admin/próprio perfil, regra, instrutor, propriedade, relação, Unimed, convite, empresa e vínculo, curso/conclusão, foto do curso, instrutor do curso, inscrição/confirmação/presença/ficha, sala, banner, notícia, convênio, galeria e foto, contato público, mensagem, configurações do site, cotação/fonte/cotações do dia, categoria, caixa, lançamento, comprovante) o preHandler lê o registro e o onResponse relê depois do sucesso; guarda só os campos alterados (máx. 40). Exclusão guarda os campos preenchidos como `before` (`after` null). Fora: `passwordHash` (senha trocada vira `{ field: 'password', after: 'alterada' }`), `token`, colunas Bytes (nunca lidas), `*Search`, `id`, `createdAt`/`updatedAt`/`deletedAt`/`isDeleted`; textos cortados em 300, datas ISO, listas "a, b", JSON como texto. Ids de relação viram nomes (`room`, `person`, `rule`, `category`…). Rota nova que edita um registro → acrescentar em `SNAPSHOTS`. Erro na leitura nunca afeta a request (linha sai sem `changes`).
+- Login (`POST /auth/login`): 2xx → `LOGIN` com `actorId` (lido do token no `onSend`); 401 → `LOGIN_FAILED`; 429 → `LOGIN_BLOCKED` (o limite da rota conta em `preValidation` para o corpo já estar lido). `targetLabel` = usuário digitado (até 60 caracteres); a senha nunca é lida pelo hook. `entity` "Login".
+- Retenção: nenhuma ainda (a trilha só cresce).
 - `entity` vem do caminho (`deriveAuditEntity`, mesma lista do filtro "Tipo" no painel). `targetLabel` = nome do alvo buscado antes da ação (`lookupTargetLabel`: edição, exclusão e POST sobre item existente, ex.: iniciar curso, foto da galeria) ou o nome do corpo.
 - `summary` (`lib/audit-sentence.ts`, `describeAuditAction`): rotas especiais por método + caminho com ids trocados por `:id` ("Iniciou o curso", "Adicionou foto à galeria", "Marcou mensagem como lida", "Editou as configurações do site", "Lançou as cotações do dia"…); as demais viram verbo + artigo pelo gênero + entidade ("Editou a galeria "FAEP""). Rota nova com ação diferente de criar/editar/excluir → acrescentar em `SPECIAL`; entidade nova → `AUDIT_ENTITY_NOUNS` e a lista do filtro no painel. A planilha `audit-logs` usa a mesma frase (sem o nome) na coluna "Ação".
 
@@ -347,7 +364,7 @@ Todas as rotas de listagem suportam paginação via `?page=1&limit=20`.
 |----------|------------------------|
 | `GET /admin/users` | `search` (nome/email sem diferenciar acento e maiúscula; CPF com ou sem máscara), `memberType`, `memberClassification`, `gender`, `ethnicity`, `educationLevel` |
 | `GET /admin/users/admins` | `search` (username) |
-| `GET /admin/courses` | `status` (PUBLIC/PRIVATE/UNPUBLISHED), `search` (nome) |
+| `GET /admin/courses` | `status` (PUBLIC/PRIVATE/UNPUBLISHED/IN_PROGRESS/COMPLETED), `search` (nome) |
 | `GET /admin/news` | `status` (PUBLISHED/UNPUBLISHED) |
 
 ## Adaptadores de banco disponíveis
@@ -447,7 +464,7 @@ Os erros de domínio vivem em `src/errors/` divididos por categoria:
 |---------|-------------|------------------------|
 | `auth.ts` | `AuthError` | `InvalidCredentialsError` |
 | `business-rule.ts` | `BusinessRuleError` | `RoomAlreadyBookedError`, `RegistrationsUnavailableError` |
-| `conflict.ts` | `ConflictError` | `UserAlreadyExistsError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `EmailOrCpfAlreadyInUseError`, `CourseRegistrationAlreadyExistsError`, `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError` |
+| `conflict.ts` | `ConflictError` | `CpfAlreadyInUseError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `CourseRegistrationAlreadyExistsError`, `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError` |
 | `not-found.ts` | `NotFoundError` | `CourseNotFoundError`, `UserNotFoundError`, `UserDataNotFoundError`, `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError`, `UserRelationNotFoundError`, `PropertyNotFoundError`, `AddressNotFoundError`, `InstructorNotFoundError`, `ContactMessageNotFoundError`, `BannerNotFoundError` |
 | `validation.ts` | `ValidationError` | — (único com parâmetro de mensagem, para erros dinâmicos do Zod) |
 
@@ -598,5 +615,5 @@ DATABASE_TEST_URL=postgresql://USER:SENHA@localhost:PORTA/BANCO npm run test:e2e
 - Os tipos do Prisma são importados de `src/generated/prisma/` — nunca editar esses arquivos
 - O `PrismaClient` é importado de `../generated/prisma/client.js` (não do pacote padrão)
 - O `StorageAdapter` é instanciado via factory `createStorageAdapter()` (Supabase Storage; buckets devem existir e ser públicos: `avatars`, `course-banners`, `news-banners`)
-- Todos os métodos de busca por email/CPF/telefone no `UserDataAdapter` filtram `isDeleted: false` — soft-deleted users não retornam em conflict checks
+- As buscas por CPF/RG no `UserDataAdapter` filtram `isDeleted: false` — soft-deleted users não retornam em conflict checks. Não há busca por e-mail/telefone: não identificam a pessoa (podem repetir)
 - **Busca sem acento** (`list-filters.ts`, pessoas/empresas/Unimed/admins e as exportações): "joao" acha "João" e vice-versa. Os nomes são comparados nas colunas `UserData.nameSearch`, `Company.nameSearch`/`tradeNameSearch` com `searchKey(termo)` (minúsculo, sem acento). Essas colunas são preenchidas por trigger (`*_fill_search`, função SQL `immutable_unaccent_lower`, migração `20260919100000_search_normalized`) — a aplicação nunca grava nelas; trigger em vez de coluna GENERATED para o `migrate dev` não acusar diferença. CPF/CNPJ só entram na busca quando o termo parece documento (só números, `.`, `-`, `/`), comparando os dígitos.

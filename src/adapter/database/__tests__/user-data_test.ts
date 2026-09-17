@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { cpfForStorage, createUserDataAdapter } from '../user-data.js';
+import { cpfForStorage, createUserDataAdapter, emailForStorage } from '../user-data.js';
 
 const prisma = {
     userData: {
@@ -23,7 +23,19 @@ describe('cpfForStorage', () => {
     });
 });
 
-describe('UserDataAdapter — CPF normalizado na escrita', () => {
+describe('emailForStorage', () => {
+    it('tira espaços das pontas', () => {
+        expect(emailForStorage(' j@x.com ')).toBe('j@x.com');
+    });
+
+    it('vazio, só espaços ou null vira null (sem e-mail)', () => {
+        expect(emailForStorage('')).toBeNull();
+        expect(emailForStorage('   ')).toBeNull();
+        expect(emailForStorage(null)).toBeNull();
+    });
+});
+
+describe('UserDataAdapter — CPF e e-mail normalizados na escrita', () => {
     beforeEach(() => vi.clearAllMocks());
 
     it('create com CPF mascarado grava só dígitos', async () => {
@@ -53,6 +65,25 @@ name: 'JOAO' },
         await adapter.update('u1', { cpf: '' });
         expect(prisma.userData.update).toHaveBeenCalledWith({ where: { id: 'u1' },
 data: { cpf: null } });
+    });
+
+    it('create com e-mail vazio grava null', async () => {
+        await adapter.create({ name: 'JOAO',
+email: '',
+phone: '44999990001',
+cpf: '11144477735' });
+        expect(prisma.userData.create).toHaveBeenCalledWith({
+            data: { name: 'JOAO',
+email: null,
+phone: '44999990001',
+cpf: '11144477735' },
+        });
+    });
+
+    it('update que limpa o e-mail grava null', async () => {
+        await adapter.update('u1', { email: ' ' });
+        expect(prisma.userData.update).toHaveBeenCalledWith({ where: { id: 'u1' },
+data: { email: null } });
     });
 
     it('update sem CPF não mexe no campo', async () => {

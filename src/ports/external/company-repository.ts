@@ -24,7 +24,7 @@ userData: {
 name: string;
 cpf: string | null;
 phone: string;
-email: string 
+email: string | null
 };
 };
 

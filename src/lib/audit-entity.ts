@@ -3,6 +3,7 @@
 // O painel lista esses mesmos nomes no filtro "Tipo" (front: auditoria/index.tsx).
 export function deriveAuditEntity(path: string): string {
     const p = path.toLowerCase().split('?')[0];
+    if (p.startsWith('/auth/')) return 'Login';
     if (p.includes('/finance/categories')) return 'Categoria financeira';
     if (p.includes('/finance/accounts')) return 'Caixa';
     if (p.includes('/finance/transfers')) return 'Transferência';
@@ -37,10 +38,23 @@ export function deriveAuditEntity(path: string): string {
     return 'Outro';
 }
 
-/** Rotas que não entram na trilha de auditoria. */
+/** Rotas que não entram na trilha como mutação comum. */
 export function skipAudit(path: string): boolean {
-    if (path === '/auth/login' || path === '/auth/refresh') return true; // ruído + sem ator; renovar a sessão não é ação
+    // O login tem registro próprio (loginAuditMethod); renovar a sessão não é ação.
+    if (path === LOGIN_PATH || path === '/auth/refresh') return true;
     if (path.startsWith('/invites/')) return true; // não persistir o token de convite
     if (path.startsWith('/admin/export/')) return true; // a exportação registra a própria linha ("Exportou")
     return false;
+}
+
+export const LOGIN_PATH = '/auth/login';
+
+export type LoginAuditMethod = 'LOGIN' | 'LOGIN_FAILED' | 'LOGIN_BLOCKED';
+
+/** Tentativa de login pelo status da resposta: entrou, senha/usuário errado ou bloqueado pelo limite. Outros → não registra. */
+export function loginAuditMethod(statusCode: number): LoginAuditMethod | null {
+    if (statusCode >= 200 && statusCode < 300) return 'LOGIN';
+    if (statusCode === 401) return 'LOGIN_FAILED';
+    if (statusCode === 429) return 'LOGIN_BLOCKED';
+    return null;
 }

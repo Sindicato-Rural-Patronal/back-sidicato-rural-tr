@@ -45,7 +45,11 @@ export async function authRouter(fastify: FastifyInstance, prisma: PrismaClient)
     fastify.post(
         '/auth/login',
         {
-            config: authRateLimit,
+            // Conta a tentativa depois de ler o corpo (preValidation, não onRequest):
+            // o bloqueio (429) entra na auditoria com o usuário digitado.
+            config: { rateLimit: { ...authRateLimit.rateLimit,
+hook: 'preValidation' as const } },
+            bodyLimit: 2048,
             schema: {
                 tags: ['Auth'],
                 summary: 'Admin login',

@@ -31,6 +31,8 @@ import {
 } from '../lib/export-labels.js';
 import { todayInBrazil } from '../lib/quote-products.js';
 import { describeAuditAction } from '../lib/audit-sentence.js';
+import { formatChanges } from '../lib/audit-diff.js';
+import { describeUserAgent } from '../lib/user-agent.js';
 
 
 // ── Conjuntos exportáveis ────────────────────────────────────────────────────
@@ -139,7 +141,7 @@ rulesId: text }),
     courses: z.object({
         ids: idList,
         search: text,
-        status: z.preprocess(empty, z.enum(['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS']).optional()),
+        status: z.preprocess(empty, z.enum(['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS', 'COMPLETED']).optional()),
     }),
     registrations: z.object({ ids: idList,
 courseIds: idList }),
@@ -149,9 +151,10 @@ read: bool }),
     unimed: z.object({ ids: idList,
 search: text }),
     'audit-logs': z.object({
-        action: z.preprocess(empty, z.enum(['create', 'edit', 'delete', 'export']).optional()),
+        action: z.preprocess(empty, z.enum(['create', 'edit', 'delete', 'export', 'login', 'login_failed']).optional()),
         entity: text,
         actorId: text,
+        ip: text,
         from: day,
         to: day,
         q: text,
@@ -499,6 +502,8 @@ value: r => csvDate(r.userData.birthDate) },
 value: r => ageOn(r.userData.birthDate, today) },
         { header: 'Confirmada',
 value: r => r.confirmed },
+        { header: 'Presença',
+value: r => (r.attended === null ? '' : r.attended ? 'Presente' : 'Faltou') },
         { header: 'Associado em dia',
 value: r => isActiveMember(r.userData.memberStatus, r.userData.membershipValidUntil, today) },
         {
@@ -591,6 +596,15 @@ value: a => a.entity },
 value: a => a.targetLabel },
     { header: 'Caminho',
 value: a => a.path },
+    { header: 'IP',
+value: a => a.ip },
+    { header: 'Local',
+value: a => a.location },
+    { header: 'Aparelho',
+value: a => (a.userAgent ? describeUserAgent(a.userAgent) : null) },
+    // "campo: antes → depois; …"
+    { header: 'Alterações',
+value: a => formatChanges(a.changes) },
 ];
 
 // ── Caso de uso ──────────────────────────────────────────────────────────────

@@ -22,7 +22,7 @@ nullable: true };
 const person = { type: 'object',
 properties: { id: str,
 name: str,
-email: str,
+email: nstr,
 phone: str,
 avatar: nstr } };
 const contactObject = {
@@ -73,7 +73,7 @@ export async function publicContactRouter(fastify: FastifyInstance, prisma: Pris
                             publicTitle: nstr,
                             userData: { type: 'object',
 properties: { name: str,
-email: str,
+email: nstr,
 phone: str,
 avatar: nstr } },
                         },

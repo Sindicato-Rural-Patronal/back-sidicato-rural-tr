@@ -110,6 +110,12 @@ describe('demais regras', () => {
         );
     });
 
+    it('curso concluído pela equipe não aceita inscrição, mesmo antes do fim', () => {
+        expect(checkCourseAcceptsRegistration(course({ status: 'COMPLETED' }), deadlineDayLate)).toBeInstanceOf(
+            CourseEndedError,
+        );
+    });
+
     it('curso lotado', () => {
         const c = course({ _count: { courseUserRegistration: 10 } } as Partial<CourseWithDetails>);
         expect(checkCourseAcceptsRegistration(c, deadlineDayLate)).toBeInstanceOf(CourseFullError);

@@ -6,7 +6,7 @@ import type {
 export type UserAdminWithDetails = UserAdminModel & {
     userData: {
         name: string;
-        email: string;
+        email: string | null;
         cpf: string | null;
         avatar: string | null;
     };

@@ -135,12 +135,20 @@ isDeleted: false },
 data: { confirmed } });
     }
 
-    countUnconfirmed(courseId: string): Promise<number> {
-        return this.prisma.courseUserRegistration.count({
+    setAttended(id: string, attended: boolean | null): Promise<courseUserRegistrationModel> {
+        return this.prisma.courseUserRegistration.update({ where: { id },
+data: { attended } });
+    }
+
+    async setAttendedForUnmarked(courseId: string, attended: boolean): Promise<number> {
+        const { count } = await this.prisma.courseUserRegistration.updateMany({
             where: { courseId,
 isDeleted: false,
-confirmed: false },
+confirmed: true,
+attended: null },
+            data: { attended },
         });
+        return count;
     }
 
     async confirmAll(courseId: string): Promise<number> {

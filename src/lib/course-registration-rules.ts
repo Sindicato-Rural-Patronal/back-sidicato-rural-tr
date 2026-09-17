@@ -60,7 +60,7 @@ export function hasCourseEnded(endTime: Date, now: Date = new Date()): boolean {
 /**
  * Regras de negócio para aceitar uma inscrição num curso:
  * - status precisa aceitar inscrições (não UNPUBLISHED nem IN_PROGRESS)
- * - o curso não pode ter terminado (dia do fim já passou em Brasília)
+ * - o curso não pode ter terminado: concluído pela equipe (COMPLETED) ou dia do fim já passou em Brasília
  * - o prazo (registrationDeadline) em Brasília: até o fim do dia, ou até a hora quando o painel informou uma
  * - não pode exceder a capacidade da sala (room.maxCapacity)
  *
@@ -73,7 +73,7 @@ export function checkCourseAcceptsRegistration(
     if (course.status === 'UNPUBLISHED' || course.status === 'IN_PROGRESS') {
         return new RegistrationsUnavailableError();
     }
-    if (hasCourseEnded(course.endTime, now)) {
+    if (course.status === 'COMPLETED' || hasCourseEnded(course.endTime, now)) {
         return new CourseEndedError();
     }
     if (isRegistrationDeadlinePassed(course.registrationDeadline, now)) {

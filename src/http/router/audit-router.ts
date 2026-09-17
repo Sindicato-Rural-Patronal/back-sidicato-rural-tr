@@ -7,6 +7,10 @@ import { requirePermission } from '../lib/require-permission.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 import { buildAuditLogWhere } from '../../adapter/database/list-filters.js';
 import { describeAuditAction } from '../../lib/audit-sentence.js';
+import { describeUserAgent } from '../../lib/user-agent.js';
+
+// Valor de antes/depois: texto, número, sim/não ou vazio.
+const auditValue = { type: ['string', 'number', 'boolean', 'null'] };
 
 export async function auditRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userAdminRepository = createUserAdminAdapter(prisma);
@@ -24,8 +28,11 @@ export async function auditRouter(fastify: FastifyInstance, prisma: PrismaClient
                     type: 'object',
                     properties: {
                         ...paginationQuerystring.properties,
+                        // login = entradas no painel; login_failed = senha errada ou bloqueio por excesso de tentativas
                         action: { type: 'string',
-enum: ['create', 'edit', 'delete', 'export'] },
+enum: ['create', 'edit', 'delete', 'export', 'login', 'login_failed'] },
+                        ip: { type: 'string',
+description: 'IP exato' },
                         entity: { type: 'string' },
                         actorId: { type: 'string' },
                         from: { type: 'string' },
@@ -49,6 +56,29 @@ nullable: true },
                             // Frase pronta ("Iniciou o curso "HORTA"") — lib/audit-sentence.ts
                             summary: { type: 'string' },
                             statusCode: { type: 'integer' },
+                            // De onde veio (linhas antigas: null)
+                            ip: { type: 'string',
+nullable: true },
+                            location: { type: 'string',
+nullable: true },
+                            // Rótulo curto do User-Agent ("Chrome no Windows"); null sem User-Agent
+                            device: { type: 'string',
+nullable: true },
+                            userAgent: { type: 'string',
+nullable: true },
+                            // Campos alterados (edição) ou do registro removido (exclusão)
+                            changes: {
+                                type: 'array',
+                                nullable: true,
+                                items: {
+                                    type: 'object',
+                                    properties: {
+                                        field: { type: 'string' },
+                                        before: auditValue,
+                                        after: auditValue,
+                                    },
+                                },
+                            },
                             createdAt: { type: 'string' },
                         },
                     }),
@@ -62,7 +92,8 @@ nullable: true },
                 Querystring: {
                     page?: number;
 limit?: number;
-                    action?: 'create' | 'edit' | 'delete' | 'export';
+                    action?: 'create' | 'edit' | 'delete' | 'export' | 'login' | 'login_failed';
+                    ip?: string;
                     entity?: string;
 actorId?: string;
 from?: string;
@@ -88,6 +119,10 @@ q?: string;
                 entity: string;
                 targetLabel: string | null;
                 statusCode: number;
+                ip: string | null;
+                userAgent: string | null;
+                location: string | null;
+                changes: unknown;
                 createdAt: Date;
             };
             const [rows, total]: [AuditRow[], number] = await Promise.all([
@@ -114,6 +149,8 @@ username: true },
                 ...r,
                 actorName: r.actorId ? (nameById.get(r.actorId) ?? '—') : 'Público',
                 summary: describeAuditAction(r),
+                device: r.userAgent ? describeUserAgent(r.userAgent) : null,
+                changes: Array.isArray(r.changes) ? r.changes : null,
             }));
 
             return res.send({

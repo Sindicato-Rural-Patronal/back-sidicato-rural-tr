@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { ListAllCoursesUseCase } from '../../usecase/list-all-courses.js';
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
+import type { CourseStatus } from '../../ports/external/course-repository.js';
 import { requirePermission } from '../lib/require-permission.js';
 
 export class ListAllCoursesController {
@@ -19,7 +20,7 @@ export class ListAllCoursesController {
         const page = Math.max(1, Number(q.page) || 1);
         const limit = Math.min(100, Math.max(1, Number(q.limit) || 20));
         const filters = {
-            status: (q.status as 'PUBLIC' | 'PRIVATE' | 'UNPUBLISHED') || undefined,
+            status: (q.status as CourseStatus) || undefined,
             search: q.search || undefined,
         };
         const response = await this.useCase.execute(page, limit, filters);

@@ -54,6 +54,7 @@ export const COURSE_STATUS_LABEL: Record<string, string> = {
     PRIVATE: 'Privado',
     UNPUBLISHED: 'Não publicado',
     IN_PROGRESS: 'Em andamento',
+    COMPLETED: 'Concluído',
 };
 
 /** Rótulo do enum; valor desconhecido volta como veio, nulo vira vazio. */
