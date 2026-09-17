@@ -1,6 +1,9 @@
 import bcrypt from 'bcrypt';
 import type { AdminInviteRepository } from '../ports/external/admin-invite-repository.js';
 import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
+import type { UserDataRepository } from '../ports/external/user-data-repository.js';
+import type { NotificationPublisher } from '../ports/external/notification-repository.js';
+import { inviteAcceptedEvent, publishSafely } from '../lib/notification-events.js';
 import { AdminInviteInvalidError } from '../errors/not-found.js';
 import { ValidationError } from '../errors/validation.js';
 import { UsernameAlreadyExistsError, AdminAccountAlreadyExistsError } from '../errors/conflict.js';
@@ -9,6 +12,8 @@ export class AcceptAdminInviteUseCase {
     constructor(
         private readonly inviteRepo: AdminInviteRepository,
         private readonly userAdminRepo: UserAdminRepository,
+        private readonly userDataRepo: UserDataRepository,
+        private readonly notifications: NotificationPublisher,
     ) {}
 
     async execute(token: string, username: string, password: string): Promise<{ error?: Error }> {
@@ -54,6 +59,20 @@ export class AcceptAdminInviteUseCase {
                 rulesId: inv.rulesId,
             });
         }
+        await this.notifyAccepted(inv.userDataId);
         return {};
+    }
+
+    private async notifyAccepted(userDataId: string): Promise<void> {
+        try {
+            const person = await this.userDataRepo.findById(userDataId);
+            await publishSafely(this.notifications, inviteAcceptedEvent({
+                personName: person?.name ?? 'Um novo administrador',
+                userDataId,
+            }));
+        } catch (e) {
+            // Acesso já ativado: falha ao avisar não desfaz nada.
+            console.error('[notifications] falha ao avisar convite aceito', e);
+        }
     }
 }

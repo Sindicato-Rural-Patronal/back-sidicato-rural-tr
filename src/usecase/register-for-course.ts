@@ -10,6 +10,8 @@ import { checkCourseAcceptsRegistration } from '../lib/course-registration-rules
 import { CourseFullError } from '../errors/business-rule.js';
 import { isPrismaUniqueViolation } from '../lib/prisma-errors.js';
 import { personEmailSchema } from '../lib/person-email.js';
+import type { NotificationPublisher } from '../ports/external/notification-repository.js';
+import { courseRegistrationEvent, publishSafely } from '../lib/notification-events.js';
 
 const schema = z.object({
     courseId: z.string().min(1),
@@ -32,6 +34,7 @@ export class RegisterForCourseUseCase {
         private readonly courseRepository: CourseRepository,
         private readonly userDataRepository: UserDataRepository,
         private readonly registrationRepository: RegistrationRepository,
+        private readonly notifications: NotificationPublisher,
     ) {}
 
     async execute(request: Request): Promise<Response> {
@@ -86,6 +89,12 @@ export class RegisterForCourseUseCase {
                 course.room.maxCapacity,
             );
             if (created === 'FULL') return { error: new CourseFullError() };
+            await publishSafely(this.notifications, courseRegistrationEvent({
+                courseId,
+                courseName: course.name,
+                personName: userData.name ?? name,
+                registrationId: created.id,
+            }));
             return { registrationId: created.id,
 userDataId: userData.id };
         } catch (e) {

@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client/extension';
 import { createContactMessageAdapter } from '../../adapter/database/contact-message-adapter.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
 import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
+import { createNotificationPublisher } from '../../adapter/database/notification-adapter.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { CreateContactMessageUseCase } from '../../usecase/create-contact-message.js';
 import { ListContactMessagesUseCase } from '../../usecase/list-contact-messages.js';
@@ -21,7 +22,9 @@ export async function contactRouter(fastify: FastifyInstance, prisma: PrismaClie
     const ruleRepository = createRuleAdapter(prisma);
     const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
-    const createController = new CreateContactMessageController(new CreateContactMessageUseCase(repo));
+    const createController = new CreateContactMessageController(
+        new CreateContactMessageUseCase(repo, createNotificationPublisher(prisma)),
+    );
     const listController = new ListContactMessagesController(new ListContactMessagesUseCase(repo));
     const markReadController = new MarkContactMessageReadController(new MarkContactMessageReadUseCase(repo));
     const deleteController = new DeleteContactMessageController(new DeleteContactMessageUseCase(repo));

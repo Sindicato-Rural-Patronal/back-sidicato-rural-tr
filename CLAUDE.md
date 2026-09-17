@@ -83,6 +83,8 @@ src/
 | `MarketQuoteHistory`     | id, marketQuoteId (FK), value, numeric, referenceDate, period — único por produto/dia/período (`@@unique`; relançar substitui) |
 | `GalleryAlbum`           | id, title, description, linkUrl, isActive, order — galerias da home (História do Sindicato, FAEP, Patrulha Rural) |
 | `GalleryPhoto`           | id, albumId (FK, cascade), url, storageKey, caption, order |
+| `Notification`           | id, type, title, body, link, permission (exigida para ver), entityId, createdAt — eventos do sino do painel (migration `20260921090000_notifications`) |
+| `NotificationRead`       | id, notificationId (FK, cascade), adminId (UserAdmin.id, sem FK), readAt — único por (notificationId, adminId); sem linha = não lida |
 
 ## Enums
 
@@ -316,7 +318,7 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 |--------|------|----------|--------------|
 | `GET` | `/admin/audit-logs` | lista paginada (filtros `action` = create, edit, delete, export, login, login_failed (LOGIN_FAILED + LOGIN_BLOCKED); `entity`, `actorId`, `ip` (exato), `from`, `to`, `q`); cada linha traz `summary` (frase pronta), `ip`, `location`, `device` ("Chrome no Windows", `lib/user-agent.ts`), `userAgent` e `changes` | `READ_AUDIT` |
 
-- O hook grava toda mutação com sucesso (método, caminho, `entity`, `targetLabel`); fora da trilha (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (a exportação grava a própria linha) e `/auth/login` (registro próprio, abaixo).
+- O hook grava toda mutação com sucesso (método, caminho, `entity`, `targetLabel`); fora da trilha (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (a exportação grava a própria linha), `/admin/notifications/read` e `/auth/login` (registro próprio, abaixo).
 - De onde veio (toda linha, inclusive EXPORT e login): `ip` (`request.ip`, real por causa do `trustProxy: 1`), `userAgent` bruto (até 300 caracteres) e `location` "Cidade, UF, País" (`lib/geoip.ts`). **O IP do cliente é enviado ao ipwho.is** (HTTPS, gratuito, sem chave, `lang=pt-BR`; tem limite de uso no plano gratuito): timeout 2 s, cache em memória por IP (24 h; falha 10 min; até 1000 IPs), IP local/reservado não consulta, nunca lança (falha → null). A consulta roda no `onResponse`, depois da resposta; a exportação grava a linha antes de responder e o hook preenche o local depois (`fillAuditLocationLater`). Desligada com `NODE_ENV=test` ou `GEOIP_DISABLED=1`.
 - O que mudou (`changes` = `[{ field, before, after }]`, `lib/audit-snapshot.ts` + `lib/audit-diff.ts`): em PATCH/PUT/DELETE autenticados de um registro identificável pelo caminho (pessoa, admin/próprio perfil, regra, instrutor, propriedade, relação, Unimed, convite, empresa e vínculo, curso/conclusão, foto do curso, instrutor do curso, inscrição/confirmação/presença/ficha, sala, banner, notícia, convênio, galeria e foto, contato público, mensagem, configurações do site, cotação/fonte/cotações do dia, categoria, caixa, lançamento, comprovante) o preHandler lê o registro e o onResponse relê depois do sucesso; guarda só os campos alterados (máx. 40). Exclusão guarda os campos preenchidos como `before` (`after` null). Fora: `passwordHash` (senha trocada vira `{ field: 'password', after: 'alterada' }`), `token`, colunas Bytes (nunca lidas), `*Search`, `id`, `createdAt`/`updatedAt`/`deletedAt`/`isDeleted`; textos cortados em 300, datas ISO, listas "a, b", JSON como texto. Ids de relação viram nomes (`room`, `person`, `rule`, `category`…). Rota nova que edita um registro → acrescentar em `SNAPSHOTS`. Erro na leitura nunca afeta a request (linha sai sem `changes`).
 - Login (`POST /auth/login`): 2xx → `LOGIN` com `actorId` (lido do token no `onSend`); 401 → `LOGIN_FAILED`; 429 → `LOGIN_BLOCKED` (o limite da rota conta em `preValidation` para o corpo já estar lido). `targetLabel` = usuário digitado (até 60 caracteres); a senha nunca é lida pelo hook. `entity` "Login".
@@ -330,6 +332,22 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 | `GET` | `/admin/rules` | `ListRulesUseCase` | `READ_RULE` |
 | `POST` | `/rules` | `CreateRuleUseCase` | `CREATE_RULE` |
 | `PATCH` | `/rules/:ruleId` | `UpdateRuleUseCase` | `UPDATE_RULE` |
+
+### Notificações (`notification-router.ts`, use cases em `usecase/notifications.ts`)
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/admin/notifications` | `ListNotificationsUseCase` → `{ unreadCount, pendingCount, events: [{ id, type, title, body, link, createdAt, read }], pending: [{ type, title, body, count, link, severity }] }` | JWT (qualquer admin) |
+| `PATCH` | `/admin/notifications/read` | `MarkNotificationsReadUseCase` — `{ ids?: string[] }` (sem `ids` = todos os visíveis não lidos; `[]` = nenhum) → `{ updated }` (quantos foram marcados agora) | JWT (qualquer admin) |
+
+- **Eventos** (gravados em `Notification`): só ações públicas/self-service, publicadas pelo port `NotificationPublisher` (`createNotificationPublisher`, `adapter/database/notification-adapter.ts`); tipos, títulos e links em `lib/notification-events.ts`. Publicar nunca derruba a ação (o adapter e `publishSafely` capturam e logam o erro).
+  - `COURSE_REGISTRATION` (`READ_COURSE`): os três `register-for-course*` — "Nova inscrição em {curso}", corpo = nome da pessoa, link `/admin/cursos?curso={id}&aba=inscricoes`, entityId = inscrição. No `register-full`, publica depois do commit.
+  - `CONTACT_MESSAGE` (`READ_CONTACT`): "Nova mensagem de {nome}", corpo = assunto ou null, link `/admin/mensagens`.
+  - `INVITE_ACCEPTED` (`READ_USER_ADMIN`): "{pessoa} ativou o acesso ao painel", link `/admin/usuarios?tab=admins`.
+  - Inscrição/cadastro feitos pela equipe no painel **não** geram evento.
+- **Visibilidade**: o admin só vê eventos cuja `permission` está na sua regra; janela de 30 dias, mais recentes primeiro, até 50. `unreadCount` = não lidos na janela. Leitura é por admin (`NotificationRead`); marcar só afeta eventos visíveis.
+- **Pendências** (`pending`): calculadas na hora por `computePendingNotifications` (`usecase/pending-notifications.ts` + `adapter/database/pending-notifications-adapter.ts`), nada gravado; `pendingCount` = tamanho da lista.
+- **Retenção**: eventos com mais de 90 dias são apagados pelo publicador, no máximo uma vez por hora por processo (timestamp em memória). Leituras caem junto (cascade).
+- `PATCH /admin/notifications/read` fica fora da auditoria (`skipAudit`).
 
 ### Dashboard
 | Método | Path | Use Case | Autenticação |
@@ -387,6 +405,7 @@ Todas as rotas de listagem suportam paginação via `?page=1&limit=20`.
 | `createInstructorAdapter` | `adapter/database/instructor-adapter.ts` | `InstructorRepository` |
 | `createBannerAdapter` | `adapter/database/banner-adapter.ts` | `BannerRepository` |
 | `createContactMessageAdapter` | `adapter/database/contact-message-adapter.ts` | `ContactMessageRepository` |
+| `createNotificationAdapter` · `createNotificationPublisher` | `adapter/database/notification-adapter.ts` | `NotificationRepository` · `NotificationPublisher` |
 | `createStorageAdapter` | `adapter/storage/factory.ts` | `StorageRepository` |
 
 ## Padrão de implementação

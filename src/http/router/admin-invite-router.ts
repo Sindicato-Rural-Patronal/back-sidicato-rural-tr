@@ -4,6 +4,7 @@ import { createAdminInviteAdapter } from '../../adapter/database/admin-invite-ad
 import { createUserDataAdapter } from '../../adapter/database/user-data.js';
 import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
+import { createNotificationPublisher } from '../../adapter/database/notification-adapter.js';
 import { CreateAdminInviteUseCase } from '../../usecase/create-admin-invite.js';
 import { GetAdminInviteUseCase } from '../../usecase/get-admin-invite.js';
 import { AcceptAdminInviteUseCase } from '../../usecase/accept-admin-invite.js';
@@ -23,7 +24,7 @@ export async function adminInviteRouter(fastify: FastifyInstance, prisma: Prisma
     const controller = new AdminInviteController(
         new CreateAdminInviteUseCase(inviteRepo, userDataRepo, ruleRepo, userAdminRepo),
         new GetAdminInviteUseCase(inviteRepo, userDataRepo, ruleRepo),
-        new AcceptAdminInviteUseCase(inviteRepo, userAdminRepo),
+        new AcceptAdminInviteUseCase(inviteRepo, userAdminRepo, userDataRepo, createNotificationPublisher(prisma)),
         new ListAdminInvitesUseCase(inviteRepo, userDataRepo, ruleRepo),
         new RevokeAdminInviteUseCase(inviteRepo),
         getAdminPermissions,
