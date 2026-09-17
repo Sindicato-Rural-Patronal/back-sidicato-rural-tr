@@ -78,7 +78,7 @@ src/
 | `UserRelation`           | id, sourceId (FK→UserData), targetId (FK→UserData), label (texto livre)                                    |
 | `Banner`                 | id, title, subtitle, imageUrl, active, order, buttons (JSON), startDate, endDate                           |
 | `ContactMessage`         | id, name, email, phone, subject, message, read, createdAt                                                  |
-| `MarketQuote`            | id, label (único; produtos fixos SOJA, MILHO, TRIGO, MANDIOCA, DOLAR criados na migration), value (texto pronto), priceCents, unit, period (MORNING/AFTERNOON), variation, referenceDate (dia do lançamento), isActive, order |
+| `MarketQuote`            | id, label (único; produtos fixos SOJA, MILHO, TRIGO, MANDIOCA, DOLAR criados na migration), value (texto pronto), priceCents, unit (configurável no painel), period (MORNING/AFTERNOON), variation, referenceDate (dia do lançamento), isActive, order |
 | `MarketQuoteHistory`     | id, marketQuoteId (FK), value, numeric, referenceDate, period — um por produto/dia/período (relançar substitui) |
 | `GalleryAlbum`           | id, title, description, linkUrl, isActive, order — galerias da home (História do Sindicato, FAEP, Patrulha Rural) |
 | `GalleryPhoto`           | id, albumId (FK, cascade), url, storageKey, caption, order |
@@ -220,6 +220,7 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 | `GET` | `/admin/market-quotes` | `ListMarketQuotesUseCase` (os 5 produtos) | `READ_MARKET_QUOTE` |
 | `PUT` | `/admin/market-quotes/daily` | `SaveDailyQuotesUseCase` — `{ period, prices: [{ id, priceCents }] }`; data = hoje (America/Sao_Paulo); variação vs lançamento anterior | `UPDATE_MARKET_QUOTE` |
 | `GET` | `/market-quotes/history?days=` | `ListQuoteHistoryUseCase` — `[{ id, label, unit, points: [{ date, period, priceCents }] }]` dos produtos ativos com ponto na janela (7–365 dias, padrão 90) | Pública |
+| `PATCH` | `/admin/market-quotes/:id` | `UpdateQuoteUnitUseCase` — `{ unit }` de `QUOTE_UNITS` (sc 60kg, sc 50kg, sc 40kg, t, kg, @) ou null; refaz o texto do preço atual | `UPDATE_MARKET_QUOTE` |
 | `PUT` | `/admin/market-quotes/source` | `UpdateQuotesSourceUseCase` — `{ source }` (fonte exibida; vazio esconde) | `UPDATE_MARKET_QUOTE` |
 
 Não há mais criar/excluir cotação: os produtos são fixos.

@@ -143,6 +143,51 @@ url: '/site-settings' })).body) as Record<string, string>;
         expect(pub.quotesSource).toBe('Coamo');
     });
 
+    it('unidade do produto é configurável e refaz o texto do preço', async () => {
+        const admin = JSON.parse((await app.inject({ method: 'GET',
+url: '/admin/market-quotes',
+headers: bearer(token) })).body) as {
+ id: string;
+label: string 
+}[];
+        const mandioca = admin.find(q => q.label === 'MANDIOCA')!;
+        await app.inject({ method: 'PUT',
+url: '/admin/market-quotes/daily',
+headers: bearer(token),
+payload: { period: 'MORNING',
+prices: [{ id: mandioca.id,
+priceCents: 76000 }] } });
+
+        const kg = await app.inject({ method: 'PATCH',
+url: `/admin/market-quotes/${mandioca.id}`,
+headers: bearer(token),
+payload: { unit: 'kg' } });
+        expect(kg.statusCode, kg.body).toBe(200);
+        expect(JSON.parse(kg.body)).toMatchObject({ unit: 'kg',
+value: 'R$ 760,00 /kg' });
+
+        const none = await app.inject({ method: 'PATCH',
+url: `/admin/market-quotes/${mandioca.id}`,
+headers: bearer(token),
+payload: { unit: null } });
+        expect(JSON.parse(none.body)).toMatchObject({ unit: null,
+value: 'R$ 760,00' });
+
+        const bad = await app.inject({ method: 'PATCH',
+url: `/admin/market-quotes/${mandioca.id}`,
+headers: bearer(token),
+payload: { unit: 'litro' } });
+        expect(bad.statusCode).toBe(400);
+        const anon = await app.inject({ method: 'PATCH',
+url: `/admin/market-quotes/${mandioca.id}`,
+payload: { unit: 't' } });
+        expect(anon.statusCode).toBe(401);
+        await app.inject({ method: 'PATCH',
+url: `/admin/market-quotes/${mandioca.id}`,
+headers: bearer(token),
+payload: { unit: 't' } });
+    });
+
     it('lançamento do dia aparece no histórico público', async () => {
         const admin = JSON.parse((await app.inject({ method: 'GET',
 url: '/admin/market-quotes',

@@ -10,6 +10,8 @@ import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.
 import { errorResponse } from '../lib/swagger-schemas.js';
 import { ListQuoteHistoryUseCase } from '../../usecase/list-quote-history.js';
 import { UpdateQuotesSourceUseCase } from '../../usecase/update-site-settings.js';
+import { UpdateQuoteUnitUseCase } from '../../usecase/update-quote-unit.js';
+import { QUOTE_UNITS } from '../../lib/quote-products.js';
 import { createSiteSettingsAdapter } from '../../adapter/database/site-settings-adapter.js';
 import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 
@@ -172,6 +174,43 @@ example: 12050 },
             },
         },
         (req: FastifyRequest, res: FastifyReply) => controller.saveDaily(req, res),
+    );
+
+    const updateUnit = new UpdateQuoteUnitUseCase(repo);
+    fastify.patch(
+        '/admin/market-quotes/:id',
+        {
+            schema: {
+                tags: ['Market Quotes'],
+                summary: 'Trocar a unidade do produto',
+                description: 'Unidade exibida no preço e no histórico (saca, tonelada, quilo, arroba). `null` = sem unidade. Os preços gravados não mudam.',
+                security: [{ bearerAuth: [] }],
+                params: { type: 'object',
+required: ['id'],
+properties: { id: { type: 'string' } } },
+                body: {
+                    type: 'object',
+                    required: ['unit'],
+                    properties: { unit: { type: 'string',
+nullable: true,
+enum: [...QUOTE_UNITS, null] } },
+                },
+                response: {
+                    200: { type: 'object',
+properties: marketQuoteProperties },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+            if ((await requirePermission(req, reply, 'UPDATE_MARKET_QUOTE', getAdminPermissions)) === null) return;
+            const r = await updateUnit.execute(req.params.id, req.body);
+            if (r.error) return reply.status(errorToStatus(r.error)).send({ error: r.error.message });
+            return reply.send(r.quote);
+        },
     );
 
     const updateSource = new UpdateQuotesSourceUseCase(createSiteSettingsAdapter(prisma));
