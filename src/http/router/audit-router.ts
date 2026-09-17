@@ -5,6 +5,7 @@ import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { requirePermission } from '../lib/require-permission.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
+import { buildAuditLogWhere } from '../../adapter/database/list-filters.js';
 
 export async function auditRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userAdminRepository = createUserAdminAdapter(prisma);
@@ -23,7 +24,7 @@ export async function auditRouter(fastify: FastifyInstance, prisma: PrismaClient
                     properties: {
                         ...paginationQuerystring.properties,
                         action: { type: 'string',
-enum: ['create', 'edit', 'delete'] },
+enum: ['create', 'edit', 'delete', 'export'] },
                         entity: { type: 'string' },
                         actorId: { type: 'string' },
                         from: { type: 'string' },
@@ -58,7 +59,7 @@ nullable: true },
                 Querystring: {
                     page?: number;
 limit?: number;
-                    action?: 'create' | 'edit' | 'delete';
+                    action?: 'create' | 'edit' | 'delete' | 'export';
                     entity?: string;
 actorId?: string;
 from?: string;
@@ -73,29 +74,8 @@ q?: string;
             const limit = Number(req.query.limit) || 30;
             const skip = (page - 1) * limit;
 
-            // Filtros opcionais.
-            const { action, entity, actorId, from, to, q } = req.query;
-            const where: Record<string, unknown> = {};
-            if (action === 'create') where.method = 'POST';
-            else if (action === 'edit') where.method = { in: ['PATCH', 'PUT'] };
-            else if (action === 'delete') where.method = 'DELETE';
-            if (entity) where.entity = entity;
-            if (actorId) where.actorId = actorId;
-            if (from || to) {
-                where.createdAt = {
-                    ...(from ? { gte: new Date(from) } : {}),
-                    // inclui o dia inteiro do `to`
-                    ...(to ? { lte: new Date(new Date(to).getTime() + 24 * 60 * 60 * 1000 - 1) } : {}),
-                };
-            }
-            if (q && q.trim()) {
-                where.OR = [
-                    { targetLabel: { contains: q.trim(),
-mode: 'insensitive' } },
-                    { path: { contains: q.trim(),
-mode: 'insensitive' } },
-                ];
-            }
+            // Filtros opcionais (mesmos da exportação).
+            const where = buildAuditLogWhere(req.query);
 
             type AuditRow = {
                 id: string;

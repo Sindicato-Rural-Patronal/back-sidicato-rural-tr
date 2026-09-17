@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client/extension';
+import { buildAdminListWhere } from './list-filters.js';
 import type {
     UserAdminRepository,
     UserAdminWithDetails,
@@ -63,20 +64,7 @@ isDeleted: false } });
 
     findAll(filters?: UserAdminListFilters, skip?: number, take?: number): Promise<UserAdminWithDetails[]> {
         return this.prisma.userAdmin.findMany({
-            where: {
-                isDeleted: false,
-                ...(filters?.search && {
-                    OR: [
-                        { username: { contains: filters.search,
-mode: 'insensitive' as const } },
-                        { userData: { name: { contains: filters.search,
-mode: 'insensitive' as const } } },
-                        { userData: { email: { contains: filters.search,
-mode: 'insensitive' as const } } },
-                    ],
-                }),
-                ...(filters?.rulesId && { rulesId: filters.rulesId }),
-            },
+            where: buildAdminListWhere(filters),
             include: {
                 userData: { select: { name: true,
 email: true,
@@ -92,22 +80,7 @@ permissions: true } },
     }
 
     count(filters?: UserAdminListFilters): Promise<number> {
-        return this.prisma.userAdmin.count({
-            where: {
-                isDeleted: false,
-                ...(filters?.search && {
-                    OR: [
-                        { username: { contains: filters.search,
-mode: 'insensitive' as const } },
-                        { userData: { name: { contains: filters.search,
-mode: 'insensitive' as const } } },
-                        { userData: { email: { contains: filters.search,
-mode: 'insensitive' as const } } },
-                    ],
-                }),
-                ...(filters?.rulesId && { rulesId: filters.rulesId }),
-            },
-        });
+        return this.prisma.userAdmin.count({ where: buildAdminListWhere(filters) });
     }
 
     update(id: string, data: UserAdminUpdateInput): Promise<UserAdminModel | null> {

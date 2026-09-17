@@ -178,6 +178,16 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 | `GET` | `/site-settings` | `GetSiteSettingsUseCase` (todas as chaves; ausente = '') | Pública |
 | `GET` · `PATCH` | `/admin/site-settings` | `GetSiteSettingsUseCase` · `UpdateSiteSettingsUseCase` (só grava o que veio; valida URLs, e-mail, UF) | `READ_BANNER` · `UPDATE_BANNER` |
 
+### Exportação CSV (, , )
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+|  |  |  — CSV (, BOM, tudo entre aspas, fórmula neutralizada com ) | por conjunto (abaixo) |
+
+- Conjuntos: , ,  (READ_USER),  (READ_USER),  (READ_USER_ADMIN), ,  (READ_COURSE),  (READ_CONTACT),  (READ_AUDIT).
+-  exporta só esses (seleção ou um registro); sem , os mesmos filtros da listagem (, compartilhado com os adapters das listas).  aceita ;  aceita .
+- Headers:  (, ou  para um registro) e .
+- Cada exportação grava um AuditLog com , entity "Exportação" (filtro  na auditoria).
+
 ### Instrutores
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|

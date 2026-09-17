@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client/extension';
+import { buildUnimedListWhere } from './list-filters.js';
 import type { UnimedBeneficiarioModel } from '../../generated/prisma/models/UnimedBeneficiario.js';
 import type {
     UnimedRepository,
@@ -59,21 +60,7 @@ isDeleted: false },
 total: number 
 }> {
         const { page, limit, search } = filters;
-        // Busca filtra pelo UserData vinculado (nome ou CPF).
-        const where = {
-            isDeleted: false,
-            ...(search
-                ? {
-                      userData: {
-                          OR: [
-                              { name: { contains: search,
-mode: 'insensitive' as const } },
-                              { cpf: { contains: search } },
-                          ],
-                      },
-                  }
-                : {}),
-        };
+        const where = buildUnimedListWhere(search);
         const [items, total] = await Promise.all([
             this.prisma.unimedBeneficiario.findMany({
                 where,

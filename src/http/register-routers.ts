@@ -25,6 +25,7 @@ import { convenioRouter } from './router/convenio-router.js';
 import { companyRouter } from './router/company-router.js';
 import { galleryRouter } from './router/gallery-router.js';
 import { publicContactRouter } from './router/public-contact-router.js';
+import { exportRouter } from './router/export-router.js';
 
 // Todas as rotas da API. Usado pelo servidor e pelos testes E2E, para os dois
 // não ficarem com conjuntos diferentes de rotas.
@@ -54,4 +55,5 @@ export function registerRouters(app: FastifyInstance, prisma: PrismaClient) {
     app.register(companyRouter, prisma);
     app.register(galleryRouter, prisma);
     app.register(publicContactRouter, prisma);
+    app.register(exportRouter, prisma);
 }

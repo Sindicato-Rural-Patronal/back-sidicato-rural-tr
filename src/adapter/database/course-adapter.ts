@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client/extension';
+import { buildCourseListWhere } from './list-filters.js';
 import type {
     CourseRepository,
     CourseWithDetails,
@@ -51,14 +52,7 @@ isDeleted: false },
 
     findAll(filters?: CourseListFilters, skip?: number, take?: number): Promise<CourseWithDetails[]> {
         return this.prisma.course.findMany({
-            where: {
-                isDeleted: false,
-                ...(filters?.status && { status: filters.status }),
-                ...(filters?.search && {
-                    name: { contains: filters.search,
-mode: 'insensitive' as const },
-                }),
-            },
+            where: buildCourseListWhere(filters),
             include: courseIncludes,
             orderBy: { startTime: 'asc' },
             skip,
@@ -67,16 +61,7 @@ mode: 'insensitive' as const },
     }
 
     count(filters?: CourseListFilters): Promise<number> {
-        return this.prisma.course.count({
-            where: {
-                isDeleted: false,
-                ...(filters?.status && { status: filters.status }),
-                ...(filters?.search && {
-                    name: { contains: filters.search,
-mode: 'insensitive' as const },
-                }),
-            },
-        });
+        return this.prisma.course.count({ where: buildCourseListWhere(filters) });
     }
 
     async update(id: string, data: CourseUpdateData): Promise<courseModel | null> {
