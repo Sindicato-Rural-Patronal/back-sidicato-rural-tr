@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client/extension';
+import { buildUserListWhere } from './list-filters.js';
 import type { UserDataUncheckedCreateInput, UserDataModel } from '../../generated/prisma/models';
 import type {
     UserDataRepository,
@@ -77,50 +78,7 @@ isPartner: true } },
     }
 
     private buildWhere(filters?: UserListFilters) {
-        const { search, memberType, memberClassification, gender, ethnicity, educationLevel, incompleteRegistration } =
-            filters ?? {};
-        return {
-            isDeleted: false,
-            ...(search && {
-                OR: [
-                    { name: { contains: search,
-mode: 'insensitive' as const } },
-                    { email: { contains: search,
-mode: 'insensitive' as const } },
-                    { cpf: { contains: search } },
-                ],
-            }),
-            ...(memberType && { memberType }),
-            ...(memberClassification && { memberClassification }),
-            ...(gender && { gender }),
-            ...(ethnicity && { ethnicity }),
-            ...(educationLevel && { educationLevel }),
-            ...(incompleteRegistration === true && {
-                // envolto em AND p/ não sobrescrever o OR da busca (search)
-                AND: [
-                    {
-                        OR: [
-                            { avatar: null },
-                            { properties: { none: {} } },
-                            { cpf: null },
-                            { rg: null },
-                            { birthDate: null },
-                            { gender: null },
-                        ],
-                    },
-                ],
-            }),
-            ...(incompleteRegistration === false && {
-                AND: [
-                    { avatar: { not: null } },
-                    { properties: { some: {} } },
-                    { cpf: { not: null } },
-                    { rg: { not: null } },
-                    { birthDate: { not: null } },
-                    { gender: { not: null } },
-                ],
-            }),
-        };
+        return buildUserListWhere(filters);
     }
 
     // Compara por CPF ignorando formatação: os CPFs foram gravados em formatos

@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client/extension';
+import { buildContactMessageWhere } from './list-filters.js';
 import type {
     ContactMessageRepository,
     ContactMessageModel,
@@ -31,20 +32,7 @@ class ContactMessageAdapter implements ContactMessageRepository {
     }
 
     private buildWhere(filters?: ContactMessageFilters) {
-        return {
-            isDeleted: false,
-            ...(filters?.read !== undefined && { read: filters.read }),
-            ...(filters?.search && {
-                OR: [
-                    { name: { contains: filters.search,
-mode: 'insensitive' as const } },
-                    { email: { contains: filters.search,
-mode: 'insensitive' as const } },
-                    { subject: { contains: filters.search,
-mode: 'insensitive' as const } },
-                ],
-            }),
-        };
+        return buildContactMessageWhere(filters);
     }
 
     findById(id: string): Promise<ContactMessageModel | null> {

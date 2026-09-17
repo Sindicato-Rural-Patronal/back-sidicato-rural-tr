@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client/extension';
+import { buildCompanyListWhere } from './list-filters.js';
 import type {
     CompanyRepository,
     CompanyListFilters,
@@ -25,24 +26,7 @@ class CompanyAdapter implements CompanyRepository {
     constructor(private prisma: PrismaClient) {}
 
     private buildWhere(filters: CompanyListFilters) {
-        const where: Record<string, unknown> = { isDeleted: false };
-        if (filters.type) where.type = filters.type;
-        if (filters.isPartner !== undefined) where.isPartner = filters.isPartner;
-        const q = filters.search?.trim();
-        if (q) {
-            const digits = q.replace(/\D/g, '');
-            const or: Record<string, unknown>[] = [
-                { name: { contains: q,
-mode: 'insensitive' } },
-                { tradeName: { contains: q,
-mode: 'insensitive' } },
-                { email: { contains: q,
-mode: 'insensitive' } },
-            ];
-            if (digits.length >= 2) or.push({ cnpj: { contains: digits } });
-            where.OR = or;
-        }
-        return where;
+        return buildCompanyListWhere(filters);
     }
 
     async findAll(filters: CompanyListFilters, skip: number, take: number): Promise<CompanyListItem[]> {
