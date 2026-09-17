@@ -178,15 +178,15 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 | `GET` | `/site-settings` | `GetSiteSettingsUseCase` (todas as chaves; ausente = '') | Pública |
 | `GET` · `PATCH` | `/admin/site-settings` | `GetSiteSettingsUseCase` · `UpdateSiteSettingsUseCase` (só grava o que veio; valida URLs, e-mail, UF) | `READ_BANNER` · `UPDATE_BANNER` |
 
-### Exportação CSV (, , )
+### Exportação CSV (`export-router.ts`, `usecase/export-data.ts`, `adapter/database/export-adapter.ts`)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
-|  |  |  — CSV (, BOM, tudo entre aspas, fórmula neutralizada com ) | por conjunto (abaixo) |
+| `GET` | `/admin/export/:dataset` | `ExportDataUseCase` — CSV (`;`, BOM, tudo entre aspas, fórmula neutralizada com `'`) | por conjunto (abaixo) |
 
-- Conjuntos: , ,  (READ_USER),  (READ_USER),  (READ_USER_ADMIN), ,  (READ_COURSE),  (READ_CONTACT),  (READ_AUDIT).
--  exporta só esses (seleção ou um registro); sem , os mesmos filtros da listagem (, compartilhado com os adapters das listas).  aceita ;  aceita .
-- Headers:  (, ou  para um registro) e .
-- Cada exportação grava um AuditLog com , entity "Exportação" (filtro  na auditoria).
+- Conjuntos: `people`, `companies`, `properties`, `unimed` (READ_USER), `admins` (READ_USER_ADMIN), `courses`, `registrations` (READ_COURSE), `contact-messages` (READ_CONTACT), `audit-logs` (READ_AUDIT).
+- `ids=a,b` exporta só esses (seleção ou um registro); sem `ids`, os mesmos filtros da listagem (`adapter/database/list-filters.ts`, compartilhado com os adapters das listas). `properties` aceita `ownerIds`; `registrations` aceita `courseIds`.
+- Headers: `Content-Disposition` (`pessoas-AAAA-MM-DD.csv`, ou `pessoa-<nome>-AAAA-MM-DD.csv` para um registro) e `X-Export-Count`.
+- Cada exportação grava um AuditLog com `method: 'EXPORT'` e entity "Exportação" (filtro `action=export` na auditoria).
 
 ### Instrutores
 | Método | Path | Use Case | Autenticação |
