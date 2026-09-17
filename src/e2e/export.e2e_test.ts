@@ -140,6 +140,7 @@ describe('Exportação CSV', () => {
         expect(regs).toHaveLength(2);
         expect(regs[1][regs[0].indexOf('Curso')]).toBe('CURSO EXPORT');
         expect(regs[1][regs[0].indexOf('Confirmada')]).toBe('Sim');
+        expect(regs[0]).toEqual(expect.arrayContaining(['Idade', 'Contato público']));
     });
 
     it('permissão por conjunto, token obrigatório e conjunto desconhecido', async () => {

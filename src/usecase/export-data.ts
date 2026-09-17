@@ -215,6 +215,17 @@ function isActiveMember(status: string | null, validUntil: Date | null, today: D
     return !validUntil || ymd(validUntil) >= ymd(today);
 }
 
+/** Idade em anos completos na data de hoje. */
+function ageOn(birth: Date | null, today: Date): number | null {
+    if (!birth) return null;
+    let age = today.getUTCFullYear() - birth.getUTCFullYear();
+    const beforeBirthday =
+        today.getUTCMonth() < birth.getUTCMonth() ||
+        (today.getUTCMonth() === birth.getUTCMonth() && today.getUTCDate() < birth.getUTCDate());
+    if (beforeBirthday) age -= 1;
+    return age;
+}
+
 function slug(value: string): string {
     return value
         .normalize('NFD')
@@ -469,6 +480,8 @@ value: r => r.userData.email },
 value: r => r.userData.phone },
         { header: 'Nascimento',
 value: r => csvDate(r.userData.birthDate) },
+        { header: 'Idade',
+value: r => ageOn(r.userData.birthDate, today) },
         { header: 'Confirmada',
 value: r => r.confirmed },
         { header: 'Associado em dia',
@@ -479,6 +492,8 @@ value: r => isActiveMember(r.userData.memberStatus, r.userData.membershipValidUn
         },
         { header: 'Cargo na diretoria',
 value: r => r.userData.boardPosition },
+        { header: 'Contato público',
+value: r => (r.userData.publicContact ? r.userData.publicContact.title || 'Sim' : '') },
         { header: 'Ficha anexada',
 value: r => !!r.ficha },
         { header: 'Inscrito em',
