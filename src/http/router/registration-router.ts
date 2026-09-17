@@ -5,6 +5,7 @@ import { createUserDataAdapter } from '../../adapter/database/user-data.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
 import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createCourseAdapter } from '../../adapter/database/course-adapter.js';
+import { createNotificationPublisher } from '../../adapter/database/notification-adapter.js';
 import { RegisterForCourseUseCase } from '../../usecase/register-for-course.js';
 import { RegisterForCourseByCpfUseCase } from '../../usecase/register-for-course-by-cpf.js';
 import { RegisterForCourseFullUseCase } from '../../usecase/register-for-course-full.js';
@@ -55,15 +56,16 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
     const ruleRepository = createRuleAdapter(prisma);
     const registrationRepository = createRegistrationAdapter(prisma);
     const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
+    const notifications = createNotificationPublisher(prisma);
 
     const registerController = new RegisterForCourseController(
-        new RegisterForCourseUseCase(courseRepository, userDataRepository, registrationRepository),
+        new RegisterForCourseUseCase(courseRepository, userDataRepository, registrationRepository, notifications),
     );
     const registerByCpfController = new RegisterForCourseByCpfController(
-        new RegisterForCourseByCpfUseCase(courseRepository, userDataRepository, registrationRepository),
+        new RegisterForCourseByCpfUseCase(courseRepository, userDataRepository, registrationRepository, notifications),
     );
     const registerFullController = new RegisterForCourseFullController(
-        new RegisterForCourseFullUseCase(prisma),
+        new RegisterForCourseFullUseCase(prisma, notifications),
     );
     const lookupByCpfController = new LookupUserByCpfController(
         new LookupUserByCpfUseCase(userDataRepository),

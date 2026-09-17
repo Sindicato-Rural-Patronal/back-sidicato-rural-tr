@@ -3,6 +3,8 @@ import { RegisterForCourseUseCase } from '../register-for-course.js';
 import type { CourseRepository } from '../../ports/external/course-repository.js';
 import type { UserDataRepository } from '../../ports/external/user-data-repository.js';
 import type { RegistrationRepository } from '../../ports/external/registration-repository.js';
+import type { NotificationPublisher } from '../../ports/external/notification-repository.js';
+import { RegisterForCourseByCpfUseCase } from '../register-for-course-by-cpf.js';
 
 const mockCourseRepo = {
     findById: vi.fn(),
@@ -31,6 +33,8 @@ const mockRegistrationRepo = {
     delete: vi.fn(),
 } as unknown as RegistrationRepository;
 
+const mockPublisher = { publish: vi.fn() } as unknown as NotificationPublisher;
+
 const validInput = {
     courseId: '123e4567-e89b-12d3-a456-426614174000',
     name: 'João Silva',
@@ -40,6 +44,7 @@ const validInput = {
 };
 
 const courseBase = {
+    name: 'Curso de Tratorista',
     endTime: new Date('2099-01-01T17:00:00.000Z'),
     registrationDeadline: null,
     room: { maxCapacity: 100 },
@@ -61,6 +66,7 @@ describe('RegisterForCourseUseCase', () => {
                 mockCourseRepo,
                 mockUserDataRepo,
                 mockRegistrationRepo,
+                mockPublisher,
             );
             const result = await uc.execute({ ...validInput,
 email: 'nao-e-email' });
@@ -73,6 +79,7 @@ email: 'nao-e-email' });
                 mockCourseRepo,
                 mockUserDataRepo,
                 mockRegistrationRepo,
+                mockPublisher,
             );
             const result = await uc.execute({ ...validInput,
 courseId: '' });
@@ -87,6 +94,7 @@ courseId: '' });
                 mockCourseRepo,
                 mockUserDataRepo,
                 mockRegistrationRepo,
+                mockPublisher,
             );
             const result = await uc.execute(validInput);
             expect(result.error).toBeDefined();
@@ -99,6 +107,7 @@ courseId: '' });
                 mockCourseRepo,
                 mockUserDataRepo,
                 mockRegistrationRepo,
+                mockPublisher,
             );
             const result = await uc.execute(validInput);
             expect(result.error).toBeDefined();
@@ -114,6 +123,7 @@ courseId: '' });
                 mockCourseRepo,
                 mockUserDataRepo,
                 mockRegistrationRepo,
+                mockPublisher,
             );
             const result = await uc.execute(validInput);
             expect(result.error?.message).toBe('Este curso já terminou e não aceita mais inscrições.');
@@ -134,6 +144,7 @@ courseId: '' });
                 mockCourseRepo,
                 mockUserDataRepo,
                 mockRegistrationRepo,
+                mockPublisher,
             );
             await uc.execute(validInput);
             expect(mockUserDataRepo.create).not.toHaveBeenCalled();
@@ -151,6 +162,7 @@ courseId: '' });
                 mockCourseRepo,
                 mockUserDataRepo,
                 mockRegistrationRepo,
+                mockPublisher,
             );
             const semEmail = await uc.execute({ ...validInput,
 email: '' });
@@ -171,6 +183,7 @@ email: '' });
                 mockCourseRepo,
                 mockUserDataRepo,
                 mockRegistrationRepo,
+                mockPublisher,
             );
             await uc.execute(validInput);
             expect(mockUserDataRepo.create).toHaveBeenCalledOnce();
@@ -184,6 +197,7 @@ email: '' });
                 mockCourseRepo,
                 mockUserDataRepo,
                 mockRegistrationRepo,
+                mockPublisher,
             );
             const result = await uc.execute(validInput);
             expect(result.error).toBeDefined();
@@ -204,6 +218,7 @@ email: '' });
                 mockCourseRepo,
                 mockUserDataRepo,
                 mockRegistrationRepo,
+                mockPublisher,
             );
             const result = await uc.execute(validInput);
             expect(result.error).toBeDefined();
@@ -221,11 +236,76 @@ email: '' });
                 mockCourseRepo,
                 mockUserDataRepo,
                 mockRegistrationRepo,
+                mockPublisher,
             );
             const result = await uc.execute(validInput);
             expect(result.error).toBeUndefined();
             expect(result.registrationId).toBe('reg-001');
             expect(result.userDataId).toBe('ud-001');
+        });
+    });
+
+    describe('notificação do painel', () => {
+        const succeed = () => {
+            vi.mocked(mockCourseRepo.findById).mockResolvedValue(publishedCourse as any);
+            vi.mocked(mockUserDataRepo.findByCpf).mockResolvedValue({ id: 'ud-001',
+name: 'João Cadastrado' } as any);
+            vi.mocked(mockRegistrationRepo.findByUserDataAndCourse).mockResolvedValue(null);
+            vi.mocked(mockRegistrationRepo.createWithCapacity).mockResolvedValue({ id: 'reg-001' } as any);
+        };
+
+        it('publica a inscrição para quem tem READ_COURSE, com link para as inscrições do curso', async () => {
+            succeed();
+            const uc = new RegisterForCourseUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo, mockPublisher);
+            await uc.execute(validInput);
+            expect(mockPublisher.publish).toHaveBeenCalledWith({
+                type: 'COURSE_REGISTRATION',
+                permission: 'READ_COURSE',
+                title: 'Nova inscrição em Curso de Tratorista',
+                body: 'João Cadastrado',
+                link: `/admin/cursos?curso=${validInput.courseId}&aba=inscricoes`,
+                entityId: 'reg-001',
+            });
+        });
+
+        it('falha ao publicar não desfaz a inscrição', async () => {
+            succeed();
+            vi.mocked(mockPublisher.publish).mockRejectedValueOnce(new Error('banco fora'));
+            const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const uc = new RegisterForCourseUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo, mockPublisher);
+            const result = await uc.execute(validInput);
+            expect(result.error).toBeUndefined();
+            expect(result.registrationId).toBe('reg-001');
+            spy.mockRestore();
+        });
+
+        it('não publica quando a inscrição falha', async () => {
+            vi.mocked(mockCourseRepo.findById).mockResolvedValue(publishedCourse as any);
+            vi.mocked(mockUserDataRepo.findByCpf).mockResolvedValue({ id: 'ud-001',
+name: 'João' } as any);
+            vi.mocked(mockRegistrationRepo.findByUserDataAndCourse).mockResolvedValue(null);
+            vi.mocked(mockRegistrationRepo.createWithCapacity).mockResolvedValue('FULL' as any);
+            const uc = new RegisterForCourseUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo, mockPublisher);
+            const result = await uc.execute(validInput);
+            expect(result.error).toBeDefined();
+            expect(mockPublisher.publish).not.toHaveBeenCalled();
+        });
+
+        it('inscrição por CPF também publica, e falha ao publicar não a derruba', async () => {
+            succeed();
+            vi.mocked(mockPublisher.publish).mockRejectedValueOnce(new Error('banco fora'));
+            const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const uc = new RegisterForCourseByCpfUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo, mockPublisher);
+            const result = await uc.execute({ courseId: validInput.courseId,
+cpf: validInput.cpf });
+            expect(result.error).toBeUndefined();
+            expect(result.registrationId).toBe('reg-001');
+            expect(mockPublisher.publish).toHaveBeenCalledWith(expect.objectContaining({
+                type: 'COURSE_REGISTRATION',
+                body: 'João Cadastrado',
+                entityId: 'reg-001',
+            }));
+            spy.mockRestore();
         });
     });
 });

@@ -43,7 +43,9 @@ export async function cleanDatabase(prisma: PrismaClient): Promise<void> {
             "Address",
             "News",
             "Banner",
-            "ContactMessage"
+            "ContactMessage",
+            "NotificationRead",
+            "Notification"
         RESTART IDENTITY CASCADE
     `);
 }

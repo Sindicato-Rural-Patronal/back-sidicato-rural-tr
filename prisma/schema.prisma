@@ -832,3 +832,33 @@ model PublicContact {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
+
+// Notificações do painel (sino): eventos de ações públicas/self-service
+// (inscrição em curso, mensagem de contato, convite aceito). Cada evento só
+// aparece para admins cuja regra tem `permission`. Eventos com mais de 90 dias
+// são apagados pelo publicador (no máximo uma vez por hora).
+model Notification {
+  id         String   @id @default(uuid())
+  type       String // COURSE_REGISTRATION, CONTACT_MESSAGE, INVITE_ACCEPTED
+  title      String
+  body       String?
+  link       String? // caminho no painel (ex.: /admin/mensagens)
+  permission String // permissão exigida para ver (ex.: READ_COURSE)
+  entityId   String? // registro de origem (ex.: id da inscrição)
+  createdAt  DateTime @default(now())
+
+  reads NotificationRead[]
+
+  @@index([createdAt])
+}
+
+// Leitura de uma notificação por um admin (UserAdmin.id). Sem linha = não lida.
+model NotificationRead {
+  id             String       @id @default(uuid())
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  adminId        String
+  readAt         DateTime     @default(now())
+
+  @@unique([notificationId, adminId])
+}

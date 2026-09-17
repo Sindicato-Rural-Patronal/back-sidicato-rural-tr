@@ -17,6 +17,8 @@ import { checkCourseAcceptsRegistration } from '../lib/course-registration-rules
 import { CourseFullError } from '../errors/business-rule.js';
 import { isPrismaUniqueViolation, uniqueViolationFields } from '../lib/prisma-errors.js';
 import { personEmailSchema } from '../lib/person-email.js';
+import type { NotificationPublisher } from '../ports/external/notification-repository.js';
+import { courseRegistrationEvent, publishSafely } from '../lib/notification-events.js';
 
 const schema = z.object({
     courseId: z.string().min(1),
@@ -59,7 +61,10 @@ userDataId?: string
  * roda numa transação: falha no meio não deixa registros órfãos.
  */
 export class RegisterForCourseFullUseCase {
-    constructor(private readonly prisma: PrismaClient) {}
+    constructor(
+        private readonly prisma: PrismaClient,
+        private readonly notifications: NotificationPublisher,
+    ) {}
 
     async execute(request: Request): Promise<Response> {
         const parsed = schema.safeParse(request);
@@ -87,7 +92,7 @@ export class RegisterForCourseFullUseCase {
             : false;
 
         try {
-            return await this.prisma.$transaction(async (tx: unknown) => {
+            const result: Response = await this.prisma.$transaction(async (tx: unknown) => {
                 const t = tx as PrismaClient;
                 const userRepo = createUserDataAdapter(t);
                 const addressRepo = createAddressAdapter(t);
@@ -137,6 +142,16 @@ isDeleted: false },
                 return { registrationId: registration.id,
 userDataId: userData.id };
             }, { isolationLevel: 'Serializable' });
+            // Depois do commit: evento de uma inscrição que existe de fato.
+            if (result.registrationId) {
+                await publishSafely(this.notifications, courseRegistrationEvent({
+                    courseId,
+                    courseName: course.name,
+                    personName: existingUser?.name ?? name,
+                    registrationId: result.registrationId,
+                }));
+            }
+            return result;
         } catch (e) {
             if (e instanceof CourseRegistrationAlreadyExistsError) return { error: e };
             if (e instanceof CourseFullError) return { error: e };
