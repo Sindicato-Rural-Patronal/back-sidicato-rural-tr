@@ -171,6 +171,7 @@ startTime: true } },
                         memberStatus: true,
                         membershipValidUntil: true,
                         boardPosition: true,
+                        publicContact: { select: { title: true } },
                         companyMemberships: {
                             where: { company: { isPartner: true,
 isDeleted: false } },

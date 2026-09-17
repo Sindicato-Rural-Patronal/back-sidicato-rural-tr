@@ -208,6 +208,7 @@ startTime: Date
         memberStatus: string | null;
         membershipValidUntil: Date | null;
         boardPosition: string | null;
+        publicContact: { title: string | null } | null;
         companyMemberships: {
  company: {
  name: string;
