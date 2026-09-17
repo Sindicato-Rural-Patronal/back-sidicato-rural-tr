@@ -84,5 +84,15 @@ describe('LoginUserAdminUseCase', () => {
             expect(payload.username).toBe(admin.username);
             expect(payload.role).toBe(admin.rulesId);
         });
+
+        it('token vale 8 horas', async () => {
+            vi.mocked(mockUserAdminRepo.findByUsername).mockResolvedValue(
+                (await makeAdmin()) as any,
+            );
+            const uc = new LoginUserAdminUseCase(mockUserAdminRepo);
+            const result = await uc.execute('admin', PASSWORD_PLAIN);
+            const payload = jwt.decode(result.token!) as Record<string, number>;
+            expect(payload.exp - payload.iat).toBe(8 * 60 * 60);
+        });
     });
 });

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type {
     FinanceRepository,
+    FinanceTransactionSum,
     FinanceTransactionWithCategory,
 } from '../ports/external/finance-repository.js';
 
@@ -24,31 +25,59 @@ const querySchema = financeFiltersSchema.extend({
     limit: z.coerce.number().int().min(1).max(1000).default(20),
 });
 
+export type FinanceTransactionsTotals = {
+    incomeCents: number;
+    expenseCents: number;
+};
+
 export type FinanceTransactionsPage = {
     data: FinanceTransactionWithCategory[];
     total: number;
     page: number;
     limit: number;
     totalPages: number;
+    /** Entradas e saídas de todos os lançamentos filtrados (não só da página). */
+    totals: FinanceTransactionsTotals;
 };
+
+/**
+ * Mesma regra do dashboard: transferência entre caixas não é receita nem
+ * despesa, e "só nota" (sem tipo) não entra no caixa — nenhum dos dois conta.
+ */
+export function financeTotals(sums: FinanceTransactionSum[]): FinanceTransactionsTotals {
+    let incomeCents = 0;
+    let expenseCents = 0;
+    for (const s of sums) {
+        if (s.transfer) continue;
+        if (s.type === 'IN') incomeCents += s.amountCents;
+        else if (s.type === 'OUT') expenseCents += s.amountCents;
+    }
+    return { incomeCents,
+expenseCents };
+}
 
 export class ListFinanceTransactionsUseCase {
     constructor(private readonly repo: FinanceRepository) {}
 
     async execute(query: unknown): Promise<FinanceTransactionsPage> {
         const q = querySchema.parse(query ?? {});
-        const to = endOfDay(q.to);
-
-        const { items, total } = await this.repo.listTransactions({
+        const filters = {
             from: q.from,
-            to,
+            to: endOfDay(q.to),
             type: q.type,
             categoryId: q.categoryId,
             accountId: q.accountId,
             search: q.search,
-            skip: (q.page - 1) * q.limit,
-            take: q.limit,
-        });
+        };
+
+        const [{ items, total }, sums] = await Promise.all([
+            this.repo.listTransactions({
+                ...filters,
+                skip: (q.page - 1) * q.limit,
+                take: q.limit,
+            }),
+            this.repo.sumTransactions(filters),
+        ]);
 
         return {
             data: items,
@@ -56,6 +85,7 @@ export class ListFinanceTransactionsUseCase {
             page: q.page,
             limit: q.limit,
             totalPages: Math.max(1, Math.ceil(total / q.limit)),
+            totals: financeTotals(sums),
         };
     }
 }

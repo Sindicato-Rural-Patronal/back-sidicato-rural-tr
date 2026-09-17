@@ -30,6 +30,7 @@ export interface ContactMessageRepository {
     findAll(skip?: number, take?: number, filters?: ContactMessageFilters): Promise<ContactMessageModel[]>;
     count(filters?: ContactMessageFilters): Promise<number>;
     findById(id: string): Promise<ContactMessageModel | null>;
-    markAsRead(id: string): Promise<ContactMessageModel | null>;
+    /** Marca como lida (true) ou não lida (false). */
+    setRead(id: string, read: boolean): Promise<ContactMessageModel | null>;
     delete(id: string): Promise<void>;
 }

@@ -8,7 +8,6 @@ const mockUserRepo = {
     findAll: vi.fn(),
     findByCpf: vi.fn(),
     findByRg: vi.fn(),
-    findByEmailOrCpf: vi.fn(),
 } as unknown as UserDataRepository;
 
 const validInput = {
@@ -38,7 +37,7 @@ describe('CreateUserUseCase', () => {
             const uc = new CreateUserUseCase(mockUserRepo);
             const result = await uc.execute(validInput);
             expect(result.error).toBeDefined();
-            expect(result.error?.message).toBe('User already exists');
+            expect(result.error?.message).toBe('CPF já cadastrado para outra pessoa.');
         });
 
         it('não cria usuário se CPF duplicado', async () => {
@@ -59,6 +58,39 @@ describe('CreateUserUseCase', () => {
             expect(result.data?.id).toBe('user-123');
             expect(result.data?.email).toBe(validInput.email);
             expect(result.error).toBeUndefined();
+        });
+    });
+
+    describe('e-mail opcional', () => {
+        it('cria sem e-mail (vazio ou ausente vira null)', async () => {
+            vi.mocked(mockUserRepo.findByCpf).mockResolvedValue(null);
+            vi.mocked(mockUserRepo.create).mockResolvedValue({ ...fakeUser,
+email: null } as any);
+            const uc = new CreateUserUseCase(mockUserRepo);
+            const result = await uc.execute({ ...validInput,
+email: '  ' });
+            expect(result.error).toBeUndefined();
+            expect(result.data?.email).toBeNull();
+            expect(mockUserRepo.create).toHaveBeenCalledWith(expect.objectContaining({ email: null }));
+            const { email: _email, ...semEmail } = validInput;
+            expect((await uc.execute(semEmail)).error).toBeUndefined();
+        });
+
+        it('recusa e-mail preenchido em formato inválido', async () => {
+            const uc = new CreateUserUseCase(mockUserRepo);
+            const result = await uc.execute({ ...validInput,
+email: 'joao@' });
+            expect(result.error?.message).toBe('E-mail inválido');
+            expect(mockUserRepo.create).not.toHaveBeenCalled();
+        });
+
+        it('só consulta o CPF: e-mail e telefone de outra pessoa não impedem', async () => {
+            vi.mocked(mockUserRepo.findByCpf).mockResolvedValue(null);
+            vi.mocked(mockUserRepo.create).mockResolvedValue(fakeUser as any);
+            const uc = new CreateUserUseCase(mockUserRepo);
+            const result = await uc.execute(validInput);
+            expect(result.error).toBeUndefined();
+            expect(mockUserRepo.findByCpf).toHaveBeenCalledWith(validInput.cpf);
         });
     });
 

@@ -247,14 +247,18 @@ username: true } })
         }));
     }
 
-    async logExport({ actorId, path, targetLabel }: Parameters<ExportRepository['logExport']>[0]): Promise<void> {
-        await this.prisma.auditLog.create({
+    // O local do IP é preenchido depois da resposta (http/audit-hooks.ts).
+    async logExport({ actorId, path, targetLabel, ip, userAgent }: Parameters<ExportRepository['logExport']>[0]): Promise<{ id: string }> {
+        return this.prisma.auditLog.create({
             data: { actorId,
 method: 'EXPORT',
 path,
 entity: 'Exportação',
 targetLabel,
-statusCode: 200 },
+statusCode: 200,
+ip,
+userAgent },
+            select: { id: true },
         });
     }
 }

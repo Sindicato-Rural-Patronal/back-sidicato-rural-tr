@@ -5,7 +5,7 @@ import { errorToStatus } from '../lib/require-permission.js';
 type Body = {
     name: string;
     phone: string;
-    email: string;
+    email?: string | null;
     cpf: string;
 };
 type Params = { courseId: string };

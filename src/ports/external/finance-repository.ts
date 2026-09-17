@@ -108,6 +108,14 @@ export type FinanceTransactionFilters = {
     take: number;
 };
 
+// Soma dos valores por tipo, com as transferências entre caixas separadas —
+// base dos totais (entradas/saídas) da lista de lançamentos.
+export type FinanceTransactionSum = {
+    type: FinancialType | null;
+    transfer: boolean;
+    amountCents: number;
+};
+
 // Resumo para o dashboard. Saldo é o acumulado histórico (caixa atual);
 // os demais números respeitam o período (from..to).
 export type FinanceSummary = {
@@ -162,6 +170,10 @@ total: number
     listTransactionsForExport(
         filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>,
     ): Promise<FinanceTransactionWithCategory[]>;
+    // Somas de todos os lançamentos que batem com os filtros (mesmo where da lista).
+    sumTransactions(
+        filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>,
+    ): Promise<FinanceTransactionSum[]>;
     findTransactionById(id: string): Promise<FinancialTransactionModel | null>;
     createTransaction(data: FinanceTransactionCreateInput): Promise<FinancialTransactionModel>;
     updateTransaction(id: string, data: FinanceTransactionUpdateInput): Promise<FinancialTransactionModel>;

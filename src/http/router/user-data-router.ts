@@ -94,7 +94,8 @@ description: 'true = só cadastros incompletos (sem avatar, sem propriedades, cp
                                     properties: {
                                         id: { type: 'string' },
                                         name: { type: 'string' },
-                                        email: { type: 'string' },
+                                        email: { type: 'string',
+nullable: true },
                                         phone: { type: 'string' },
                                         cpf: { type: 'string',
 nullable: true },
@@ -141,7 +142,8 @@ nullable: true },
                         properties: {
                             id: { type: 'string' },
                             name: { type: 'string' },
-                            email: { type: 'string' },
+                            email: { type: 'string',
+nullable: true },
                             phone: { type: 'string' },
                             cpf: { type: 'string',
 nullable: true },
@@ -334,18 +336,20 @@ nullable: true },
                 description: `Creates a new UserData (rural worker). Public route — no authentication required.
 
 **Business rules:**
-- \`cpf\` must be unique per user — returns 409 if the CPF is already registered
+- \`cpf\` must be unique per user — returns 409 ("CPF já cadastrado para outra pessoa.") if the CPF is already registered
+- \`phone\` is required; \`email\` is optional (empty = no e-mail, stored as null)
 - \`email\` and \`phone\` may be shared across multiple users
 - This record represents the rural worker; to have admin access, a \`UserAdmin\` linked to this record must be created (via \`POST /admin/users\`)
 - Companies (CNPJ) are registered separately, in \`/admin/companies\``,
                 body: {
                     type: 'object',
-                    required: ['name', 'email', 'phone', 'cpf'],
+                    required: ['name', 'phone', 'cpf'],
                     properties: {
                         name: { type: 'string',
 example: 'João da Silva' },
+                        // Sem format: vazio é aceito (= sem e-mail); o formato é conferido no use case.
                         email: { type: 'string',
-format: 'email',
+nullable: true,
 example: 'joao@example.com' },
                         phone: { type: 'string',
 example: '44999990001' },
@@ -360,7 +364,8 @@ example: '52998224725' },
                         properties: {
                             id: { type: 'string' },
                             name: { type: 'string' },
-                            email: { type: 'string' },
+                            email: { type: 'string',
+nullable: true },
                             phone: { type: 'string' },
                             cpf: { type: 'string' },
                             createdAt: { type: 'string',
@@ -368,7 +373,7 @@ format: 'date-time' },
                         },
                     },
                     409: {
-                        description: 'Email or phone already registered',
+                        description: 'CPF already registered',
                         type: 'object',
                         properties: { error: { type: 'string' } },
                     },
@@ -400,7 +405,8 @@ format: 'date-time' },
                     properties: {
                         name: { type: 'string' },
                         email: { type: 'string',
-format: 'email' },
+nullable: true,
+description: 'Opcional; vazio ou null apaga' },
                         phone: { type: 'string' },
                         cpf: { type: 'string',
 nullable: true },

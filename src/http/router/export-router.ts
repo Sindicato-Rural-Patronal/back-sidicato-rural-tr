@@ -7,6 +7,8 @@ import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.
 import { EXPORT_DATASETS, ExportDataUseCase, type ExportDataset } from '../../usecase/export-data.js';
 import { errorToStatus, requirePermission } from '../lib/require-permission.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { fillAuditLocationLater } from '../audit-hooks.js';
+import { requestContext } from '../../lib/request-context.js';
 
 export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const getAdminPermissions = new GetAdminPermissionsUseCase(createUserAdminAdapter(prisma), createRuleAdapter(prisma));
@@ -29,7 +31,7 @@ export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClien
 | registrations | courseIds | READ_COURSE |
 | contact-messages | search, read | READ_CONTACT |
 | unimed | search | READ_USER |
-| audit-logs | action, entity, actorId, from, to (AAAA-MM-DD, dia em Brasília), q — no máximo ${AUDIT_EXPORT_LIMIT} linhas mais recentes | READ_AUDIT |
+| audit-logs | action (create, edit, delete, export, login, login_failed), entity, actorId, ip, from, to (AAAA-MM-DD, dia em Brasília), q — no máximo ${AUDIT_EXPORT_LIMIT} linhas mais recentes | READ_AUDIT |
 
 Cada exportação fica registrada na auditoria (ação "Exportou").`;
 
@@ -60,9 +62,13 @@ additionalProperties: true } }),
         if (r.error || !r.result) return reply.status(errorToStatus(r.error)).send({ error: r.error?.message });
 
         try {
-            await repo.logExport({ actorId,
-path: `/admin/export/${dataset}`,
-targetLabel: r.result.auditLabel });
+            const logged = await repo.logExport({
+                actorId,
+                path: `/admin/export/${dataset}`,
+                targetLabel: r.result.auditLabel,
+                ...requestContext(req),
+            });
+            fillAuditLocationLater(req, logged.id);
         } catch {
             /* auditoria nunca deve derrubar a exportação */
         }

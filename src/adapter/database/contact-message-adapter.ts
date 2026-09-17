@@ -42,10 +42,10 @@ isDeleted: false },
         }) as Promise<ContactMessageModel | null>;
     }
 
-    markAsRead(id: string): Promise<ContactMessageModel | null> {
+    setRead(id: string, read: boolean): Promise<ContactMessageModel | null> {
         return this.prisma.contactMessage.update({
             where: { id },
-            data: { read: true },
+            data: { read },
         }) as Promise<ContactMessageModel | null>;
     }
 

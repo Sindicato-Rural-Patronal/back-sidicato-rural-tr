@@ -14,6 +14,8 @@ export type CourseCreateData = {
     workloadHours?: number;
     registrationDeadline?: Date;
     observations?: string;
+    eventNumber?: string;
+    minStudents?: number;
 };
 
 export type CourseUpdateData = {
@@ -24,6 +26,8 @@ export type CourseUpdateData = {
     endTime?: Date;
     status?: CourseStatus;
     bannerUrl?: string;
+    /** Miniatura da capa (cards); null quando não deu para gerar. */
+    bannerThumbUrl?: string | null;
     price?: number;
     workloadHours?: number;
     registrationDeadline?: Date | null;

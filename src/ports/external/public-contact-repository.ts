@@ -6,7 +6,7 @@ export type PublicContactWithPerson = PublicContactModel & {
     userData: {
         id: string;
         name: string;
-        email: string;
+        email: string | null;
         phone: string;
         avatar: string | null;
     };

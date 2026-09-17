@@ -10,18 +10,20 @@ import { ValidationError } from '../errors/validation.js';
 import { CourseNotFoundError } from '../errors/not-found.js';
 import {
     CourseRegistrationAlreadyExistsError,
-    DuplicateUserContactError,
+    CpfAlreadyInUseError,
 } from '../errors/conflict.js';
 import { isValidCpf } from '../lib/cpf.js';
 import { checkCourseAcceptsRegistration } from '../lib/course-registration-rules.js';
 import { CourseFullError } from '../errors/business-rule.js';
 import { isPrismaUniqueViolation, uniqueViolationFields } from '../lib/prisma-errors.js';
+import { personEmailSchema } from '../lib/person-email.js';
 
 const schema = z.object({
     courseId: z.string().min(1),
     name: z.string().min(1),
     phone: z.string().min(1),
-    email: z.string().email(),
+    // Opcional (vazio = sem e-mail) e pode repetir entre pessoas.
+    email: personEmailSchema,
     cpf: z.string().min(1),
     rg: z.string().optional(),
     birthDate: z.coerce.date().optional(),
@@ -50,7 +52,8 @@ userDataId?: string
 /**
  * Inscrição pública completa: cria o participante com os dados da ficha simples
  * (rg, nascimento) e registra o endereço como propriedade principal, depois
- * inscreve no curso. Se já existir alguém com o mesmo email/CPF, apenas inscreve.
+ * inscreve no curso. Se já existir alguém com o mesmo CPF, apenas inscreve (e-mail e
+ * telefone podem repetir entre pessoas e não identificam ninguém).
  *
  * Toda a criação (user → endereço → propriedade → primaryProperty → inscrição)
  * roda numa transação: falha no meio não deixa registros órfãos.
@@ -77,7 +80,7 @@ export class RegisterForCourseFullUseCase {
         const closed = checkCourseAcceptsRegistration(course);
         if (closed) return { error: closed };
 
-        const existingUser = await userDataRepository.findByEmailOrCpf(email, cpf);
+        const existingUser = await userDataRepository.findByCpf(cpf);
 
         const hasAddress = address
             ? Object.entries(address).some(([k, v]) => k !== 'type' && v && String(v).trim())
@@ -96,7 +99,7 @@ export class RegisterForCourseFullUseCase {
                     userData = await userRepo.create({
                         name,
                         phone,
-                        email,
+                        email: email ?? null,
                         cpf,
                         rg: rg || null,
                         birthDate: birthDate ?? null,
@@ -138,12 +141,15 @@ userDataId: userData.id };
             if (e instanceof CourseRegistrationAlreadyExistsError) return { error: e };
             if (e instanceof CourseFullError) return { error: e };
             const fields = uniqueViolationFields(e);
+            // CPF primeiro: o índice "UserData_cpf_active_unique" também tem "active" no nome.
+            if (fields.some(f => f.includes('cpf'))) return { error: new CpfAlreadyInUseError() };
             const isRegistrationDup = fields.some(
                 f => f.includes('courseId') || f.includes('userDataId') || f.includes('active'),
             );
             if (isRegistrationDup) return { error: new CourseRegistrationAlreadyExistsError() };
-            // Outra violação de unicidade = e-mail/telefone/CPF de outro usuário.
-            if (isPrismaUniqueViolation(e)) return { error: new DuplicateUserContactError() };
+            // Outra violação de unicidade: o único dado único da pessoa é o CPF
+            // (outra inscrição criou o mesmo CPF ao mesmo tempo).
+            if (isPrismaUniqueViolation(e)) return { error: new CpfAlreadyInUseError() };
             return { error: e instanceof Error ? e : new Error('Registration failed') };
         }
     }

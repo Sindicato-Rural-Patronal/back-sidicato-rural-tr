@@ -26,6 +26,7 @@ export class UploadBannerCourseController {
         if (response.error) {
             return reply.status(errorToStatus(response.error)).send({ error: response.error.message });
         }
-        return reply.status(200).send({ url: response.url });
+        return reply.status(200).send({ url: response.url,
+thumbUrl: response.thumbUrl ?? null });
     }
 }

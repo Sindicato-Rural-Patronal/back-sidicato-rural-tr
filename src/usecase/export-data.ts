@@ -20,7 +20,6 @@ import { stripAccents } from '../lib/text.js';
 import { csvDate, csvDateTime, csvList, csvMoney, csvWallClock, toCsv, type CsvColumn } from '../lib/csv.js';
 import {
     ADDRESS_TYPE_LABEL,
-    AUDIT_METHOD_LABEL,
     COMPANY_TYPE_LABEL,
     COURSE_STATUS_LABEL,
     EDUCATION_LABEL,
@@ -31,6 +30,9 @@ import {
     label,
 } from '../lib/export-labels.js';
 import { todayInBrazil } from '../lib/quote-products.js';
+import { describeAuditAction } from '../lib/audit-sentence.js';
+import { formatChanges } from '../lib/audit-diff.js';
+import { describeUserAgent } from '../lib/user-agent.js';
 
 
 // ── Conjuntos exportáveis ────────────────────────────────────────────────────
@@ -139,7 +141,7 @@ rulesId: text }),
     courses: z.object({
         ids: idList,
         search: text,
-        status: z.preprocess(empty, z.enum(['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS']).optional()),
+        status: z.preprocess(empty, z.enum(['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS', 'COMPLETED']).optional()),
     }),
     registrations: z.object({ ids: idList,
 courseIds: idList }),
@@ -149,9 +151,10 @@ read: bool }),
     unimed: z.object({ ids: idList,
 search: text }),
     'audit-logs': z.object({
-        action: z.preprocess(empty, z.enum(['create', 'edit', 'delete', 'export']).optional()),
+        action: z.preprocess(empty, z.enum(['create', 'edit', 'delete', 'export', 'login', 'login_failed']).optional()),
         entity: text,
         actorId: text,
+        ip: text,
         from: day,
         to: day,
         q: text,
@@ -160,10 +163,12 @@ search: text }),
 
 // ── Formatação ───────────────────────────────────────────────────────────────
 
+// CPF sempre como 000.000.000-00 (gravado só com dígitos). Valor antigo que não
+// tem 11 dígitos sai só com os dígitos, sem máscara pela metade.
 function formatCpf(cpf: string | null): string {
     if (!cpf) return '';
     const d = cpf.replace(/\D/g, '');
-    return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : cpf;
+    return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : d;
 }
 
 function formatCnpj(cnpj: string | null): string {
@@ -497,6 +502,8 @@ value: r => csvDate(r.userData.birthDate) },
 value: r => ageOn(r.userData.birthDate, today) },
         { header: 'Confirmada',
 value: r => r.confirmed },
+        { header: 'Presença',
+value: r => (r.attended === null ? '' : r.attended ? 'Presente' : 'Faltou') },
         { header: 'Associado em dia',
 value: r => isActiveMember(r.userData.memberStatus, r.userData.membershipValidUntil, today) },
         {
@@ -579,14 +586,25 @@ const auditColumns: CsvColumn<AuditLogExportRow>[] = [
 value: a => csvDateTime(a.createdAt) },
     { header: 'Quem',
 value: a => a.actorName },
+    // Mesma frase da tela de auditoria, sem o nome (que vai em "Alvo").
     { header: 'Ação',
-value: a => label(AUDIT_METHOD_LABEL, a.method) },
+value: a => describeAuditAction({ ...a,
+targetLabel: null }) },
     { header: 'Área',
 value: a => a.entity },
     { header: 'Alvo',
 value: a => a.targetLabel },
     { header: 'Caminho',
 value: a => a.path },
+    { header: 'IP',
+value: a => a.ip },
+    { header: 'Local',
+value: a => a.location },
+    { header: 'Aparelho',
+value: a => (a.userAgent ? describeUserAgent(a.userAgent) : null) },
+    // "campo: antes → depois; …"
+    { header: 'Alterações',
+value: a => formatChanges(a.changes) },
 ];
 
 // ── Caso de uso ──────────────────────────────────────────────────────────────

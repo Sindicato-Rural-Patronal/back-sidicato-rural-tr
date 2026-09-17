@@ -189,7 +189,7 @@ method: 'POST' } });
         expect(res.statusCode).toBe(200);
         const [header, ...data] = rows(res.body);
         expect(data.length).toBeGreaterThanOrEqual(5);
-        expect(data.every(r => r[header.indexOf('Ação')] === 'Exportou')).toBe(true);
+        expect(data.every(r => r[header.indexOf('Ação')] === 'Exportou uma planilha')).toBe(true);
         expect(data.map(r => r[header.indexOf('Alvo')])).toContain('Pessoas: BRUNO EXPORTA');
 
         const list = await app.inject({ method: 'GET',

@@ -11,11 +11,35 @@ import type {
 export function createUserDataAdapter(prisma: PrismaClient): UserDataRepository {
     return new UserDataAdapter(prisma);
 }
+
+/** CPF é gravado só com dígitos (o painel mandava com e sem máscara); vazio vira null. */
+export function cpfForStorage(cpf: string | null): string | null {
+    return cpf?.replace(/\D/g, '') || null;
+}
+
+/** E-mail é opcional: sem espaços nas pontas; vazio vira null. */
+export function emailForStorage(email: string | null): string | null {
+    return email?.trim() || null;
+}
+
+// Todo INSERT/UPDATE de UserData passa por aqui: normaliza CPF e e-mail num lugar só
+// (cadastro e edição no painel, inscrição pública em curso). Campo ausente no data não é mexido.
+interface StoredDocs {
+    cpf?: string | null;
+    email?: string | null;
+}
+function withStoredDocs<T extends StoredDocs>(data: T): T {
+    const out = { ...data };
+    if (data.cpf !== undefined) out.cpf = cpfForStorage(data.cpf);
+    if (data.email !== undefined) out.email = emailForStorage(data.email);
+    return out;
+}
+
 export class UserDataAdapter implements UserDataRepository {
     constructor(private prisma: PrismaClient) {}
     create(data: UserDataUncheckedCreateInput): Promise<UserDataModel | null> {
         return this.prisma.userData.create({
-            data,
+            data: withStoredDocs(data),
         });
     }
     findById(id: string): Promise<UserDataModel | null> {
@@ -100,34 +124,9 @@ isPartner: true } },
 rg } });
     }
 
-    async findByEmailOrCpf(email: string, cpf: string): Promise<UserDataModel | null> {
-        const digits = cpf.replace(/\D/g, '');
-        // O CPF é a identidade: se bate por CPF, é a pessoa (prioridade). Só casa
-        // por e-mail quando o registro NÃO tem CPF ou tem o MESMO CPF — assim um
-        // e-mail que pertence a outra pessoa (CPF diferente) não vincula errado
-        // (o create seguinte colide no unique de e-mail e vira 409, não bind).
-        const rows = await this.prisma.$queryRaw<UserDataModel[]>`
-            SELECT * FROM "UserData"
-            WHERE "isDeleted" = false
-              AND (
-                    (${digits} <> ''
-                     AND regexp_replace(COALESCE("cpf", ''), '[^0-9]', '', 'g') = ${digits})
-                    OR ("email" = ${email}
-                        AND (COALESCE("cpf", '') = ''
-                             OR regexp_replace(COALESCE("cpf", ''), '[^0-9]', '', 'g') = ${digits}))
-                  )
-            ORDER BY (
-                CASE WHEN ${digits} <> ''
-                          AND regexp_replace(COALESCE("cpf", ''), '[^0-9]', '', 'g') = ${digits}
-                     THEN 0 ELSE 1 END
-            )
-            LIMIT 1`;
-        return rows[0] ?? null;
-    }
-
     update(id: string, data: UserDataUpdateInput): Promise<UserDataModel | null> {
         return this.prisma.userData.update({ where: { id },
-data });
+data: withStoredDocs(data) });
     }
 
     async delete(id: string): Promise<void> {

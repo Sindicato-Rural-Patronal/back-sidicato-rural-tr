@@ -27,6 +27,24 @@ import { StartCourseController } from '../controllers/start-course.js';
 import { UploadRegistrationFichaController } from '../controllers/upload-registration-ficha.js';
 import { DownloadRegistrationFichaController } from '../controllers/download-registration-ficha.js';
 import { DeleteRegistrationFichaController } from '../controllers/delete-registration-ficha.js';
+import {
+    AdminRegisterPersonUseCase,
+    ConfirmAllRegistrationsUseCase,
+} from '../../usecase/admin-course-registrations.js';
+import {
+    AdminRegisterPersonController,
+    ConfirmAllRegistrationsController,
+} from '../controllers/admin-course-registrations.js';
+import { CompleteCourseUseCase } from '../../usecase/complete-course.js';
+import { CompleteCourseController } from '../controllers/complete-course.js';
+import {
+    SetRegistrationAttendanceUseCase,
+    SetUnmarkedAttendanceUseCase,
+} from '../../usecase/course-attendance.js';
+import {
+    SetRegistrationAttendanceController,
+    SetUnmarkedAttendanceController,
+} from '../controllers/course-attendance.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 
@@ -78,6 +96,26 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
         new DeleteRegistrationFichaUseCase(registrationRepository),
         getAdminPermissions,
     );
+    const adminRegisterController = new AdminRegisterPersonController(
+        new AdminRegisterPersonUseCase(courseRepository, userDataRepository, registrationRepository),
+        getAdminPermissions,
+    );
+    const confirmAllController = new ConfirmAllRegistrationsController(
+        new ConfirmAllRegistrationsUseCase(courseRepository, registrationRepository),
+        getAdminPermissions,
+    );
+    const completeCourseController = new CompleteCourseController(
+        new CompleteCourseUseCase(courseRepository),
+        getAdminPermissions,
+    );
+    const setAttendanceController = new SetRegistrationAttendanceController(
+        new SetRegistrationAttendanceUseCase(registrationRepository),
+        getAdminPermissions,
+    );
+    const setUnmarkedAttendanceController = new SetUnmarkedAttendanceController(
+        new SetUnmarkedAttendanceUseCase(courseRepository, registrationRepository),
+        getAdminPermissions,
+    );
 
     fastify.post(
         '/courses/:courseId/register',
@@ -86,7 +124,7 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
                 tags: ['Registrations'],
                 summary: 'Register for a course',
                 description:
-                    'Public. Looks up existing UserData by email or CPF — if found, associates the registration; otherwise creates a new record.',
+                    'Public. Looks up existing UserData by CPF — if found, associates the registration; otherwise creates a new record. E-mail is optional and may repeat between people.',
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -94,14 +132,15 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
                 },
                 body: {
                     type: 'object',
-                    required: ['name', 'phone', 'email', 'cpf'],
+                    required: ['name', 'phone', 'cpf'],
                     properties: {
                         name: { type: 'string',
 example: 'João da Silva' },
                         phone: { type: 'string',
 example: '44999990001' },
+                        // Opcional; sem format para aceitar vazio (formato conferido no use case).
                         email: { type: 'string',
-format: 'email',
+nullable: true,
 example: 'joao@example.com' },
                         cpf: { type: 'string',
 example: '52998224725' },
@@ -127,7 +166,7 @@ example: '52998224725' },
                 Body: {
                     name: string;
                     phone: string;
-                    email: string;
+                    email?: string | null;
                     cpf: string;
                 };
             }>,
@@ -215,7 +254,7 @@ nullable: true },
                 tags: ['Registrations'],
                 summary: 'Register a new participant with full data',
                 description:
-                    'Public. Creates the participant (with rg/birthDate and address as their primary property) and registers for the course. If a UserData already exists for the email/CPF, only registers.',
+                    'Public. Creates the participant (with rg/birthDate and address as their primary property) and registers for the course. If a UserData already exists for the CPF, only registers. E-mail is optional.',
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -223,12 +262,12 @@ nullable: true },
                 },
                 body: {
                     type: 'object',
-                    required: ['name', 'phone', 'email', 'cpf'],
+                    required: ['name', 'phone', 'cpf'],
                     properties: {
                         name: { type: 'string' },
                         phone: { type: 'string' },
                         email: { type: 'string',
-format: 'email' },
+nullable: true },
                         cpf: { type: 'string' },
                         rg: { type: 'string' },
                         birthDate: { type: 'string' },
@@ -275,7 +314,8 @@ enum: ['URBAN', 'RURAL'] },
     const userDataProperties = {
         id: { type: 'string' },
         name: { type: 'string' },
-        email: { type: 'string' },
+        email: { type: 'string',
+nullable: true },
         phone: { type: 'string' },
         cpf: { type: 'string',
 nullable: true },
@@ -328,6 +368,11 @@ nullable: true } } } },
                                         courseId: { type: 'string' },
                                         userDataId: { type: 'string' },
                                         confirmed: { type: 'boolean' },
+                                        attended: {
+                                            type: 'boolean',
+                                            nullable: true,
+                                            description: 'Presença: true presente, false faltou, null sem marcar',
+                                        },
                                         createdAt: { type: 'string' },
                                         userData: { type: 'object',
 properties: userDataProperties },
@@ -358,6 +403,71 @@ limit?: number
             }>,
             res: FastifyReply,
         ) => listController.handle(req, res),
+    );
+
+    fastify.post(
+        '/admin/courses/:courseId/registrations',
+        {
+            schema: {
+                tags: ['Admin — Registrations'],
+                summary: 'Register a person from the admin panel',
+                description:
+                    'Inscreve uma pessoa já cadastrada. Ignora prazo, status e data de término do curso; só respeita a lotação da sala. A inscrição já nasce confirmada. Pessoa já inscrita → 409; curso lotado → 409.',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['courseId'],
+                    properties: { courseId: { type: 'string' } },
+                },
+                body: {
+                    type: 'object',
+                    required: ['userDataId'],
+                    properties: { userDataId: { type: 'string' } },
+                },
+                response: {
+                    201: { type: 'object',
+properties: { registrationId: { type: 'string' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                    409: errorResponse,
+                },
+            },
+        },
+        (
+            req: FastifyRequest<{
+                Params: { courseId: string };
+                Body: { userDataId: string };
+            }>,
+            res: FastifyReply,
+        ) => adminRegisterController.handle(req, res),
+    );
+
+    fastify.patch(
+        '/admin/courses/:courseId/registrations/confirm-all',
+        {
+            schema: {
+                tags: ['Admin — Registrations'],
+                summary: 'Confirm all unconfirmed registrations of a course',
+                description: 'Retorna `confirmed`: quantas inscrições foram confirmadas agora.',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['courseId'],
+                    properties: { courseId: { type: 'string' } },
+                },
+                response: {
+                    200: { type: 'object',
+properties: { confirmed: { type: 'integer' } } },
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { courseId: string } }>, res: FastifyReply) =>
+            confirmAllController.handle(req, res),
     );
 
     fastify.delete(
@@ -424,9 +534,9 @@ Body: { confirmed: boolean }
         {
             schema: {
                 tags: ['Admin — Registrations'],
-                summary: 'Start the course (requires all registrations confirmed)',
+                summary: 'Start the course',
                 description:
-                    'Sets the course status to IN_PROGRESS. Fails if there are no registrations or any is unconfirmed.',
+                    'Sets the course status to IN_PROGRESS. Fails (400) only if there are no registrations; unconfirmed registrations do not block.',
                 security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
@@ -445,6 +555,125 @@ properties: { message: { type: 'string' } } },
         },
         (req: FastifyRequest<{ Params: { courseId: string } }>, res: FastifyReply) =>
             startCourseController.handle(req, res),
+    );
+
+    fastify.patch(
+        '/admin/courses/:courseId/complete',
+        {
+            schema: {
+                tags: ['Admin — Courses'],
+                summary: 'Mark the course as completed',
+                description:
+                    'Manual. Only from IN_PROGRESS (other status → 409). Sets the status to COMPLETED: the course stays out of the public list, its page still opens by link and it never accepts registrations.',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['courseId'],
+                    properties: { courseId: { type: 'string' } },
+                },
+                response: {
+                    200: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'string' },
+                            status: { type: 'string',
+enum: ['COMPLETED'] },
+                        },
+                    },
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                    409: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest<{ Params: { courseId: string } }>, res: FastifyReply) =>
+            completeCourseController.handle(req, res),
+    );
+
+    fastify.patch(
+        '/admin/registrations/:registrationId/attendance',
+        {
+            schema: {
+                tags: ['Admin — Registrations'],
+                summary: 'Mark attendance of a registration',
+                description: '`attended`: true = presente, false = faltou, null = desmarcar.',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['registrationId'],
+                    properties: { registrationId: { type: 'string' } },
+                },
+                body: {
+                    type: 'object',
+                    required: ['attended'],
+                    properties: { attended: { type: 'boolean',
+nullable: true } },
+                },
+                response: {
+                    200: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'string' },
+                            attended: { type: 'boolean',
+nullable: true },
+                        },
+                    },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (
+            req: FastifyRequest<{
+                Params: { registrationId: string };
+                Body: { attended: boolean | null };
+            }>,
+            res: FastifyReply,
+        ) => setAttendanceController.handle(req, res),
+    );
+
+    fastify.patch(
+        '/admin/courses/:courseId/registrations/attendance',
+        {
+            schema: {
+                tags: ['Admin — Registrations'],
+                summary: 'Mark attendance of every unmarked confirmed registration',
+                description:
+                    'Sets `attended` on every confirmed, active registration of the course that is still unmarked (null). Already marked and unconfirmed registrations are left as they are. Returns `updated`: how many changed.',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    required: ['courseId'],
+                    properties: { courseId: { type: 'string' } },
+                },
+                body: {
+                    type: 'object',
+                    required: ['attended'],
+                    // nullable: sem isso o ajv converte null em false (marcaria faltas);
+                    // o use case recusa null com 400.
+                    properties: { attended: { type: 'boolean',
+nullable: true } },
+                },
+                response: {
+                    200: { type: 'object',
+properties: { updated: { type: 'integer' } } },
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (
+            req: FastifyRequest<{
+                Params: { courseId: string };
+                Body: { attended: boolean };
+            }>,
+            res: FastifyReply,
+        ) => setUnmarkedAttendanceController.handle(req, res),
     );
 
     fastify.post(

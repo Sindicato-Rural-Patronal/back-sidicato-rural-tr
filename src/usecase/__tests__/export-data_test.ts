@@ -133,6 +133,22 @@ value: () => true },
 describe('ExportDataUseCase', () => {
     beforeEach(() => vi.clearAllMocks());
 
+    it('CPF sempre no formato 000.000.000-00, venha com ou sem máscara', async () => {
+        vi.mocked(repo.people).mockResolvedValue([
+            person({ id: 'a',
+cpf: '12345678909' }),
+            person({ id: 'b',
+cpf: '123.456.789-09' }),
+            person({ id: 'c',
+cpf: '123.456' }),
+            person({ id: 'd',
+cpf: null }),
+        ] as never);
+        const r = await new ExportDataUseCase(repo, now).execute('people', {});
+        const [header, ...rows] = parse(r.result!.csv);
+        expect(rows.map(row => row[header.indexOf('CPF')])).toEqual(['123.456.789-09', '123.456.789-09', '123456', '']);
+    });
+
     it('pessoas: colunas legíveis, endereço da propriedade principal e fórmula neutralizada', async () => {
         vi.mocked(repo.people).mockResolvedValue([person()] as never);
         const r = await new ExportDataUseCase(repo, now).execute('people', { search: 'joão',
@@ -198,6 +214,39 @@ actorName: 'bali' },
         const r = await new ExportDataUseCase(repo, now).execute('audit-logs', { action: 'export' });
         expect(repo.auditLogs).toHaveBeenCalledWith(expect.objectContaining({ action: 'export' }));
         const [, row] = parse(r.result!.csv);
-        expect(row).toEqual(['17/09/2026 10:00', 'bali', 'Exportou', 'Exportação', 'Pessoas: 3 registros (todos)', '/admin/export/people']);
+        expect(row).toEqual(['17/09/2026 10:00', 'bali', 'Exportou uma planilha', 'Exportação', 'Pessoas: 3 registros (todos)', '/admin/export/people', '', '', '', '']);
+    });
+
+    it('auditoria traz IP, local, aparelho e o que mudou', async () => {
+        vi.mocked(repo.auditLogs).mockResolvedValue([
+            { id: '2',
+method: 'PATCH',
+path: '/users/x',
+entity: 'Usuário',
+targetLabel: 'JOÃO',
+createdAt: new Date('2026-09-17T13:00:00.000Z'),
+actorName: 'bali',
+ip: '200.1.2.3',
+location: 'Terra Roxa, PR, Brasil',
+userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+changes: [{ field: 'email',
+before: 'a@x.com',
+after: null }, { field: 'phone',
+before: '44999990000',
+after: '44988880000' }] },
+        ] as never);
+        const r = await new ExportDataUseCase(repo, now).execute('audit-logs', { action: 'login_failed',
+ip: '200.1.2.3' });
+        expect(r.error).toBeUndefined();
+        expect(repo.auditLogs).toHaveBeenCalledWith(expect.objectContaining({ action: 'login_failed',
+ip: '200.1.2.3' }));
+        const [header, row] = parse(r.result!.csv);
+        expect(header.slice(-4)).toEqual(['IP', 'Local', 'Aparelho', 'Alterações']);
+        expect(row.slice(-4)).toEqual([
+            '200.1.2.3',
+            'Terra Roxa, PR, Brasil',
+            'Chrome no Windows',
+            'E-mail: a@x.com → (vazio); Telefone: 44999990000 → 44988880000',
+        ]);
     });
 });

@@ -2,14 +2,16 @@ import { z } from 'zod';
 import type { UserDataRepository } from '../ports/external/user-data-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { UserNotFoundError } from '../errors/not-found.js';
-import { EmailOrCpfAlreadyInUseError, RgAlreadyInUseError } from '../errors/conflict.js';
+import { CpfAlreadyInUseError, RgAlreadyInUseError } from '../errors/conflict.js';
 import { isValidCpf } from '../lib/cpf.js';
 import { MEMBER_TYPES } from '../lib/member-types.js';
 import { isValidBrPhone, isValidRg, isValidCnh } from '../lib/br-validators.js';
+import { personEmailSchema } from '../lib/person-email.js';
 
 const updateUserDataSchema = z.object({
     name: z.string().min(1).optional(),
-    email: z.string().email().optional(),
+    // Opcional e pode repetir entre pessoas; vazio apaga (grava null).
+    email: personEmailSchema,
     phone: z.string().refine(v => isValidBrPhone(v), 'Telefone inválido (DDD + 8 ou 9 dígitos)').optional(),
     cpf: z.string().refine(v => isValidCpf(v), 'CPF inválido').nullable().optional(),
     avatar: z.string().nullable().optional(),
@@ -91,7 +93,7 @@ export class UpdateUserDataUseCase {
         if (data.cpf) {
             const conflict = await this.userDataRepository.findByCpf(data.cpf);
             if (conflict && conflict.id !== userId) {
-                return { error: new EmailOrCpfAlreadyInUseError() };
+                return { error: new CpfAlreadyInUseError() };
             }
         }
         if (data.rg) {

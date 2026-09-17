@@ -11,7 +11,6 @@ const mockUserRepo = {
     count: vi.fn(),
     findByCpf: vi.fn(),
     findByRg: vi.fn(),
-    findByEmailOrCpf: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
 } as unknown as UserDataRepository;

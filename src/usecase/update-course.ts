@@ -11,7 +11,8 @@ const updateCourseBodySchema = z.object({
     roomId: z.uuid().optional(),
     startTime: z.iso.datetime().optional(),
     endTime: z.iso.datetime().optional(),
-    status: z.enum(['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS'] as const).optional(),
+    // COMPLETED também: pela edição dá para concluir ou desfazer a conclusão.
+    status: z.enum(['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS', 'COMPLETED'] as const).optional(),
     price: z.number().min(0).optional(),
     workloadHours: z.number().int().min(0).optional(),
     registrationDeadline: z.iso.datetime().nullable().optional(),
@@ -45,6 +46,12 @@ export class UpdateCourseUseCase {
         if (!existing) return { error: new CourseNotFoundError() };
 
         const data = validation.data;
+
+        // "Concluído" só vem de um curso em andamento (ou já concluído); o painel
+        // conclui pelo botão próprio e a edição só permite desfazer.
+        if (data.status === 'COMPLETED' && existing.status !== 'IN_PROGRESS' && existing.status !== 'COMPLETED') {
+            return { error: new ValidationError('Só é possível concluir um curso que está em andamento.') };
+        }
 
         if (data.roomId) {
             const room = await this.roomRepository.findById(data.roomId);

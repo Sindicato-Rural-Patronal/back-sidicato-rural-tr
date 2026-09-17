@@ -107,7 +107,7 @@ properties: { id: str,
 name: str,
 cpf: nstr,
 phone: str,
-email: str } },
+email: nstr } },
     },
 };
 

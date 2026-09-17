@@ -8,7 +8,7 @@ import type { Property } from '../../generated/prisma/client.js';
 
 export type UserDataUpdateInput = Partial<{
     name: string;
-    email: string;
+    email: string | null;
     phone: string;
     cpf: string | null;
     avatar: string | null;
@@ -106,7 +106,6 @@ export interface UserDataRepository {
     count(filters?: UserListFilters): Promise<number>;
     findByCpf(cpf: string): Promise<UserDataModel | null>;
     findByRg(rg: string): Promise<UserDataModel | null>;
-    findByEmailOrCpf(email: string, cpf: string): Promise<UserDataModel | null>;
     update(id: string, data: UserDataUpdateInput): Promise<UserDataModel | null>;
     delete(id: string): Promise<void>;
 }

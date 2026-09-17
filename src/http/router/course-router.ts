@@ -26,13 +26,16 @@ import { DeleteCoursePhotoUseCase } from '../../usecase/delete-course-photo.js';
 import { GetAdminCourseDetailController } from '../controllers/get-admin-course-detail.js';
 import { GetAdminCourseDetailUseCase } from '../../usecase/get-admin-course-detail.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
+import { CopyCourseExtrasUseCase } from '../../usecase/copy-course-extras.js';
+import { createInstructorAdapter } from '../../adapter/database/instructor-adapter.js';
+import { downloadImage } from '../../lib/download-image.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 
 const courseDetailProperties = {
     id: { type: 'string',
 example: '550e8400-e29b-41d4-a716-446655440000' },
     status: { type: 'string',
-enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS'],
+enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS', 'COMPLETED'],
 example: 'PUBLIC' },
     title: { type: 'string',
 example: 'Manejo de Pastagem' },
@@ -51,6 +54,10 @@ example: 0 },
     coverImage: { type: 'string',
 nullable: true,
 example: 'https://storage.example.com/banners/curso-01.jpg' },
+    coverImageThumb: { type: 'string',
+nullable: true,
+description: 'WebP ~640px for cards; null → use coverImage',
+example: 'https://storage.example.com/banners/curso-01-thumb.webp' },
     price: { type: 'number',
 example: 150.00 },
     startDate: { type: 'string',
@@ -73,6 +80,7 @@ example: 'Dr. Carlos Mendes' },
             type: 'object',
             properties: {
                 id: { type: 'string' },
+                userDataId: { type: 'string' },
                 title: { type: 'string',
 nullable: true,
 example: 'Engenheiro Agrônomo' },
@@ -100,7 +108,12 @@ example: 'https://facebook.com/joao.silva' },
     },
     registrationDeadline: { type: 'string',
 nullable: true,
-example: '2026-08-05T23:59:00-03:00' },
+description: 'Deadline day (YYYY-MM-DD, Brasília)',
+example: '2026-08-05' },
+    registrationDeadlineTime: { type: 'string',
+nullable: true,
+description: 'Deadline time (HH:MM, Brasília) when set; null → open through the whole deadline day',
+example: '18:00' },
     observations: { type: 'string',
 nullable: true,
 example: 'Trazer botas e protetor solar.' },
@@ -128,12 +141,19 @@ export async function courseRouter(fastify: FastifyInstance, prisma: PrismaClien
     const ruleRepository = createRuleAdapter(prisma);
     const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
+    const uploadBannerUseCase = new UploadCourseBannerUseCase(storage, courseRepository);
     const createCourseController = new CreateCourseController(
         new CreateCourseUseCase(courseRepository, roomRepository),
         getAdminPermissions,
+        new CopyCourseExtrasUseCase(
+            courseRepository,
+            createInstructorAdapter(prisma),
+            uploadBannerUseCase,
+            downloadImage,
+        ),
     );
     const uploadBannerController = new UploadBannerCourseController(
-        new UploadCourseBannerUseCase(storage, courseRepository),
+        uploadBannerUseCase,
         getAdminPermissions,
     );
     const getCourseDetailController = new GetCourseDetailController(
@@ -186,7 +206,7 @@ minimum: 1,
 maximum: 1000,
 default: 20 },
                         status: { type: 'string',
-enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS'],
+enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS', 'COMPLETED'],
 description: 'Filtrar por status' },
                         search: { type: 'string',
 description: 'Busca por nome do curso' },
@@ -199,7 +219,7 @@ description: 'Busca por nome do curso' },
                             id: { type: 'string' },
                             status: {
                                 type: 'string',
-                                enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS'],
+                                enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS', 'COMPLETED'],
                             },
                             title: { type: 'string' },
                             eventNumber: { type: 'string',
@@ -209,6 +229,8 @@ nullable: true },
                             maxStudents: { type: 'integer' },
                             price: { type: 'number' },
                             coverImage: { type: 'string',
+nullable: true },
+                            coverImageThumb: { type: 'string',
 nullable: true },
                             photoCount: { type: 'integer' },
                         },
@@ -313,7 +335,12 @@ properties: courseDetailProperties },
   - \`PUBLIC\` — appears in \`GET /courses\`
 - \`startTime\` and \`endTime\` are ISO 8601 with timezone (e.g. \`2025-08-10T09:00:00-03:00\`)
 - \`registrationDeadline\` optional — enrollment cutoff date (also ISO 8601)
-- \`price\` in BRL (float); \`workloadHours\` in whole hours`,
+- \`price\` in BRL (float); \`workloadHours\` in whole hours
+
+**Duplicar curso (opcional):**
+- \`copyCoverFromCourseId\` — copia a capa desse curso para um arquivo próprio do curso novo (não reaproveita a URL: trocar a capa de um mudaria a do outro). Resposta traz \`coverCopied\` (false = enviar a capa pela edição)
+- \`copyInstructorsFromCourseId\` — copia os instrutores (título e categoria); \`instructorAssignmentIds\` limita a esses vínculos. Resposta traz \`instructorsCopied\`
+- A galeria não é copiada; se a cópia falhar o curso continua criado`,
                 security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
@@ -327,7 +354,7 @@ example: 'Técnicas modernas de manejo de pastagem para bovinos.' },
 format: 'uuid',
 example: '550e8400-e29b-41d4-a716-446655440010' },
                         status: { type: 'string',
-enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS'],
+enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS', 'COMPLETED'],
 example: 'UNPUBLISHED' },
                         startTime: { type: 'string',
 format: 'date-time',
@@ -346,11 +373,26 @@ format: 'date-time',
 example: '2026-08-05T23:59:00-03:00' },
                         observations: { type: 'string',
 example: 'Trazer botas e protetor solar.' },
+                        eventNumber: { type: 'string',
+example: 'EVT-2026-042' },
+                        minStudents: { type: 'integer',
+minimum: 0,
+example: 5 },
+                        copyCoverFromCourseId: { type: 'string' },
+                        copyInstructorsFromCourseId: { type: 'string' },
+                        instructorAssignmentIds: { type: 'array',
+items: { type: 'string' } },
                     },
                 },
                 response: {
-                    201: { type: 'object',
-properties: { id: { type: 'string' } } },
+                    201: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'string' },
+                            coverCopied: { type: 'boolean' },
+                            instructorsCopied: { type: 'integer' },
+                        },
+                    },
                     400: errorResponse,
                     401: errorResponse,
                     403: errorResponse,
@@ -372,7 +414,8 @@ properties: { id: { type: 'string' } } },
 - Send as \`multipart/form-data\` with the file in the \`file\` field
 - The file is stored in the public Supabase Storage bucket (\`course-banners\`), which must already exist
 - The URL returned in \`url\` is saved to the course \`coverImage\` field and should be used directly in \`<img>\`
-- Uploading a new banner overwrites the previous one
+- A ~640px WebP thumbnail is generated too (\`thumbUrl\`, saved as \`coverImageThumb\`, used by the cards); \`null\` if it could not be generated
+- Uploading a new banner overwrites the previous one (and its thumbnail)
 - \`courseId\` must be an existing course ID`,
                 security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
@@ -383,7 +426,9 @@ properties: { id: { type: 'string' } } },
                 },
                 response: {
                     200: { type: 'object',
-properties: { url: { type: 'string' } } },
+properties: { url: { type: 'string' },
+thumbUrl: { type: 'string',
+nullable: true } } },
                     400: errorResponse,
                     401: errorResponse,
                     403: errorResponse,
@@ -425,7 +470,7 @@ example: 'Técnicas modernas de manejo de pastagem para bovinos.' },
 format: 'uuid',
 example: '550e8400-e29b-41d4-a716-446655440010' },
                         status: { type: 'string',
-enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS'],
+enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS', 'COMPLETED'],
 example: 'PUBLIC' },
                         startTime: { type: 'string',
 format: 'date-time',

@@ -80,6 +80,20 @@ roomId: 'nao-e-uuid' });
             expect(result.courseId).toBe('course-abc');
         });
 
+        it('grava nº do evento e mínimo de alunos informados na criação', async () => {
+            vi.mocked(mockRoomRepo.findById).mockResolvedValue({ id: validInput.roomId } as any);
+            vi.mocked(mockCourseRepo.isRoomAvailable).mockResolvedValue(true);
+            vi.mocked(mockCourseRepo.create).mockResolvedValue({ id: 'course-abc' } as any);
+            const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
+            await uc.execute({ ...validInput,
+eventNumber: '261676',
+minStudents: 8 });
+            expect(mockCourseRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({ eventNumber: '261676',
+minStudents: 8 }),
+            );
+        });
+
         it('falha se repositório retornar null na criação', async () => {
             vi.mocked(mockRoomRepo.findById).mockResolvedValue({ id: validInput.roomId } as any);
             vi.mocked(mockCourseRepo.isRoomAvailable).mockResolvedValue(true);

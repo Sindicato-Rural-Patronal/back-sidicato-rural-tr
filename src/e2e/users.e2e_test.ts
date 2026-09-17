@@ -51,7 +51,8 @@ email: string
         expect(body.email).toBe('joao.silva@test.com');
     });
 
-    it('returns 409 when email already registered', async () => {
+    // E-mail e telefone podem repetir (contacts-shared.e2e_test.ts); só o CPF não.
+    it('returns 409 when CPF already registered', async () => {
         await app.inject({
             method: 'POST',
             url: '/users',
@@ -64,31 +65,12 @@ cpf: '52223330274' },
             method: 'POST',
             url: '/users',
             payload: { name: 'Second',
-email: 'dup@test.com',
+email: 'other@test.com',
 phone: '44911110003',
-cpf: '52223330355' },
+cpf: '52223330274' },
         });
         expect(res.statusCode).toBe(409);
-    });
-
-    it('returns 409 when phone already registered', async () => {
-        await app.inject({
-            method: 'POST',
-            url: '/users',
-            payload: { name: 'Phone First',
-email: 'phone1@test.com',
-phone: '44911110004',
-cpf: '52223330436' },
-        });
-        const res = await app.inject({
-            method: 'POST',
-            url: '/users',
-            payload: { name: 'Phone Second',
-email: 'phone2@test.com',
-phone: '44911110004',
-cpf: '52223330517' },
-        });
-        expect(res.statusCode).toBe(409);
+        expect(JSON.parse(res.body).error).toBe('CPF já cadastrado para outra pessoa.');
     });
 
     it('returns 400 when required fields are missing', async () => {

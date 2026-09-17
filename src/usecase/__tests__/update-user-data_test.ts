@@ -10,7 +10,6 @@ const mockUserRepo = {
     count: vi.fn(),
     findByCpf: vi.fn(),
     findByRg: vi.fn(),
-    findByEmailOrCpf: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
 } as unknown as UserDataRepository;
@@ -37,7 +36,7 @@ describe('UpdateUserDataUseCase', () => {
             const result = await uc.execute({ userId: 'user-001',
 email: 'nao-e-email' });
             expect(result.error).toBeDefined();
-            expect(result.error?.message).toContain('Invalid email');
+            expect(result.error?.message).toContain('E-mail inválido');
         });
 
         it('retorna ValidationError se maritalStatus inválido', async () => {
@@ -98,7 +97,7 @@ id: 'outro-user' } as any);
             const result = await uc.execute({ userId: 'user-001',
 cpf: '52998224725' });
             expect(result.error).toBeDefined();
-            expect(result.error?.message).toBe('CPF already in use');
+            expect(result.error?.message).toBe('CPF já cadastrado para outra pessoa.');
         });
 
         it('não retorna erro se CPF pertencer ao próprio usuário', async () => {
@@ -171,6 +170,24 @@ name: 'Maria Santos' });
                 nationality: 'Brasileiro',
             });
             expect(result.error).toBeUndefined();
+        });
+
+        it('e-mail é opcional: vazio ou null apaga (grava null)', async () => {
+            const uc = new UpdateUserDataUseCase(mockUserRepo);
+            expect((await uc.execute({ userId: 'user-001',
+email: '' })).error).toBeUndefined();
+            expect(mockUserRepo.update).toHaveBeenLastCalledWith('user-001', expect.objectContaining({ email: null }));
+            expect((await uc.execute({ userId: 'user-001',
+email: null })).error).toBeUndefined();
+            expect(mockUserRepo.update).toHaveBeenLastCalledWith('user-001', expect.objectContaining({ email: null }));
+        });
+
+        it('e-mail igual ao de outra pessoa não é conflito (só o CPF é)', async () => {
+            const uc = new UpdateUserDataUseCase(mockUserRepo);
+            const result = await uc.execute({ userId: 'user-001',
+email: ' casal@example.com ' });
+            expect(result.error).toBeUndefined();
+            expect(mockUserRepo.update).toHaveBeenCalledWith('user-001', { email: 'casal@example.com' });
         });
 
         it('permite setar campos como null', async () => {

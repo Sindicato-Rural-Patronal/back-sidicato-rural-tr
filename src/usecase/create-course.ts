@@ -16,6 +16,8 @@ const createCourseRequestSchema = z.object({
     workloadHours: z.number().int().min(0).default(0),
     registrationDeadline: z.iso.datetime().optional(),
     observations: z.string().optional(),
+    eventNumber: z.string().optional(),
+    minStudents: z.number().int().min(0).optional(),
 });
 
 type CreateCourseRequest = z.input<typeof createCourseRequestSchema>;
@@ -50,6 +52,8 @@ export class CreateCourseUseCase {
             workloadHours,
             registrationDeadline,
             observations,
+            eventNumber,
+            minStudents,
         } = validation.data;
 
         const room = await this.roomRepository.findById(roomId);
@@ -76,6 +80,8 @@ export class CreateCourseUseCase {
             workloadHours,
             registrationDeadline: registrationDeadline ? new Date(registrationDeadline) : undefined,
             observations,
+            eventNumber,
+            minStudents,
         });
 
         if (!course) {

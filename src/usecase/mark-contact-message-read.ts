@@ -3,14 +3,16 @@ import type { ContactMessageRepository } from '../ports/external/contact-message
 
 type Response = { error?: Error };
 
+// Marca a mensagem como lida (padrão) ou como não lida. No painel, "não lida" usa a
+// rota própria PATCH /admin/contacts/messages/:id/unread para a auditoria dizer qual foi.
 export class MarkContactMessageReadUseCase {
     constructor(private readonly repo: ContactMessageRepository) {}
 
-    async execute(id: string): Promise<Response> {
+    async execute(id: string, read = true): Promise<Response> {
         const existing = await this.repo.findById(id);
         if (!existing) return { error: new ContactMessageNotFoundError() };
 
-        await this.repo.markAsRead(id);
+        if (existing.read !== read) await this.repo.setRead(id, read);
         return {};
     }
 }

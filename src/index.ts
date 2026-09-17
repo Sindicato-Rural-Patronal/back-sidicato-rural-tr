@@ -17,6 +17,9 @@ function safeUrl(url: string): string {
 import { createPrismaClient } from './lib/prisma.js';
 
 const server = fastify({
+    // Em produção a API só é acessível pelo proxy do Coolify (um salto): sem isto
+    // request.ip é o do proxy e o limite de tentativas de login vale para todos.
+    trustProxy: 1,
     logger: true,
     disableRequestLogging: true,
     ajv: {

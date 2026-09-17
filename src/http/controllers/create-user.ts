@@ -8,7 +8,7 @@ export class CreateUserController {
     async handle(request: FastifyRequest, reply: FastifyReply) {
         const { name, email, phone, cpf } = request.body as {
             name: string;
-            email: string;
+            email?: string | null;
             phone: string;
             cpf: string;
         };

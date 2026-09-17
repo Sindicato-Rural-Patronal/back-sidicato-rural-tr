@@ -80,6 +80,29 @@ name: 'Novo Nome' });
             expect(result.error).toBeUndefined();
         });
 
+        it('não conclui pela edição um curso que não está em andamento', async () => {
+            vi.mocked(mockCourseRepo.findById).mockResolvedValue({ ...existingCourse,
+status: 'PUBLIC' } as any);
+            const uc = new UpdateCourseUseCase(mockCourseRepo, mockRoomRepo);
+            const result = await uc.execute({ courseId: 'course-001',
+status: 'COMPLETED' });
+            expect(result.error?.message).toBe('Só é possível concluir um curso que está em andamento.');
+            expect(mockCourseRepo.update).not.toHaveBeenCalled();
+        });
+
+        it('aceita concluir e desfazer a conclusão pela edição', async () => {
+            vi.mocked(mockCourseRepo.findById).mockResolvedValue({ ...existingCourse,
+status: 'IN_PROGRESS' } as any);
+            vi.mocked(mockCourseRepo.update).mockResolvedValue({ id: 'course-001' } as any);
+            const uc = new UpdateCourseUseCase(mockCourseRepo, mockRoomRepo);
+            for (const status of ['COMPLETED', 'IN_PROGRESS'] as const) {
+                const result = await uc.execute({ courseId: 'course-001',
+status });
+                expect(result.error).toBeUndefined();
+                expect(mockCourseRepo.update).toHaveBeenLastCalledWith('course-001', expect.objectContaining({ status }));
+            }
+        });
+
         it('falha se repositório retornar null na atualização', async () => {
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(existingCourse as any);
             vi.mocked(mockCourseRepo.update).mockResolvedValue(null);

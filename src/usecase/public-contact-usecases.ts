@@ -33,7 +33,7 @@ export type PublicContactItem = {
     publicTitle: string | null;
     userData: {
  name: string;
-email: string;
+email: string | null;
 phone: string;
 avatar: string | null 
 };

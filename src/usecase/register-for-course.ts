@@ -9,12 +9,14 @@ import { isValidCpf } from '../lib/cpf.js';
 import { checkCourseAcceptsRegistration } from '../lib/course-registration-rules.js';
 import { CourseFullError } from '../errors/business-rule.js';
 import { isPrismaUniqueViolation } from '../lib/prisma-errors.js';
+import { personEmailSchema } from '../lib/person-email.js';
 
 const schema = z.object({
     courseId: z.string().min(1),
     name: z.string().min(1),
     phone: z.string().min(1),
-    email: z.string().email(),
+    // Opcional (vazio = sem e-mail) e pode repetir entre pessoas.
+    email: personEmailSchema,
     cpf: z.string().min(1),
 });
 
@@ -53,13 +55,15 @@ export class RegisterForCourseUseCase {
         const closed = checkCourseAcceptsRegistration(course);
         if (closed) return { error: closed };
 
-        let userData = await this.userDataRepository.findByEmailOrCpf(email, cpf);
+        // A pessoa é identificada só pelo CPF: e-mail e telefone podem ser de outra
+        // pessoa da família e não servem para achar o cadastro.
+        let userData = await this.userDataRepository.findByCpf(cpf);
 
         if (!userData) {
             userData = await this.userDataRepository.create({
                 name,
                 phone,
-                email,
+                email: email ?? null,
                 cpf,
             });
             if (!userData) {

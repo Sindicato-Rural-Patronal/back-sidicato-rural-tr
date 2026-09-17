@@ -4,6 +4,7 @@ import type {
     CourseStatus,
 } from '../ports/external/course-repository.js';
 import { CourseNotFoundError } from '../errors/not-found.js';
+import { deadlineTime } from '../lib/course-registration-rules.js';
 
 export type CourseFrontendDetail = {
     id: string;
@@ -16,6 +17,8 @@ export type CourseFrontendDetail = {
     preEnrolled: number;
     waitlist: number;
     coverImage: string | null;
+    /** Miniatura WebP da capa (cards); null → usar coverImage. */
+    coverImageThumb: string | null;
     price: number;
     startDate: string;
     endDate: string;
@@ -26,6 +29,8 @@ export type CourseFrontendDetail = {
     instructorName: string;
     instructors: {
         id: string;
+        /** Pessoa do cadastro (UserData) do instrutor. */
+        userDataId: string;
         title: string | null;
         category: string | null;
         name: string;
@@ -35,7 +40,10 @@ export type CourseFrontendDetail = {
         instagram: string | null;
         facebook: string | null;
     }[];
+    /** Dia do prazo, "AAAA-MM-DD". */
     registrationDeadline: string | null;
+    /** Hora do prazo "HH:MM" quando o painel informou; null = vale o dia inteiro. */
+    registrationDeadlineTime: string | null;
     observations: string | null;
     eventNumber: string | null;
     photoGallery: {
@@ -58,6 +66,7 @@ export function mapToFrontend(course: CourseWithDetails): CourseFrontendDetail {
         preEnrolled: course.preEnrolled,
         waitlist: course.waitlist,
         coverImage: course.bannerUrl ?? null,
+        coverImageThumb: course.bannerThumbUrl ?? null,
         price: course.price,
         startDate: course.startTime.toISOString().split('T')[0],
         endDate: course.endTime.toISOString().split('T')[0],
@@ -68,6 +77,7 @@ export function mapToFrontend(course: CourseWithDetails): CourseFrontendDetail {
         instructorName,
         instructors: course.instructors.map((ci) => ({
             id: ci.id,
+            userDataId: ci.instructor?.userData?.id ?? '',
             title: ci.title ?? null,
             category: ci.category ?? null,
             name: ci.instructor?.userData?.name ?? '',
@@ -78,6 +88,7 @@ export function mapToFrontend(course: CourseWithDetails): CourseFrontendDetail {
             facebook: ci.instructor?.facebook ?? null,
         })),
         registrationDeadline: course.registrationDeadline?.toISOString().split('T')[0] ?? null,
+        registrationDeadlineTime: deadlineTime(course.registrationDeadline),
         observations: course.observations ?? null,
         eventNumber: course.eventNumber ?? null,
         photoGallery: course.photos.map(

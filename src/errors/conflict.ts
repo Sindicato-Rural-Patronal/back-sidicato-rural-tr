@@ -1,23 +1,11 @@
 export class ConflictError extends Error {}
 
-export class UserAlreadyExistsError extends ConflictError {
+// O CPF é a identidade da pessoa: é o único dado de cadastro que não pode repetir
+// (e-mail e telefone podem ser do casal, da família).
+export class CpfAlreadyInUseError extends ConflictError {
     constructor() {
-        super('User already exists');
-        this.name = 'UserAlreadyExistsError';
-    }
-}
-
-export class EmailOrCpfAlreadyInUseError extends ConflictError {
-    constructor() {
-        super('CPF already in use');
-        this.name = 'EmailOrCpfAlreadyInUseError';
-    }
-}
-
-export class DuplicateUserContactError extends ConflictError {
-    constructor() {
-        super('E-mail, telefone ou CPF já cadastrado para outro usuário.');
-        this.name = 'DuplicateUserContactError';
+        super('CPF já cadastrado para outra pessoa.');
+        this.name = 'CpfAlreadyInUseError';
     }
 }
 

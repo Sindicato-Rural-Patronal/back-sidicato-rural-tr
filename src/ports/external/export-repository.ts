@@ -9,9 +9,11 @@ import type { ContactMessageFilters } from './contact-message-repository.js';
 
 /** Filtros da trilha de auditoria (mesmos da tela Auditoria). */
 export type AuditLogFilters = {
-    action?: 'create' | 'edit' | 'delete' | 'export';
+    action?: 'create' | 'edit' | 'delete' | 'export' | 'login' | 'login_failed';
     entity?: string;
     actorId?: string;
+    /** IP exato. */
+    ip?: string;
     from?: string;
     to?: string;
     q?: string;
@@ -62,7 +64,7 @@ export type PersonExportRow = {
     specialNeeds: boolean;
     driverLicense: string | null;
     driverLicenseCategory: string | null;
-    email: string;
+    email: string | null;
     phone: string;
     phone2: string | null;
     phone3: string | null;
@@ -155,7 +157,7 @@ export type AdminExportRow = {
     createdAt: Date;
     userData: {
  name: string;
-email: string;
+email: string | null;
 cpf: string | null;
 phone: string 
 };
@@ -192,6 +194,8 @@ instructor: { userData: { name: string } }
 export type RegistrationExportRow = {
     id: string;
     confirmed: boolean;
+    /** Presença: true presente, false faltou, null sem marcar. */
+    attended: boolean | null;
     createdAt: Date;
     ficha: { id: string } | null;
     course: {
@@ -202,7 +206,7 @@ startTime: Date
     userData: {
         name: string;
         cpf: string | null;
-        email: string;
+        email: string | null;
         phone: string;
         birthDate: Date | null;
         memberStatus: string | null;
@@ -251,7 +255,7 @@ export type UnimedExportRow = {
 cpf: string | null;
 birthDate: Date | null;
 phone: string;
-email: string 
+email: string | null
 };
 };
 
@@ -261,6 +265,11 @@ export type AuditLogExportRow = {
     path: string;
     entity: string;
     targetLabel: string | null;
+    ip: string | null;
+    userAgent: string | null;
+    location: string | null;
+    /** [{ field, before, after }] (lib/audit-diff.ts) ou null. */
+    changes: unknown;
     createdAt: Date;
     actorName: string;
 };
@@ -279,8 +288,10 @@ export interface ExportRepository {
     auditLogs(filters: AuditLogFilters): Promise<AuditLogExportRow[]>;
     /** Registra a exportação na trilha de auditoria. */
     logExport(entry: {
- actorId: string;
-path: string;
-targetLabel: string 
-}): Promise<void>;
+        actorId: string;
+        path: string;
+        targetLabel: string;
+        ip: string | null;
+        userAgent: string | null;
+    }): Promise<{ id: string }>;
 }
