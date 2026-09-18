@@ -195,3 +195,10 @@ export class CompanyMemberNotFoundError extends NotFoundError {
         this.name = 'CompanyMemberNotFoundError';
     }
 }
+
+export class RoomBookingNotFoundError extends NotFoundError {
+    constructor() {
+        super('Reserva de sala não encontrada');
+        this.name = 'RoomBookingNotFoundError';
+    }
+}

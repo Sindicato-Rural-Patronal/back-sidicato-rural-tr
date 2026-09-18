@@ -164,6 +164,20 @@ caption: true } }),
 select: { filename: true,
 mimeType: true } }),
     '/rooms/:id': byFirstId('room'),
+    // Reserva de sala (evento/reunião): sala pelo nome; o responsável do cadastro pelo nome.
+    '/admin/room-bookings/:id': async (prisma, ids) => {
+        const b = await prisma.roomBooking.findUnique({
+            where: { id: ids[0] },
+            include: { room: nameOnly,
+responsible: nameOnly },
+        });
+        return named(
+            b,
+            { room: b?.room?.name ?? null,
+responsible: b?.responsible?.name ?? null },
+            ['roomId', 'responsibleUserDataId', 'seriesId', 'isDeleted', 'deletedAt', 'updatedAt', 'createdAt'],
+        );
+    },
 
     // Site
     '/admin/banners/:id': byFirstId('banner'),

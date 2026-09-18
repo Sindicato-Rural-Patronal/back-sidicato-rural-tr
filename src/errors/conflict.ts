@@ -30,6 +30,13 @@ export class RoomHasCoursesError extends ConflictError {
     }
 }
 
+export class RoomHasBookingsError extends ConflictError {
+    constructor() {
+        super('Sala com reservas (eventos ou reuniões) marcadas e não pode ser removida.');
+        this.name = 'RoomHasBookingsError';
+    }
+}
+
 export class RgAlreadyInUseError extends ConflictError {
     constructor() {
         super('RG already in use');

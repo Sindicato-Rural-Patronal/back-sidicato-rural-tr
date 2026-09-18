@@ -9,6 +9,7 @@ import type {
     PersonExportRow,
     PropertyExportRow,
     RegistrationExportRow,
+    RoomBookingExportRow,
     UnimedExportRow,
 } from '../../ports/external/export-repository.js';
 import {
@@ -20,6 +21,7 @@ import {
     buildUnimedListWhere,
     buildUserListWhere,
 } from './list-filters.js';
+import { buildRoomBookingWhere, roomBookingSelect, toRoomBookingItem } from './room-booking-adapter.js';
 
 export function createExportAdapter(prisma: PrismaClient): ExportRepository {
     return new ExportAdapter(prisma);
@@ -245,6 +247,16 @@ username: true } })
             ...r,
             actorName: r.actorId ? (nameById.get(r.actorId) ?? '—') : 'Público',
         }));
+    }
+
+    // Mesmos filtros da listagem de reservas (com ids, só esses).
+    async roomBookings(filters: Parameters<ExportRepository['roomBookings']>[0]): Promise<RoomBookingExportRow[]> {
+        const rows = await this.prisma.roomBooking.findMany({
+            where: buildRoomBookingWhere(filters),
+            select: roomBookingSelect,
+            orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
+        });
+        return rows.map(toRoomBookingItem);
     }
 
     // O local do IP é preenchido depois da resposta (http/audit-hooks.ts).

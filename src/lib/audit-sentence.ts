@@ -59,6 +59,8 @@ g: 'f' },
 g: 'f' },
     'Relação': { noun: 'relação',
 g: 'f' },
+    'Reserva de sala': { noun: 'reserva de sala',
+g: 'f' },
     'Sala': { noun: 'sala',
 g: 'f' },
     'Transferência': { noun: 'transferência',
@@ -171,6 +173,16 @@ const SPECIAL: Record<string, Sentence> = {
     'DELETE /admin/invites/:id': fixed('Cancelou um convite de acesso ao painel', 'Cancelou o convite de acesso de'),
 };
 
+// Excluir uma reserva "e as próximas da série" (?scope=future). A chave de SPECIAL
+// ignora a query; só vale quando o caminho gravado a mantém.
+const ROOM_BOOKING_DELETE_KEY = 'DELETE /admin/room-bookings/:id';
+
+function roomBookingScopeFuture(method: string, path: string): boolean {
+    if (auditRouteKey(method, path) !== ROOM_BOOKING_DELETE_KEY) return false;
+    const query = path.split('?')[1];
+    return !!query && new URLSearchParams(query).get('scope') === 'future';
+}
+
 const UUID_SEGMENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** "PATCH /admin/galleries/<uuid>/photos/<uuid>" → "PATCH /admin/galleries/:id/photos/:id". */
@@ -191,6 +203,11 @@ export function describeAuditAction(entry: {
     targetLabel: string | null;
 }): string {
     const label = entry.targetLabel?.trim() || null;
+    if (roomBookingScopeFuture(entry.method, entry.path)) {
+        return label
+            ? `Excluiu a reserva de sala ${q(label)} e as próximas da série`
+            : 'Excluiu uma reserva de sala e as próximas da série';
+    }
     const special = SPECIAL[auditRouteKey(entry.method, entry.path)];
     if (special) return special(label);
 

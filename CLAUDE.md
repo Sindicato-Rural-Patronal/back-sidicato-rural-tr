@@ -70,6 +70,7 @@ src/
 | `Rule`                   | id, name, description, permissions (Permission[])                                                          |
 | `Course`                 | id, name, description, roomId (FK), startTime, endTime, status, price, workloadHours, coverImage (coluna `bannerUrl`, JPEG 1920×1080), coverImageThumb (coluna `bannerThumbUrl`, WebP 640×360 para os cards; migration `20260919110000`; null em cursos antigos → front usa a capa), eventNumber, minStudents, preEnrolled, waitlist, registrationDeadline, observations |
 | `CourseInstructor`       | id, courseId (FK), instructorId (FK→UserInstructor), title, category                                      |
+| `RoomBooking`            | id, type (`BookingType`: EVENT/MEETING), title, description, roomId (FK→room, cascade), startTime, endTime (hora "de parede" com Z, como o curso), responsibleUserDataId (FK→UserData, SetNull), responsibleName (responsável sem cadastro), seriesId (mesma repetição), isDeleted/deletedAt — índices (roomId, startTime) e (seriesId); CHECK `endTime > startTime`. Migration `20260922090000_room_bookings` |
 | `Room`                   | id, name (lista fixa em `lib/room-names.ts`: AUDITORIO, COZINHA, SALA DE VIDEO CONFERENCIA, SALA 1, SALA 2, SALA APL; único), description, maxCapacity, addressId (FK) |
 | `News`                   | id, title, content, summary, bannerUrl, status, publishedAt                                                |
 | `CoursePhoto`            | id, courseId (FK), url, caption                                                                            |
@@ -92,6 +93,7 @@ src/
 |------|---------|
 | `CourseStatus` | `PUBLIC`, `PRIVATE`, `UNPUBLISHED`, `IN_PROGRESS` (iniciado pelo painel), `COMPLETED` (concluído à mão pelo painel) |
 | `NewsStatus` | `PUBLISHED`, `UNPUBLISHED` |
+| `BookingType` | `EVENT`, `MEETING` (reservas de sala) |
 | `Permission` | `CREATE_USER`, `UPDATE_USER`, `DELETE_USER`, `READ_USER`, `CREATE_COURSE`, `UPDATE_COURSE`, `DELETE_COURSE`, `READ_COURSE`, `CREATE_RULE`, `UPDATE_RULE`, `DELETE_RULE`, `READ_RULE`, `CREATE_USER_ADMIN`, `UPDATE_USER_ADMIN`, `DELETE_USER_ADMIN`, `READ_USER_ADMIN`, `CREATE_NEWS`, `UPDATE_NEWS`, `DELETE_NEWS`, `READ_NEWS`, `READ_CONTACT`, `UPDATE_CONTACT`, `CREATE_BANNER`, `UPDATE_BANNER`, `DELETE_BANNER`, `READ_BANNER` |
 | `MaritalStatus` | `SINGLE`, `MARRIED`, `DIVORCED`, `WIDOWED`, `DOMESTIC_PARTNERSHIP` |
 | `Gender` | `MALE`, `FEMALE`, `OTHER` |
@@ -189,7 +191,8 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 |--------|------|----------|--------------|
 | `GET` · `POST` | `/admin/export/:dataset` | `ExportDataUseCase` — CSV (`;`, BOM, tudo entre aspas, fórmula neutralizada com `'`). POST recebe os parâmetros no corpo JSON (listas como array; é o que o painel usa, seleção grande não cabe na URL) | por conjunto (abaixo) |
 
-- Conjuntos: `people`, `companies`, `properties`, `unimed` (READ_USER), `admins` (READ_USER_ADMIN), `courses`, `registrations` (READ_COURSE), `contact-messages` (READ_CONTACT), `audit-logs` (READ_AUDIT).
+- Conjuntos: `people`, `companies`, `properties`, `unimed` (READ_USER), `admins` (READ_USER_ADMIN), `courses`, `registrations`, `room-bookings` (READ_COURSE), `contact-messages` (READ_CONTACT), `audit-logs` (READ_AUDIT).
+- `room-bookings` aceita `from`, `to` (AAAA-MM-DD), `roomId`, `type` e `search`; colunas Tipo, Título, Sala, Início, Término (DD/MM/AAAA HH:MM, hora gravada), Responsável, Descrição, Série (Sim/Não).
 - `ids` exporta só esses (seleção ou um registro; lista vazia → 400); sem `ids`, os mesmos filtros da listagem (`adapter/database/list-filters.ts`, compartilhado com os adapters das listas). `properties` aceita `ownerIds`; `registrations` aceita `courseIds`.
 - Headers: `Content-Disposition` (`pessoas-AAAA-MM-DD.csv`, ou `pessoa-<nome>-AAAA-MM-DD.csv` para um registro) e `X-Export-Count`.
 - Filtros validados como na listagem (enums de sexo/etnia/escolaridade; datas `AAAA-MM-DD`, dia em Brasília). `audit-logs` sai com no máximo 20.000 linhas mais recentes.
@@ -233,6 +236,28 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 | `GET` | `/rooms` | `ListRoomsUseCase` | Pública |
 | `POST` | `/rooms` | `CreateRoomUseCase` (nome da lista fixa, normalizado; repetido → 409) | `CREATE_COURSE` |
 | `PATCH` | `/rooms/:roomId` | `UpdateRoomUseCase` (pode manter nome antigo; trocar exige nome da lista) | `UPDATE_COURSE` |
+| `DELETE` | `/rooms/:roomId` | `DeleteRoomUseCase` — 409 com curso vinculado (`RoomHasCoursesError`) ou com reserva futura (`RoomHasBookingsError`) | `DELETE_COURSE` |
+
+### Reservas de sala (`room-booking-router.ts`, use cases em `usecase/room-booking-usecases.ts`)
+
+Eventos e reuniões que ocupam as salas, além dos cursos. Mesmas permissões dos cursos.
+
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/admin/room-bookings?from&to[&roomId][&type][&search]` | `ListRoomBookingsUseCase` | `READ_COURSE` |
+| `GET` | `/admin/room-schedule?from&to[&roomId]` | `GetRoomScheduleUseCase` (cursos + reservas) | `READ_COURSE` |
+| `POST` | `/admin/room-bookings` | `CreateRoomBookingUseCase` (com `repeat` opcional) | `CREATE_COURSE` |
+| `PATCH` | `/admin/room-bookings/:id` | `UpdateRoomBookingUseCase` (só esta ocorrência) | `UPDATE_COURSE` |
+| `DELETE` | `/admin/room-bookings/:id?scope=one|future` | `DeleteRoomBookingUseCase` (exclusão lógica) → `{ deleted }` | `DELETE_COURSE` |
+
+- **Horários**: hora "de parede" de Brasília rotulada em UTC, igual aos cursos (`2026-10-05T08:00:00.000Z` = 08:00 em Terra Roxa). O painel monta a string, o backend nunca converte fuso.
+- **`from`/`to`** (`AAAA-MM-DD`, obrigatórios, `to >= from`, no máximo 370 dias) delimitam `[from 00:00, to + 1 dia 00:00)`; volta **tudo o que sobrepõe** o período, por início, sem paginação (o painel acha a reserva a editar nessa lista — não há GET por id).
+- Item: `{ id, type, title, description, roomId, roomName, startTime, endTime, responsible: { id, name } | null, responsibleName, seriesId }`. Agenda: `{ kind: COURSE|EVENT|MEETING, id, title, roomId, roomName, startTime, endTime, status (do curso; null na reserva), seriesId }` — a agenda traz os cursos de qualquer status (não excluídos), quem filtra é a tela.
+- **Criar**: `{ type, title, description?, roomId, startTime, endTime, responsibleUserDataId?, responsibleName?, repeat?: { frequency: WEEKLY|MONTHLY, until: AAAA-MM-DD } }` → 201 `{ ids, seriesId }`. `repeat` gera uma ocorrência por semana ou por mês no mesmo dia (mês sem o dia, ex. 31, é pulado), até `until` inclusive, no máximo 60 (mais que isso → 400); cada ocorrência é uma linha com o mesmo `seriesId` (`null` quando só há uma). Título aparado, até 150 caracteres — o texto vai como veio (quem escreve em maiúsculas é o painel).
+- **Editar**: todos os campos opcionais, muda **só aquela ocorrência**; `description`, `responsibleUserDataId` e `responsibleName` aceitam `null` para limpar. Conflito só é checado quando sala ou horário mudam.
+- **Conflito** (`usecase/room-availability.ts`, compartilhado com os cursos): mesma sala, `existente.início < novo.fim` e `existente.fim > novo.início` (encostar é permitido), contra **cursos e reservas** não excluídos. Todas as ocorrências são checadas antes de gravar, dentro da transação (trava por sala com `pg_advisory_xact_lock`): qualquer conflito → nada é criado e a resposta é 409 `Sala ocupada: Curso "X" em 05/10 08:00–12:00` (rótulos Curso/Evento/Reunião, primeiro conflito; o dia do término só aparece quando é outro dia). Criar/editar curso usa a mesma checagem — `CourseRepository.findRoomConflict` — e mostra a mesma mensagem (status de sempre: `POST /courses` responde 400, `PATCH /courses/:id` responde 409).
+- **Excluir**: `scope=one` (padrão) só aquela; `scope=future` aquela e as seguintes da mesma série (`startTime >=`), sempre exclusão lógica → `{ deleted }`.
+- **Sala**: `DELETE /rooms/:roomId` recusa (409) enquanto houver reserva não excluída terminando de agora em diante (relógio de Brasília). Reservas passadas não impedem — caem junto com a sala (FK `ON DELETE CASCADE`).
 
 ### Cotações (`market-quote-router.ts`)
 | Método | Path | Use Case | Autenticação |
@@ -320,11 +345,11 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 
 - O hook grava toda mutação com sucesso (método, caminho, `entity`, `targetLabel`); fora da trilha (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (a exportação grava a própria linha), `/admin/notifications/read` e `/auth/login` (registro próprio, abaixo).
 - De onde veio (toda linha, inclusive EXPORT e login): `ip` (`request.ip`, real por causa do `trustProxy: 1`), `userAgent` bruto (até 300 caracteres) e `location` "Cidade, UF, País" (`lib/geoip.ts`). **O IP do cliente é enviado ao ipwho.is** (HTTPS, gratuito, sem chave, `lang=pt-BR`; tem limite de uso no plano gratuito): timeout 2 s, cache em memória por IP (24 h; falha 10 min; até 1000 IPs), IP local/reservado não consulta, nunca lança (falha → null). A consulta roda no `onResponse`, depois da resposta; a exportação grava a linha antes de responder e o hook preenche o local depois (`fillAuditLocationLater`). Desligada com `NODE_ENV=test` ou `GEOIP_DISABLED=1`.
-- O que mudou (`changes` = `[{ field, before, after }]`, `lib/audit-snapshot.ts` + `lib/audit-diff.ts`): em PATCH/PUT/DELETE autenticados de um registro identificável pelo caminho (pessoa, admin/próprio perfil, regra, instrutor, propriedade, relação, Unimed, convite, empresa e vínculo, curso/conclusão, foto do curso, instrutor do curso, inscrição/confirmação/presença/ficha, sala, banner, notícia, convênio, galeria e foto, contato público, mensagem, configurações do site, cotação/fonte/cotações do dia, categoria, caixa, lançamento, comprovante) o preHandler lê o registro e o onResponse relê depois do sucesso; guarda só os campos alterados (máx. 40). Exclusão guarda os campos preenchidos como `before` (`after` null). Fora: `passwordHash` (senha trocada vira `{ field: 'password', after: 'alterada' }`), `token`, colunas Bytes (nunca lidas), `*Search`, `id`, `createdAt`/`updatedAt`/`deletedAt`/`isDeleted`; textos cortados em 300, datas ISO, listas "a, b", JSON como texto. Ids de relação viram nomes (`room`, `person`, `rule`, `category`…). Rota nova que edita um registro → acrescentar em `SNAPSHOTS`. Erro na leitura nunca afeta a request (linha sai sem `changes`).
+- O que mudou (`changes` = `[{ field, before, after }]`, `lib/audit-snapshot.ts` + `lib/audit-diff.ts`): em PATCH/PUT/DELETE autenticados de um registro identificável pelo caminho (pessoa, admin/próprio perfil, regra, instrutor, propriedade, relação, Unimed, convite, empresa e vínculo, curso/conclusão, foto do curso, instrutor do curso, inscrição/confirmação/presença/ficha, sala, reserva de sala (sala e responsável pelo nome; sem `seriesId`), banner, notícia, convênio, galeria e foto, contato público, mensagem, configurações do site, cotação/fonte/cotações do dia, categoria, caixa, lançamento, comprovante) o preHandler lê o registro e o onResponse relê depois do sucesso; guarda só os campos alterados (máx. 40). Exclusão guarda os campos preenchidos como `before` (`after` null). Fora: `passwordHash` (senha trocada vira `{ field: 'password', after: 'alterada' }`), `token`, colunas Bytes (nunca lidas), `*Search`, `id`, `createdAt`/`updatedAt`/`deletedAt`/`isDeleted`; textos cortados em 300, datas ISO, listas "a, b", JSON como texto. Ids de relação viram nomes (`room`, `person`, `rule`, `category`…). Rota nova que edita um registro → acrescentar em `SNAPSHOTS`. Erro na leitura nunca afeta a request (linha sai sem `changes`).
 - Login (`POST /auth/login`): 2xx → `LOGIN` com `actorId` (lido do token no `onSend`); 401 → `LOGIN_FAILED`; 429 → `LOGIN_BLOCKED` (o limite da rota conta em `preValidation` para o corpo já estar lido). `targetLabel` = usuário digitado (até 60 caracteres); a senha nunca é lida pelo hook. `entity` "Login".
 - Retenção: nenhuma ainda (a trilha só cresce).
 - `entity` vem do caminho (`deriveAuditEntity`, mesma lista do filtro "Tipo" no painel). `targetLabel` = nome do alvo buscado antes da ação (`lookupTargetLabel`: edição, exclusão e POST sobre item existente, ex.: iniciar curso, foto da galeria) ou o nome do corpo.
-- `summary` (`lib/audit-sentence.ts`, `describeAuditAction`): rotas especiais por método + caminho com ids trocados por `:id` ("Iniciou o curso", "Adicionou foto à galeria", "Marcou mensagem como lida", "Editou as configurações do site", "Lançou as cotações do dia"…); as demais viram verbo + artigo pelo gênero + entidade ("Editou a galeria "FAEP""). Rota nova com ação diferente de criar/editar/excluir → acrescentar em `SPECIAL`; entidade nova → `AUDIT_ENTITY_NOUNS` e a lista do filtro no painel. A planilha `audit-logs` usa a mesma frase (sem o nome) na coluna "Ação".
+- `summary` (`lib/audit-sentence.ts`, `describeAuditAction`): rotas especiais por método + caminho com ids trocados por `:id` ("Iniciou o curso", "Adicionou foto à galeria", "Marcou mensagem como lida", "Editou as configurações do site", "Lançou as cotações do dia"…); as demais viram verbo + artigo pelo gênero + entidade ("Editou a galeria "FAEP""). Reserva de sala (`/admin/room-bookings`, entidade "Reserva de sala", feminino; alvo = título): "Criou uma reserva de sala", "Editou/Excluiu a reserva de sala "Título""; `DELETE ?scope=future` vira "… e as próximas da série" (o hook guarda o `?scope=future` no caminho gravado só nessa rota). Rota nova com ação diferente de criar/editar/excluir → acrescentar em `SPECIAL`; entidade nova → `AUDIT_ENTITY_NOUNS` e a lista do filtro no painel. A planilha `audit-logs` usa a mesma frase (sem o nome) na coluna "Ação".
 
 ### Regras
 | Método | Path | Use Case | Autenticação |
@@ -346,6 +371,7 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
   - Inscrição/cadastro feitos pela equipe no painel **não** geram evento.
 - **Visibilidade**: o admin só vê eventos cuja `permission` está na sua regra; janela de 30 dias, mais recentes primeiro, até 50. `unreadCount` = não lidos na janela. Leitura é por admin (`NotificationRead`); marcar só afeta eventos visíveis.
 - **Pendências** (`pending`): calculadas na hora por `computePendingNotifications` (`usecase/pending-notifications.ts` + `adapter/database/pending-notifications-adapter.ts`), nada gravado; `pendingCount` = tamanho da lista.
+  - `ROOM_BOOKINGS_TODAY` (`READ_COURSE`, info): reservas de sala não excluídas que ocupam o dia de hoje em Brasília (mesma convenção de hora "de parede" dos cursos) → um item "Reservas de sala hoje", corpo "08:00 Título (Sala)" até 3 + "e mais N" (reserva que começou antes de hoje leva "DD/MM"), `count` = total, link `/admin/agenda`.
 - **Retenção**: eventos com mais de 90 dias são apagados pelo publicador, no máximo uma vez por hora por processo (timestamp em memória). Leituras caem junto (cascade).
 - `PATCH /admin/notifications/read` fica fora da auditoria (`skipAudit`).
 
@@ -395,6 +421,7 @@ Todas as rotas de listagem suportam paginação via `?page=1&limit=20`.
 | `createRuleAdapter` | `adapter/database/rule-adapter.ts` | `RuleRepository` |
 | `createNewsAdapter` | `adapter/database/news-adapter.ts` | `NewsRepository` |
 | `createRoomAdapter` | `adapter/database/room-adapter.ts` | `RoomRepository` |
+| `createRoomBookingAdapter` | `adapter/database/room-booking-adapter.ts` | `RoomBookingRepository` |
 | `createRegistrationAdapter` | `adapter/database/registration-adapter.ts` | `RegistrationRepository` |
 | `createAddressAdapter` | `adapter/database/address-adapter.ts` | `AddressRepository` |
 | `createUserRelationAdapter` | `adapter/database/user-relation-adapter.ts` | `UserRelationRepository` |
@@ -482,9 +509,9 @@ Os erros de domínio vivem em `src/errors/` divididos por categoria:
 | Arquivo | Classe base | Subclasses específicas |
 |---------|-------------|------------------------|
 | `auth.ts` | `AuthError` | `InvalidCredentialsError` |
-| `business-rule.ts` | `BusinessRuleError` | `RoomAlreadyBookedError`, `RegistrationsUnavailableError` |
-| `conflict.ts` | `ConflictError` | `CpfAlreadyInUseError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `CourseRegistrationAlreadyExistsError`, `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError` |
-| `not-found.ts` | `NotFoundError` | `CourseNotFoundError`, `UserNotFoundError`, `UserDataNotFoundError`, `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError`, `UserRelationNotFoundError`, `PropertyNotFoundError`, `AddressNotFoundError`, `InstructorNotFoundError`, `ContactMessageNotFoundError`, `BannerNotFoundError` |
+| `business-rule.ts` | `BusinessRuleError` | `RoomAlreadyBookedError` (a mensagem diz o que ocupa a sala), `RegistrationsUnavailableError` |
+| `conflict.ts` | `ConflictError` | `CpfAlreadyInUseError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `CourseRegistrationAlreadyExistsError`, `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError`, `RoomHasCoursesError`, `RoomHasBookingsError` |
+| `not-found.ts` | `NotFoundError` | `CourseNotFoundError`, `UserNotFoundError`, `UserDataNotFoundError`, `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError`, `UserRelationNotFoundError`, `PropertyNotFoundError`, `AddressNotFoundError`, `InstructorNotFoundError`, `ContactMessageNotFoundError`, `BannerNotFoundError`, `RoomBookingNotFoundError` |
 | `validation.ts` | `ValidationError` | — (único com parâmetro de mensagem, para erros dinâmicos do Zod) |
 
 Use cases lançam a subclasse específica. Controllers usam `errorToStatus(response.error)` de `http/lib/require-permission.ts` para mapear para HTTP status:

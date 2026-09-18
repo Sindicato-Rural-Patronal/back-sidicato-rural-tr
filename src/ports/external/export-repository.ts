@@ -3,6 +3,7 @@ import type { CompanyListFilters } from './company-repository.js';
 import type { CourseListFilters } from './course-repository.js';
 import type { UserAdminListFilters } from './user-admin-repository.js';
 import type { ContactMessageFilters } from './contact-message-repository.js';
+import type { RoomBookingFilters, RoomBookingItem } from './room-booking-repository.js';
 
 // Exportação de dados do painel. Cada método aceita os filtros da listagem
 // correspondente OU uma lista de ids (seleção / um registro só). Sem paginação.
@@ -274,6 +275,9 @@ export type AuditLogExportRow = {
     actorName: string;
 };
 
+/** Reserva de sala (evento/reunião), mesmo formato da listagem. */
+export type RoomBookingExportRow = RoomBookingItem;
+
 export interface ExportRepository {
     people(filters: UserListFilters & ExportSelection): Promise<PersonExportRow[]>;
     companies(filters: CompanyListFilters & ExportSelection): Promise<CompanyExportRow[]>;
@@ -286,6 +290,8 @@ export interface ExportRepository {
     contactMessages(filters: ContactMessageFilters & ExportSelection): Promise<ContactMessageExportRow[]>;
     unimed(filters: { search?: string } & ExportSelection): Promise<UnimedExportRow[]>;
     auditLogs(filters: AuditLogFilters): Promise<AuditLogExportRow[]>;
+    /** Reservas de sala: período (from inclusivo, to exclusivo), sala, tipo, busca ou ids. */
+    roomBookings(filters: RoomBookingFilters): Promise<RoomBookingExportRow[]>;
     /** Registra a exportação na trilha de auditoria. */
     logExport(entry: {
         actorId: string;

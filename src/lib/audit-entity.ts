@@ -19,6 +19,8 @@ export function deriveAuditEntity(path: string): string {
     if (p.includes('/site-settings')) return 'Configurações do site';
     if (p.includes('/invites')) return 'Convite';
     if (p.includes('/unimed')) return 'Beneficiário Unimed';
+    // Antes de /rooms: "/room-bookings" é a reserva (evento/reunião), não a sala.
+    if (p.includes('/room-bookings')) return 'Reserva de sala';
     if (p.includes('/rooms')) return 'Sala';
     if (p.includes('/rule')) return 'Regra';
     if (p.includes('/instructor')) return 'Instrutor';

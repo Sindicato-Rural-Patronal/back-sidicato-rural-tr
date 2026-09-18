@@ -4,6 +4,7 @@ import type {
     PendingCourse,
     PendingCourseFilter,
     PendingNotificationsRepository,
+    RoomBookingsOverlap,
 } from '../../ports/external/pending-notifications-repository.js';
 import { buildUserListWhere } from './list-filters.js';
 
@@ -140,5 +141,34 @@ lt: before },
         ]);
         return { total,
 names: rows.map((r: { name: string }) => r.name) };
+    }
+
+    async roomBookingsOverlapping(from: Date, before: Date, take: number): Promise<RoomBookingsOverlap> {
+        const where = {
+            isDeleted: false,
+            startTime: { lt: before },
+            endTime: { gt: from },
+        };
+        const [total, rows] = await Promise.all([
+            this.prisma.roomBooking.count({ where }),
+            this.prisma.roomBooking.findMany({
+                where,
+                select: { title: true,
+startTime: true,
+room: { select: { name: true } } },
+                orderBy: [{ startTime: 'asc' }, { id: 'asc' }],
+                take,
+            }),
+        ]);
+        return {
+            total,
+            items: rows.map((r: {
+                title: string;
+                startTime: Date;
+                room: { name: string } | null;
+            }) => ({ title: r.title,
+roomName: r.room?.name ?? '',
+startTime: r.startTime })),
+        };
     }
 }

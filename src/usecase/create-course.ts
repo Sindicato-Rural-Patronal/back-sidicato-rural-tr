@@ -4,6 +4,7 @@ import type { RoomRepository } from '../ports/external/room-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { RoomNotFoundError } from '../errors/not-found.js';
 import { RoomAlreadyBookedError } from '../errors/business-rule.js';
+import { conflictMessage } from './room-availability.js';
 
 const createCourseRequestSchema = z.object({
     name: z.string().min(1, 'Course name is required'),
@@ -64,9 +65,10 @@ export class CreateCourseUseCase {
         const start = new Date(startTime);
         const end = new Date(endTime);
 
-        const available = await this.courseRepository.isRoomAvailable(roomId, start, end);
-        if (!available) {
-            return { error: new RoomAlreadyBookedError() };
+        // Sala ocupada por outro curso ou por uma reserva (evento/reunião).
+        const conflict = await this.courseRepository.findRoomConflict(roomId, start, end);
+        if (conflict) {
+            return { error: new RoomAlreadyBookedError(conflictMessage(conflict)) };
         }
 
         const course = await this.courseRepository.create({

@@ -24,6 +24,7 @@ export function createTestPrisma(): PrismaClient {
 export async function cleanDatabase(prisma: PrismaClient): Promise<void> {
     await prisma.$executeRawUnsafe(`
         TRUNCATE TABLE
+            "RoomBooking",
             "courseUserRegistration",
             "CourseInstructor",
             "CoursePhoto",

@@ -1,5 +1,6 @@
 import type { courseModel, CoursePhotoModel } from '../../generated/prisma/models.js';
 import { CourseStatus } from '../../generated/prisma/enums.js';
+import type { RoomOccupant } from './room-booking-repository.js';
 
 export { CourseStatus };
 
@@ -76,12 +77,16 @@ export interface CourseRepository {
     count(filters?: CourseListFilters): Promise<number>;
     update(id: string, data: CourseUpdateData): Promise<courseModel | null>;
     delete(id: string): Promise<boolean>;
-    isRoomAvailable(
+    /**
+     * Primeiro curso ou reserva (evento/reunião) que ocupa a sala no período,
+     * ignorando o próprio curso na edição; null = sala livre.
+     */
+    findRoomConflict(
         roomId: string,
         startTime: Date,
         endTime: Date,
         excludeCourseId?: string,
-    ): Promise<boolean>;
+    ): Promise<RoomOccupant | null>;
     addPhoto(courseId: string, url: string, caption?: string): Promise<CoursePhotoModel>;
     deletePhoto(photoId: string): Promise<boolean>;
 }

@@ -3,13 +3,22 @@ import { UpdateCourseUseCase } from '../update-course.js';
 import type { CourseRepository } from '../../ports/external/course-repository.js';
 import type { RoomRepository } from '../../ports/external/room-repository.js';
 
+// Reunião que já ocupa a sala (curso e reservas dividem a agenda).
+const CONFLICT = {
+    kind: 'MEETING' as const,
+    id: 'booking-1',
+    title: 'Diretoria',
+    startTime: new Date('2026-07-01T09:00:00.000Z'),
+    endTime: new Date('2026-07-01T10:00:00.000Z'),
+};
+
 const mockCourseRepo = {
     create: vi.fn(),
     findById: vi.fn(),
     findAll: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
-    isRoomAvailable: vi.fn(),
+    findRoomConflict: vi.fn(),
     addPhoto: vi.fn(),
     deletePhoto: vi.fn(),
 } as unknown as CourseRepository;
@@ -59,14 +68,14 @@ describe('UpdateCourseUseCase', () => {
 
         it('falha se nova sala já estiver ocupada no período', async () => {
             vi.mocked(mockRoomRepo.findById).mockResolvedValue({ id: 'room-002' } as any);
-            vi.mocked(mockCourseRepo.isRoomAvailable).mockResolvedValue(false);
+            vi.mocked(mockCourseRepo.findRoomConflict).mockResolvedValue(CONFLICT);
             const uc = new UpdateCourseUseCase(mockCourseRepo, mockRoomRepo);
             const result = await uc.execute({
                 courseId: 'course-001',
                 roomId: '123e4567-e89b-12d3-a456-426614174000',
             });
             expect(result.error).toBeDefined();
-            expect(result.error?.message).toBe('Room is already booked for this period');
+            expect(result.error?.message).toBe('Sala ocupada: Reunião "Diretoria" em 01/07 09:00–10:00');
         });
     });
 

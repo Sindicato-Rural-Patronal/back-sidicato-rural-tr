@@ -88,6 +88,9 @@ select: { title: true } }))?.title ?? null;
             case 'Mensagem':
                 return (await prisma.contactMessage.findUnique({ where: { id },
 select: { name: true } }))?.name ?? null;
+            case 'Reserva de sala':
+                return (await prisma.roomBooking.findUnique({ where: { id },
+select: { title: true } }))?.title ?? null;
             case 'Sala':
                 return (await prisma.room.findUnique({ where: { id },
 select: { name: true } }))?.name ?? null;
