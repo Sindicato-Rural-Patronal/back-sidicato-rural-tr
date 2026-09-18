@@ -11,6 +11,8 @@ g: Gender
 }> = {
     'Administrador': { noun: 'administrador',
 g: 'm' },
+    'Auditoria': { noun: 'trilha de auditoria',
+g: 'f' },
     'Banner': { noun: 'banner',
 g: 'm' },
     'Beneficiário Unimed': { noun: 'beneficiário Unimed',
@@ -128,6 +130,7 @@ const SPECIAL: Record<string, Sentence> = {
 
     // Pessoas e administradores
     'POST /admin/users/:id/avatar': fixed('Trocou a foto de um usuário', 'Trocou a foto de'),
+    'POST /admin/users/merge': fixed('Juntou dois cadastros repetidos', 'Juntou dois cadastros repetidos de'),
     'PATCH /admin/me': () => 'Editou o próprio perfil',
     'POST /admin/me/avatar': () => 'Trocou a própria foto',
 
@@ -157,6 +160,7 @@ const SPECIAL: Record<string, Sentence> = {
     'PATCH /admin/companies/:id/members/:id': fixed('Editou o vínculo de uma pessoa com uma empresa', 'Editou o vínculo de uma pessoa com a empresa'),
     'DELETE /admin/companies/:id/members/:id': fixed('Desvinculou uma pessoa de uma empresa', 'Desvinculou uma pessoa da empresa'),
     'POST /admin/companies/:id/properties': fixed('Adicionou propriedade a uma empresa', 'Adicionou propriedade à empresa'),
+    'PATCH /admin/companies/:id/properties/:id': fixed('Editou propriedade de uma empresa', 'Editou propriedade da empresa'),
     'DELETE /admin/companies/:id/properties/:id': fixed('Removeu propriedade de uma empresa', 'Removeu propriedade da empresa'),
 
     // Cotações

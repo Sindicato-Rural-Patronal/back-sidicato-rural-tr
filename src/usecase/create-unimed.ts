@@ -6,10 +6,17 @@ import type {
 } from '../ports/external/unimed-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { UnimedBeneficiarioAlreadyExistsError } from '../errors/conflict.js';
+import { onlyDigits, unimedFieldsIssue } from '../lib/unimed-options.js';
 
 // String opcional: "" e null viram undefined (não sobrescreve com vazio).
 const optionalString = z.preprocess(
     v => (v === '' || v == null ? undefined : v),
+    z.string().optional(),
+);
+
+// CNS chega mascarado do painel ("700 0000 0000 0000") e é gravado só com dígitos.
+const optionalDigits = z.preprocess(
+    v => (v === '' || v == null ? undefined : typeof v === 'string' ? onlyDigits(v) || undefined : v),
     z.string().optional(),
 );
 
@@ -23,7 +30,7 @@ export const unimedSchema = z.object({
     tipoMovimento: optionalString,
     tipoDependente: optionalString,
     grauDependencia: optionalString,
-    cns: optionalString,
+    cns: optionalDigits,
     nomeMae: optionalString,
     profissao: optionalString,
     plano: optionalString,
@@ -49,6 +56,10 @@ beneficiario?: UnimedBeneficiarioModel
         if (!parsed.success) {
             return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Dados inválidos') };
         }
+        // Listas fixas (tipo de movimento / grau de dependência) e CNS.
+        const issue = unimedFieldsIssue(parsed.data);
+        if (issue) return { error: new ValidationError(issue) };
+
         // 1:1 com UserData — bloqueia um segundo cadastro ativo para a mesma pessoa.
         const existing = await this.repo.findByUserDataId(parsed.data.userDataId);
         if (existing) return { error: new UnimedBeneficiarioAlreadyExistsError() };

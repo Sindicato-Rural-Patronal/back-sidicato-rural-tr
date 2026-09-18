@@ -113,3 +113,22 @@ export class CompanyMemberAlreadyExistsError extends ConflictError {
         this.name = 'CompanyMemberAlreadyExistsError';
     }
 }
+
+// Juntar dois cadastros da mesma pessoa (item "possíveis duplicados").
+export class MergeDifferentCpfError extends ConflictError {
+    constructor() {
+        super('Cadastros com CPFs diferentes não podem ser juntados.');
+        this.name = 'MergeDifferentCpfError';
+    }
+}
+
+export class MergeBothHaveLoginError extends ConflictError {
+    constructor() {
+        // UserAdmin.userDataId é único (conta mesmo a excluída), então só dá para
+        // juntar quando um dos dois cadastros nunca teve login.
+        super(
+            'Os dois cadastros têm conta de acesso ao painel. Só é possível juntar quando apenas um deles tem login.',
+        );
+        this.name = 'MergeBothHaveLoginError';
+    }
+}

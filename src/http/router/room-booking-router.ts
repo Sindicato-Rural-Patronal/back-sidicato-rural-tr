@@ -8,8 +8,10 @@ import {
     CreateRoomBookingUseCase,
     DeleteRoomBookingUseCase,
     GetRoomScheduleUseCase,
+    ListPublicEventsUseCase,
     ListRoomBookingsUseCase,
     MAX_RANGE_DAYS,
+    PUBLIC_EVENTS_LIMIT,
     UpdateRoomBookingUseCase,
 } from '../../usecase/room-booking-usecases.js';
 import { MAX_OCCURRENCES } from '../../usecase/room-availability.js';
@@ -31,6 +33,8 @@ const bookingObject = {
         type: str,
         title: str,
         description: nstr,
+        publicOnSite: { type: 'boolean' },
+        publicDescription: nstr,
         roomId: str,
         roomName: str,
         startTime: str,
@@ -58,6 +62,20 @@ const scheduleObject = {
         endTime: str,
         status: nstr,
         seriesId: nstr,
+        publicOnSite: { type: 'boolean' },
+    },
+};
+
+// Evento publicado no site (rota pública, sem dados internos).
+const publicEventObject = {
+    type: 'object',
+    properties: {
+        id: str,
+        title: str,
+        description: nstr,
+        startTime: str,
+        endTime: str,
+        roomName: str,
     },
 };
 
@@ -90,11 +108,30 @@ export async function roomBookingRouter(fastify: FastifyInstance, prisma: Prisma
     const create = new CreateRoomBookingUseCase(repo);
     const update = new UpdateRoomBookingUseCase(repo);
     const remove = new DeleteRoomBookingUseCase(repo);
+    const publicEvents = new ListPublicEventsUseCase(repo);
     const getAdminPermissions = new GetAdminPermissionsUseCase(createUserAdminAdapter(prisma), createRuleAdapter(prisma));
 
     const can = (req: FastifyRequest, reply: FastifyReply, perm: Permission) =>
         requirePermission(req, reply, perm, getAdminPermissions);
     const fail = (reply: FastifyReply, error: Error) => reply.status(errorToStatus(error)).send({ error: error.message });
+
+    // ─── Rota pública ──────────────────────────────────────────────────────
+    fastify.get(
+        '/events',
+        {
+            schema: {
+                tags,
+                summary: 'Eventos publicados no site',
+                description: `Eventos (nunca reuniões) marcados como "Mostrar no site" que ainda não terminaram, do mais próximo em diante, no máximo ${PUBLIC_EVENTS_LIMIT}. ${timeNote}`,
+                response: { 200: { type: 'array',
+items: publicEventObject } },
+            },
+        },
+        async (_req: FastifyRequest, reply: FastifyReply) => {
+            const r = await publicEvents.execute();
+            return reply.send(r.events);
+        },
+    );
 
     fastify.get(
         '/admin/room-bookings',
@@ -165,6 +202,9 @@ items: scheduleObject },
                         title: { type: 'string',
 example: 'Reunião da diretoria' },
                         description: nstr,
+                        publicOnSite: { type: 'boolean',
+description: 'Mostrar na página pública de eventos (só type EVENT).' },
+                        publicDescription: nstr,
                         roomId: str,
                         startTime: { type: 'string',
 example: '2026-10-05T08:00:00.000Z' },
@@ -222,6 +262,8 @@ seriesId: r.seriesId ?? null });
                         type: bookingTypeSchema,
                         title: str,
                         description: nstr,
+                        publicOnSite: { type: 'boolean' },
+                        publicDescription: nstr,
                         roomId: str,
                         startTime: str,
                         endTime: str,

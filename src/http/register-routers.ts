@@ -3,6 +3,7 @@ import type { PrismaClient } from '@prisma/client/extension';
 import { userDataRouter } from './router/user-data-router.js';
 import { authRouter } from './router/auth-router.js';
 import { userAdminRouter } from './router/user-admin.js';
+import { userMergeRouter } from './router/user-merge-router.js';
 import { courseRouter } from './router/course-router.js';
 import { ruleRouter } from './router/rule-router.js';
 import { roomRouter } from './router/room-router.js';
@@ -35,6 +36,7 @@ export function registerRouters(app: FastifyInstance, prisma: PrismaClient) {
     app.register(userDataRouter, prisma);
     app.register(authRouter, prisma);
     app.register(userAdminRouter, prisma);
+    app.register(userMergeRouter, prisma);
     app.register(courseRouter, prisma);
     app.register(roomRouter, prisma);
     app.register(roomBookingRouter, prisma);

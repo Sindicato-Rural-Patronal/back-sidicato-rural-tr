@@ -12,6 +12,8 @@ export const financeFiltersSchema = z.object({
     type: z.enum(['IN', 'OUT']).optional(),
     categoryId: z.preprocess(v => (v === '' ? undefined : v), z.string().uuid().optional()),
     accountId: z.preprocess(v => (v === '' ? undefined : v), z.string().uuid().optional()),
+    // Forma de pagamento (texto do lançamento) — o filtro ignora maiúsculas.
+    method: z.preprocess(v => (v === '' ? undefined : v), z.string().optional()),
     search: z.preprocess(v => (v === '' ? undefined : v), z.string().optional()),
 });
 
@@ -67,6 +69,7 @@ export class ListFinanceTransactionsUseCase {
             type: q.type,
             categoryId: q.categoryId,
             accountId: q.accountId,
+            method: q.method,
             search: q.search,
         };
 

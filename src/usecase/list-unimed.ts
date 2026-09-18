@@ -5,6 +5,8 @@ const querySchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(1000).default(20),
     search: z.preprocess(v => (v === '' ? undefined : v), z.string().optional()),
+    // Aba Unimed da ficha da pessoa: cadastros dela ou em que ela é o titular.
+    userDataId: z.preprocess(v => (v === '' ? undefined : v), z.string().uuid().optional()),
 });
 
 export type UnimedPage = {
@@ -24,6 +26,7 @@ export class ListUnimedUseCase {
             page: q.page,
             limit: q.limit,
             search: q.search,
+            userDataId: q.userDataId,
         });
         return {
             data: items,

@@ -23,6 +23,7 @@ import {
     ListPartnersUseCase,
     ReorderPartnersUseCase,
 } from '../../usecase/company-usecases.js';
+import { UpdatePropertyUseCase } from '../../usecase/update-property.js';
 import { UploadCompanyPartnerLogoUseCase } from '../../usecase/upload-company-partner-logo.js';
 import { CompanyController } from '../controllers/company-controller.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
@@ -194,6 +195,7 @@ export async function companyRouter(fastify: FastifyInstance, prisma: PrismaClie
             removeMember: new RemoveCompanyMemberUseCase(repo),
             titles: new ListMemberTitlesUseCase(repo),
             addProperty: new AddCompanyPropertyUseCase(repo, propertyRepo, addressRepo),
+            updateProperty: new UpdatePropertyUseCase(propertyRepo, addressRepo),
             removeProperty: new RemoveCompanyPropertyUseCase(repo, propertyRepo),
             uploadPartnerLogo: new UploadCompanyPartnerLogoUseCase(createStorageAdapter(), repo),
             listPartners: new ListPartnersUseCase(repo),
@@ -372,6 +374,28 @@ properties: { id: str } },
 ...errs },
         },
     }, (req: Id, res: FastifyReply) => controller.addProperty(req, res));
+
+    fastify.patch('/admin/companies/:id/properties/:propertyId', {
+        schema: {
+            tags,
+summary: 'Editar propriedade/endereço da empresa',
+            description: 'Campos opcionais: o que não vier fica como está. Propriedade de outra empresa responde 404.',
+            security: sec,
+            params: { type: 'object',
+required: ['id', 'propertyId'],
+properties: { id: str,
+propertyId: str } },
+            body: {
+                type: 'object',
+                properties: { name: str,
+registration: nstr,
+address: { type: 'object',
+additionalProperties: true } },
+            },
+            response: { 200: propertySchema,
+...errs },
+        },
+    }, (req: Prop, res: FastifyReply) => controller.updateProperty(req, res));
 
     fastify.delete('/admin/companies/:id/properties/:propertyId', {
         schema: {

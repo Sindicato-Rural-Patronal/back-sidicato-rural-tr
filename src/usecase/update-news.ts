@@ -10,6 +10,8 @@ const updateNewsRequestSchema = z.object({
     summary: z.string().optional().nullable(),
     status: z.enum(['PUBLISHED', 'UNPUBLISHED'] as const).optional(),
     publishedAt: z.iso.datetime().optional().nullable(),
+    // Agendamento: hora "de parede" de Brasília com Z; null = publicar agora.
+    publishAt: z.iso.datetime().optional().nullable(),
 });
 
 type UpdateNewsRequest = z.infer<typeof updateNewsRequestSchema>;
@@ -26,21 +28,34 @@ export class UpdateNewsUseCase {
             };
         }
 
-        const { newsId, publishedAt, ...updateData } = validation.data;
+        const { newsId, publishedAt, publishAt, ...updateData } = validation.data;
 
         const existing = await this.newsRepository.findById(newsId);
         if (!existing) return { error: new NewsNotFoundError() };
 
+        // Voltar para rascunho descarta o agendamento.
+        const nextPublishAt =
+            updateData.status === 'UNPUBLISHED'
+                ? null
+                : publishAt !== undefined
+                  ? publishAt
+                      ? new Date(publishAt)
+                      : null
+                  : undefined;
+
         const updated = await this.newsRepository.update(newsId, {
             ...updateData,
+            publishAt: nextPublishAt,
             publishedAt:
                 publishedAt !== undefined
                     ? publishedAt
                         ? new Date(publishedAt)
                         : null
-                    : updateData.status === 'PUBLISHED' && !existing.publishedAt
-                      ? new Date()
-                      : undefined,
+                    : // Agendada: a data mostrada ao leitor é a que ela entra no ar.
+                      (nextPublishAt ??
+                      (updateData.status === 'PUBLISHED' && !existing.publishedAt
+                          ? new Date()
+                          : undefined)),
         });
 
         if (!updated) return { error: new Error('Failed to update news') };

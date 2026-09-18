@@ -12,6 +12,15 @@ export interface PropertyRepository {
         registration?: string;
         addressId: string;
     }): Promise<Property>;
+    /** Edição: campo ausente não muda; `registration: null` limpa a matrícula. */
+    update(
+        id: string,
+        data: {
+ name?: string;
+registration?: string | null;
+addressId?: string 
+},
+    ): Promise<PropertyWithAddress>;
     findByUserDataId(userDataId: string, skip?: number, take?: number): Promise<PropertyWithAddress[]>;
     countByUserDataId(userDataId: string): Promise<number>;
     findById(id: string): Promise<Property | null>;

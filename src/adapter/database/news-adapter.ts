@@ -4,8 +4,26 @@ import type {
     NewsModel,
     NewsCreateData,
     NewsUpdateData,
-    NewsStatus,
+    NewsListFilters,
 } from '../../ports/external/news-repository.js';
+
+/**
+ * Filtros da listagem. `schedule` recorta pelo agendamento: `visible` = sem
+ * agendamento ou já passou; `scheduled` = marcada para depois.
+ */
+export function buildNewsWhere(f: NewsListFilters) {
+    const search = f.search?.trim();
+    return {
+        isDeleted: false,
+        ...(f.status && { status: f.status }),
+        ...(f.schedule?.state === 'visible' && {
+            OR: [{ publishAt: null }, { publishAt: { lte: f.schedule.at } }],
+        }),
+        ...(f.schedule?.state === 'scheduled' && { publishAt: { gt: f.schedule.at } }),
+        ...(search && { title: { contains: search,
+mode: 'insensitive' as const } }),
+    };
+}
 
 export function createNewsAdapter(prisma: PrismaClient): NewsRepository {
     return new NewsAdapter(prisma);
@@ -23,25 +41,17 @@ export class NewsAdapter implements NewsRepository {
 isDeleted: false } }) as Promise<NewsModel | null>;
     }
 
-    findAll(statusFilter?: NewsStatus, skip?: number, take?: number): Promise<NewsModel[]> {
+    findAll(filters: NewsListFilters, skip?: number, take?: number): Promise<NewsModel[]> {
         return this.prisma.news.findMany({
-            where: {
-                isDeleted: false,
-                ...(statusFilter ? { status: statusFilter } : {}),
-            },
+            where: buildNewsWhere(filters),
             orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
             skip,
             take,
         }) as Promise<NewsModel[]>;
     }
 
-    count(statusFilter?: NewsStatus): Promise<number> {
-        return this.prisma.news.count({
-            where: {
-                isDeleted: false,
-                ...(statusFilter ? { status: statusFilter } : {}),
-            },
-        });
+    count(filters: NewsListFilters): Promise<number> {
+        return this.prisma.news.count({ where: buildNewsWhere(filters) });
     }
 
     async update(id: string, data: NewsUpdateData): Promise<NewsModel | null> {

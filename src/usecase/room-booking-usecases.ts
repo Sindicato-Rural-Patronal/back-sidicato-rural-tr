@@ -6,11 +6,13 @@ import type {
     RoomBookingRepository,
     RoomBookingUpdateData,
     RoomScheduleItem,
+    PublicEventItem,
+    BookingType,
 } from '../ports/external/room-booking-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { RoomBookingNotFoundError, RoomNotFoundError, UserDataNotFoundError } from '../errors/not-found.js';
 import { RoomAlreadyBookedError } from '../errors/business-rule.js';
-import { conflictMessage, findConflict, generateOccurrences } from './room-availability.js';
+import { conflictMessage, findConflict, generateOccurrences, nowWallClock } from './room-availability.js';
 
 // Reservas de sala: eventos e reuniões que ocupam as salas além dos cursos.
 // Horários em hora "de parede" de Brasília rotulada em UTC (igual aos cursos).
@@ -38,6 +40,11 @@ const title = z
     .min(1, 'Informe o título')
     .max(150, 'Título muito longo (máximo de 150 caracteres)');
 const description = z.preprocess(blankToNull, z.string().trim().max(2000, 'Descrição muito longa').nullable().optional());
+const publicDescription = z.preprocess(
+    blankToNull,
+    z.string().trim().max(2000, 'Descrição pública muito longa').nullable().optional(),
+);
+const publicOnSite = z.boolean().optional();
 const responsibleName = z.preprocess(blankToNull, z.string().trim().max(150, 'Nome do responsável muito longo').nullable().optional());
 const responsibleUserDataId = z.preprocess(blankToNull, z.string().trim().max(64).nullable().optional());
 const roomId = z.string({ message: 'Escolha a sala' }).trim().min(1, 'Escolha a sala').max(64);
@@ -58,6 +65,8 @@ const createSchema = z.object({
     type: bookingType,
     title,
     description,
+    publicOnSite,
+    publicDescription,
     roomId,
     startTime: dateTime('Início'),
     endTime: dateTime('Término'),
@@ -76,6 +85,8 @@ const updateSchema = z.object({
     type: bookingType.optional(),
     title: title.optional(),
     description,
+    publicOnSite,
+    publicDescription,
     roomId: roomId.optional(),
     startTime: dateTime('Início').optional(),
     endTime: dateTime('Término').optional(),
@@ -102,6 +113,30 @@ to: Date
     }
     return { range: { from: start,
 to: new Date(lastDay.getTime() + DAY_MS) } };
+}
+
+/**
+ * Só evento vai para o site: virar reunião tira a publicação. Sem `requested`,
+ * mantém o que já estava (`current`).
+ */
+export function effectivePublicOnSite(
+    type: BookingType,
+    requested: boolean | undefined,
+    current = false,
+): boolean {
+    return type === 'EVENT' ? (requested ?? current) : false;
+}
+
+/** Quantos eventos a página pública mostra de uma vez. */
+export const PUBLIC_EVENTS_LIMIT = 50;
+
+export class ListPublicEventsUseCase {
+    constructor(private readonly repo: RoomBookingRepository) {}
+
+    /** Eventos publicados que ainda não terminaram, do mais próximo em diante. */
+    async execute(now: Date = new Date()): Promise<{ events: PublicEventItem[] }> {
+        return { events: await this.repo.listPublicEvents(nowWallClock(now), PUBLIC_EVENTS_LIMIT) };
+    }
 }
 
 export class ListRoomBookingsUseCase {
@@ -158,10 +193,13 @@ endTime: new Date(data.endTime) };
 
         // Série só quando a repetição gerou mais de uma ocorrência.
         const seriesId = occurrences.length > 1 ? randomUUID() : null;
+        const showOnSite = effectivePublicOnSite(data.type, data.publicOnSite);
         const rows: RoomBookingCreateData[] = occurrences.map(slot => ({
             type: data.type,
             title: data.title,
             description: data.description ?? null,
+            publicOnSite: showOnSite,
+            publicDescription: showOnSite ? (data.publicDescription ?? null) : null,
             roomId: data.roomId,
             startTime: slot.startTime,
             endTime: slot.endTime,
@@ -212,9 +250,20 @@ export class UpdateRoomBookingUseCase {
             return { error: new UserDataNotFoundError() };
         }
 
+        // Virar reunião tira do site; evento mantém/muda conforme o corpo.
+        const showOnSite = effectivePublicOnSite(
+            data.type ?? existing.type,
+            data.publicOnSite,
+            existing.publicOnSite,
+        );
+
         // Só o que veio no corpo (null limpa descrição/responsável).
         const changes: RoomBookingUpdateData = {
             ...(data.type !== undefined && { type: data.type }),
+            ...(showOnSite !== existing.publicOnSite && { publicOnSite: showOnSite }),
+            ...(!showOnSite && existing.publicDescription !== null && { publicDescription: null }),
+            ...(showOnSite &&
+                data.publicDescription !== undefined && { publicDescription: data.publicDescription }),
             ...(data.title !== undefined && { title: data.title }),
             ...(data.description !== undefined && { description: data.description }),
             ...(data.roomId !== undefined && { roomId: slot.roomId }),

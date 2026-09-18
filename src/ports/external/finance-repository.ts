@@ -1,9 +1,20 @@
 import type { FinancialCategoryModel } from '../../generated/prisma/models/FinancialCategory.js';
 import type { FinancialTransactionModel } from '../../generated/prisma/models/FinancialTransaction.js';
 import type { FinancialAccountModel } from '../../generated/prisma/models/FinancialAccount.js';
+import type { FinanceRecurringTransactionModel } from '../../generated/prisma/models/FinanceRecurringTransaction.js';
+import type { FinancePaymentMethodModel } from '../../generated/prisma/models/FinancePaymentMethod.js';
+import type { FinanceMonthlyClosingModel } from '../../generated/prisma/models/FinanceMonthlyClosing.js';
 import type { FinancialType } from '../../generated/prisma/enums.js';
 
-export type { FinancialCategoryModel, FinancialTransactionModel, FinancialAccountModel, FinancialType };
+export type {
+    FinancialCategoryModel,
+    FinancialTransactionModel,
+    FinancialAccountModel,
+    FinanceRecurringTransactionModel,
+    FinancePaymentMethodModel,
+    FinanceMonthlyClosingModel,
+    FinancialType,
+};
 
 export type FinanceCategoryCreateInput = {
     name: string;
@@ -103,6 +114,8 @@ export type FinanceTransactionFilters = {
     type?: FinancialType;
     categoryId?: string;
     accountId?: string;
+    /** Forma de pagamento (texto do lançamento; comparado sem diferenciar maiúsculas). */
+    method?: string;
     search?: string;
     skip: number;
     take: number;
@@ -142,6 +155,71 @@ name: string;
 color: string;
 balanceCents: number 
 }[];
+};
+
+// ── Recorrentes (item 50) ───────────────────────────────────────────────────
+// Meses são texto "YYYY-MM" (comparável e ordenável como string, sem fuso).
+export type FinanceRecurrenceCreateInput = {
+    type: FinancialType;
+    description: string;
+    amountCents: number;
+    dayOfMonth: number;
+    startMonth: string;
+    endMonth?: string | null;
+    paymentMethod?: string | null;
+    notes?: string | null;
+    categoryId?: string | null;
+    accountId?: string | null;
+    active?: boolean;
+};
+
+export type FinanceRecurrenceUpdateInput = Partial<FinanceRecurrenceCreateInput>;
+
+// Recorrência com categoria e caixa embutidos (listagem do painel).
+export type FinanceRecurrenceWithRefs = FinanceRecurringTransactionModel & {
+    category: FinancialCategoryModel | null;
+    account: FinancialAccountModel | null;
+};
+
+// Lançamento a criar a partir de uma recorrência, em um mês específico.
+export type FinanceRecurrenceRun = {
+    recurringId: string;
+    recurringMonth: string;
+    date: Date;
+    type: FinancialType;
+    amountCents: number;
+    description: string;
+    method?: string | null;
+    notes?: string | null;
+    categoryId?: string | null;
+    accountId?: string | null;
+};
+
+// ── Formas de pagamento (item 51) ───────────────────────────────────────────
+export type FinancePaymentMethodCreateInput = {
+    name: string;
+    active?: boolean;
+    order?: number;
+};
+
+export type FinancePaymentMethodUpdateInput = Partial<FinancePaymentMethodCreateInput>;
+
+// ── Fechamento mensal (item 52) ─────────────────────────────────────────────
+// Movimento de um caixa em um mês, com o saldo de abertura (tudo antes do mês).
+export type FinanceAccountMonthMovement = {
+    openingCents: number;
+    inCents: number;
+    outCents: number;
+};
+
+export type FinanceClosingCreateInput = {
+    accountId: string;
+    month: string;
+    expectedBalanceCents: number;
+    countedBalanceCents: number;
+    differenceCents: number;
+    notes?: string | null;
+    closedByAdminId?: string | null;
 };
 
 export interface FinanceRepository {
@@ -194,6 +272,37 @@ total: number
     ): Promise<FinanceAttachmentMeta>;
     getAttachment(id: string): Promise<FinanceAttachmentFile | null>;
     deleteAttachment(id: string): Promise<boolean>;
+
+    // Recorrentes
+    listRecurrences(includeInactive: boolean): Promise<FinanceRecurrenceWithRefs[]>;
+    // Só as ativas (e não excluídas) — base da geração automática.
+    listRecurrencesToGenerate(): Promise<FinanceRecurringTransactionModel[]>;
+    findRecurrenceById(id: string): Promise<FinanceRecurringTransactionModel | null>;
+    createRecurrence(data: FinanceRecurrenceCreateInput): Promise<FinanceRecurringTransactionModel>;
+    updateRecurrence(id: string, data: FinanceRecurrenceUpdateInput): Promise<FinanceRecurringTransactionModel>;
+    // Soft-delete: os lançamentos já gerados continuam no caixa.
+    softDeleteRecurrence(id: string): Promise<boolean>;
+    // Cria o lançamento do mês; `false` quando ele já existia (unique) — idempotente.
+    createRecurrenceTransaction(run: FinanceRecurrenceRun): Promise<boolean>;
+    setRecurrenceLastGeneratedMonth(id: string, month: string): Promise<void>;
+
+    // Formas de pagamento
+    listPaymentMethods(includeInactive: boolean): Promise<FinancePaymentMethodModel[]>;
+    findPaymentMethodByName(name: string): Promise<FinancePaymentMethodModel | null>;
+    createPaymentMethod(data: FinancePaymentMethodCreateInput): Promise<FinancePaymentMethodModel>;
+    updatePaymentMethod(id: string, data: FinancePaymentMethodUpdateInput): Promise<FinancePaymentMethodModel>;
+    softDeletePaymentMethod(id: string): Promise<boolean>;
+
+    // Fechamento mensal
+    listClosings(filters: {
+ accountId?: string;
+year?: string 
+}): Promise<FinanceMonthlyClosingModel[]>;
+    findClosing(accountId: string, month: string): Promise<FinanceMonthlyClosingModel | null>;
+    // Saldo de abertura + entradas/saídas do caixa no mês [from, to].
+    accountMonthMovement(accountId: string, from: Date, to: Date): Promise<FinanceAccountMonthMovement>;
+    createClosing(data: FinanceClosingCreateInput): Promise<FinanceMonthlyClosingModel>;
+    deleteClosing(id: string): Promise<boolean>;
 
     // Dashboard
     summary(from: Date, to: Date): Promise<FinanceSummary>;

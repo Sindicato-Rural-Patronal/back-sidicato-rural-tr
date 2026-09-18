@@ -19,6 +19,22 @@ export class PropertyAdapter implements PropertyRepository {
         return this.prisma.property.create({ data });
     }
 
+    update(
+        id: string,
+        data: {
+ name?: string;
+registration?: string | null;
+addressId?: string 
+},
+    ): Promise<PropertyWithAddress> {
+        // Campos undefined são ignorados pelo Prisma: só muda o que veio.
+        return this.prisma.property.update({
+            where: { id },
+            data,
+            include: { address: true },
+        }) as Promise<PropertyWithAddress>;
+    }
+
     findByUserDataId(userDataId: string, skip?: number, take?: number): Promise<PropertyWithAddress[]> {
         return this.prisma.property.findMany({
             where: { userDataId,
