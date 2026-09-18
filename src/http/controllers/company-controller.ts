@@ -14,6 +14,7 @@ import type {
     ListPartnersUseCase,
     ReorderPartnersUseCase,
 } from '../../usecase/company-usecases.js';
+import type { UpdatePropertyUseCase } from '../../usecase/update-property.js';
 import type { UploadCompanyPartnerLogoUseCase } from '../../usecase/upload-company-partner-logo.js';
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { requirePermission, errorToStatus } from '../lib/require-permission.js';
@@ -39,6 +40,7 @@ export type CompanyUseCases = {
     removeMember: RemoveCompanyMemberUseCase;
     titles: ListMemberTitlesUseCase;
     addProperty: AddCompanyPropertyUseCase;
+    updateProperty: UpdatePropertyUseCase;
     removeProperty: RemoveCompanyPropertyUseCase;
     uploadPartnerLogo: UploadCompanyPartnerLogoUseCase;
     listPartners: ListPartnersUseCase;
@@ -127,6 +129,17 @@ export class CompanyController {
         const r = await this.uc.addProperty.execute(req.params.id, req.body);
         if (r.error) return this.fail(reply, r.error);
         return reply.status(201).send({ id: r.property!.id });
+    }
+
+    async updateProperty(req: FastifyRequest<{ Params: PropertyParams }>, reply: FastifyReply) {
+        if ((await this.can(req, reply, 'UPDATE_USER')) === null) return;
+        const r = await this.uc.updateProperty.execute(
+            req.params.propertyId,
+            { companyId: req.params.id },
+            req.body,
+        );
+        if (r.error) return this.fail(reply, r.error);
+        return reply.send(r.property);
     }
 
     async removeProperty(req: FastifyRequest<{ Params: PropertyParams }>, reply: FastifyReply) {

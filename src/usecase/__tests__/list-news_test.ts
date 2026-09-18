@@ -19,15 +19,15 @@ describe('ListNewsUseCase', () => {
         it('passes PUBLISHED filter to repository when provided', async () => {
             vi.mocked(mockNewsRepo.findAll).mockResolvedValue([]);
             const uc = new ListNewsUseCase(mockNewsRepo);
-            await uc.execute('PUBLISHED');
-            expect(mockNewsRepo.findAll).toHaveBeenCalledWith('PUBLISHED', 0, 20);
+            await uc.execute({ status: 'PUBLISHED' });
+            expect(mockNewsRepo.findAll).toHaveBeenCalledWith({ status: 'PUBLISHED' }, 0, 20);
         });
 
         it('busca todas as notícias quando filtro não informado', async () => {
             vi.mocked(mockNewsRepo.findAll).mockResolvedValue([]);
             const uc = new ListNewsUseCase(mockNewsRepo);
             await uc.execute();
-            expect(mockNewsRepo.findAll).toHaveBeenCalledWith(undefined, 0, 20);
+            expect(mockNewsRepo.findAll).toHaveBeenCalledWith({}, 0, 20);
         });
 
         it('retorna lista de notícias', async () => {

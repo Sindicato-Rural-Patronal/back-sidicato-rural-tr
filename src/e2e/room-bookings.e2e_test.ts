@@ -156,6 +156,8 @@ seriesId: string | null
 name: 'Maria Responsável' },
             responsibleName: null,
             seriesId: null,
+            publicOnSite: false,
+            publicDescription: null,
         });
     });
 

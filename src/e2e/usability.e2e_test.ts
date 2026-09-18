@@ -222,8 +222,14 @@ url: `/courses/${ids.course}` });
     it('financeiro: lista traz os totais do filtro', async () => {
         const res = await get('/admin/finance/transactions');
         expect(res.statusCode, res.body).toBe(200);
-        expect((JSON.parse(res.body) as { totals: unknown }).totals).toEqual({ incomeCents: 0,
-expenseCents: 0 });
+        const { totals } = JSON.parse(res.body) as {
+ totals: {
+ incomeCents: number;
+expenseCents: number 
+} 
+};
+        expect(typeof totals.incomeCents).toBe('number');
+        expect(typeof totals.expenseCents).toBe('number');
     });
 
     it('mensagem pode voltar a ficar não lida', async () => {

@@ -238,6 +238,11 @@ model RoomBooking {
   // Responsável sem cadastro (texto livre)
   responsibleName       String?
   seriesId              String?
+  // Publicação no site: só eventos (EVENT) podem aparecer em /eventos.
+  publicOnSite          Boolean     @default(false)
+  // Texto mostrado ao público. Separado de `description`, que são as
+  // observações internas da equipe (não devem vazar para o site).
+  publicDescription     String?
   isDeleted             Boolean     @default(false)
   deletedAt             DateTime?
   createdAt             DateTime    @default(now())
@@ -245,6 +250,7 @@ model RoomBooking {
 
   @@index([roomId, startTime])
   @@index([seriesId])
+  @@index([publicOnSite, startTime])
 }
 
 enum QuotePeriod {
@@ -338,11 +344,17 @@ model News {
   summary     String?
   bannerUrl   String?
   status      NewsStatus @default(UNPUBLISHED)
+  // Data mostrada ao leitor ("Publicada em").
   publishedAt DateTime?
+  // Agendamento: hora "de parede" de Brasília rotulada em UTC (como os cursos).
+  // null = no ar assim que o status for PUBLISHED; no futuro = só aparece depois.
+  publishAt   DateTime?
   isDeleted   Boolean    @default(false)
   deletedAt   DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+
+  @@index([status, publishAt])
 }
 
 // Unicidade (courseId, userDataId) entre inscrições ATIVAS é garantida por
@@ -402,6 +414,7 @@ model FinancialCategory {
   updatedAt DateTime      @updatedAt
 
   transactions FinancialTransaction[]
+  recurrences  FinanceRecurringTransaction[]
 }
 
 // Financeiro: lançamento de caixa. Valor em CENTAVOS (Int) — nunca float.
@@ -430,6 +443,13 @@ model FinancialTransaction {
   // userAdmin.id de quem lançou (histórico; sem FK formal).
   createdBy String?
 
+  // Origem do lançamento quando ele nasceu de uma recorrência (item 50).
+  // `recurringMonth` é o mês gerado ("YYYY-MM"); o par (recurringId,
+  // recurringMonth) é único → a geração nunca repete o mesmo mês.
+  recurring   FinanceRecurringTransaction? @relation(fields: [recurringId], references: [id], onDelete: SetNull)
+  recurringId String?
+  recurringMonth String?
+
   // Dados da Nota de Empenho (fornecedor, NF, banco/cheque, desconto). Opcional;
   // usado para gerar o PDF de quitação do lançamento.
   empenho Json?
@@ -441,11 +461,82 @@ model FinancialTransaction {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  @@unique([recurringId, recurringMonth])
   @@index([date])
   @@index([type])
   @@index([categoryId])
   @@index([accountId])
   @@index([transferId])
+}
+
+// Financeiro: lançamento recorrente (aluguel, salário, mensalidade…). Não é um
+// lançamento: é o molde de onde, todo mês, nasce um FinancialTransaction.
+// Meses são texto "YYYY-MM" (sem fuso, comparável e ordenável como string).
+model FinanceRecurringTransaction {
+  id          String        @id @default(uuid())
+  type        FinancialType
+  description String
+  amountCents Int
+  // Dia do mês do lançamento (1–31). Mês mais curto usa o último dia dele.
+  dayOfMonth  Int
+  // Primeiro mês a gerar ("YYYY-MM") e, opcional, o último.
+  startMonth  String
+  endMonth    String?
+  // Último mês já gerado ("YYYY-MM") — junto com o unique de
+  // FinancialTransaction(recurringId, recurringMonth) garante a idempotência.
+  lastGeneratedMonth String?
+  paymentMethod String?
+  notes         String?
+  active        Boolean @default(true)
+
+  category   FinancialCategory? @relation(fields: [categoryId], references: [id])
+  categoryId String?
+  account    FinancialAccount? @relation(fields: [accountId], references: [id])
+  accountId  String?
+
+  transactions FinancialTransaction[]
+
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([active])
+}
+
+// Financeiro: formas de pagamento cadastráveis (PIX, DINHEIRO, BOLETO…).
+// FinancialTransaction.method continua texto livre (histórico); esta lista é o
+// que o painel oferece no select, e o usuário pode acrescentar.
+model FinancePaymentMethod {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Financeiro: fechamento/conferência mensal de um caixa. Guarda o saldo que o
+// sistema calculou (expected) e o que foi contado na mão (counted).
+model FinanceMonthlyClosing {
+  id                   String   @id @default(uuid())
+  account              FinancialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  accountId            String
+  // Mês fechado, "YYYY-MM".
+  month                String
+  expectedBalanceCents Int
+  countedBalanceCents  Int
+  // counted − expected (positivo = sobrou dinheiro no caixa).
+  differenceCents      Int
+  notes                String?
+  closedAt             DateTime @default(now())
+  // userAdmin.id de quem fechou (histórico; sem FK formal).
+  closedByAdminId      String?
+
+  @@unique([accountId, month])
+  @@index([month])
 }
 
 // Multi-caixa: conta/caixa onde o dinheiro está (Caixa geral, Banco, Poupança…).
@@ -462,6 +553,8 @@ model FinancialAccount {
   updatedAt DateTime @updatedAt
 
   transactions FinancialTransaction[]
+  recurrences  FinanceRecurringTransaction[]
+  closings     FinanceMonthlyClosing[]
 }
 
 // Comprovante/anexo de um lançamento (PDF ou imagem). Guardado no banco
@@ -537,6 +630,8 @@ enum Permission {
   READ_MARKET_QUOTE
 
   READ_AUDIT
+  // Configurar a trilha (tempo de guarda dos registros).
+  UPDATE_AUDIT
 
   CREATE_FINANCE
   UPDATE_FINANCE

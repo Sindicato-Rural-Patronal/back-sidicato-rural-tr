@@ -25,6 +25,7 @@ const ROOM = 'room-1';
 function makeRepo(occupants: RoomOccupant[] = []) {
     const repo = {
         list: vi.fn().mockResolvedValue([]),
+        listPublicEvents: vi.fn().mockResolvedValue([]),
         schedule: vi.fn().mockResolvedValue([]),
         findById: vi.fn(),
         occupants: vi.fn(),
@@ -51,6 +52,8 @@ const BOOKING: RoomBookingItem = {
     type: 'MEETING',
     title: 'Diretoria',
     description: null,
+    publicOnSite: false,
+    publicDescription: null,
     roomId: ROOM,
     roomName: 'SALA 1',
     startTime: new Date('2026-10-05T08:00:00.000Z'),

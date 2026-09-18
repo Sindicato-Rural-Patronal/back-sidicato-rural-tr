@@ -19,7 +19,12 @@ export type RoomBookingItem = {
     id: string;
     type: BookingType;
     title: string;
+    /** Observações internas da equipe (nunca vão para o site). */
     description: string | null;
+    /** Aparece em /eventos; só vale para type = EVENT. */
+    publicOnSite: boolean;
+    /** Texto do evento no site. */
+    publicDescription: string | null;
     roomId: string;
     roomName: string;
     startTime: Date;
@@ -44,6 +49,18 @@ export type RoomScheduleItem = {
     /** Status do curso; null para reservas. */
     status: string | null;
     seriesId: string | null;
+    /** Evento publicado no site (sempre false para cursos e reuniões). */
+    publicOnSite: boolean;
+};
+
+/** Evento publicado no site (rota pública GET /events). */
+export type PublicEventItem = {
+    id: string;
+    title: string;
+    description: string | null;
+    startTime: Date;
+    endTime: Date;
+    roomName: string;
 };
 
 export type RoomBookingFilters = {
@@ -62,6 +79,8 @@ export type RoomBookingCreateData = {
     type: BookingType;
     title: string;
     description: string | null;
+    publicOnSite: boolean;
+    publicDescription: string | null;
     roomId: string;
     startTime: Date;
     endTime: Date;
@@ -89,6 +108,8 @@ export type GuardedWrite<T> = { conflict: RoomOccupant } | { result: T };
 export interface RoomBookingRepository {
     /** Não excluídas que sobrepõem o período, por início. */
     list(filters: RoomBookingFilters): Promise<RoomBookingItem[]>;
+    /** Eventos publicados no site que ainda não acabaram em `from`, por início. */
+    listPublicEvents(from: Date, limit: number): Promise<PublicEventItem[]>;
     /** Cursos (não excluídos) e reservas que sobrepõem o período, por início. */
     schedule(filters: {
         from: Date;

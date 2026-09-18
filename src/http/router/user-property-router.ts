@@ -6,13 +6,68 @@ import { createAddressAdapter } from '../../adapter/database/address-adapter.js'
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
 import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { AddPropertyUseCase } from '../../usecase/add-property.js';
+import { UpdatePropertyUseCase } from '../../usecase/update-property.js';
 import { DeletePropertyUseCase } from '../../usecase/delete-property.js';
 import { ListUserPropertiesUseCase } from '../../usecase/list-user-properties.js';
 import { AddPropertyController } from '../controllers/add-property.js';
+import { UpdatePropertyController } from '../controllers/update-property.js';
 import { DeletePropertyController } from '../controllers/delete-property.js';
 import { ListUserPropertiesController } from '../controllers/list-user-properties.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
+
+// Campos do endereço aceitos no corpo (criar e editar usam os mesmos).
+const addressBodyProperties = {
+    type: { type: 'string',
+nullable: true,
+enum: ['URBAN', 'RURAL'] },
+    city: { type: 'string',
+nullable: true },
+    state: { type: 'string',
+nullable: true },
+    zipCode: { type: 'string',
+nullable: true },
+    complement: { type: 'string',
+nullable: true },
+    notes: { type: 'string',
+nullable: true },
+    street: { type: 'string',
+nullable: true },
+    number: { type: 'string',
+nullable: true },
+    neighborhood: { type: 'string',
+nullable: true },
+    localityName: { type: 'string',
+nullable: true },
+    road: { type: 'string',
+nullable: true },
+    km: { type: 'string',
+nullable: true },
+    lot: { type: 'string',
+nullable: true },
+    section: { type: 'string',
+nullable: true },
+};
+
+// Propriedade como sai na resposta (a listagem devolve o mesmo formato).
+const propertyResponse = {
+    type: 'object',
+    properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        registration: { type: 'string',
+nullable: true },
+        address: {
+            type: 'object',
+            nullable: true,
+            properties: {
+                ...addressBodyProperties,
+                id: { type: 'string' },
+                type: { type: 'string' },
+            },
+        },
+    },
+};
 
 export async function userPropertyRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userDataRepository = createUserDataAdapter(prisma);
@@ -28,6 +83,10 @@ export async function userPropertyRouter(fastify: FastifyInstance, prisma: Prism
     );
     const addPropertyController = new AddPropertyController(
         new AddPropertyUseCase(userDataRepository, propertyRepository, addressRepository),
+        getAdminPermissions,
+    );
+    const updatePropertyController = new UpdatePropertyController(
+        new UpdatePropertyUseCase(propertyRepository, addressRepository),
         getAdminPermissions,
     );
     const deletePropertyController = new DeletePropertyController(
@@ -173,6 +232,51 @@ properties: { id: { type: 'string' } } },
         (req: FastifyRequest, res: FastifyReply) =>
             addPropertyController.handle(
                 req as Parameters<typeof addPropertyController.handle>[0],
+                res,
+            ),
+    );
+
+    fastify.patch(
+        '/admin/users/:id/properties/:propertyId',
+        {
+            schema: {
+                tags: ['Admin — Properties'],
+                summary: 'Update a property (rural land) of a worker',
+                description:
+                    'Todos os campos são opcionais: o que não vier fica como está. Propriedade de outra pessoa responde 404.',
+                security: [{ bearerAuth: [] }],
+                params: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string' },
+                        propertyId: { type: 'string' },
+                    },
+                    required: ['id', 'propertyId'],
+                },
+                body: {
+                    type: 'object',
+                    properties: {
+                        name: { type: 'string',
+example: 'Fazenda São João' },
+                        registration: { type: 'string',
+nullable: true,
+example: 'MAT-2026-123' },
+                        address: { type: 'object',
+properties: addressBodyProperties },
+                    },
+                },
+                response: {
+                    200: propertyResponse,
+                    400: errorResponse,
+                    401: errorResponse,
+                    403: errorResponse,
+                    404: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest, res: FastifyReply) =>
+            updatePropertyController.handle(
+                req as Parameters<typeof updatePropertyController.handle>[0],
                 res,
             ),
     );

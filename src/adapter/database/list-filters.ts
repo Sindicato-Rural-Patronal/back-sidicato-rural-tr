@@ -24,7 +24,7 @@ export function searchKey(value: string): string {
 type TextSearch = {
     term: string;
     key: string;
-    /** Dígitos do termo quando ele parece um documento (só números, ponto, traço, barra); senão ''. */
+    /** Dígitos do termo quando ele parece documento ou telefone (só números e pontuação); senão ''. */
     docDigits: string;
 };
 
@@ -32,8 +32,9 @@ type TextSearch = {
 function textSearch(search: string | undefined): TextSearch | null {
     const term = search?.trim();
     if (!term) return null;
-    // "joao 1" não vira busca por CPF/CNPJ contendo "1".
-    const docDigits = /^[\d.\-/\s]+$/.test(term) ? term.replace(/\D/g, '') : '';
+    // "joao 1" não vira busca por CPF/CNPJ/telefone contendo "1".
+    // Parênteses e "+" entram por causa do telefone: "(44) 99999-0001".
+    const docDigits = /^[\d.\-/\s()+]+$/.test(term) ? term.replace(/\D/g, '') : '';
     return { term,
 key: searchKey(term),
 docDigits };
@@ -59,9 +60,31 @@ function cpfConditions(s: TextSearch) {
     return s.docDigits ? [{ cpf: { contains: s.docDigits } }] : [];
 }
 
-/** Busca de pessoa (nome, e-mail, CPF) — usada nas pessoas e dentro do Unimed. */
+/**
+ * Telefone: cadastros antigos gravaram com máscara e os novos só com dígitos.
+ * Sem função no `contains` do Prisma, procura pelos dois — os dígitos ("44999")
+ * e o termo como foi digitado ("(44) 99999"). Só quando a busca parece um
+ * telefone (números e pontuação) e tem ao menos 3 dígitos, senão "1" casaria
+ * com quase todo mundo.
+ */
+function phoneConditions(s: TextSearch) {
+    if (s.docDigits.length < 3) return [];
+    const values = s.term === s.docDigits ? [s.docDigits] : [s.docDigits, s.term];
+    return values.flatMap(value => [
+        { phone: { contains: value } },
+        { phone2: { contains: value } },
+        { phone3: { contains: value } },
+    ]);
+}
+
+/** Busca de pessoa (nome, e-mail, CPF, telefones) — pessoas e Unimed. */
 function personSearchOr(s: TextSearch) {
-    return [...nameConditions(s, 'name', 'nameSearch'), ...emailConditions(s), ...cpfConditions(s)];
+    return [
+        ...nameConditions(s, 'name', 'nameSearch'),
+        ...emailConditions(s),
+        ...cpfConditions(s),
+        ...phoneConditions(s),
+    ];
 }
 
 export function buildUserListWhere(filters?: UserListFilters) {
@@ -114,6 +137,7 @@ export function buildCompanyListWhere(filters: CompanyListFilters) {
             ...nameConditions(s, 'name', 'nameSearch'),
             ...nameConditions(s, 'tradeName', 'tradeNameSearch'),
             ...emailConditions(s),
+            ...phoneConditions(s),
         ];
         if (s.docDigits.length >= 2) or.push({ cnpj: { contains: s.docDigits } });
         where.OR = or;
@@ -163,12 +187,20 @@ mode: 'insensitive' as const } },
     };
 }
 
-// Busca filtra pelo UserData vinculado (nome ou CPF).
-export function buildUnimedListWhere(search?: string) {
+// Busca filtra pelo UserData vinculado (nome, CPF ou telefone).
+// `userDataId` traz os cadastros ligados à pessoa: o dela e aqueles em que ela é
+// o titular da família (usado na aba Unimed da ficha da pessoa).
+export function buildUnimedListWhere(search?: string, userDataId?: string) {
     const s = textSearch(search);
     return {
         isDeleted: false,
-        ...(s && { userData: { OR: [...nameConditions(s, 'name', 'nameSearch'), ...cpfConditions(s)] } }),
+        ...(s && {
+            userData: {
+                OR: [...nameConditions(s, 'name', 'nameSearch'), ...cpfConditions(s), ...phoneConditions(s)],
+            },
+        }),
+        ...(userDataId && { OR: [{ userDataId },
+{ titularId: userDataId }] }),
     };
 }
 

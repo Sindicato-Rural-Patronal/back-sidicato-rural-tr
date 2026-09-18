@@ -34,6 +34,8 @@ nullable: true },
 enum: ['PUBLISHED', 'UNPUBLISHED'] },
     publishedAt: { type: 'string',
 nullable: true },
+    publishAt: { type: 'string',
+nullable: true },
     createdAt: { type: 'string' },
     updatedAt: { type: 'string' },
 };
@@ -82,7 +84,8 @@ export async function newsRouter(fastify: FastifyInstance, prisma: PrismaClient)
             schema: {
                 tags: ['News'],
                 summary: 'List published news',
-                description: 'Returns published news ordered by most recent first.',
+                description:
+                    'Notícias publicadas, mais recentes primeiro. Agendadas para depois ficam de fora até a hora chegar (relógio de Brasília).',
                 querystring: paginationQuerystring,
                 response: {
                     200: pagedResponse({ type: 'object',
@@ -136,9 +139,14 @@ default: 1 },
 minimum: 1,
 maximum: 1000,
 default: 20 },
-                        status: { type: 'string',
-enum: ['PUBLISHED', 'UNPUBLISHED'],
-description: 'Filtrar por status' },
+                        status: {
+                            type: 'string',
+                            enum: ['PUBLISHED', 'SCHEDULED', 'UNPUBLISHED'],
+                            description:
+                                'PUBLISHED = já no ar; SCHEDULED = publicada, mas agendada para depois; UNPUBLISHED = rascunho',
+                        },
+                        search: { type: 'string',
+description: 'Buscar por título' },
                     },
                 },
                 response: {
@@ -175,6 +183,14 @@ example: 'UNPUBLISHED' },
                         publishedAt: { type: 'string',
 format: 'date-time',
 example: '2026-08-10T08:00:00-03:00' },
+                        publishAt: {
+                            type: 'string',
+                            format: 'date-time',
+                            nullable: true,
+                            description:
+                                'Agendamento: hora "de parede" de Brasília com Z. null/ausente = no ar assim que o status for PUBLISHED.',
+                            example: '2026-08-10T08:00:00.000Z',
+                        },
                     },
                 },
                 response: {
@@ -218,6 +234,13 @@ example: 'PUBLISHED' },
 format: 'date-time',
 nullable: true,
 example: '2026-08-10T08:00:00-03:00' },
+                        publishAt: {
+                            type: 'string',
+                            format: 'date-time',
+                            nullable: true,
+                            description: 'Agendamento (hora de Brasília com Z); null = publicar agora.',
+                            example: '2026-08-10T08:00:00.000Z',
+                        },
                     },
                 },
                 response: {

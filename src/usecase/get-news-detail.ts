@@ -1,5 +1,6 @@
 import type { NewsRepository, NewsModel } from '../ports/external/news-repository.js';
 import { NewsNotFoundError } from '../errors/not-found.js';
+import { isNewsVisible, nowWallClock } from './news-visibility.js';
 
 type GetNewsDetailResponse = {
     error?: Error;
@@ -9,10 +10,10 @@ type GetNewsDetailResponse = {
 export class GetNewsDetailUseCase {
     constructor(private readonly newsRepository: NewsRepository) {}
 
-    async execute(id: string): Promise<GetNewsDetailResponse> {
+    async execute(id: string, at: Date = nowWallClock()): Promise<GetNewsDetailResponse> {
         const news = await this.newsRepository.findById(id);
-        // Rota pública: rascunhos (não PUBLISHED) não devem vazar por UUID.
-        if (!news || news.status !== 'PUBLISHED') {
+        // Rota pública: rascunho e notícia agendada não vazam por UUID.
+        if (!news || !isNewsVisible(news, at)) {
             return { error: new NewsNotFoundError() };
         }
         return { news };

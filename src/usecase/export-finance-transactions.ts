@@ -17,6 +17,8 @@ value: t => t.category?.name },
 value: t => t.description },
     { header: 'Método',
 value: t => t.method },
+    { header: 'Recorrente',
+value: t => (t.recurringId ? 'Sim' : 'Não') },
     { header: 'Valor (R$)',
 value: t => csvMoney(t.amountCents / 100) },
     { header: 'Observações',
@@ -35,6 +37,7 @@ export class ExportFinanceTransactionsUseCase {
             type: q.type,
             categoryId: q.categoryId,
             accountId: q.accountId,
+            method: q.method,
             search: q.search,
         });
         return toCsv(columns, rows);

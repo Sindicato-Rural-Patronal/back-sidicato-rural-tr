@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { ListNewsUseCase } from '../../usecase/list-news.js';
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { requirePermission } from '../lib/require-permission.js';
+import { adminNewsFilters, nowWallClock } from '../../usecase/news-visibility.js';
 
 export class ListAllNewsController {
     constructor(
@@ -18,8 +19,8 @@ export class ListAllNewsController {
         const q = request.query as Record<string, string>;
         const page = Math.max(1, Number(q.page) || 1);
         const limit = Math.min(100, Math.max(1, Number(q.limit) || 20));
-        const status = (q.status as 'PUBLISHED' | 'UNPUBLISHED') || undefined;
-        const response = await this.listNewsUseCase.execute(status, page, limit);
+        const filters = adminNewsFilters(q.status, q.search, nowWallClock());
+        const response = await this.listNewsUseCase.execute(filters, page, limit);
         return reply.status(200).send(response.result);
     }
 }

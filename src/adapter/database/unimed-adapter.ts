@@ -59,8 +59,8 @@ isDeleted: false },
  items: UnimedWithUser[];
 total: number 
 }> {
-        const { page, limit, search } = filters;
-        const where = buildUnimedListWhere(search);
+        const { page, limit, search, userDataId } = filters;
+        const where = buildUnimedListWhere(search, userDataId);
         const [items, total] = await Promise.all([
             this.prisma.unimedBeneficiario.findMany({
                 where,

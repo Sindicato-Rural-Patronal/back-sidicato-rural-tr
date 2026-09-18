@@ -65,14 +65,14 @@ src/
 | `CompanyMember`          | id, companyId (FK), userDataId (FK), title (texto livre em maiúsculas) — único por (companyId, userDataId) |
 | `UserAdmin`              | id, username, passwordHash, userDataId (FK), rulesId (FK)                                                  |
 | `PublicContact`          | id, userDataId (FK único, cascade), title (cargo exibido), order — contatos da página Contato; qualquer pessoa, com ou sem login |
-| `SiteSetting`            | key, value — chaves `social.*`, `org.*` (telefone, e-mail, endereço, horário, busca do mapa), `about.text`, `quotes.source` |
+| `SiteSetting`            | key, value — chaves `social.*`, `org.*` (telefone, e-mail, endereço, horário, busca do mapa), `about.text`, `quotes.source`, `audit.retentionDays` |
 | `UserInstructor`         | id, userDataId (FK único), bio, linkedin, instagram, facebook                                              |
 | `Rule`                   | id, name, description, permissions (Permission[])                                                          |
 | `Course`                 | id, name, description, roomId (FK), startTime, endTime, status, price, workloadHours, coverImage (coluna `bannerUrl`, JPEG 1920×1080), coverImageThumb (coluna `bannerThumbUrl`, WebP 640×360 para os cards; migration `20260919110000`; null em cursos antigos → front usa a capa), eventNumber, minStudents, preEnrolled, waitlist, registrationDeadline, observations |
 | `CourseInstructor`       | id, courseId (FK), instructorId (FK→UserInstructor), title, category                                      |
-| `RoomBooking`            | id, type (`BookingType`: EVENT/MEETING), title, description, roomId (FK→room, cascade), startTime, endTime (hora "de parede" com Z, como o curso), responsibleUserDataId (FK→UserData, SetNull), responsibleName (responsável sem cadastro), seriesId (mesma repetição), isDeleted/deletedAt — índices (roomId, startTime) e (seriesId); CHECK `endTime > startTime`. Migration `20260922090000_room_bookings` |
+| `RoomBooking`            | id, type (`BookingType`: EVENT/MEETING), title, description, roomId (FK→room, cascade), startTime, endTime (hora "de parede" com Z, como o curso), responsibleUserDataId (FK→UserData, SetNull), responsibleName (responsável sem cadastro), seriesId (mesma repetição), publicOnSite (aparece em `GET /events`; só EVENT), publicDescription (texto do evento no site — `description` é observação interna e nunca sai para o público), isDeleted/deletedAt — índices (roomId, startTime), (seriesId) e (publicOnSite, startTime); CHECK `endTime > startTime`. Migrations `20260922090000_room_bookings` e `20260923090000_news_schedule_public_events` |
 | `Room`                   | id, name (lista fixa em `lib/room-names.ts`: AUDITORIO, COZINHA, SALA DE VIDEO CONFERENCIA, SALA 1, SALA 2, SALA APL; único), description, maxCapacity, addressId (FK) |
-| `News`                   | id, title, content, summary, bannerUrl, status, publishedAt                                                |
+| `News`                   | id, title, content, summary, bannerUrl, status, publishedAt (data mostrada ao leitor), publishAt (agendamento: hora "de parede" de Brasília com Z; null = no ar assim que o status for PUBLISHED) — índice (status, publishAt). Migration `20260923090000_news_schedule_public_events` |
 | `CoursePhoto`            | id, courseId (FK), url, caption                                                                            |
 | `CourseUserRegistration` | id, courseId (FK), userDataId (FK), confirmed, attended (presença: null = sem marcar, true = presente, false = faltou; migration `20260920100000_course_completed_attendance`), isDeleted |
 | `Address`                | id, type (URBAN/RURAL), city, state, zipCode, complement, notes, street, number, neighborhood, localityName, road, km, lot, section |
@@ -94,7 +94,7 @@ src/
 | `CourseStatus` | `PUBLIC`, `PRIVATE`, `UNPUBLISHED`, `IN_PROGRESS` (iniciado pelo painel), `COMPLETED` (concluído à mão pelo painel) |
 | `NewsStatus` | `PUBLISHED`, `UNPUBLISHED` |
 | `BookingType` | `EVENT`, `MEETING` (reservas de sala) |
-| `Permission` | `CREATE_USER`, `UPDATE_USER`, `DELETE_USER`, `READ_USER`, `CREATE_COURSE`, `UPDATE_COURSE`, `DELETE_COURSE`, `READ_COURSE`, `CREATE_RULE`, `UPDATE_RULE`, `DELETE_RULE`, `READ_RULE`, `CREATE_USER_ADMIN`, `UPDATE_USER_ADMIN`, `DELETE_USER_ADMIN`, `READ_USER_ADMIN`, `CREATE_NEWS`, `UPDATE_NEWS`, `DELETE_NEWS`, `READ_NEWS`, `READ_CONTACT`, `UPDATE_CONTACT`, `CREATE_BANNER`, `UPDATE_BANNER`, `DELETE_BANNER`, `READ_BANNER` |
+| `Permission` | `CREATE_USER`, `UPDATE_USER`, `DELETE_USER`, `READ_USER`, `CREATE_COURSE`, `UPDATE_COURSE`, `DELETE_COURSE`, `READ_COURSE`, `CREATE_RULE`, `UPDATE_RULE`, `DELETE_RULE`, `READ_RULE`, `CREATE_USER_ADMIN`, `UPDATE_USER_ADMIN`, `DELETE_USER_ADMIN`, `READ_USER_ADMIN`, `CREATE_NEWS`, `UPDATE_NEWS`, `DELETE_NEWS`, `READ_NEWS`, `READ_CONTACT`, `UPDATE_CONTACT`, `CREATE_BANNER`, `UPDATE_BANNER`, `DELETE_BANNER`, `READ_BANNER`, `READ_AUDIT`, `UPDATE_AUDIT` (+ `*_MARKET_QUOTE`, `*_FINANCE`, `*_CONVENIO`) |
 | `MaritalStatus` | `SINGLE`, `MARRIED`, `DIVORCED`, `WIDOWED`, `DOMESTIC_PARTNERSHIP` |
 | `Gender` | `MALE`, `FEMALE`, `OTHER` |
 | `Ethnicity` | `WHITE`, `BLACK`, `MIXED`, `ASIAN`, `INDIGENOUS` |
@@ -112,7 +112,10 @@ CREATE_USER_ADMIN  UPDATE_USER_ADMIN  DELETE_USER_ADMIN  READ_USER_ADMIN
 CREATE_NEWS    UPDATE_NEWS    DELETE_NEWS    READ_NEWS
 READ_CONTACT   UPDATE_CONTACT
 CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
+READ_AUDIT     UPDATE_AUDIT   (ver a trilha · configurar o tempo de guarda)
 ```
+
+> As demais (`*_MARKET_QUOTE`, `*_FINANCE`, `*_CONVENIO`) estão no enum `Permission` em `prisma/schema.prisma`.
 
 ## Rotas HTTP
 
@@ -136,10 +139,20 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 | `DELETE` | `/admin/users/:id/relations/:relationId` | `DeleteUserRelationUseCase` | `UPDATE_USER` |
 | `GET` | `/admin/users/:id/properties` | `ListUserPropertiesUseCase` | `READ_USER` |
 | `POST` | `/admin/users/:id/properties` | `AddPropertyUseCase` | `UPDATE_USER` |
+| `PATCH` | `/admin/users/:id/properties/:propertyId` | `UpdatePropertyUseCase` | `UPDATE_USER` |
 | `DELETE` | `/admin/users/:id/properties/:propertyId` | `DeletePropertyUseCase` | `UPDATE_USER` |
 | `POST` | `/admin/users/:id/avatar` | `UploadAvatarUseCase` | `UPDATE_USER` |
+| `GET` | `/admin/users/duplicates?limit=50` | `ListDuplicatePeopleUseCase` | `READ_USER` |
+| `GET` | `/admin/users/merge-preview?ids=a,b` | `ComparePeopleForMergeUseCase` | `READ_USER` |
+| `POST` | `/admin/users/merge` | `MergeUsersUseCase` | `DELETE_USER` + `UPDATE_USER` |
 
 > Cadastro e edição de pessoa (`POST /users`, `PATCH /users/:id`): nome, telefone e CPF obrigatórios no cadastro; e-mail opcional (vazio ou null = sem e-mail; preenchido precisa ser válido — `lib/person-email.ts`). E-mail e telefone podem repetir; só o CPF de outra pessoa ativa dá 409 `CpfAlreadyInUseError` ("CPF já cadastrado para outra pessoa."). RG repetido continua 409. As respostas com `email` de pessoa o declaram `nullable`.
+
+> **Cadastros repetidos** (`user-merge-router.ts`, `usecase/merge-users.ts`, `adapter/database/user-merge-adapter.ts`): a inscrição pública só acha a pessoa pelo CPF, então quem estava cadastrado sem CPF ganha um segundo cadastro ao se inscrever.
+> - `GET /admin/users/duplicates` → `{ groups: [{ key, reason: NOME|TELEFONE|EMAIL, people: [{ id, name, cpf, email, phone, createdAt, hasLogin, counts: { registrations, companies, properties, relations } }] }] }`. Grupos de pessoas ativas com o mesmo `nameSearch`, telefone (só dígitos) ou e-mail (minúsculo) em que **pelo menos uma está sem CPF**; o mesmo par que casa por dois motivos sai uma vez só. `hasLogin` = existe `UserAdmin` (mesmo excluído — a coluna é única).
+> - `GET /admin/users/merge-preview?ids=a,b` → os dois cadastros no mesmo formato, para a comparação lado a lado do painel.
+> - `POST /admin/users/merge` `{ keepId, removeId }` → `{ keepId, removedId, movedRegistrations, movedCompanies, movedProperties, movedRelations, filledFields[] }`. **Numa transação só**, vão de `removeId` para `keepId`: inscrições em curso (inscrita nos dois no mesmo curso → fica a de `keepId`, a outra é cancelada), vínculos com empresas (vínculo repetido → fica o título de `keepId`, o outro é apagado), propriedades, relações nos dois sentidos (a relação entre os dois cadastros e as repetidas viram exclusão lógica), beneficiário Unimed (+ `titularId` de quem apontava para o removido), contato público, `UserInstructor`, `UserAdmin`, `AdminInvite` e `RoomBooking.responsibleUserDataId` — Unimed, contato público e instrutor só quando `keepId` ainda não tem o seu (contato público repetido é apagado, senão "Nossa Equipe" mostraria alguém excluído). Depois, os campos **vazios** de `keepId` são preenchidos com os do removido (CPF, RG, nascimento, e-mail, telefone, CAD/PRO…; nada preenchido é sobrescrito) e o removido vira `isDeleted` — nunca é apagado. A ordem importa: o removido é excluído **antes** de o CPF ir para o que fica (o índice único de CPF vale entre ativos).
+> - Recusa: mesmo id e cadastro já excluído → 400; CPFs diferentes → 409 "Cadastros com CPFs diferentes não podem ser juntados."; os dois com conta de acesso ao painel → 409 (`UserAdmin.userDataId` é único).
 
 ### Empresas e parceiros (`company-router.ts`, use cases em `usecase/company-usecases.ts`)
 | Método | Path | Use Case | Autenticação |
@@ -154,6 +167,7 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 | `PATCH` | `/admin/companies/:id/members/:memberId` | `UpdateCompanyMemberUseCase` | `UPDATE_USER` |
 | `DELETE` | `/admin/companies/:id/members/:memberId` | `RemoveCompanyMemberUseCase` | `UPDATE_USER` |
 | `POST` | `/admin/companies/:id/properties` | `AddCompanyPropertyUseCase` | `UPDATE_USER` |
+| `PATCH` | `/admin/companies/:id/properties/:propertyId` | `UpdatePropertyUseCase` (mesmo use case da pessoa; dono errado → 404) | `UPDATE_USER` |
 | `DELETE` | `/admin/companies/:id/properties/:propertyId` | `RemoveCompanyPropertyUseCase` | `UPDATE_USER` |
 | `POST` | `/admin/companies/:id/partner-logo` | `UploadCompanyPartnerLogoUseCase` | `UPDATE_USER` |
 | `GET` | `/partners` | `ListPartnersUseCase` (empresas parceiras ativas) | Pública |
@@ -238,12 +252,29 @@ CREATE_BANNER  UPDATE_BANNER  DELETE_BANNER  READ_BANNER
 | `PATCH` | `/rooms/:roomId` | `UpdateRoomUseCase` (pode manter nome antigo; trocar exige nome da lista) | `UPDATE_COURSE` |
 | `DELETE` | `/rooms/:roomId` | `DeleteRoomUseCase` — 409 com curso vinculado (`RoomHasCoursesError`) ou com reserva futura (`RoomHasBookingsError`) | `DELETE_COURSE` |
 
+### Unimed (`unimed-router.ts`, use cases `*-unimed.ts`)
+
+Convênio 1:1 com `UserData` (a pessoa vive no `UserData`; aqui só os campos do plano). Permissões de pessoa (`READ/CREATE/UPDATE/DELETE_USER`).
+
+| Método | Path | Use Case | Autenticação |
+|--------|------|----------|--------------|
+| `GET` | `/admin/unimed` | `ListUnimedUseCase` — paginado; `?search` (nome/CPF/telefone da pessoa) e `?userDataId=` (os cadastros da pessoa **e** aqueles em que ela é o titular — aba Unimed da ficha) | `READ_USER` |
+| `GET` | `/admin/unimed/:id` | `GetUnimedUseCase` | `READ_USER` |
+| `POST` | `/admin/unimed` | `CreateUnimedUseCase` (segundo cadastro ativo da mesma pessoa → 409) | `CREATE_USER` |
+| `PATCH` | `/admin/unimed/:id` | `UpdateUnimedUseCase` | `UPDATE_USER` |
+| `DELETE` | `/admin/unimed/:id` | `DeleteUnimedUseCase` (soft) | `DELETE_USER` |
+
+- **Listas fixas** (`lib/unimed-options.ts`): `tipoMovimento` (INCLUSAO DE TITULAR/DEPENDENTE, EXCLUSAO DE TITULAR/DEPENDENTE, ALTERACAO CADASTRAL, REATIVACAO) e `grauDependencia` (TITULAR, CONJUGE, FILHO(A), ENTEADO(A), PAI/MAE, OUTRO). Valor fora da lista → 400, **menos** quando é o que já estava gravado naquele registro: cadastro antigo do sistema legado (texto livre) continua salvável sem perder o dado — `unimedFieldsIssue(data, previous)`. `plano` e `tipoDependente` seguem texto livre.
+- **CNS**: chega mascarado e é gravado só com dígitos; 15 dígitos, com a mesma folga para o valor antigo do registro.
+- Migration `20260923120500_unimed_fixed_lists` só arruma dados existentes (maiúsculas quando o texto já é item da lista; tira a máscara do CNS quando sobram 15 dígitos) — nada é apagado.
+
 ### Reservas de sala (`room-booking-router.ts`, use cases em `usecase/room-booking-usecases.ts`)
 
 Eventos e reuniões que ocupam as salas, além dos cursos. Mesmas permissões dos cursos.
 
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
+| `GET` | `/events` | `ListPublicEventsUseCase` — eventos publicados que ainda não terminaram (`endTime >= agora` no relógio de Brasília), por início, até 50; devolve `{ id, title, description (= publicDescription), startTime, endTime, roomName }` | Pública |
 | `GET` | `/admin/room-bookings?from&to[&roomId][&type][&search]` | `ListRoomBookingsUseCase` | `READ_COURSE` |
 | `GET` | `/admin/room-schedule?from&to[&roomId]` | `GetRoomScheduleUseCase` (cursos + reservas) | `READ_COURSE` |
 | `POST` | `/admin/room-bookings` | `CreateRoomBookingUseCase` (com `repeat` opcional) | `CREATE_COURSE` |
@@ -252,9 +283,10 @@ Eventos e reuniões que ocupam as salas, além dos cursos. Mesmas permissões do
 
 - **Horários**: hora "de parede" de Brasília rotulada em UTC, igual aos cursos (`2026-10-05T08:00:00.000Z` = 08:00 em Terra Roxa). O painel monta a string, o backend nunca converte fuso.
 - **`from`/`to`** (`AAAA-MM-DD`, obrigatórios, `to >= from`, no máximo 370 dias) delimitam `[from 00:00, to + 1 dia 00:00)`; volta **tudo o que sobrepõe** o período, por início, sem paginação (o painel acha a reserva a editar nessa lista — não há GET por id).
-- Item: `{ id, type, title, description, roomId, roomName, startTime, endTime, responsible: { id, name } | null, responsibleName, seriesId }`. Agenda: `{ kind: COURSE|EVENT|MEETING, id, title, roomId, roomName, startTime, endTime, status (do curso; null na reserva), seriesId }` — a agenda traz os cursos de qualquer status (não excluídos), quem filtra é a tela.
-- **Criar**: `{ type, title, description?, roomId, startTime, endTime, responsibleUserDataId?, responsibleName?, repeat?: { frequency: WEEKLY|MONTHLY, until: AAAA-MM-DD } }` → 201 `{ ids, seriesId }`. `repeat` gera uma ocorrência por semana ou por mês no mesmo dia (mês sem o dia, ex. 31, é pulado), até `until` inclusive, no máximo 60 (mais que isso → 400); cada ocorrência é uma linha com o mesmo `seriesId` (`null` quando só há uma). Título aparado, até 150 caracteres — o texto vai como veio (quem escreve em maiúsculas é o painel).
-- **Editar**: todos os campos opcionais, muda **só aquela ocorrência**; `description`, `responsibleUserDataId` e `responsibleName` aceitam `null` para limpar. Conflito só é checado quando sala ou horário mudam.
+- Item: `{ id, type, title, description, publicOnSite, publicDescription, roomId, roomName, startTime, endTime, responsible: { id, name } | null, responsibleName, seriesId }`. Agenda: `{ kind: COURSE|EVENT|MEETING, id, title, roomId, roomName, startTime, endTime, status (do curso; null na reserva), seriesId, publicOnSite (false em curso e reunião) }` — a agenda traz os cursos de qualquer status (não excluídos), quem filtra é a tela.
+- **Criar**: `{ type, title, description?, publicOnSite?, publicDescription?, roomId, startTime, endTime, responsibleUserDataId?, responsibleName?, repeat?: { frequency: WEEKLY|MONTHLY, until: AAAA-MM-DD } }` → 201 `{ ids, seriesId }`. `repeat` gera uma ocorrência por semana ou por mês no mesmo dia (mês sem o dia, ex. 31, é pulado), até `until` inclusive, no máximo 60 (mais que isso → 400); cada ocorrência é uma linha com o mesmo `seriesId` (`null` quando só há uma). Título aparado, até 150 caracteres — o texto vai como veio (quem escreve em maiúsculas é o painel).
+- **Editar**: todos os campos opcionais, muda **só aquela ocorrência**; `description`, `publicDescription`, `responsibleUserDataId` e `responsibleName` aceitam `null` para limpar. Conflito só é checado quando sala ou horário mudam.
+- **No site** (`effectivePublicOnSite`): só `type: EVENT` pode ser publicado — reunião é forçada a `publicOnSite: false` (marcar no corpo não adianta) e virar reunião tira a publicação e limpa `publicDescription`. `GET /events` (pública, sem token) devolve os eventos publicados que ainda não terminaram (`endTime >= agora` no relógio de Brasília), por início, no máximo 50, com `{ id, title, description (= `publicDescription`), startTime, endTime, roomName }` — as observações internas (`description`) nunca saem.
 - **Conflito** (`usecase/room-availability.ts`, compartilhado com os cursos): mesma sala, `existente.início < novo.fim` e `existente.fim > novo.início` (encostar é permitido), contra **cursos e reservas** não excluídos. Todas as ocorrências são checadas antes de gravar, dentro da transação (trava por sala com `pg_advisory_xact_lock`): qualquer conflito → nada é criado e a resposta é 409 `Sala ocupada: Curso "X" em 05/10 08:00–12:00` (rótulos Curso/Evento/Reunião, primeiro conflito; o dia do término só aparece quando é outro dia). Criar/editar curso usa a mesma checagem — `CourseRepository.findRoomConflict` — e mostra a mesma mensagem (status de sempre: `POST /courses` responde 400, `PATCH /courses/:id` responde 409).
 - **Excluir**: `scope=one` (padrão) só aquela; `scope=future` aquela e as seguintes da mesma série (`startTime >=`), sempre exclusão lógica → `{ deleted }`.
 - **Sala**: `DELETE /rooms/:roomId` recusa (409) enquanto houver reserva não excluída terminando de agora em diante (relógio de Brasília). Reservas passadas não impedem — caem junto com a sala (FK `ON DELETE CASCADE`).
@@ -307,14 +339,16 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 ### Notícias
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
-| `GET` | `/news` | `ListNewsUseCase` | Pública |
-| `GET` | `/news/:newsId` | `GetNewsDetailUseCase` | Pública |
+| `GET` | `/news` | `ListNewsUseCase` — só as publicadas e já no ar (agendada para depois fica de fora) | Pública |
+| `GET` | `/news/:newsId` | `GetNewsDetailUseCase` — rascunho e agendada dão 404, mesmo com o link | Pública |
 | `POST` | `/news` | `CreateNewsUseCase` | `CREATE_NEWS` |
 | `PATCH` | `/news/:newsId` | `UpdateNewsUseCase` | `UPDATE_NEWS` |
 | `DELETE` | `/news/:newsId` | `DeleteNewsUseCase` | `DELETE_NEWS` |
 | `POST` | `/news/:newsId/banner` | `UploadNewsBannerUseCase` | `UPDATE_NEWS` |
 | `POST` | `/news/:newsId/image` | `UploadNewsBlockImageUseCase` | `UPDATE_NEWS` |
-| `GET` | `/admin/news` | `ListAllNewsUseCase` | `READ_NEWS` |
+| `GET` | `/admin/news` | `ListAllNewsUseCase` (filtros `status` = PUBLISHED/SCHEDULED/UNPUBLISHED e `search` por título) | `READ_NEWS` |
+
+- **Agendamento** (`usecase/news-visibility.ts`): `publishAt` é hora "de parede" de Brasília rotulada em UTC (como os cursos). `null`/ausente = no ar assim que o status for PUBLISHED; no futuro = só aparece depois (lista e detalhe públicos comparam com `nowWallClock()`). Rascunho nunca guarda agendamento e voltar para rascunho descarta o que havia. Quando a notícia é agendada e `publishedAt` não vem no corpo, a data mostrada ao leitor passa a ser a do agendamento. `publishAt` no corpo de `POST /news` e `PATCH /news/:newsId` (null = publicar agora).
 
 ### Banners
 | Método | Path | Use Case | Autenticação |
@@ -342,12 +376,14 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
 | `GET` | `/admin/audit-logs` | lista paginada (filtros `action` = create, edit, delete, export, login, login_failed (LOGIN_FAILED + LOGIN_BLOCKED); `entity`, `actorId`, `ip` (exato), `from`, `to`, `q`); cada linha traz `summary` (frase pronta), `ip`, `location`, `device` ("Chrome no Windows", `lib/user-agent.ts`), `userAgent` e `changes` | `READ_AUDIT` |
+| `GET` | `/admin/audit-settings` | `GetAuditRetentionUseCase` + o registro mais antigo e o total (`{ retentionDays, options, oldestAt, total }`) | `READ_AUDIT` |
+| `PATCH` | `/admin/audit-settings` | `UpdateAuditRetentionUseCase` — `{ retentionDays }` (0 = para sempre, senão 30 a 3650); aplica a limpeza na hora e devolve `deleted` | `UPDATE_AUDIT` |
 
 - O hook grava toda mutação com sucesso (método, caminho, `entity`, `targetLabel`); fora da trilha (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (a exportação grava a própria linha), `/admin/notifications/read` e `/auth/login` (registro próprio, abaixo).
 - De onde veio (toda linha, inclusive EXPORT e login): `ip` (`request.ip`, real por causa do `trustProxy: 1`), `userAgent` bruto (até 300 caracteres) e `location` "Cidade, UF, País" (`lib/geoip.ts`). **O IP do cliente é enviado ao ipwho.is** (HTTPS, gratuito, sem chave, `lang=pt-BR`; tem limite de uso no plano gratuito): timeout 2 s, cache em memória por IP (24 h; falha 10 min; até 1000 IPs), IP local/reservado não consulta, nunca lança (falha → null). A consulta roda no `onResponse`, depois da resposta; a exportação grava a linha antes de responder e o hook preenche o local depois (`fillAuditLocationLater`). Desligada com `NODE_ENV=test` ou `GEOIP_DISABLED=1`.
 - O que mudou (`changes` = `[{ field, before, after }]`, `lib/audit-snapshot.ts` + `lib/audit-diff.ts`): em PATCH/PUT/DELETE autenticados de um registro identificável pelo caminho (pessoa, admin/próprio perfil, regra, instrutor, propriedade, relação, Unimed, convite, empresa e vínculo, curso/conclusão, foto do curso, instrutor do curso, inscrição/confirmação/presença/ficha, sala, reserva de sala (sala e responsável pelo nome; sem `seriesId`), banner, notícia, convênio, galeria e foto, contato público, mensagem, configurações do site, cotação/fonte/cotações do dia, categoria, caixa, lançamento, comprovante) o preHandler lê o registro e o onResponse relê depois do sucesso; guarda só os campos alterados (máx. 40). Exclusão guarda os campos preenchidos como `before` (`after` null). Fora: `passwordHash` (senha trocada vira `{ field: 'password', after: 'alterada' }`), `token`, colunas Bytes (nunca lidas), `*Search`, `id`, `createdAt`/`updatedAt`/`deletedAt`/`isDeleted`; textos cortados em 300, datas ISO, listas "a, b", JSON como texto. Ids de relação viram nomes (`room`, `person`, `rule`, `category`…). Rota nova que edita um registro → acrescentar em `SNAPSHOTS`. Erro na leitura nunca afeta a request (linha sai sem `changes`).
 - Login (`POST /auth/login`): 2xx → `LOGIN` com `actorId` (lido do token no `onSend`); 401 → `LOGIN_FAILED`; 429 → `LOGIN_BLOCKED` (o limite da rota conta em `preValidation` para o corpo já estar lido). `targetLabel` = usuário digitado (até 60 caracteres); a senha nunca é lida pelo hook. `entity` "Login".
-- Retenção: nenhuma ainda (a trilha só cresce).
+- Retenção configurável (`usecase/audit-retention.ts` + `adapter/database/audit-cleanup.ts`): o tempo de guarda fica em `SiteSetting['audit.retentionDays']` (0/ausente = guardar para sempre, que é o padrão; o painel oferece 0, 90, 180, 365 e 730 dias e a API aceita 0 ou 30–3650). A limpeza roda a reboque de uma gravação na trilha (como a dos eventos do sino), no máximo uma vez por hora por processo, apaga em lotes de 1000 (até 20.000 por rodada) e loga quantas linhas saíram; `PATCH /admin/audit-settings` aplica na hora. Nunca apaga com guarda 0. A permissão `UPDATE_AUDIT` foi concedida na migration a toda regra que já tinha `READ_AUDIT`.
 - `entity` vem do caminho (`deriveAuditEntity`, mesma lista do filtro "Tipo" no painel). `targetLabel` = nome do alvo buscado antes da ação (`lookupTargetLabel`: edição, exclusão e POST sobre item existente, ex.: iniciar curso, foto da galeria) ou o nome do corpo.
 - `summary` (`lib/audit-sentence.ts`, `describeAuditAction`): rotas especiais por método + caminho com ids trocados por `:id` ("Iniciou o curso", "Adicionou foto à galeria", "Marcou mensagem como lida", "Editou as configurações do site", "Lançou as cotações do dia"…); as demais viram verbo + artigo pelo gênero + entidade ("Editou a galeria "FAEP""). Reserva de sala (`/admin/room-bookings`, entidade "Reserva de sala", feminino; alvo = título): "Criou uma reserva de sala", "Editou/Excluiu a reserva de sala "Título""; `DELETE ?scope=future` vira "… e as próximas da série" (o hook guarda o `?scope=future` no caminho gravado só nessa rota). Rota nova com ação diferente de criar/editar/excluir → acrescentar em `SPECIAL`; entidade nova → `AUDIT_ENTITY_NOUNS` e a lista do filtro no painel. A planilha `audit-logs` usa a mesma frase (sem o nome) na coluna "Ação".
 
@@ -383,9 +419,31 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 ### Financeiro (`finance-router.ts`)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
-| `GET` | `/admin/finance/transactions` | `ListFinanceTransactionsUseCase` — paginado + filtros (from, to, type, categoryId, accountId, search); `totals: { incomeCents, expenseCents }` soma todos os lançamentos filtrados (não só a página), sem transferências entre caixas nem "só nota" (mesma regra do `/admin/finance/summary`) | `READ_FINANCE` |
+| `GET` | `/admin/finance/transactions` | `ListFinanceTransactionsUseCase` — paginado + filtros (from, to, type, categoryId, accountId, `method`, search); `totals: { incomeCents, expenseCents }` soma todos os lançamentos filtrados (não só a página), sem transferências entre caixas nem "só nota" (mesma regra do `/admin/finance/summary`) | `READ_FINANCE` |
+| `GET/POST/PATCH/DELETE` | `/admin/finance/recurrences[/:id]` | `finance-recurrences.ts` — molde do lançamento que se repete todo mês | `READ/CREATE/UPDATE/DELETE_FINANCE` |
+| `POST` | `/admin/finance/recurrences/generate` | `GenerateFinanceRecurrencesUseCase` → `{ created }` | `CREATE_FINANCE` |
+| `GET/POST/PATCH/DELETE` | `/admin/finance/payment-methods[/:id]` | `finance-payment-methods.ts` — lista de formas de pagamento | `READ/CREATE/UPDATE/DELETE_FINANCE` |
+| `GET` | `/admin/finance/closings` · `/closings/preview?accountId&month` | `finance-closings.ts` — fechamentos e prévia do mês | `READ_FINANCE` |
+| `POST/DELETE` | `/admin/finance/closings[/:id]` | fechar o mês / reabrir | `CREATE_FINANCE` / `DELETE_FINANCE` |
 
 Demais rotas (categorias, caixas, lançamentos, transferências, comprovantes, export, summary) em `finance-router.ts`.
+
+**Recorrentes** (`FinanceRecurringTransaction`): meses são texto `"AAAA-MM"` (`startMonth`,
+`endMonth?`, `lastGeneratedMonth?`); `dayOfMonth` 1–31, e o mês mais curto usa o último dia
+dele. A geração (chamada quando a tela do Financeiro abre) cria os lançamentos que faltam até
+o mês atual e é **idempotente**: além do `lastGeneratedMonth`, o unique
+`FinancialTransaction(recurringId, recurringMonth)` impede o mesmo mês duas vezes. Excluir a
+recorrência é soft-delete do molde — os lançamentos já gerados ficam no caixa. Teto de 120
+meses por rodada.
+
+**Formas de pagamento** (`FinancePaymentMethod`): `FinancialTransaction.method` continua texto
+livre (histórico); esta é a lista que o painel oferece. Nome gravado em caixa alta, único; o
+filtro `method` da listagem/CSV compara sem diferenciar maiúsculas.
+
+**Fechamento mensal** (`FinanceMonthlyClosing`, único por `accountId` + `month`): saldo
+esperado = abertura (tudo antes do mês) + entradas − saídas do caixa, sempre **recalculado no
+servidor**; `differenceCents` = contado − esperado. `DELETE` reabre o mês sem tocar nos
+lançamentos.
 
 ### Endereço
 | Método | Path | Use Case | Autenticação |
@@ -406,16 +464,17 @@ Todas as rotas de listagem suportam paginação via `?page=1&limit=20`.
 
 | Endpoint | Query params de filtro |
 |----------|------------------------|
-| `GET /admin/users` | `search` (nome/email sem diferenciar acento e maiúscula; CPF com ou sem máscara), `memberType`, `memberClassification`, `gender`, `ethnicity`, `educationLevel` |
+| `GET /admin/users` | `search` (nome/email sem diferenciar acento e maiúscula; CPF e telefone com ou sem máscara — telefone procura em `phone`/`phone2`/`phone3`, pelos dígitos e pelo termo digitado, a partir de 3 dígitos), `memberType`, `memberClassification`, `gender`, `ethnicity`, `educationLevel` |
 | `GET /admin/users/admins` | `search` (username) |
 | `GET /admin/courses` | `status` (PUBLIC/PRIVATE/UNPUBLISHED/IN_PROGRESS/COMPLETED), `search` (nome) |
-| `GET /admin/news` | `status` (PUBLISHED/UNPUBLISHED) |
+| `GET /admin/news` | `status` (PUBLISHED = já no ar / SCHEDULED = agendada para depois / UNPUBLISHED = rascunho), `search` (título) |
 
 ## Adaptadores de banco disponíveis
 
 | Adapter | Arquivo | Port implementado |
 |---------|---------|-------------------|
 | `createUserDataAdapter` | `adapter/database/user-data.ts` | `UserDataRepository` |
+| `createUserMergeAdapter` | `adapter/database/user-merge-adapter.ts` | `UserMergeRepository` |
 | `createUserAdminAdapter` | `adapter/database/user-admin-adapter.ts` | `UserAdminRepository` |
 | `createCourseAdapter` | `adapter/database/course-adapter.ts` | `CourseRepository` |
 | `createRuleAdapter` | `adapter/database/rule-adapter.ts` | `RuleRepository` |
@@ -510,7 +569,7 @@ Os erros de domínio vivem em `src/errors/` divididos por categoria:
 |---------|-------------|------------------------|
 | `auth.ts` | `AuthError` | `InvalidCredentialsError` |
 | `business-rule.ts` | `BusinessRuleError` | `RoomAlreadyBookedError` (a mensagem diz o que ocupa a sala), `RegistrationsUnavailableError` |
-| `conflict.ts` | `ConflictError` | `CpfAlreadyInUseError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `CourseRegistrationAlreadyExistsError`, `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError`, `RoomHasCoursesError`, `RoomHasBookingsError` |
+| `conflict.ts` | `ConflictError` | `CpfAlreadyInUseError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `CourseRegistrationAlreadyExistsError`, `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError`, `RoomHasCoursesError`, `RoomHasBookingsError`, `MergeDifferentCpfError`, `MergeBothHaveLoginError` |
 | `not-found.ts` | `NotFoundError` | `CourseNotFoundError`, `UserNotFoundError`, `UserDataNotFoundError`, `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError`, `UserRelationNotFoundError`, `PropertyNotFoundError`, `AddressNotFoundError`, `InstructorNotFoundError`, `ContactMessageNotFoundError`, `BannerNotFoundError`, `RoomBookingNotFoundError` |
 | `validation.ts` | `ValidationError` | — (único com parâmetro de mensagem, para erros dinâmicos do Zod) |
 
@@ -662,4 +721,4 @@ DATABASE_TEST_URL=postgresql://USER:SENHA@localhost:PORTA/BANCO npm run test:e2e
 - O `PrismaClient` é importado de `../generated/prisma/client.js` (não do pacote padrão)
 - O `StorageAdapter` é instanciado via factory `createStorageAdapter()` (Supabase Storage; buckets devem existir e ser públicos: `avatars`, `course-banners`, `news-banners`)
 - As buscas por CPF/RG no `UserDataAdapter` filtram `isDeleted: false` — soft-deleted users não retornam em conflict checks. Não há busca por e-mail/telefone: não identificam a pessoa (podem repetir)
-- **Busca sem acento** (`list-filters.ts`, pessoas/empresas/Unimed/admins e as exportações): "joao" acha "João" e vice-versa. Os nomes são comparados nas colunas `UserData.nameSearch`, `Company.nameSearch`/`tradeNameSearch` com `searchKey(termo)` (minúsculo, sem acento). Essas colunas são preenchidas por trigger (`*_fill_search`, função SQL `immutable_unaccent_lower`, migração `20260919100000_search_normalized`) — a aplicação nunca grava nelas; trigger em vez de coluna GENERATED para o `migrate dev` não acusar diferença. CPF/CNPJ só entram na busca quando o termo parece documento (só números, `.`, `-`, `/`), comparando os dígitos.
+- **Busca sem acento** (`list-filters.ts`, pessoas/empresas/Unimed/admins e as exportações): "joao" acha "João" e vice-versa. Os nomes são comparados nas colunas `UserData.nameSearch`, `Company.nameSearch`/`tradeNameSearch` com `searchKey(termo)` (minúsculo, sem acento). Essas colunas são preenchidas por trigger (`*_fill_search`, função SQL `immutable_unaccent_lower`, migração `20260919100000_search_normalized`) — a aplicação nunca grava nelas; trigger em vez de coluna GENERATED para o `migrate dev` não acusar diferença. CPF/CNPJ só entram na busca quando o termo parece documento (só números e pontuação: `.`, `-`, `/`, `( )`, `+`), comparando os dígitos. **Telefone** entra com a mesma regra, a partir de 3 dígitos, em `phone`/`phone2`/`phone3` (da pessoa e da empresa; no Unimed, pelos da pessoa): como cadastros antigos gravaram com máscara e os novos só com dígitos, procura pelos dois — `44999990001` e `(44) 99999-0001`.

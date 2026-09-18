@@ -11,6 +11,7 @@ import type {
     RoomBookingUpdateData,
     RoomOccupant,
     RoomScheduleItem,
+    PublicEventItem,
 } from '../../ports/external/room-booking-repository.js';
 
 export function createRoomBookingAdapter(prisma: PrismaClient): RoomBookingRepository {
@@ -48,6 +49,8 @@ export const roomBookingSelect = {
     type: true,
     title: true,
     description: true,
+    publicOnSite: true,
+    publicDescription: true,
     roomId: true,
     startTime: true,
     endTime: true,
@@ -184,6 +187,7 @@ select: roomBookingSelect });
                 endTime: c.endTime,
                 status: c.status,
                 seriesId: null,
+                publicOnSite: false,
             })),
             ...bookings.map(b => ({
                 kind: b.type,
@@ -195,9 +199,45 @@ select: roomBookingSelect });
                 endTime: b.endTime,
                 status: null,
                 seriesId: b.seriesId,
+                publicOnSite: b.publicOnSite,
             })),
         ];
         return items.sort((a, b) => a.startTime.getTime() - b.startTime.getTime() || a.title.localeCompare(b.title));
+    }
+
+    async listPublicEvents(from: Date, limit: number): Promise<PublicEventItem[]> {
+        const rows: {
+            id: string;
+            title: string;
+            publicDescription: string | null;
+            startTime: Date;
+            endTime: Date;
+            room: { name: string };
+        }[] = await this.prisma.roomBooking.findMany({
+            // Reunião nunca vai para o site, mesmo que a flag fique marcada.
+            where: { isDeleted: false,
+publicOnSite: true,
+type: 'EVENT',
+endTime: { gte: from } },
+            select: {
+                id: true,
+                title: true,
+                publicDescription: true,
+                startTime: true,
+                endTime: true,
+                room: { select: { name: true } },
+            },
+            orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
+            take: limit,
+        });
+        return rows.map(r => ({
+            id: r.id,
+            title: r.title,
+            description: r.publicDescription,
+            startTime: r.startTime,
+            endTime: r.endTime,
+            roomName: r.room.name,
+        }));
     }
 
     async findById(id: string): Promise<RoomBookingItem | null> {

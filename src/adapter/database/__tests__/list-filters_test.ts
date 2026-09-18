@@ -72,6 +72,25 @@ describe('buildUserListWhere', () => {
         expect(JSON.stringify(where.OR)).not.toContain('cpf');
     });
 
+    it('telefone procura nos três campos, pelos dígitos e como digitado', () => {
+        const where = buildUserListWhere({ search: '(44) 99999-0001' });
+        for (const field of ['phone', 'phone2', 'phone3']) {
+            // Cadastro novo (só dígitos) e cadastro antigo (gravado com máscara).
+            expect(where.OR).toContainEqual({ [field]: { contains: '44999990001' } });
+            expect(where.OR).toContainEqual({ [field]: { contains: '(44) 99999-0001' } });
+        }
+    });
+
+    it('telefone só com dígitos não repete a condição', () => {
+        const where = buildUserListWhere({ search: '99999000' });
+        expect(where.OR?.filter(c => 'phone' in c)).toEqual([{ phone: { contains: '99999000' } }]);
+    });
+
+    it('busca curta ou com texto não procura telefone', () => {
+        expect(JSON.stringify(buildUserListWhere({ search: '44' }).OR)).not.toContain('phone');
+        expect(JSON.stringify(buildUserListWhere({ search: 'joao 1' }).OR)).not.toContain('phone');
+    });
+
     it('mantém os outros filtros junto da busca', () => {
         const where = buildUserListWhere({ search: 'maria',
 memberType: 'ALUNO',
@@ -101,6 +120,12 @@ describe('buildCompanyListWhere', () => {
         expect(JSON.stringify(buildCompanyListWhere({ search: 'Loja 12' }).OR)).not.toContain('cnpj');
     });
 
+    it('telefone da empresa entra na busca', () => {
+        const where = buildCompanyListWhere({ search: '44 3645-1234' });
+        expect(where.OR).toContainEqual({ phone: { contains: '4436451234' } });
+        expect(where.OR).toContainEqual({ phone3: { contains: '44 3645-1234' } });
+    });
+
     it('filtros de tipo e parceria continuam', () => {
         expect(buildCompanyListWhere({ type: 'PUBLIC',
 isPartner: false })).toEqual({
@@ -124,6 +149,12 @@ describe('buildUnimedListWhere', () => {
                     { nameSearch: { contains: '111.444' } },
                     { name: ci('111.444') },
                     { cpf: { contains: '111444' } },
+                    { phone: { contains: '111444' } },
+                    { phone2: { contains: '111444' } },
+                    { phone3: { contains: '111444' } },
+                    { phone: { contains: '111.444' } },
+                    { phone2: { contains: '111.444' } },
+                    { phone3: { contains: '111.444' } },
                 ],
             },
         });

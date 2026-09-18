@@ -7,6 +7,7 @@ import { diffSnapshots, removedSnapshot, type AuditChange } from '../lib/audit-d
 import { shouldSnapshot, snapshotTarget } from '../lib/audit-snapshot.js';
 import { lookupLocation } from '../lib/geoip.js';
 import { requestContext } from '../lib/request-context.js';
+import { maybeCleanupAuditLogs } from '../adapter/database/audit-cleanup.js';
 
 // O que um hook deixa na request para o seguinte.
 type AuditStash = {
@@ -136,6 +137,7 @@ data: { location } });
                         location: loginMethod === 'LOGIN_BLOCKED' ? null : await lookupLocation(ctx.ip),
                     },
                 });
+                await maybeCleanupAuditLogs(prisma);
                 return;
             }
 
@@ -165,6 +167,9 @@ data: { location } });
                     ...(changes && { changes }),
                 },
             });
+            // Tempo de guarda configurado no painel: apaga o que passou do prazo
+            // (no máximo uma vez por hora por processo).
+            await maybeCleanupAuditLogs(prisma);
         } catch {
             /* auditoria nunca deve derrubar a aplicação */
         }

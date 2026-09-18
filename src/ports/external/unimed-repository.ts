@@ -37,7 +37,9 @@ export type UnimedUpdateInput = Partial<Omit<UnimedCreateInput, 'userDataId' | '
 export type UnimedListFilters = {
  page: number;
 limit: number;
-search?: string 
+search?: string;
+/** Cadastros da pessoa: o dela e os em que ela é o titular. */
+userDataId?: string 
 };
 
 export interface UnimedRepository {

@@ -8,6 +8,8 @@ const createNewsRequestSchema = z.object({
     summary: z.string().optional(),
     status: z.enum(['PUBLISHED', 'UNPUBLISHED'] as const).default('UNPUBLISHED'),
     publishedAt: z.iso.datetime().optional(),
+    // Agendamento: hora "de parede" de Brasília com Z. Só vale com status PUBLISHED.
+    publishAt: z.iso.datetime().nullable().optional(),
 });
 
 type CreateNewsRequest = z.input<typeof createNewsRequestSchema>;
@@ -28,17 +30,22 @@ export class CreateNewsUseCase {
         }
 
         const { title, content, summary, status, publishedAt } = validation.data;
+        // Rascunho não tem agendamento.
+        const publishAt =
+            status === 'PUBLISHED' && validation.data.publishAt
+                ? new Date(validation.data.publishAt)
+                : null;
 
         const news = await this.newsRepository.create({
             title,
             content,
             summary,
             status,
+            // Agendada: a data mostrada ao leitor é a que ela entra no ar.
             publishedAt: publishedAt
                 ? new Date(publishedAt)
-                : status === 'PUBLISHED'
-                  ? new Date()
-                  : undefined,
+                : (publishAt ?? (status === 'PUBLISHED' ? new Date() : undefined)),
+            publishAt,
         });
 
         return { newsId: news.id };

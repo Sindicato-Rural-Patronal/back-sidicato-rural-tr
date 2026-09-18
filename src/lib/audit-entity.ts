@@ -16,6 +16,7 @@ export function deriveAuditEntity(path: string): string {
     if (p.includes('/convenios')) return 'Convênio';
     if (p.includes('/galleries')) return 'Galeria';
     if (p.includes('/public-contacts')) return 'Contato público';
+    if (p.includes('/audit-settings')) return 'Auditoria';
     if (p.includes('/site-settings')) return 'Configurações do site';
     if (p.includes('/invites')) return 'Convite';
     if (p.includes('/unimed')) return 'Beneficiário Unimed';
@@ -32,6 +33,8 @@ export function deriveAuditEntity(path: string): string {
     if (p.includes('/register') || p.includes('/registrations')) return 'Inscrição';
     if (p.includes('/properties')) return 'Propriedade';
     if (p.includes('/relations')) return 'Relação';
+    // Antes da regra de administrador: juntar cadastros é ação sobre pessoas.
+    if (p === '/admin/users/merge') return 'Usuário';
     // Conta de acesso ao painel: /admin/me, /admin/users e /admin/users/:id (sem sub-rota).
     if (/^\/admin\/me(\/|$)/.test(p) || /^\/admin\/users(\/[^/]+)?$/.test(p)) return 'Administrador';
     if (p.includes('/users')) return 'Usuário';
