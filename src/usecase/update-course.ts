@@ -4,6 +4,7 @@ import type { RoomRepository } from '../ports/external/room-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { CourseNotFoundError, RoomNotFoundError } from '../errors/not-found.js';
 import { RoomAlreadyBookedError } from '../errors/business-rule.js';
+import { conflictMessage } from './room-availability.js';
 
 const updateCourseBodySchema = z.object({
     name: z.string().min(1).optional(),
@@ -63,13 +64,14 @@ export class UpdateCourseUseCase {
         const newEnd = data.endTime ? new Date(data.endTime) : existing.endTime;
 
         if (data.roomId || data.startTime || data.endTime) {
-            const available = await this.courseRepository.isRoomAvailable(
+            // Sala ocupada por outro curso ou por uma reserva (evento/reunião).
+            const conflict = await this.courseRepository.findRoomConflict(
                 newRoomId,
                 newStart,
                 newEnd,
                 courseId,
             );
-            if (!available) return { error: new RoomAlreadyBookedError() };
+            if (conflict) return { error: new RoomAlreadyBookedError(conflictMessage(conflict)) };
         }
 
         const updatePayload: Parameters<CourseRepository['update']>[1] = {

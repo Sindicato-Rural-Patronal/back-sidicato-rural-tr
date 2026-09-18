@@ -61,4 +61,11 @@ data });
     countCourses(roomId: string): Promise<number> {
         return this.prisma.course.count({ where: { roomId } });
     }
+
+    // Reservas passadas ou excluídas não impedem: caem junto com a sala (cascade).
+    countFutureBookings(roomId: string, from: Date): Promise<number> {
+        return this.prisma.roomBooking.count({ where: { roomId,
+isDeleted: false,
+endTime: { gte: from } } });
+    }
 }

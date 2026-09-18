@@ -13,6 +13,7 @@ import type {
     PersonExportRow,
     PropertyExportRow,
     RegistrationExportRow,
+    RoomBookingExportRow,
     UnimedExportRow,
 } from '../ports/external/export-repository.js';
 import { ValidationError } from '../errors/validation.js';
@@ -20,6 +21,7 @@ import { stripAccents } from '../lib/text.js';
 import { csvDate, csvDateTime, csvList, csvMoney, csvWallClock, toCsv, type CsvColumn } from '../lib/csv.js';
 import {
     ADDRESS_TYPE_LABEL,
+    BOOKING_TYPE_LABEL,
     COMPANY_TYPE_LABEL,
     COURSE_STATUS_LABEL,
     EDUCATION_LABEL,
@@ -74,6 +76,10 @@ single: 'unimed' },
 title: 'Auditoria',
 file: 'auditoria',
 single: 'auditoria' },
+    'room-bookings': { permission: 'READ_COURSE',
+title: 'Reservas de sala',
+file: 'reservas-de-sala',
+single: 'reserva' },
 } as const satisfies Record<string, {
  permission: Permission;
 title: string;
@@ -158,6 +164,14 @@ search: text }),
         from: day,
         to: day,
         q: text,
+    }),
+    'room-bookings': z.object({
+        ids: idList,
+        from: day,
+        to: day,
+        roomId: text,
+        type: z.preprocess(empty, z.enum(['EVENT', 'MEETING'], { message: 'Filtro inválido' }).optional()),
+        search: text,
     }),
 } satisfies Record<ExportDataset, z.ZodTypeAny>;
 
@@ -607,6 +621,26 @@ value: a => (a.userAgent ? describeUserAgent(a.userAgent) : null) },
 value: a => formatChanges(a.changes) },
 ];
 
+// Horários da reserva saem como gravados (relógio de Brasília com Z, igual ao curso).
+const roomBookingColumns: CsvColumn<RoomBookingExportRow>[] = [
+    { header: 'Tipo',
+value: b => label(BOOKING_TYPE_LABEL, b.type) },
+    { header: 'Título',
+value: b => b.title },
+    { header: 'Sala',
+value: b => b.roomName },
+    { header: 'Início',
+value: b => csvWallClock(b.startTime) },
+    { header: 'Término',
+value: b => csvWallClock(b.endTime) },
+    { header: 'Responsável',
+value: b => b.responsible?.name ?? b.responsibleName },
+    { header: 'Descrição',
+value: b => b.description },
+    { header: 'Série',
+value: b => !!b.seriesId },
+];
+
 // ── Caso de uso ──────────────────────────────────────────────────────────────
 
 // Planilha CSV de um conjunto de dados: com `ids` exporta só os selecionados
@@ -713,6 +747,25 @@ firstName: rows[0]?.userData.name };
                 const rows = await this.repo.auditLogs(q as AuditLogFilters);
                 return { csv: toCsv(auditColumns, rows),
 count: rows.length };
+            }
+            case 'room-bookings': {
+                // Dias do filtro → período [from 00:00, to + 1 dia 00:00) no relógio gravado.
+                const { from, to, ...rest } = q as {
+ from?: string;
+to?: string;
+roomId?: string;
+type?: 'EVENT' | 'MEETING';
+search?: string;
+ids?: string[] 
+};
+                const rows = await this.repo.roomBookings({
+                    ...rest,
+                    from: from ? new Date(`${from}T00:00:00.000Z`) : undefined,
+                    to: to ? new Date(new Date(`${to}T00:00:00.000Z`).getTime() + 24 * 60 * 60 * 1000) : undefined,
+                });
+                return { csv: toCsv(roomBookingColumns, rows),
+count: rows.length,
+firstName: rows[0]?.title };
             }
         }
     }

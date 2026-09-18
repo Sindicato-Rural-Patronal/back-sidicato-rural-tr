@@ -9,7 +9,7 @@ const mockCourseRepo = {
     findAll: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
-    isRoomAvailable: vi.fn(),
+    findRoomConflict: vi.fn(),
     addPhoto: vi.fn(),
     deletePhoto: vi.fn(),
 } as unknown as CourseRepository;

@@ -57,6 +57,11 @@ export const COURSE_STATUS_LABEL: Record<string, string> = {
     COMPLETED: 'Concluído',
 };
 
+export const BOOKING_TYPE_LABEL: Record<string, string> = {
+    EVENT: 'Evento',
+    MEETING: 'Reunião',
+};
+
 /** Rótulo do enum; valor desconhecido volta como veio, nulo vira vazio. */
 export function label(map: Record<string, string>, value: string | null | undefined): string {
     if (!value) return '';

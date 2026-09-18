@@ -5,6 +5,7 @@ import type {
     PendingCourse,
     PendingCourseFilter,
     PendingNotificationsRepository,
+    RoomBookingsOverlap,
 } from '../../ports/external/pending-notifications-repository.js';
 
 // Repositório em memória que aplica os filtros como o adapter do Prisma faria.
@@ -17,6 +18,13 @@ class FakeRepo implements PendingNotificationsRepository {
     members: {
         name: string;
         validUntil: Date;
+    }[] = [];
+    bookings: {
+        title: string;
+        roomName: string;
+        startTime: Date;
+        endTime: Date;
+        isDeleted?: boolean;
     }[] = [];
     calls: string[] = [];
 
@@ -63,6 +71,28 @@ names: this.partners.slice(0, take) };
         return { total: rows.length,
 names: rows.slice(0, take).map(m => m.name) };
     }
+
+    async roomBookingsOverlapping(from: Date, before: Date, take: number): Promise<RoomBookingsOverlap> {
+        this.calls.push('roomBookingsOverlapping');
+        const rows = this.bookings
+            .filter(b => !b.isDeleted && b.startTime < before && b.endTime > from)
+            .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+        return {
+            total: rows.length,
+            items: rows.slice(0, take).map(({ title, roomName, startTime }) => ({ title,
+roomName,
+startTime })),
+        };
+    }
+}
+
+// Hora "de parede" de Brasília gravada com Z.
+function booking(title: string, roomName: string, start: string, end: string, isDeleted = false) {
+    return { title,
+roomName,
+startTime: new Date(`${start}Z`),
+endTime: new Date(`${end}Z`),
+isDeleted };
 }
 
 let seq = 0;
@@ -501,6 +531,62 @@ unconfirmedCount: 2 }),
             ['info', 'GALLERY_WITHOUT_PHOTO'],
             ['info', 'INCOMPLETE_REGISTRATIONS'],
         ]);
+    });
+});
+
+describe('computePendingNotifications — reservas de sala', () => {
+    it('agrega as reservas de hoje com hora, título e sala ("e mais N")', async () => {
+        const repo = new FakeRepo();
+        repo.bookings = [
+            booking('Reunião da diretoria', 'SALA 1', '2026-09-17T14:00:00', '2026-09-17T16:00:00'),
+            booking('Palestra', 'AUDITORIO', '2026-09-17T08:00:00', '2026-09-17T10:00:00'),
+            booking('Excluída', 'SALA 2', '2026-09-17T09:00:00', '2026-09-17T10:00:00', true),
+            booking('Almoço', 'COZINHA', '2026-09-17T11:30:00', '2026-09-17T13:00:00'),
+            booking('Noite', 'SALA APL', '2026-09-17T19:00:00', '2026-09-17T22:00:00'),
+            booking('Amanhã', 'SALA 1', '2026-09-18T08:00:00', '2026-09-18T09:00:00'),
+            booking('Ontem', 'SALA 1', '2026-09-16T08:00:00', '2026-09-16T23:59:00'),
+        ];
+        const result = await computePendingNotifications(repo, ['READ_COURSE'], THU_NOON);
+        expect(result).toEqual([
+            {
+                type: 'ROOM_BOOKINGS_TODAY',
+                title: 'Reservas de sala hoje',
+                body: '08:00 Palestra (AUDITORIO), 11:30 Almoço (COZINHA), 14:00 Reunião da diretoria (SALA 1) e mais 1',
+                count: 4,
+                link: '/admin/agenda',
+                severity: 'info',
+            },
+        ]);
+    });
+
+    it('conta a reserva que atravessa a meia-noite e usa o dia de Brasília', async () => {
+        const repo = new FakeRepo();
+        repo.bookings = [
+            booking('Vigília', 'AUDITORIO', '2026-09-16T20:00:00', '2026-09-17T02:00:00'),
+            booking('Termina à meia-noite', 'SALA 2', '2026-09-16T22:00:00', '2026-09-17T00:00:00'),
+        ];
+        // 23:30 de 17/09 em Brasília = 02:30Z do dia 18: ainda é dia 17.
+        const result = await computePendingNotifications(
+            repo,
+            ['READ_COURSE'],
+            new Date('2026-09-18T02:30:00Z'),
+        );
+        expect(result).toEqual([
+            expect.objectContaining({ type: 'ROOM_BOOKINGS_TODAY',
+body: '16/09 20:00 Vigília (AUDITORIO)',
+count: 1 }),
+        ]);
+    });
+
+    it('sem reservas hoje ou sem READ_COURSE não aparece', async () => {
+        const repo = new FakeRepo();
+        repo.bookings = [booking('Amanhã', 'SALA 1', '2026-09-18T08:00:00', '2026-09-18T09:00:00')];
+        expect(await computePendingNotifications(repo, ['READ_COURSE'], THU_NOON)).toEqual([]);
+
+        repo.bookings = [booking('Hoje', 'SALA 1', '2026-09-17T08:00:00', '2026-09-17T09:00:00')];
+        repo.calls = [];
+        expect(await computePendingNotifications(repo, ['READ_BANNER', 'READ_USER'], THU_NOON)).toEqual([]);
+        expect(repo.calls).not.toContain('roomBookingsOverlapping');
     });
 });
 

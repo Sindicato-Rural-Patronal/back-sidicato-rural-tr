@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client/extension';
 import { buildCourseListWhere } from './list-filters.js';
+import { findRoomOccupants } from './room-booking-adapter.js';
 import type {
     CourseRepository,
     CourseWithDetails,
@@ -7,6 +8,7 @@ import type {
     CourseUpdateData,
     CourseListFilters,
 } from '../../ports/external/course-repository.js';
+import type { RoomOccupant } from '../../ports/external/room-booking-repository.js';
 import type { courseModel } from '../../generated/prisma/models/course.js';
 import type { CoursePhotoModel } from '../../generated/prisma/models.js';
 
@@ -124,20 +126,14 @@ deletedAt: new Date() },
         }
     }
 
-    async isRoomAvailable(
+    // Cursos e reservas (eventos/reuniões) dividem a agenda da sala.
+    async findRoomConflict(
         roomId: string,
         startTime: Date,
         endTime: Date,
         excludeCourseId?: string,
-    ): Promise<boolean> {
-        const overlap = await this.prisma.course.count({
-            where: {
-                roomId,
-                isDeleted: false,
-                id: excludeCourseId ? { not: excludeCourseId } : undefined,
-                NOT: [{ endTime: { lte: startTime } }, { startTime: { gte: endTime } }],
-            },
-        });
-        return overlap === 0;
+    ): Promise<RoomOccupant | null> {
+        const occupants = await findRoomOccupants(this.prisma, roomId, startTime, endTime, { courseId: excludeCourseId });
+        return occupants[0] ?? null;
     }
 }

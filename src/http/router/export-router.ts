@@ -31,6 +31,7 @@ export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClien
 | registrations | courseIds | READ_COURSE |
 | contact-messages | search, read | READ_CONTACT |
 | unimed | search | READ_USER |
+| room-bookings | from, to (AAAA-MM-DD), roomId, type (EVENT, MEETING), search | READ_COURSE |
 | audit-logs | action (create, edit, delete, export, login, login_failed), entity, actorId, ip, from, to (AAAA-MM-DD, dia em Brasília), q — no máximo ${AUDIT_EXPORT_LIMIT} linhas mais recentes | READ_AUDIT |
 
 Cada exportação fica registrada na auditoria (ação "Exportou").`;

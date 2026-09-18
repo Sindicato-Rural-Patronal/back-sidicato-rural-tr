@@ -6,6 +6,7 @@ import { userAdminRouter } from './router/user-admin.js';
 import { courseRouter } from './router/course-router.js';
 import { ruleRouter } from './router/rule-router.js';
 import { roomRouter } from './router/room-router.js';
+import { roomBookingRouter } from './router/room-booking-router.js';
 import { dashboardRouter } from './router/dashboard-router.js';
 import { registrationRouter } from './router/registration-router.js';
 import { newsRouter } from './router/news-router.js';
@@ -36,6 +37,7 @@ export function registerRouters(app: FastifyInstance, prisma: PrismaClient) {
     app.register(userAdminRouter, prisma);
     app.register(courseRouter, prisma);
     app.register(roomRouter, prisma);
+    app.register(roomBookingRouter, prisma);
     app.register(ruleRouter, prisma);
     app.register(dashboardRouter, prisma);
     app.register(registrationRouter, prisma);

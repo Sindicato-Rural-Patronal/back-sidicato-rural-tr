@@ -22,4 +22,6 @@ maxCapacity: number
     ): Promise<roomModel>;
     delete(id: string): Promise<boolean>;
     countCourses(roomId: string): Promise<number>;
+    /** Reservas (eventos/reuniões) não excluídas que terminam em `from` ou depois. */
+    countFutureBookings(roomId: string, from: Date): Promise<number>;
 }

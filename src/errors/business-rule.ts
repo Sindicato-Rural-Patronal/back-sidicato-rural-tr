@@ -1,8 +1,9 @@
 export class BusinessRuleError extends Error {}
 
+// A mensagem diz o que ocupa a sala (usecase/room-availability.ts, conflictMessage).
 export class RoomAlreadyBookedError extends BusinessRuleError {
-    constructor() {
-        super('Room is already booked for this period');
+    constructor(message = 'Room is already booked for this period') {
+        super(message);
         this.name = 'RoomAlreadyBookedError';
     }
 }

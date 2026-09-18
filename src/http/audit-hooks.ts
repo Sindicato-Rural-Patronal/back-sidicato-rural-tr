@@ -147,11 +147,16 @@ data: { location } });
                 lookupLocation(ctx.ip),
                 auditChanges(prisma, s._auditBefore, method, path, actorId),
             ]);
+            // Exclusão de reserva "e as próximas da série": mantém o ?scope=future no
+            // caminho gravado (a frase da auditoria depende dele).
+            const scopeFuture = method === 'DELETE'
+                && /^\/admin\/room-bookings\/[^/]+$/.test(path)
+                && new URLSearchParams((request.url ?? '').split('?')[1] ?? '').get('scope') === 'future';
             await prisma.auditLog.create({
                 data: {
                     actorId,
                     method,
-                    path,
+                    path: scopeFuture ? `${path}?scope=future` : path,
                     entity: deriveAuditEntity(path),
                     targetLabel,
                     statusCode: reply.statusCode,

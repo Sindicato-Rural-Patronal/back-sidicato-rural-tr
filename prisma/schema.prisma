@@ -110,6 +110,8 @@ model UserData {
   companyMemberships CompanyMember[]
   // Aparece em "Nossa Equipe" na página Contato
   publicContact      PublicContact?
+  // Reservas de sala (eventos/reuniões) em que a pessoa é a responsável
+  roomBookings       RoomBooking[]
   // Propriedade marcada como principal (endereço usado na ficha). Sem FK formal:
   // guarda o id de uma Property do próprio usuário.
   primaryPropertyId String?
@@ -204,11 +206,45 @@ model room {
   description String
   maxCapacity Int
   courses     course[]
+  bookings    RoomBooking[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   addressId  String?
   address    Address? @relation(fields: [addressId], references: [id])
+}
+
+// Reservas de sala além dos cursos: eventos e reuniões. Horários gravados como
+// os do curso: hora "de parede" de Brasília rotulada em UTC (08:00 = ...T08:00:00.000Z).
+// Repetição (semanal/mensal) cria uma linha por ocorrência, com o mesmo seriesId.
+// Conflito (mesma sala, horários sobrepostos) é checado na aplicação contra
+// cursos e reservas (usecase/room-availability.ts). Migração 20260922090000_room_bookings.
+enum BookingType {
+  EVENT
+  MEETING
+}
+
+model RoomBooking {
+  id                    String      @id @default(uuid())
+  type                  BookingType
+  title                 String
+  description           String?
+  roomId                String
+  room                  room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  startTime             DateTime
+  endTime               DateTime
+  responsibleUserDataId String?
+  responsible           UserData?   @relation(fields: [responsibleUserDataId], references: [id], onDelete: SetNull)
+  // Responsável sem cadastro (texto livre)
+  responsibleName       String?
+  seriesId              String?
+  isDeleted             Boolean     @default(false)
+  deletedAt             DateTime?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  @@index([roomId, startTime])
+  @@index([seriesId])
 }
 
 enum QuotePeriod {

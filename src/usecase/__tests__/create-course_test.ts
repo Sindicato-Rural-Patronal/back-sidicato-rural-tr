@@ -3,9 +3,18 @@ import { CreateCourseUseCase } from '../create-course.js';
 import type { CourseRepository } from '../../ports/external/course-repository.js';
 import type { RoomRepository } from '../../ports/external/room-repository.js';
 
+// Reunião que já ocupa a sala (curso e reservas dividem a agenda).
+const CONFLICT = {
+    kind: 'MEETING' as const,
+    id: 'booking-1',
+    title: 'Diretoria',
+    startTime: new Date('2026-07-01T09:00:00.000Z'),
+    endTime: new Date('2026-07-01T10:00:00.000Z'),
+};
+
 const mockCourseRepo = {
     create: vi.fn(),
-    isRoomAvailable: vi.fn(),
+    findRoomConflict: vi.fn(),
     findById: vi.fn(),
     findAll: vi.fn(),
     update: vi.fn(),
@@ -61,18 +70,18 @@ roomId: 'nao-e-uuid' });
 
         it('falha se sala já ocupada no período', async () => {
             vi.mocked(mockRoomRepo.findById).mockResolvedValue({ id: validInput.roomId } as any);
-            vi.mocked(mockCourseRepo.isRoomAvailable).mockResolvedValue(false);
+            vi.mocked(mockCourseRepo.findRoomConflict).mockResolvedValue(CONFLICT);
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
             const result = await uc.execute(validInput);
             expect(result.error).toBeDefined();
-            expect(result.error?.message).toBe('Room is already booked for this period');
+            expect(result.error?.message).toBe('Sala ocupada: Reunião "Diretoria" em 01/07 09:00–10:00');
         });
     });
 
     describe('criação bem-sucedida', () => {
         it('retorna courseId ao criar curso válido', async () => {
             vi.mocked(mockRoomRepo.findById).mockResolvedValue({ id: validInput.roomId } as any);
-            vi.mocked(mockCourseRepo.isRoomAvailable).mockResolvedValue(true);
+            vi.mocked(mockCourseRepo.findRoomConflict).mockResolvedValue(null);
             vi.mocked(mockCourseRepo.create).mockResolvedValue({ id: 'course-abc' } as any);
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
             const result = await uc.execute(validInput);
@@ -82,7 +91,7 @@ roomId: 'nao-e-uuid' });
 
         it('grava nº do evento e mínimo de alunos informados na criação', async () => {
             vi.mocked(mockRoomRepo.findById).mockResolvedValue({ id: validInput.roomId } as any);
-            vi.mocked(mockCourseRepo.isRoomAvailable).mockResolvedValue(true);
+            vi.mocked(mockCourseRepo.findRoomConflict).mockResolvedValue(null);
             vi.mocked(mockCourseRepo.create).mockResolvedValue({ id: 'course-abc' } as any);
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
             await uc.execute({ ...validInput,
@@ -96,7 +105,7 @@ minStudents: 8 }),
 
         it('falha se repositório retornar null na criação', async () => {
             vi.mocked(mockRoomRepo.findById).mockResolvedValue({ id: validInput.roomId } as any);
-            vi.mocked(mockCourseRepo.isRoomAvailable).mockResolvedValue(true);
+            vi.mocked(mockCourseRepo.findRoomConflict).mockResolvedValue(null);
             vi.mocked(mockCourseRepo.create).mockResolvedValue(null as any);
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
             const result = await uc.execute(validInput);

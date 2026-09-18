@@ -10,7 +10,7 @@ const mockCourseRepo = {
     count: vi.fn().mockResolvedValue(0),
     update: vi.fn(),
     delete: vi.fn(),
-    isRoomAvailable: vi.fn(),
+    findRoomConflict: vi.fn(),
     addPhoto: vi.fn(),
     deletePhoto: vi.fn(),
 } as unknown as CourseRepository;

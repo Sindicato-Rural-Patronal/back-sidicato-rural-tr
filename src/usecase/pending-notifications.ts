@@ -2,6 +2,7 @@ import type {
     NamedCount,
     PendingCourse,
     PendingNotificationsRepository,
+    PendingRoomBooking,
 } from '../ports/external/pending-notifications-repository.js';
 
 // Pendências do painel (sino de notificações), calculadas na hora a partir dos
@@ -172,6 +173,35 @@ async function coursePendings(
     return items;
 }
 
+/** "08:00 Reunião (SALA 1)"; reserva que começou antes de hoje leva o dia ("16/09 20:00 …"). */
+function bookingText(b: PendingRoomBooking, today: Date): string {
+    const iso = b.startTime.toISOString();
+    const time = iso.slice(11, 16);
+    const when = b.startTime < today ? `${dayMonth(b.startTime)} ${time}` : time;
+    return b.roomName ? `${when} ${b.title} (${b.roomName})` : `${when} ${b.title}`;
+}
+
+async function roomBookingPendings(
+    repo: PendingNotificationsRepository,
+    today: Date,
+): Promise<PendingNotification[]> {
+    const bookings = await repo.roomBookingsOverlapping(today, addDays(today, 1), NAMES_IN_BODY);
+    if (bookings.total <= 0) return [];
+    return [
+        {
+            type: 'ROOM_BOOKINGS_TODAY',
+            title: 'Reservas de sala hoje',
+            body: formatNames(
+                bookings.items.map(b => bookingText(b, today)),
+                bookings.total,
+            ),
+            count: bookings.total,
+            link: '/admin/agenda',
+            severity: 'info',
+        },
+    ];
+}
+
 async function quotePendings(
     repo: PendingNotificationsRepository,
     clock: ReturnType<typeof brasiliaClock>,
@@ -258,7 +288,7 @@ async function userPendings(
 /**
  * Pendências visíveis para um admin, conforme as permissões dele.
  * Ordem: avisos (warning) primeiro, depois informativos; dentro de cada grupo,
- * cursos, cotações, galerias e cadastros.
+ * cursos, reservas de sala, cotações, galerias e cadastros.
  */
 export async function computePendingNotifications(
     repo: PendingNotificationsRepository,
@@ -271,6 +301,7 @@ export async function computePendingNotifications(
 
     const groups = await Promise.all([
         can('READ_COURSE') ? coursePendings(repo, clock.today) : none,
+        can('READ_COURSE') ? roomBookingPendings(repo, clock.today) : none,
         can('READ_MARKET_QUOTE') ? quotePendings(repo, clock) : none,
         can('READ_BANNER') ? galleryPendings(repo) : none,
         can('READ_USER') ? userPendings(repo, clock.today) : none,
