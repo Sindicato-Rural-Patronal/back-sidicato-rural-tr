@@ -122,7 +122,9 @@ server.register(cors, {
 // definem um limite mais estrito via `config.rateLimit` na própria rota.
 server.register(rateLimit, {
     global: true,
-    max: 200,
+    // Por IP: um escritório inteiro costuma sair pelo mesmo endereço, e cada tela
+    // do painel faz várias chamadas (listas + sino de notificações a cada minuto).
+    max: 600,
     timeWindow: '1 minute',
 });
 
