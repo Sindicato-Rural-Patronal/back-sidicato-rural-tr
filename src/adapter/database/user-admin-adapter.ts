@@ -88,6 +88,11 @@ permissions: true } },
 data });
     }
 
+    async updateDashboardPrefs(id: string, prefs: Record<string, unknown>): Promise<void> {
+        await this.prisma.userAdmin.update({ where: { id },
+data: { dashboardPrefs: prefs } });
+    }
+
     async delete(id: string): Promise<void> {
         await this.prisma.userAdmin.update({
             where: { id },

@@ -14,6 +14,8 @@ export type CurrentAdminResponse = {
         rulesId: string;
         ruleName: string;
         permissions: string[];
+        /** Preferências do Painel Geral deste admin; null = padrão. */
+        dashboardPrefs: Record<string, unknown> | null;
     };
 };
 
@@ -43,6 +45,7 @@ export class GetCurrentAdminUseCase {
                 rulesId: admin.rulesId,
                 ruleName: rule.name,
                 permissions: rule.permissions,
+                dashboardPrefs: (admin.dashboardPrefs as Record<string, unknown> | null) ?? null,
             },
         };
     }

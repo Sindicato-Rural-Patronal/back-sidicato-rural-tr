@@ -48,5 +48,7 @@ rulesId: string
     findAll(filters?: UserAdminListFilters, skip?: number, take?: number): Promise<UserAdminWithDetails[]>;
     count(filters?: UserAdminListFilters): Promise<number>;
     update(id: string, data: UserAdminUpdateInput): Promise<UserAdminModel | null>;
+    /** Preferências do Painel Geral deste admin (JSON livre, pequeno). */
+    updateDashboardPrefs(id: string, prefs: Record<string, unknown>): Promise<void>;
     delete(id: string): Promise<void>;
 }

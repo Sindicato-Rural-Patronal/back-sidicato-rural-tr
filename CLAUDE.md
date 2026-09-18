@@ -63,7 +63,7 @@ src/
 | `UserData`               | id, name, email (opcional; vazio = null), phone (obrigatório) — e-mail e telefone podem repetir entre pessoas (casal, família; índices únicos removidos na migration `20260920090000_userdata_contact_not_unique`), cpf (a identidade: único entre ativos; só dígitos; vazio = null — `UserDataAdapter` normaliza CPF e e-mail em create/update), nameSearch (busca, preenchida por trigger), avatar, nickname, maritalStatus, phone2, phone3, rg, rgIssuer, rgIssuedAt, birthDate, driverLicense, driverLicenseCategory, birthPlace, nationality, gender, ethnicity, educationLevel, functionalCategory, specialNeeds, memberClassification, cadPro (até 5), familyIncome, memberType (lista fixa em `lib/member-types.ts`: ALUNO, PRODUTOR RURAL, TRABALHADOR RURAL ASSALARIADO, TRABALHADOR RURAL AUTONOMO; fora da lista → 400), boardPosition, boardMember, memberStatus, memberSince, memberNotes, memberNotesNumber, addressId (FK). Colunas cnpj/isPartner/partner* foram removidas (migration `20260917140000`): CNPJ antigo e tipo de membro fora da lista (ex.: SOCIO) foram copiados para `memberNotes` — empresa/parceria é `Company` |
 | `Company`                | id, name (razão social), tradeName (nome fantasia), nameSearch/tradeNameSearch (busca, preenchidas por trigger), addressId (FK→Address, sede; SetNull), cnpj (só dígitos; único entre ativas, índice parcial), stateRegistration, type (PRIVATE/PUBLIC), phone, phone2, phone3, email, website, notes, isPartner, partnerUrl, partnerLogo, partnerOrder, primaryPropertyId, isDeleted (soft delete) |
 | `CompanyMember`          | id, companyId (FK), userDataId (FK), title (texto livre em maiúsculas) — único por (companyId, userDataId) |
-| `UserAdmin`              | id, username, passwordHash, userDataId (FK), rulesId (FK)                                                  |
+| `UserAdmin`              | id, username, passwordHash, userDataId (FK), rulesId (FK), dashboardPrefs (Json?, preferências do Painel Geral deste admin; null = padrão — migration `20260924090000_admin_dashboard_prefs`) |
 | `PublicContact`          | id, userDataId (FK único, cascade), title (cargo exibido), order — contatos da página Contato; qualquer pessoa, com ou sem login |
 | `SiteSetting`            | key, value — chaves `social.*`, `org.*` (telefone, e-mail, endereço, horário, busca do mapa), `about.text`, `quotes.source`, `audit.retentionDays` |
 | `UserInstructor`         | id, userDataId (FK único), bio, linkedin, instagram, facebook                                              |
@@ -177,13 +177,16 @@ READ_AUDIT     UPDATE_AUDIT   (ver a trilha · configurar o tempo de guarda)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
 | `GET` | `/admin/me` | `GetCurrentAdminUseCase` | JWT (qualquer admin) |
+| `PATCH` | `/admin/me/preferences` | `UpdateAdminPreferencesUseCase` | JWT (qualquer admin) |
 | `GET` | `/admin/users/admins` | `ListUserAdminsUseCase` | `READ_USER_ADMIN` |
 | `POST` | `/admin/users` | `CreateUserAdminUseCase` | `CREATE_USER_ADMIN` |
 | `PATCH` | `/admin/users/:id` | `UpdateUserAdminUseCase` | `UPDATE_USER_ADMIN` |
 | `DELETE` | `/admin/users/:id` | `DeleteUserAdminUseCase` | `DELETE_USER_ADMIN` |
 
-> `GET /admin/me` retorna `{ userId, userDataId, username, rulesId, ruleName, permissions[] }`.
+> `GET /admin/me` retorna `{ userId, userDataId, username, name, avatar, rulesId, ruleName, permissions[], dashboardPrefs }`.
 > `userId` = UserAdmin.id (igual ao JWT). `userDataId` = UserData.id vinculado.
+>
+> **Preferências do Painel Geral** (`usecase/admin-preferences.ts`, coluna `UserAdmin.dashboardPrefs Json?`, migration `20260924090000_admin_dashboard_prefs`): `PATCH /admin/me/preferences` com `{ dashboardPrefs: {...} }`, self-service — o admin só mexe nas próprias (o id vem do token), sem permissão de gestão. O conteúdo é livre (o painel decide: cartões escondidos, ordem, filtro do calendário…) e **substitui o objeto inteiro**; precisa ser um objeto simples (null, array ou outro tipo → 400) de no máximo 4 KB em JSON (`MAX_PREFS_BYTES`). Responde `{ dashboardPrefs }` e o valor volta em `GET /admin/me` — `null` enquanto o admin nunca salvou (o painel cai no layout padrão).
 
 ### Contatos públicos (`public-contact-router.ts`, use cases em `usecase/public-contact-usecases.ts`)
 | Método | Path | Use Case | Autenticação |
@@ -283,7 +286,7 @@ Eventos e reuniões que ocupam as salas, além dos cursos. Mesmas permissões do
 
 - **Horários**: hora "de parede" de Brasília rotulada em UTC, igual aos cursos (`2026-10-05T08:00:00.000Z` = 08:00 em Terra Roxa). O painel monta a string, o backend nunca converte fuso.
 - **`from`/`to`** (`AAAA-MM-DD`, obrigatórios, `to >= from`, no máximo 370 dias) delimitam `[from 00:00, to + 1 dia 00:00)`; volta **tudo o que sobrepõe** o período, por início, sem paginação (o painel acha a reserva a editar nessa lista — não há GET por id).
-- Item: `{ id, type, title, description, publicOnSite, publicDescription, roomId, roomName, startTime, endTime, responsible: { id, name } | null, responsibleName, seriesId }`. Agenda: `{ kind: COURSE|EVENT|MEETING, id, title, roomId, roomName, startTime, endTime, status (do curso; null na reserva), seriesId, publicOnSite (false em curso e reunião) }` — a agenda traz os cursos de qualquer status (não excluídos), quem filtra é a tela.
+- Item: `{ id, type, title, description, publicOnSite, publicDescription, roomId, roomName, startTime, endTime, responsible: { id, name } | null, responsibleName, seriesId }`. Agenda: `{ kind: COURSE|EVENT|MEETING, id, title, roomId, roomName, startTime, endTime, status (do curso; null na reserva), seriesId, publicOnSite (false em curso e reunião), enrolled, maxStudents, registrationDeadline, registrationDeadlineTime }` — a agenda traz os cursos de **qualquer status** (inclusive `UNPUBLISHED` e `COMPLETED`; não excluídos), quem filtra é a tela. Os quatro últimos campos só vêm preenchidos em `kind: COURSE` (null em evento/reunião): `enrolled` = inscrições ativas, `maxStudents` = capacidade da sala, `registrationDeadline` = dia "AAAA-MM-DD" e `registrationDeadlineTime` = "HH:MM" ou null (dia inteiro). Tudo em **duas** consultas (cursos com `_count` + reservas), sem N+1 — é o que o calendário do Painel Geral consome, em vez de paginar `/admin/courses`.
 - **Criar**: `{ type, title, description?, publicOnSite?, publicDescription?, roomId, startTime, endTime, responsibleUserDataId?, responsibleName?, repeat?: { frequency: WEEKLY|MONTHLY, until: AAAA-MM-DD } }` → 201 `{ ids, seriesId }`. `repeat` gera uma ocorrência por semana ou por mês no mesmo dia (mês sem o dia, ex. 31, é pulado), até `until` inclusive, no máximo 60 (mais que isso → 400); cada ocorrência é uma linha com o mesmo `seriesId` (`null` quando só há uma). Título aparado, até 150 caracteres — o texto vai como veio (quem escreve em maiúsculas é o painel).
 - **Editar**: todos os campos opcionais, muda **só aquela ocorrência**; `description`, `publicDescription`, `responsibleUserDataId` e `responsibleName` aceitam `null` para limpar. Conflito só é checado quando sala ou horário mudam.
 - **No site** (`effectivePublicOnSite`): só `type: EVENT` pode ser publicado — reunião é forçada a `publicOnSite: false` (marcar no corpo não adianta) e virar reunião tira a publicação e limpa `publicDescription`. `GET /events` (pública, sem token) devolve os eventos publicados que ainda não terminaram (`endTime >= agora` no relógio de Brasília), por início, no máximo 50, com `{ id, title, description (= `publicDescription`), startTime, endTime, roomName }` — as observações internas (`description`) nunca saem.
@@ -411,10 +414,32 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 - **Retenção**: eventos com mais de 90 dias são apagados pelo publicador, no máximo uma vez por hora por processo (timestamp em memória). Leituras caem junto (cascade).
 - `PATCH /admin/notifications/read` fica fora da auditoria (`skipAudit`).
 
-### Dashboard
+### Dashboard (Painel Geral)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
-| `GET` | `/admin/dashboard/stats` | `DashboardStatsUseCase` | `READ_COURSE` |
+| `GET` | `/admin/dashboard/stats` | `DashboardStatsUseCase` | JWT (qualquer admin) |
+
+Os números do Painel Geral, **filtrados pelas permissões de quem pediu**: cada bloco que a regra do admin não deixa ver é **omitido** da resposta, em vez de a rota inteira dar 403 (o painel é a tela inicial depois do login; só sem token é 401). "Hoje" é sempre o dia em Brasília (`brasiliaToday`, UTC-3 fixo), no mesmo formato "de parede" com Z das datas do curso.
+
+```
+READ_COURSE       courses: { total, public, private, unpublished, inProgress, completed }
+                  totalRooms
+                  registrations: { last30Days, pendingConfirmation }
+                  coursesStartingIn7Days
+                  totalRegistrations, registrationsLast30Days   (nomes antigos, mantidos)
+READ_USER         totalUsers, membershipsExpiring30Days
+READ_USER_ADMIN   totalAdmins
+READ_CONTACT      unreadMessages
+READ_MARKET_QUOTE quotesToday: { launched: boolean, period: 'MORNING' | 'AFTERNOON' | null }
+```
+
+- `registrations.pendingConfirmation` — **todas** as inscrições ativas sem confirmar em cursos não excluídos que ainda não terminaram (`endTime >= hoje`). É de propósito mais amplo que o aviso `REGISTRATIONS_UNCONFIRMED` do sino, que só olha de amanhã até +7 dias.
+- `coursesStartingIn7Days` — cursos `PUBLIC`/`PRIVATE` que começam de hoje até hoje + 7, inclusive.
+- `membershipsExpiring30Days` — sai do **mesmo** `PendingNotificationsRepository.membershipsExpiring` do sino (memberStatus `ACTIVE`, validade de hoje até hoje + 30, inclusive): os dois números nunca divergem.
+- `totalUsers` — todas as pessoas ativas do cadastro, **não** o número de associados.
+- `quotesToday` — só o fato: houve lançamento hoje e qual foi o último período (`countQuoteHistory` do sino + `lastQuotePeriodOfDay`). A regra de quando cobrar (dias úteis, a partir das 11h) continua só no sino.
+- Consultas novas em `ports/external/dashboard-repository.ts` + `adapter/database/dashboard-adapter.ts` (`countPendingConfirmation`, `countCoursesStarting`, `lastQuotePeriodOfDay`); o resto reaproveita os repositórios de curso, pessoa, admin, inscrição, sala, mensagem e pendências.
+- O calendário do painel é `GET /admin/room-schedule` (abaixo) — não se pagina `/admin/courses` para montá-lo. O cartão "Cursos Públicos" continua com a consulta dele (precisa de capa e paginação).
 
 ### Financeiro (`finance-router.ts`)
 | Método | Path | Use Case | Autenticação |

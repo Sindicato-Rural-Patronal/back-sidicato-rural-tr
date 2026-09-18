@@ -63,6 +63,13 @@ const scheduleObject = {
         status: nstr,
         seriesId: nstr,
         publicOnSite: { type: 'boolean' },
+        // Só vêm preenchidos em kind = COURSE (null em evento/reunião).
+        enrolled: { type: 'integer',
+nullable: true },
+        maxStudents: { type: 'integer',
+nullable: true },
+        registrationDeadline: nstr,
+        registrationDeadlineTime: nstr,
     },
 };
 
@@ -169,7 +176,9 @@ items: bookingObject },
             schema: {
                 tags,
                 summary: 'Agenda das salas (cursos + reservas)',
-                description: `Cursos não excluídos (qualquer status; \`status\` vem preenchido) e reservas que sobrepõem o período, por início. ${timeNote}`,
+                description: `Cursos não excluídos de **qualquer status** (inclusive UNPUBLISHED e COMPLETED; \`status\` vem preenchido) e reservas que sobrepõem o período, por início. É o que o calendário do Painel Geral consome — não é preciso paginar \`/admin/courses\`.
+
+Em \`kind: COURSE\` também vêm \`enrolled\`, \`maxStudents\` (capacidade da sala), \`registrationDeadline\` (dia, AAAA-MM-DD) e \`registrationDeadlineTime\` ("HH:MM" ou null = dia inteiro); em evento/reunião os quatro são null. ${timeNote}`,
                 security: sec,
                 querystring: { type: 'object',
 properties: rangeQuery },
