@@ -407,7 +407,7 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
   - Inscrição/cadastro feitos pela equipe no painel **não** geram evento.
 - **Visibilidade**: o admin só vê eventos cuja `permission` está na sua regra; janela de 30 dias, mais recentes primeiro, até 50. `unreadCount` = não lidos na janela. Leitura é por admin (`NotificationRead`); marcar só afeta eventos visíveis.
 - **Pendências** (`pending`): calculadas na hora por `computePendingNotifications` (`usecase/pending-notifications.ts` + `adapter/database/pending-notifications-adapter.ts`), nada gravado; `pendingCount` = tamanho da lista.
-  - `ROOM_BOOKINGS_TODAY` (`READ_COURSE`, info): reservas de sala não excluídas que ocupam o dia de hoje em Brasília (mesma convenção de hora "de parede" dos cursos) → um item "Reservas de sala hoje", corpo "08:00 Título (Sala)" até 3 + "e mais N" (reserva que começou antes de hoje leva "DD/MM"), `count` = total, link `/admin/agenda`.
+  - `ROOM_BOOKINGS_TODAY` (`READ_COURSE`, info): reservas de sala não excluídas que ocupam o dia de hoje em Brasília (mesma convenção de hora "de parede" dos cursos) → um item "Reservas de sala hoje", corpo "08:00 Título (Sala)" até 3 + "e mais N" (reserva que começou antes de hoje leva "DD/MM"), `count` = total, link `/admin/dashboard?dia=<hoje em Brasília>` (a agenda das salas é o calendário do Painel Geral).
 - **Retenção**: eventos com mais de 90 dias são apagados pelo publicador, no máximo uma vez por hora por processo (timestamp em memória). Leituras caem junto (cascade).
 - `PATCH /admin/notifications/read` fica fora da auditoria (`skipAudit`).
 

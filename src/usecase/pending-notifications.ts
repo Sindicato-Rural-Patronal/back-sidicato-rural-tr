@@ -196,7 +196,8 @@ async function roomBookingPendings(
                 bookings.total,
             ),
             count: bookings.total,
-            link: '/admin/agenda',
+            // A agenda das salas vive no calendário do Painel Geral, no dia de hoje.
+            link: `/admin/dashboard?dia=${today.toISOString().slice(0, 10)}`,
             severity: 'info',
         },
     ];
