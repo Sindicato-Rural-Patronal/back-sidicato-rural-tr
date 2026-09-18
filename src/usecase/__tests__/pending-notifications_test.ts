@@ -553,7 +553,7 @@ describe('computePendingNotifications — reservas de sala', () => {
                 title: 'Reservas de sala hoje',
                 body: '08:00 Palestra (AUDITORIO), 11:30 Almoço (COZINHA), 14:00 Reunião da diretoria (SALA 1) e mais 1',
                 count: 4,
-                link: '/admin/agenda',
+                link: '/admin/dashboard?dia=2026-09-17',
                 severity: 'info',
             },
         ]);
@@ -574,7 +574,9 @@ describe('computePendingNotifications — reservas de sala', () => {
         expect(result).toEqual([
             expect.objectContaining({ type: 'ROOM_BOOKINGS_TODAY',
 body: '16/09 20:00 Vigília (AUDITORIO)',
-count: 1 }),
+count: 1,
+// O link leva ao dia de Brasília no calendário do painel.
+link: '/admin/dashboard?dia=2026-09-17' }),
         ]);
     });
 
