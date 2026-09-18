@@ -19,7 +19,9 @@ import { createPrismaClient } from './lib/prisma.js';
 const server = fastify({
     // Em produção a API só é acessível pelo proxy do Coolify (um salto): sem isto
     // request.ip é o do proxy e o limite de tentativas de login vale para todos.
-    trustProxy: 1,
+    // Confia só em quem abriu a conexão (o proxy), então request.ip é o último
+    // endereço do X-Forwarded-For — o de quem acessou, que ninguém de fora forja.
+    trustProxy: (_address: string, hop: number) => hop === 0,
     logger: true,
     disableRequestLogging: true,
     ajv: {
