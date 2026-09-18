@@ -51,6 +51,14 @@ export type RoomScheduleItem = {
     seriesId: string | null;
     /** Evento publicado no site (sempre false para cursos e reuniões). */
     publicOnSite: boolean;
+    /** Só em curso: inscrições ativas; null em evento/reunião. */
+    enrolled: number | null;
+    /** Só em curso: capacidade da sala; null em evento/reunião. */
+    maxStudents: number | null;
+    /** Só em curso: dia do prazo de inscrição ("AAAA-MM-DD"); null = sem prazo. */
+    registrationDeadline: string | null;
+    /** Só em curso: hora do prazo ("HH:MM"); null = vale o dia inteiro. */
+    registrationDeadlineTime: string | null;
 };
 
 /** Evento publicado no site (rota pública GET /events). */

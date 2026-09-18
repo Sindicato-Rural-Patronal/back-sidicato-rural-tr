@@ -13,6 +13,7 @@ import type {
     RoomScheduleItem,
     PublicEventItem,
 } from '../../ports/external/room-booking-repository.js';
+import { courseDay, deadlineTime } from '../../lib/course-registration-rules.js';
 
 export function createRoomBookingAdapter(prisma: PrismaClient): RoomBookingRepository {
     return new RoomBookingAdapter(prisma);
@@ -156,6 +157,7 @@ roomId?: string
 startTime: { lt: to },
 endTime: { gt: from },
 ...(roomId && { roomId }) };
+        // Uma consulta só: a contagem de inscritos vem junto (sem N+1).
         const courses: {
             id: string;
             name: string;
@@ -163,16 +165,26 @@ endTime: { gt: from },
             startTime: Date;
             endTime: Date;
             status: string;
-            room: { name: string };
+            registrationDeadline: Date | null;
+            room: {
+ name: string;
+maxCapacity: number
+};
+            _count: { courseUserRegistration: number };
         }[] = await this.prisma.course.findMany({
             where,
-            select: { id: true,
-name: true,
-roomId: true,
-startTime: true,
-endTime: true,
-status: true,
-room: { select: { name: true } } },
+            select: {
+                id: true,
+                name: true,
+                roomId: true,
+                startTime: true,
+                endTime: true,
+                status: true,
+                registrationDeadline: true,
+                room: { select: { name: true,
+maxCapacity: true } },
+                _count: { select: { courseUserRegistration: { where: { isDeleted: false } } } },
+            },
         });
         const bookings: BookingRow[] = await this.prisma.roomBooking.findMany({ where,
 select: roomBookingSelect });
@@ -188,6 +200,12 @@ select: roomBookingSelect });
                 status: c.status,
                 seriesId: null,
                 publicOnSite: false,
+                enrolled: c._count.courseUserRegistration,
+                maxStudents: c.room.maxCapacity,
+                registrationDeadline: c.registrationDeadline
+                    ? courseDay(c.registrationDeadline)
+                    : null,
+                registrationDeadlineTime: deadlineTime(c.registrationDeadline),
             })),
             ...bookings.map(b => ({
                 kind: b.type,
@@ -200,6 +218,11 @@ select: roomBookingSelect });
                 status: null,
                 seriesId: b.seriesId,
                 publicOnSite: b.publicOnSite,
+                // Campos só de curso.
+                enrolled: null,
+                maxStudents: null,
+                registrationDeadline: null,
+                registrationDeadlineTime: null,
             })),
         ];
         return items.sort((a, b) => a.startTime.getTime() - b.startTime.getTime() || a.title.localeCompare(b.title));

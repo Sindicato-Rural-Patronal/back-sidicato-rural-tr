@@ -15,6 +15,8 @@ import { GetCurrentAdminController } from '../controllers/get-current-admin.js';
 import { GetCurrentAdminUseCase } from '../../usecase/get-current-admin.js';
 import { UpdateMeController } from '../controllers/update-me.js';
 import { UpdateMeUseCase } from '../../usecase/update-me.js';
+import { AdminPreferencesController } from '../controllers/admin-preferences.js';
+import { MAX_PREFS_BYTES, UpdateAdminPreferencesUseCase } from '../../usecase/admin-preferences.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
 
@@ -48,6 +50,10 @@ export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaCl
         new UpdateMeUseCase(userAdminRepository, userDataRepository),
         getAdminPermissions,
     );
+    const adminPreferencesController = new AdminPreferencesController(
+        new UpdateAdminPreferencesUseCase(userAdminRepository),
+        getAdminPermissions,
+    );
 
     fastify.get(
         '/admin/me',
@@ -71,6 +77,13 @@ nullable: true },
                             ruleName: { type: 'string' },
                             permissions: { type: 'array',
 items: { type: 'string' } },
+                            dashboardPrefs: {
+                                type: 'object',
+                                nullable: true,
+                                additionalProperties: true,
+                                description:
+                                    'Preferências do Painel Geral deste admin (JSON livre); null = padrão.',
+                            },
                         },
                     },
                     401: errorResponse,
@@ -79,6 +92,38 @@ items: { type: 'string' } },
             },
         },
         (req: FastifyRequest, res: FastifyReply) => getCurrentAdminController.handle(req, res),
+    );
+
+    fastify.patch(
+        '/admin/me/preferences',
+        {
+            schema: {
+                tags: ['Admin — Auth'],
+                summary: 'Salvar as preferências do Painel Geral deste admin',
+                description: `Self-service: qualquer admin autenticado grava as **próprias** preferências (o id vem do token). O conteúdo de \`dashboardPrefs\` é livre — o painel decide o que guarda (cartões escondidos, ordem, filtro do calendário…) —, mas precisa ser um objeto de no máximo ${MAX_PREFS_BYTES} bytes em JSON; o objeto enviado substitui o anterior inteiro. Vem de volta em \`GET /admin/me\`.`,
+                security: [{ bearerAuth: [] }],
+                body: {
+                    type: 'object',
+                    required: ['dashboardPrefs'],
+                    properties: {
+                        dashboardPrefs: { type: 'object',
+additionalProperties: true },
+                    },
+                },
+                response: {
+                    200: {
+                        type: 'object',
+                        properties: {
+                            dashboardPrefs: { type: 'object',
+additionalProperties: true },
+                        },
+                    },
+                    400: errorResponse,
+                    401: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest, res: FastifyReply) => adminPreferencesController.handle(req, res),
     );
 
     fastify.patch(
