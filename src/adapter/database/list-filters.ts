@@ -161,30 +161,13 @@ export function buildCompanyListWhere(filters: CompanyListFilters) {
     return where;
 }
 
-/**
- * Separa o ano do resto da busca de cursos. Um pedaco solto de 4 digitos entre
- * 1990 e 2100 vale como ano: digitar "2023" lista o ano todo e "2023 horta"
- * estreita dentro dele. E o jeito de achar curso antigo sem precisar de filtro
- * proprio na tela.
- */
-export function splitCourseSearch(search?: string): { year?: number; text?: string } {
-    const termos = (search ?? '').trim().split(/\s+/).filter(Boolean);
-    if (termos.length === 0) return {};
-
-    let year: number | undefined;
-    const resto: string[] = [];
-    for (const termo of termos) {
-        const n = Number(termo);
-        if (year === undefined && /^\d{4}$/.test(termo) && n >= 1990 && n <= 2100) year = n;
-        else resto.push(termo);
-    }
-    const text = resto.join(' ');
-    return { year,
-text: text || undefined };
-}
-
 export function buildCourseListWhere(filters?: CourseListFilters) {
-    const { year, text } = splitCourseSearch(filters?.search);
+    // Ano e texto sao filtros SEPARADOS de proposito. Deduzir o ano de um
+    // numero digitado na busca confundia dois cadastros com o mesmo nome em
+    // anos diferentes: nao dava para pedir "o de 2023" sem depender de a busca
+    // adivinhar o que era nome e o que era ano.
+    const text = filters?.search?.trim();
+    const year = filters?.year;
     return {
         isDeleted: false,
         ...(filters?.status && { status: filters.status }),
@@ -193,7 +176,6 @@ export function buildCourseListWhere(filters?: CourseListFilters) {
             startTime: { gte: new Date(Date.UTC(year, 0, 1)),
 lt: new Date(Date.UTC(year + 1, 0, 1)) },
         }),
-        // O numero do evento ja era prometido na tela de busca e nunca procurado.
         ...(text && {
             OR: [
                 { name: { contains: text,

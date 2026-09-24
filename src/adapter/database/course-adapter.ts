@@ -62,6 +62,17 @@ isDeleted: false },
         }) as Promise<CourseWithDetails[]>;
     }
 
+    async years(): Promise<number[]> {
+        // So a data de inicio de cada curso; sao poucas centenas de linhas e
+        // evita SQL cru so para um DISTINCT de ano.
+        const rows = await this.prisma.course.findMany({
+            where: { isDeleted: false },
+            select: { startTime: true },
+        });
+        const anos = new Set((rows as { startTime: Date }[]).map(r => r.startTime.getUTCFullYear()));
+        return [...anos].sort((a, b) => b - a);
+    }
+
     count(filters?: CourseListFilters): Promise<number> {
         return this.prisma.course.count({ where: buildCourseListWhere(filters) });
     }

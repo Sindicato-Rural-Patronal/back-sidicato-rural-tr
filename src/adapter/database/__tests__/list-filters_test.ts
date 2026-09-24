@@ -7,7 +7,6 @@ import {
     buildUnimedListWhere,
     buildUserListWhere,
     searchKey,
-    splitCourseSearch,
 } from '../list-filters.js';
 
 const ci = (value: string) => ({ contains: value,
@@ -180,44 +179,25 @@ rulesId: 'r1' });
 });
 
 
-describe('splitCourseSearch', () => {
-    it('sem busca nao separa nada', () => {
-        expect(splitCourseSearch()).toEqual({});
-        expect(splitCourseSearch('   ')).toEqual({});
-    });
-
-    it('4 digitos soltos viram o ano', () => {
-        expect(splitCourseSearch('2023')).toEqual({ year: 2023 });
-        expect(splitCourseSearch('2023 horta')).toEqual({ year: 2023,
-text: 'horta' });
-        expect(splitCourseSearch('horta 2023')).toEqual({ year: 2023,
-text: 'horta' });
-    });
-
-    it('numero que nao e ano continua sendo texto', () => {
-        // Numero de evento costuma ter 4 digitos tambem: fora da faixa de anos
-        // ele tem de continuar procuravel como texto.
-        expect(splitCourseSearch('1200')).toEqual({ text: '1200' });
-        expect(splitCourseSearch('123')).toEqual({ text: '123' });
-        expect(splitCourseSearch('20233')).toEqual({ text: '20233' });
-    });
-
-    it('so o primeiro ano conta; o resto e texto', () => {
-        expect(splitCourseSearch('2023 2024')).toEqual({ year: 2023,
-text: '2024' });
-    });
-});
-
 describe('buildCourseListWhere', () => {
     it('sem filtro so tira os excluidos', () => {
         expect(buildCourseListWhere()).toEqual({ isDeleted: false });
     });
 
-    it('ano vira faixa de datas do ano inteiro', () => {
-        expect(buildCourseListWhere({ search: '2023' })).toEqual({
+    it('o ano e filtro proprio e vira a faixa do ano inteiro', () => {
+        expect(buildCourseListWhere({ year: 2023 })).toEqual({
             isDeleted: false,
             startTime: { gte: new Date(Date.UTC(2023, 0, 1)),
 lt: new Date(Date.UTC(2024, 0, 1)) },
+        });
+    });
+
+    it('numero digitado na busca NAO vira ano', () => {
+        // Dois cursos com o mesmo nome em anos diferentes: quem quer o antigo
+        // escolhe o ano no filtro, em vez de torcer para a busca adivinhar.
+        expect(buildCourseListWhere({ search: '2023' })).toEqual({
+            isDeleted: false,
+            OR: [{ name: ci('2023') }, { eventNumber: ci('2023') }],
         });
     });
 
@@ -229,7 +209,7 @@ lt: new Date(Date.UTC(2024, 0, 1)) },
     });
 
     it('ano e texto juntos estreitam dentro do ano', () => {
-        expect(buildCourseListWhere({ search: 'horta 2023' })).toEqual({
+        expect(buildCourseListWhere({ year: 2023, search: 'horta' })).toEqual({
             isDeleted: false,
             startTime: { gte: new Date(Date.UTC(2023, 0, 1)),
 lt: new Date(Date.UTC(2024, 0, 1)) },
@@ -238,7 +218,7 @@ lt: new Date(Date.UTC(2024, 0, 1)) },
     });
 
     it('a situacao continua valendo junto com a busca', () => {
-        expect(buildCourseListWhere({ status: 'COMPLETED', search: '2023' })).toMatchObject({
+        expect(buildCourseListWhere({ status: 'COMPLETED', year: 2023 })).toMatchObject({
             status: 'COMPLETED',
             startTime: { gte: new Date(Date.UTC(2023, 0, 1)) },
         });

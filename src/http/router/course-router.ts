@@ -30,6 +30,7 @@ import { CopyCourseExtrasUseCase } from '../../usecase/copy-course-extras.js';
 import { createInstructorAdapter } from '../../adapter/database/instructor-adapter.js';
 import { downloadImage } from '../../lib/download-image.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
+import { requirePermission } from '../lib/require-permission.js';
 
 const courseDetailProperties = {
     id: { type: 'string',
@@ -209,7 +210,11 @@ default: 20 },
 enum: ['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS', 'COMPLETED'],
 description: 'Filtrar por status' },
                         search: { type: 'string',
-description: 'Busca por nome do curso' },
+description: 'Busca por nome do curso ou nº do evento' },
+                        year: { type: 'integer',
+minimum: 1990,
+maximum: 2100,
+description: 'Só os cursos que começam neste ano (filtro separado da busca)' },
                     },
                 },
                 response: {
@@ -241,6 +246,30 @@ nullable: true },
             },
         },
         (req: FastifyRequest, res: FastifyReply) => listAllCoursesController.handle(req, res),
+    );
+
+    // Os anos que o filtro da tela oferece: so os que tem curso, para a lista
+    // nao ter ano vazio nem faltar o mais antigo.
+    fastify.get(
+        '/admin/courses/years',
+        {
+            schema: {
+                tags: ['Admin — Courses'],
+                summary: 'Anos com curso cadastrado (admin)',
+                description: 'Anos de inicio dos cursos, do mais recente para o mais antigo. Requer `READ_COURSE`.',
+                security: [{ bearerAuth: [] }],
+                response: {
+                    200: { type: 'array',
+items: { type: 'integer' } },
+                    401: errorResponse,
+                    403: errorResponse,
+                },
+            },
+        },
+        async (req: FastifyRequest, res: FastifyReply) => {
+            if ((await requirePermission(req, res, 'READ_COURSE', getAdminPermissions)) === null) return;
+            return res.status(200).send(await courseRepository.years());
+        },
     );
 
     fastify.get(
