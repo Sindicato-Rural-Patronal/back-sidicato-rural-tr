@@ -16,6 +16,10 @@ import { createSiteSettingsAdapter } from '../../adapter/database/site-settings-
 import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 
 const marketQuoteProperties = {
+    morningCents: { type: ['integer', 'null'],
+description: 'Preço da manhã no dia de referência (centavos); null = não lançado' },
+    afternoonCents: { type: ['integer', 'null'],
+description: 'Preço da tarde no dia de referência (centavos); null = não lançado' },
     id: { type: 'string' },
     label: { type: 'string' },
     value: { type: 'string',

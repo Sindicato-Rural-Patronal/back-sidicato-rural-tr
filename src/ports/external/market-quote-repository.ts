@@ -32,7 +32,19 @@ export interface MarketQuoteRepository {
     saveDaily(entries: DailyQuoteEntry[]): Promise<void>;
     /** Lançamentos com data a partir de `since`, em ordem cronológica (dia, depois manhã/tarde). */
     historySince(since: Date): Promise<QuoteHistoryRow[]>;
+    /**
+     * Os preços de manhã e de tarde de cada produto no dia de referência dele.
+     * A home mostra os dois lado a lado; o produto guarda só o último.
+     */
+    dayPrices(pairs: { id: string; date: Date }[]): Promise<DayPriceRow[]>;
 }
+
+export type DayPriceRow = {
+    marketQuoteId: string;
+    period: QuotePeriod | null;
+    /** Preço em centavos (o histórico guarda em reais). */
+    priceCents: number;
+};
 
 export type QuoteHistoryRow = {
     marketQuoteId: string;
