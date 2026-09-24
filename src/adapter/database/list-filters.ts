@@ -145,13 +145,46 @@ export function buildCompanyListWhere(filters: CompanyListFilters) {
     return where;
 }
 
+/**
+ * Separa o ano do resto da busca de cursos. Um pedaco solto de 4 digitos entre
+ * 1990 e 2100 vale como ano: digitar "2023" lista o ano todo e "2023 horta"
+ * estreita dentro dele. E o jeito de achar curso antigo sem precisar de filtro
+ * proprio na tela.
+ */
+export function splitCourseSearch(search?: string): { year?: number; text?: string } {
+    const termos = (search ?? '').trim().split(/\s+/).filter(Boolean);
+    if (termos.length === 0) return {};
+
+    let year: number | undefined;
+    const resto: string[] = [];
+    for (const termo of termos) {
+        const n = Number(termo);
+        if (year === undefined && /^\d{4}$/.test(termo) && n >= 1990 && n <= 2100) year = n;
+        else resto.push(termo);
+    }
+    const text = resto.join(' ');
+    return { year,
+text: text || undefined };
+}
+
 export function buildCourseListWhere(filters?: CourseListFilters) {
+    const { year, text } = splitCourseSearch(filters?.search);
     return {
         isDeleted: false,
         ...(filters?.status && { status: filters.status }),
-        ...(filters?.search && {
-            name: { contains: filters.search,
-mode: 'insensitive' as const },
+        // O curso guarda horario de parede, entao o ano vai em UTC igual ao resto.
+        ...(year !== undefined && {
+            startTime: { gte: new Date(Date.UTC(year, 0, 1)),
+lt: new Date(Date.UTC(year + 1, 0, 1)) },
+        }),
+        // O numero do evento ja era prometido na tela de busca e nunca procurado.
+        ...(text && {
+            OR: [
+                { name: { contains: text,
+mode: 'insensitive' as const } },
+                { eventNumber: { contains: text,
+mode: 'insensitive' as const } },
+            ],
         }),
     };
 }
