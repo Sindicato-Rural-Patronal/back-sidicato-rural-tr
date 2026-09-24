@@ -26,12 +26,27 @@ function quote(text: string): string {
     return `"${text.replace(/"/g, '""')}"`;
 }
 
-export function toCsv<T>(columns: CsvColumn<T>[], rows: T[]): string {
+/** A tabela sem o BOM — serve para juntar varias num arquivo so. */
+export function csvBody<T>(columns: CsvColumn<T>[], rows: T[]): string {
     const lines = [columns.map(c => quote(c.header)).join(';')];
     for (const row of rows) {
         lines.push(columns.map(c => quote(cellText(c.value(row)))).join(';'));
     }
-    return `﻿${lines.join('\r\n')}\r\n`;
+    return `${lines.join('\r\n')}\r\n`;
+}
+
+export function toCsv<T>(columns: CsvColumn<T>[], rows: T[]): string {
+    return `﻿${csvBody(columns, rows)}`;
+}
+
+/**
+ * Varias tabelas num arquivo so, cada uma com titulo e cabecalho proprios,
+ * separadas por uma linha em branco. E o formato que o Excel abre inteiro: as
+ * secoes ficam uma embaixo da outra na mesma planilha.
+ */
+export function toCsvSections(sections: { title: string; body: string }[]): string {
+    const blocos = sections.map(s => `${quote(s.title)}\r\n${s.body}`);
+    return `﻿${blocos.join('\r\n')}`;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');

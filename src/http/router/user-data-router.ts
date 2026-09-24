@@ -86,6 +86,8 @@ enum: ['NO_FORMAL_EDUCATION', 'INCOMPLETE_PRIMARY', 'COMPLETE_PRIMARY', 'INCOMPL
 description: 'Nível de escolaridade' },
                         incompleteRegistration: { type: 'boolean',
 description: 'true = só cadastros incompletos (sem avatar, sem propriedades, cpf, rg, birthDate ou gender nulos) | false = só cadastros completos' },
+                        activeMember: { type: 'boolean',
+description: 'true = só associados em dia (situação ATIVO e validade não vencida; validade em branco conta como em dia)' },
                     },
                 },
                 response: {

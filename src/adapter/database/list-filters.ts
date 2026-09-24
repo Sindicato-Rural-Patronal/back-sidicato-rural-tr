@@ -87,9 +87,17 @@ function personSearchOr(s: TextSearch) {
     ];
 }
 
+/** Hoje as 00:00, para comparar validade so pela data (vale o dia inteiro). */
+function hojeSemHora(): Date {
+    const agora = new Date();
+    return new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+}
+
 export function buildUserListWhere(filters?: UserListFilters) {
-    const { search, memberType, memberClassification, gender, ethnicity, educationLevel, incompleteRegistration } =
-        filters ?? {};
+    const {
+        search, memberType, memberClassification, gender, ethnicity, educationLevel,
+        incompleteRegistration, activeMember,
+    } = filters ?? {};
     const s = textSearch(search);
     return {
         isDeleted: false,
@@ -99,6 +107,14 @@ export function buildUserListWhere(filters?: UserListFilters) {
         ...(gender && { gender }),
         ...(ethnicity && { ethnicity }),
         ...(educationLevel && { educationLevel }),
+        // Associado em dia. Vai em AND porque tem OR proprio (validade em
+        // branco tambem conta) e nao pode atropelar o OR da busca.
+        ...(activeMember === true && {
+            memberStatus: 'ACTIVE' as const,
+            AND: [
+                { OR: [{ membershipValidUntil: null }, { membershipValidUntil: { gte: hojeSemHora() } }] },
+            ],
+        }),
         ...(incompleteRegistration === true && {
             // envolto em AND p/ não sobrescrever o OR da busca (search)
             AND: [

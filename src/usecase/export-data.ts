@@ -18,7 +18,10 @@ import type {
 } from '../ports/external/export-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { stripAccents } from '../lib/text.js';
-import { csvDate, csvDateTime, csvList, csvMoney, csvWallClock, toCsv, type CsvColumn } from '../lib/csv.js';
+import {
+    csvBody, csvDate, csvDateTime, csvList, csvMoney, csvWallClock, toCsv, toCsvSections,
+    type CsvColumn,
+} from '../lib/csv.js';
 import {
     ADDRESS_TYPE_LABEL,
     BOOKING_TYPE_LABEL,
@@ -80,6 +83,14 @@ single: 'auditoria' },
 title: 'Reservas de sala',
 file: 'reservas-de-sala',
 single: 'reserva' },
+    // Relatorio de cadastros: os quatro tipos num arquivo so. Pede
+    // READ_USER_ADMIN (a permissao mais alta das secoes) porque traz tambem os
+    // administradores; quem so tem READ_USER continua com as exportacoes de
+    // cada tipo, que ja existem.
+    cadastros: { permission: 'READ_USER_ADMIN',
+title: 'Relatório de cadastros',
+file: 'relatorio-de-cadastros',
+single: 'cadastro' },
 } as const satisfies Record<string, {
  permission: Permission;
 title: string;
@@ -132,6 +143,7 @@ const schemas = {
         ethnicity: enumOf(Ethnicity),
         educationLevel: enumOf(EducationLevel),
         incompleteRegistration: bool,
+        activeMember: bool,
     }),
     companies: z.object({
         ids: idList,
@@ -141,6 +153,8 @@ const schemas = {
     }),
     properties: z.object({ ids: idList,
 ownerIds: idList }),
+    // O relatorio e sempre o retrato completo: nao aceita filtro nem selecao.
+    cadastros: z.object({}),
     admins: z.object({ ids: idList,
 search: text,
 rulesId: text }),
@@ -689,6 +703,25 @@ count: number;
 firstName?: string 
 }> {
         switch (dataset) {
+            case 'cadastros': {
+                const [pessoas, associados, empresas, administradores] = await Promise.all([
+                    this.repo.people({}),
+                    this.repo.people({ activeMember: true }),
+                    this.repo.companies({}),
+                    this.repo.admins({}),
+                ]);
+                const csv = toCsvSections([
+                    { title: 'PESSOAS FISICAS', body: csvBody(peopleColumns(today), pessoas) },
+                    { title: 'ASSOCIADOS EM DIA', body: csvBody(peopleColumns(today), associados) },
+                    { title: 'PESSOAS JURIDICAS', body: csvBody(companyColumns, empresas) },
+                    { title: 'ADMINISTRADORES', body: csvBody(adminColumns, administradores) },
+                ]);
+                // O total do relatorio e a soma dos quatro: e o numero que a
+                // tela mostra em "planilha com N registros baixada".
+                const count = pessoas.length + associados.length + empresas.length + administradores.length;
+                return { csv,
+count };
+            }
             case 'people': {
                 const rows = await this.repo.people(q);
                 return { csv: toCsv(peopleColumns(today), rows),

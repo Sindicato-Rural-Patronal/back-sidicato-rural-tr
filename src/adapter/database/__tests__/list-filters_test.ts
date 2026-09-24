@@ -244,3 +244,35 @@ lt: new Date(Date.UTC(2024, 0, 1)) },
         });
     });
 });
+
+
+describe('buildUserListWhere — associados em dia', () => {
+    it('sem o filtro, nao mexe em situacao nem validade', () => {
+        expect(buildUserListWhere()).not.toHaveProperty('memberStatus');
+    });
+
+    it('exige situacao ATIVO e validade nao vencida', () => {
+        const where = buildUserListWhere({ activeMember: true }) as Record<string, unknown>;
+        expect(where.memberStatus).toBe('ACTIVE');
+        // Validade em branco tambem conta como em dia — dai o OR.
+        const and = where.AND as { OR: unknown[] }[];
+        expect(and[0].OR).toHaveLength(2);
+        expect(and[0].OR[0]).toEqual({ membershipValidUntil: null });
+    });
+
+    it('a validade compara so pela data (vale o dia inteiro)', () => {
+        const where = buildUserListWhere({ activeMember: true }) as Record<string, unknown>;
+        const and = where.AND as { OR: { membershipValidUntil?: { gte?: Date } }[] }[];
+        const gte = and[0].OR[1].membershipValidUntil?.gte as Date;
+        expect(gte.getHours()).toBe(0);
+        expect(gte.getMinutes()).toBe(0);
+        expect(gte.getSeconds()).toBe(0);
+    });
+
+    it('convive com a busca por texto sem atropelar o OR dela', () => {
+        const where = buildUserListWhere({ activeMember: true, search: 'joao' }) as Record<string, unknown>;
+        // O OR de cima e o da busca; o da validade fica dentro do AND.
+        expect(Array.isArray(where.OR)).toBe(true);
+        expect(Array.isArray(where.AND)).toBe(true);
+    });
+});
