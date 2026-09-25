@@ -5,9 +5,14 @@ import { ValidationError } from '../errors/validation.js';
 import { CourseNotFoundError, RoomNotFoundError } from '../errors/not-found.js';
 import { RoomAlreadyBookedError } from '../errors/business-rule.js';
 import { conflictMessage } from './room-availability.js';
+import { nomeDoCurso } from '../lib/course-name.js';
 
 const updateCourseBodySchema = z.object({
-    name: z.string().min(1).optional(),
+    // Apagar o titulo na edicao devolve o nome generico, em vez de recusar.
+    name: z.preprocess(
+        v => (v === undefined ? undefined : nomeDoCurso(typeof v === 'string' ? v : null)),
+        z.string().min(1).optional(),
+    ),
     description: z.string().min(1).optional(),
     roomId: z.uuid().optional(),
     startTime: z.iso.datetime().optional(),
