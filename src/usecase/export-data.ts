@@ -711,10 +711,14 @@ firstName?: string
                     this.repo.admins({}),
                 ]);
                 const csv = toCsvSections([
-                    { title: 'PESSOAS FISICAS', body: csvBody(peopleColumns(today), pessoas) },
-                    { title: 'ASSOCIADOS EM DIA', body: csvBody(peopleColumns(today), associados) },
-                    { title: 'PESSOAS JURIDICAS', body: csvBody(companyColumns, empresas) },
-                    { title: 'ADMINISTRADORES', body: csvBody(adminColumns, administradores) },
+                    { title: 'PESSOAS FISICAS',
+body: csvBody(peopleColumns(today), pessoas) },
+                    { title: 'ASSOCIADOS EM DIA',
+body: csvBody(peopleColumns(today), associados) },
+                    { title: 'PESSOAS JURIDICAS',
+body: csvBody(companyColumns, empresas) },
+                    { title: 'ADMINISTRADORES',
+body: csvBody(adminColumns, administradores) },
                 ]);
                 // O total do relatorio e a soma dos quatro: e o numero que a
                 // tela mostra em "planilha com N registros baixada".

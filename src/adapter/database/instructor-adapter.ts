@@ -65,11 +65,21 @@ name: true } } },
         title?: string,
         category?: string,
     ): Promise<CourseInstructorModel> {
-        return this.prisma.courseInstructor.create({
-            data: { instructorId,
+        // Tirar um instrutor do curso é soft-delete, mas o unique
+        // (instructorId, courseId) conta as linhas excluídas: sem o upsert,
+        // colocar o mesmo instrutor de volta estourava o unique — o usecase só
+        // enxerga os vínculos ativos e deixava o create passar.
+        return this.prisma.courseInstructor.upsert({
+            where: { instructorId_courseId: { instructorId,
+courseId } },
+            create: { instructorId,
 courseId,
 title,
 category },
+            update: { title,
+category,
+isDeleted: false,
+deletedAt: null },
         });
     }
 

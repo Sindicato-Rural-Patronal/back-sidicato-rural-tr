@@ -8,7 +8,7 @@ import type { NotificationPublisher } from '../../ports/external/notification-re
 const inviteRepo = { findByToken: vi.fn(),
 consume: vi.fn() } as unknown as AdminInviteRepository;
 const userAdminRepo = {
-    findByUsernameAny: vi.fn(),
+    findByUsername: vi.fn(),
     findByUserDataIdAny: vi.fn(),
     create: vi.fn(),
     reactivate: vi.fn(),
@@ -31,7 +31,7 @@ const useCase = () => new AcceptAdminInviteUseCase(inviteRepo, userAdminRepo, us
 function validInvite() {
     vi.mocked(inviteRepo.findByToken).mockResolvedValue(invite as never);
     vi.mocked(inviteRepo.consume).mockResolvedValue(true);
-    vi.mocked(userAdminRepo.findByUsernameAny).mockResolvedValue(null);
+    vi.mocked(userAdminRepo.findByUsername).mockResolvedValue(null);
     vi.mocked(userAdminRepo.findByUserDataIdAny).mockResolvedValue(null);
     vi.mocked(userDataRepo.findById).mockResolvedValue({ id: 'ud-1',
 name: 'ANA SOUZA' } as never);

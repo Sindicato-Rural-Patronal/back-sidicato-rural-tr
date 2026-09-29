@@ -129,11 +129,66 @@ rg } });
 data: withStoredDocs(data) });
     }
 
+    // Excluir a pessoa leva junto tudo que só existe por causa dela. Antes, só
+    // a ficha era marcada: o acesso ao painel continuava valendo, a inscrição
+    // continuava ocupando vaga no curso e o vínculo com a empresa continuava
+    // aparecendo — tudo apontando para um cadastro que não existe mais.
+    //
+    // Nada disso é apagado de verdade: o histórico (auditoria, lista de
+    // presença de curso já realizado) continua no banco, só sai das telas.
     async delete(id: string): Promise<void> {
-        await this.prisma.userData.update({
-            where: { id },
-            data: { isDeleted: true,
-deletedAt: new Date() },
+        const deletedAt = new Date();
+        const marcar = { isDeleted: true,
+deletedAt } as const;
+
+        await this.prisma.$transaction(async (tx: unknown) => {
+            const t = tx as PrismaClient;
+
+            await t.userData.update({ where: { id },
+data: marcar });
+
+            // Acesso ao painel: sem isso a pessoa excluída continuava entrando.
+            await t.userAdmin.updateMany({ where: { userDataId: id,
+isDeleted: false },
+data: marcar });
+            await t.adminInvite.deleteMany({ where: { userDataId: id,
+usedAt: null } });
+
+            // Inscrições ativas: liberam a vaga e somem da lista do curso.
+            await t.courseUserRegistration.updateMany({
+                where: { userDataId: id,
+isDeleted: false },
+                data: marcar,
+            });
+
+            // Instrutor: tira dos cursos em que estava escalado.
+            const instrutor = await t.userInstructor.findFirst({
+                where: { userDataId: id },
+                select: { id: true },
+            });
+            if (instrutor) {
+                await t.courseInstructor.updateMany({
+                    where: { instructorId: instrutor.id,
+isDeleted: false },
+                    data: marcar,
+                });
+            }
+
+            await t.unimedBeneficiario.updateMany({ where: { userDataId: id,
+isDeleted: false },
+data: marcar });
+            await t.property.updateMany({ where: { userDataId: id,
+isDeleted: false },
+data: marcar });
+            await t.userRelation.updateMany({
+                where: { OR: [{ sourceId: id }, { targetId: id }],
+isDeleted: false },
+                data: marcar,
+            });
+
+            // Estas duas não têm exclusão lógica: a linha some mesmo.
+            await t.publicContact.deleteMany({ where: { userDataId: id } });
+            await t.companyMember.deleteMany({ where: { userDataId: id } });
         });
     }
 }

@@ -25,7 +25,7 @@ export class RoomNameAlreadyExistsError extends ConflictError {
 
 export class RoomHasCoursesError extends ConflictError {
     constructor() {
-        super('Sala vinculada a cursos e não pode ser removida.');
+        super('Sala com cursos marcados que ainda não terminaram. Exclua ou remarque esses cursos antes.');
         this.name = 'RoomHasCoursesError';
     }
 }

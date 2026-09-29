@@ -44,7 +44,10 @@ export function toCsv<T>(columns: CsvColumn<T>[], rows: T[]): string {
  * separadas por uma linha em branco. E o formato que o Excel abre inteiro: as
  * secoes ficam uma embaixo da outra na mesma planilha.
  */
-export function toCsvSections(sections: { title: string; body: string }[]): string {
+export function toCsvSections(sections: {
+ title: string;
+body: string 
+}[]): string {
     const blocos = sections.map(s => `${quote(s.title)}\r\n${s.body}`);
     return `﻿${blocos.join('\r\n')}`;
 }

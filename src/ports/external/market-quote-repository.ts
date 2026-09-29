@@ -36,7 +36,10 @@ export interface MarketQuoteRepository {
      * Os preços de manhã e de tarde de cada produto no dia de referência dele.
      * A home mostra os dois lado a lado; o produto guarda só o último.
      */
-    dayPrices(pairs: { id: string; date: Date }[]): Promise<DayPriceRow[]>;
+    dayPrices(pairs: {
+ id: string;
+date: Date 
+}[]): Promise<DayPriceRow[]>;
 }
 
 export type DayPriceRow = {

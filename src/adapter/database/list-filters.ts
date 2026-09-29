@@ -191,6 +191,10 @@ export function buildAdminListWhere(filters?: UserAdminListFilters) {
     const s = textSearch(filters?.search);
     return {
         isDeleted: false,
+        // Pessoa excluída não é administrador: a exclusão do cadastro leva o
+        // acesso junto, e a condição aqui cobre os logins que já estavam
+        // soltos de antes — a lista mostra quem de fato consegue entrar.
+        userData: { isDeleted: false },
         ...(s && {
             OR: [
                 { username: insensitive(s.term) },

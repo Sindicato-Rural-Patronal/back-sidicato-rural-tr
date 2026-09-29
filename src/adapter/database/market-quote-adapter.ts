@@ -79,7 +79,10 @@ numeric: true },
         });
     }
 
-    async dayPrices(pairs: { id: string; date: Date }[]): Promise<DayPriceRow[]> {
+    async dayPrices(pairs: {
+ id: string;
+date: Date 
+}[]): Promise<DayPriceRow[]> {
         if (pairs.length === 0) return [];
         const rows = await this.prisma.marketQuoteHistory.findMany({
             where: {
@@ -93,7 +96,11 @@ numeric: true },
         });
         // O historico guarda em reais (numeric = priceCents / 100); a tela
         // trabalha em centavos, entao volta multiplicado.
-        type Linha = { marketQuoteId: string; period: QuotePeriod | null; numeric: number | null };
+        type Linha = {
+ marketQuoteId: string;
+period: QuotePeriod | null;
+numeric: number | null 
+};
         return (rows as Linha[]).map(r => ({
             marketQuoteId: r.marketQuoteId,
             period: r.period,

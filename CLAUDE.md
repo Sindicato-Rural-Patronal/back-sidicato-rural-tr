@@ -132,7 +132,7 @@ READ_AUDIT     UPDATE_AUDIT   (ver a trilha · configurar o tempo de guarda)
 | `GET` | `/admin/users` | `ListUsersUseCase` | `READ_USER` |
 | `GET` | `/admin/users/:id` | `GetUserDetailUseCase` | `READ_USER` |
 | `PATCH` | `/users/:id` | `UpdateUserDataUseCase` | `UPDATE_USER` |
-| `DELETE` | `/users/:id` | `DeleteUserDataUseCase` | `DELETE_USER` |
+| `DELETE` | `/users/:id` | `DeleteUserDataUseCase` (soft; leva junto login, convite não usado, inscrições ativas, escala de instrutor, Unimed, propriedades, relações, contato público e vínculos com empresas) | `DELETE_USER` |
 | `PUT` | `/admin/users/:id/address` | `UpsertUserAddressUseCase` | `UPDATE_USER` |
 | `GET` | `/admin/users/:id/relations` | `ListUserRelationsUseCase` | `READ_USER` |
 | `POST` | `/admin/users/:id/relations` | `AddUserRelationUseCase` | `UPDATE_USER` |
@@ -253,7 +253,9 @@ READ_AUDIT     UPDATE_AUDIT   (ver a trilha · configurar o tempo de guarda)
 | `GET` | `/rooms` | `ListRoomsUseCase` | Pública |
 | `POST` | `/rooms` | `CreateRoomUseCase` (nome da lista fixa, normalizado; repetido → 409) | `CREATE_COURSE` |
 | `PATCH` | `/rooms/:roomId` | `UpdateRoomUseCase` (pode manter nome antigo; trocar exige nome da lista) | `UPDATE_COURSE` |
-| `DELETE` | `/rooms/:roomId` | `DeleteRoomUseCase` — 409 com curso vinculado (`RoomHasCoursesError`) ou com reserva futura (`RoomHasBookingsError`) | `DELETE_COURSE` |
+| `DELETE` | `/rooms/:roomId` | `DeleteRoomUseCase` (soft) — 409 só com curso (`RoomHasCoursesError`) ou reserva (`RoomHasBookingsError`) que **ainda não terminou** | `DELETE_COURSE` |
+
+Excluir sala é **soft-delete** (`isDeleted`, migração `20260929090000_room_soft_delete`): a FK `course.roomId` é obrigatória e sem cascade, então antes bastava um curso de anos atrás — ou já excluído — para a sala nunca mais sair da lista. Agora o curso antigo continua apontando para ela (histórico e agenda antiga inteiros) e só segura a sala o que ainda vai acontecer nela. O nome é único entre as salas **ativas**, por índice parcial: excluir `SALA 1` e cadastrar de novo funciona.
 
 ### Unimed (`unimed-router.ts`, use cases `*-unimed.ts`)
 
@@ -745,5 +747,7 @@ DATABASE_TEST_URL=postgresql://USER:SENHA@localhost:PORTA/BANCO npm run test:e2e
 - Os tipos do Prisma são importados de `src/generated/prisma/` — nunca editar esses arquivos
 - O `PrismaClient` é importado de `../generated/prisma/client.js` (não do pacote padrão)
 - O `StorageAdapter` é instanciado via factory `createStorageAdapter()` (Supabase Storage; buckets devem existir e ser públicos: `avatars`, `course-banners`, `news-banners`)
+- **Soft-delete — as duas regras.** (1) *Antes de excluir*, o que barra é só o que ainda está vivo e vai acontecer: sala presa por curso/reserva que não terminou, regra presa por administrador ativo. Vínculo com registro já excluído, ou com coisa que já passou, nunca barra. (2) *Ao excluir*, o que só existe por causa do registro cai junto, na mesma transação: excluir uma pessoa (`UserDataAdapter.delete`) leva login, convite não usado, inscrições ativas, escala como instrutor, Unimed, propriedades, relações, contato público e vínculos com empresas — sem isso a pessoa excluída continuava entrando no painel e ocupando vaga em curso. Nada é apagado de verdade; só sai das telas.
+- **Valor único + soft-delete.** Um `@unique` cheio conta as linhas excluídas e prende o valor para sempre. Duas saídas, conforme o caso: **índice parcial** `WHERE "isDeleted" = false` quando o valor deve voltar a ficar livre (inscrição ativa em curso, `UserAdmin.username`, nome da sala, CNPJ de empresa) — não dá para escrever como `@unique` no schema, vai na migração com o comentário do porquê; ou **upsert que revive a linha** quando o registro é o mesmo voltando (`UnimedBeneficiario` por pessoa, `CourseInstructor` por (instrutor, curso), forma de pagamento por nome). Checagem de conflito em usecase enxerga só os ativos, então sem uma das duas o `create` estoura P2002 (500).
 - As buscas por CPF/RG no `UserDataAdapter` filtram `isDeleted: false` — soft-deleted users não retornam em conflict checks. Não há busca por e-mail/telefone: não identificam a pessoa (podem repetir)
 - **Busca sem acento** (`list-filters.ts`, pessoas/empresas/Unimed/admins e as exportações): "joao" acha "João" e vice-versa. Os nomes são comparados nas colunas `UserData.nameSearch`, `Company.nameSearch`/`tradeNameSearch` com `searchKey(termo)` (minúsculo, sem acento). Essas colunas são preenchidas por trigger (`*_fill_search`, função SQL `immutable_unaccent_lower`, migração `20260919100000_search_normalized`) — a aplicação nunca grava nelas; trigger em vez de coluna GENERATED para o `migrate dev` não acusar diferença. CPF/CNPJ só entram na busca quando o termo parece documento (só números e pontuação: `.`, `-`, `/`, `( )`, `+`), comparando os dígitos. **Telefone** entra com a mesma regra, a partir de 3 dígitos, em `phone`/`phone2`/`phone3` (da pessoa e da empresa; no Unimed, pelos da pessoa): como cadastros antigos gravaram com máscara e os novos só com dígitos, procura pelos dois — `44999990001` e `(44) 99999-0001`.
