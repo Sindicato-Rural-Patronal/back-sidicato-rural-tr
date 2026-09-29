@@ -132,6 +132,15 @@ model UserInstructor {
   userData   UserData @relation(fields: [userDataId], references: [id])
   userDataId String   @unique
 
+  // Remover instrutor e soft-delete: a escala em curso (CourseInstructor) e FK
+  // obrigatoria sem cascade, entao apagar a linha nao funcionava para quem ja
+  // tinha dado aula — o erro morria num catch mudo e a rota respondia 200.
+  // Colunas criadas na migracao 20260929150000_user_instructor_soft_delete.
+  // O unique de userDataId conta as linhas excluidas, por isso `promote` faz
+  // upsert (revive a linha) em vez de create.
+  isDeleted  Boolean  @default(false)
+  deletedAt  DateTime?
+
   courseAssignments CourseInstructor[]
 }
 
@@ -874,6 +883,14 @@ model Convenio {
 
   isActive  Boolean  @default(true)
   order     Int      @default(0)
+
+  // Sem soft-delete de propósito: excluir convênio apaga a linha
+  // (DeleteConvenioUseCase). As colunas isDeleted/deletedAt/createdBy que este
+  // modelo declarava nunca chegaram ao banco — nenhuma migração as criou — e
+  // nada no código as lia; saíram na migração
+  // 20260929140000_convenio_sem_soft_delete. Não "ativar" o soft-delete aqui
+  // sem antes trocar o @unique do slug por índice parcial: senão o convênio
+  // excluído segura o slug para sempre e não dá para recadastrar.
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

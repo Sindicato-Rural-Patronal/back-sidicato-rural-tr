@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '../../generated/prisma/client.js';
+import { semRegistro } from './prisma-errors.js';
 import type { FinancialCategoryModel } from '../../generated/prisma/models/FinancialCategory.js';
 import type { FinancialTransactionModel } from '../../generated/prisma/models/FinancialTransaction.js';
 import type {
@@ -285,8 +286,8 @@ mimeType: row.mimeType };
         try {
             await this.prisma.financialAttachment.delete({ where: { id } });
             return true;
-        } catch {
-            return false;
+        } catch (e) {
+            return semRegistro(e, false);
         }
     }
 
@@ -621,8 +622,8 @@ outCents: pick(inside, 'OUT') };
         try {
             await this.prisma.financeMonthlyClosing.delete({ where: { id } });
             return true;
-        } catch {
-            return false;
+        } catch (e) {
+            return semRegistro(e, false);
         }
     }
 }

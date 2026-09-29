@@ -58,14 +58,6 @@ export function conflictMessage(o: RoomOccupant): string {
     return `Sala ocupada: ${OCCUPANT_KIND_LABEL[o.kind]} "${o.title}" em ${dayMonth(o.startTime)} ${hourMinute(o.startTime)}–${end}`;
 }
 
-/** Menor início e maior término de uma lista não vazia de horários. */
-export function slotsRange(slots: TimeSlot[]): TimeSlot {
-    return {
-        startTime: new Date(Math.min(...slots.map(s => s.startTime.getTime()))),
-        endTime: new Date(Math.max(...slots.map(s => s.endTime.getTime()))),
-    };
-}
-
 /**
  * Ocorrências de uma reserva. Sem repetição, só a própria. Semanal: a cada 7
  * dias; mensal: mesmo dia do mês (mês sem esse dia, ex. 31, é pulado). Vai até

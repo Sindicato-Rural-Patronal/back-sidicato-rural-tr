@@ -1,4 +1,5 @@
 import type { PrismaClient } from '../../generated/prisma/client.js';
+import { semRegistro } from './prisma-errors.js';
 import type { courseUserRegistrationModel } from '../../generated/prisma/models/courseUserRegistration.js';
 import type {
     RegistrationRepository,
@@ -169,8 +170,8 @@ confirmed: false },
 deletedAt: new Date() },
             });
             return true;
-        } catch {
-            return false;
+        } catch (e) {
+            return semRegistro(e, false);
         }
     }
 
@@ -206,8 +207,8 @@ mimeType: row.mimeType };
         try {
             await this.prisma.registrationFicha.delete({ where: { registrationId } });
             return true;
-        } catch {
-            return false;
+        } catch (e) {
+            return semRegistro(e, false);
         }
     }
 }

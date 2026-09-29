@@ -1,10 +1,13 @@
 name: CI
 
+# `staging` e nao `dev`: a `dev` ficou parada (a distribuicao virou
+# staging = testes, main = producao) e o CI nao rodava justamente no branch
+# que recebe todo o trabalho.
 on:
   push:
-    branches: [main, dev]
+    branches: [main, staging]
   pull_request:
-    branches: [main, dev]
+    branches: [main, staging]
 
 jobs:
   ci:

@@ -10,7 +10,10 @@ export class DemoteInstructorUseCase {
         const instructor = await this.instructorRepository.findByUserId(userDataId);
         if (!instructor) return { error: new InstructorNotFoundError() };
 
-        await this.instructorRepository.demote(userDataId);
+        // O retorno era ignorado: quando a remocao falhava, a rota respondia
+        // 200 e a pessoa continuava instrutora.
+        const removido = await this.instructorRepository.demote(userDataId);
+        if (!removido) return { error: new InstructorNotFoundError() };
         return {};
     }
 }
