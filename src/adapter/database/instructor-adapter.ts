@@ -1,4 +1,5 @@
 import type { PrismaClient } from '../../generated/prisma/client.js';
+import { semRegistro } from './prisma-errors.js';
 import type { UserInstructorModel, CourseInstructorModel } from '../../generated/prisma/models.js';
 import type {
     InstructorRepository,
@@ -20,11 +21,21 @@ export class InstructorAdapter implements InstructorRepository {
         instagram?: string,
         facebook?: string,
     ): Promise<UserInstructorModel> {
-        return this.prisma.userInstructor.create({ data: { userDataId,
+        // Quem ja foi instrutor tem a linha guardada (o unique de userDataId
+        // conta tambem as excluidas): promover de novo revive a mesma linha,
+        // com os dados novos, em vez de estourar o unique.
+        const data = { userDataId,
 bio,
 linkedin,
 instagram,
-facebook } });
+facebook };
+        return this.prisma.userInstructor.upsert({
+            where: { userDataId },
+            create: data,
+            update: { ...data,
+isDeleted: false,
+deletedAt: null },
+        });
     }
 
     update(userDataId: string, data: InstructorUpdateData): Promise<UserInstructorModel | null> {
@@ -32,21 +43,30 @@ facebook } });
 data });
     }
 
+    // Soft-delete, nao DELETE. A escala em curso (CourseInstructor.instructorId)
+    // e uma FK obrigatoria sem cascade: apagar a linha de quem ja deu qualquer
+    // curso violava a chave estrangeira. O erro caia num catch mudo e o usecase
+    // nem olhava o retorno, entao "remover instrutor" respondia 200 e nao
+    // removia nada. Marcando, o historico dos cursos antigos fica inteiro.
     async demote(userDataId: string): Promise<boolean> {
-        try {
-            await this.prisma.userInstructor.delete({ where: { userDataId } });
-            return true;
-        } catch {
-            return false;
-        }
+        const { count } = await this.prisma.userInstructor.updateMany({
+            where: { userDataId,
+isDeleted: false },
+            data: { isDeleted: true,
+deletedAt: new Date() },
+        });
+        return count > 0;
     }
 
     findByUserId(userDataId: string): Promise<UserInstructorModel | null> {
-        return this.prisma.userInstructor.findUnique({ where: { userDataId } });
+        return this.prisma.userInstructor.findFirst({ where: { userDataId,
+isDeleted: false } });
     }
 
     findAll(skip?: number, take?: number): Promise<UserInstructorWithUser[]> {
         return this.prisma.userInstructor.findMany({
+            where: { isDeleted: false,
+userData: { isDeleted: false } },
             include: { userData: { select: { id: true,
 name: true } } },
             orderBy: { userData: { name: 'asc' } },
@@ -56,7 +76,10 @@ name: true } } },
     }
 
     count(): Promise<number> {
-        return this.prisma.userInstructor.count();
+        return this.prisma.userInstructor.count({
+            where: { isDeleted: false,
+userData: { isDeleted: false } },
+        });
     }
 
     addToCourse(
@@ -91,8 +114,8 @@ deletedAt: null },
 deletedAt: new Date() },
             });
             return true;
-        } catch {
-            return false;
+        } catch (e) {
+            return semRegistro(e, false);
         }
     }
 

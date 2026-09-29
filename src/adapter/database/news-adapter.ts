@@ -1,4 +1,5 @@
 import type { PrismaClient } from '../../generated/prisma/client.js';
+import { semRegistro } from './prisma-errors.js';
 import type {
     NewsRepository,
     NewsModel,
@@ -58,8 +59,8 @@ isDeleted: false } }) as Promise<NewsModel | null>;
         try {
             return (await this.prisma.news.update({ where: { id },
 data })) as NewsModel;
-        } catch {
-            return null;
+        } catch (e) {
+            return semRegistro(e, null);
         }
     }
 
@@ -71,8 +72,8 @@ data })) as NewsModel;
 deletedAt: new Date() },
             });
             return true;
-        } catch {
-            return false;
+        } catch (e) {
+            return semRegistro(e, false);
         }
     }
 
@@ -82,8 +83,8 @@ deletedAt: new Date() },
                 where: { id },
                 data: { bannerUrl },
             })) as NewsModel;
-        } catch {
-            return null;
+        } catch (e) {
+            return semRegistro(e, null);
         }
     }
 }

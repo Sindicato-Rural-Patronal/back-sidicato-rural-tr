@@ -1,4 +1,5 @@
 import type { PrismaClient } from '../../generated/prisma/client.js';
+import { semRegistro } from './prisma-errors.js';
 import { buildCourseListWhere } from './list-filters.js';
 import { findRoomOccupants } from './room-booking-adapter.js';
 import type {
@@ -84,8 +85,8 @@ isDeleted: false },
 room: { connect: { id: roomId } } } : rest;
             return await this.prisma.course.update({ where: { id },
 data: updateData });
-        } catch {
-            return null;
+        } catch (e) {
+            return semRegistro(e, null);
         }
     }
 
@@ -111,8 +112,8 @@ deletedAt: now },
                 }),
             ]);
             return true;
-        } catch {
-            return false;
+        } catch (e) {
+            return semRegistro(e, false);
         }
     }
 
@@ -132,8 +133,8 @@ caption },
 deletedAt: new Date() },
             });
             return true;
-        } catch {
-            return false;
+        } catch (e) {
+            return semRegistro(e, false);
         }
     }
 

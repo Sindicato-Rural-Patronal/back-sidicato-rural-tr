@@ -917,6 +917,11 @@ model Company {
   // Propriedade principal (endereço preferencial). Sem FK formal, como em UserData.
   primaryPropertyId String?
 
+  // ATENCAO: excluir convenio e exclusao FISICA (DeleteConvenioUseCase), e
+  // estas duas colunas nunca foram lidas nem escritas. Nao "ativar" o
+  // soft-delete sem antes trocar o @unique do slug por indice parcial
+  // (WHERE isDeleted = false) e filtrar isDeleted no findBySlug/findAll:
+  // senao o convenio excluido segura o slug para sempre.
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
   createdBy String?
