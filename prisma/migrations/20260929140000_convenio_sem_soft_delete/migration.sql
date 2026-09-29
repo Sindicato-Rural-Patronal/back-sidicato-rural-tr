@@ -1,14 +1,19 @@
 -- Convênio nunca teve exclusão lógica: DeleteConvenioUseCase apaga a linha de
--- verdade, e estas três colunas jamais foram lidas nem escritas por nada no
--- código. Ficavam ali como armadilha: quem resolvesse "ativar" o soft-delete
--- veria as colunas prontas e não a parte difícil — o `slug` é @unique cheio,
--- então um convênio excluído seguraria o slug para sempre e não daria para
--- recadastrar (o mesmo problema que travava as salas).
+-- verdade. E as colunas isDeleted/deletedAt/createdBy que o schema.prisma
+-- declarava **nunca chegaram ao banco** — a migração que criou a tabela
+-- (20260916120000_convenio) não as tem, e nenhuma outra as acrescentou. Como
+-- nada no código lia nem escrevia nelas, o desencontro entre o schema e o
+-- banco passou meses sem aparecer.
 --
--- Todas as linhas têm isDeleted = false, deletedAt = null e createdBy = null,
--- então não há dado a perder. Se algum dia o soft-delete fizer sentido aqui, o
--- caminho é: colunas de volta + trocar o @unique do slug por índice parcial
+-- Esta migração tira as colunas do schema e, se em algum ambiente elas tiverem
+-- sido criadas à mão, do banco também. O IF EXISTS é o que faz ela funcionar
+-- nos dois casos: banco novo (nunca teve) e banco que porventura tenha.
+--
+-- Se algum dia o soft-delete fizer sentido aqui, o caminho é: colunas de volta
+-- POR MIGRAÇÃO + trocar o @unique do slug por índice parcial
 -- (WHERE "isDeleted" = false) + filtrar isDeleted em findBySlug/findAll/listMenu.
-ALTER TABLE "Convenio" DROP COLUMN "isDeleted";
-ALTER TABLE "Convenio" DROP COLUMN "deletedAt";
-ALTER TABLE "Convenio" DROP COLUMN "createdBy";
+-- Sem a segunda parte, o convênio excluído segura o slug para sempre e não dá
+-- para recadastrar — o mesmo problema que travava as salas.
+ALTER TABLE "Convenio" DROP COLUMN IF EXISTS "isDeleted";
+ALTER TABLE "Convenio" DROP COLUMN IF EXISTS "deletedAt";
+ALTER TABLE "Convenio" DROP COLUMN IF EXISTS "createdBy";
