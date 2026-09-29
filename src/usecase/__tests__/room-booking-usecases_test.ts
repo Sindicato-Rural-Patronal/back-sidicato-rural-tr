@@ -245,17 +245,42 @@ describe('DeleteRoomBookingUseCase', () => {
     });
 });
 
-describe('DeleteRoomUseCase com reservas', () => {
-    it('recusa sala com reserva futura, contando a partir do relógio de Brasília', async () => {
-        const rooms = {
+describe('DeleteRoomUseCase', () => {
+    const AGORA = () => new Date('2026-10-05T11:00:00.000Z');
+    // Relógio de parede de Brasília: 11:00Z vira 08:00 rotulado como Z.
+    const PAREDE = new Date('2026-10-05T08:00:00.000Z');
+
+    function salas(over: Partial<Record<string, unknown>> = {}) {
+        return {
             findById: vi.fn().mockResolvedValue({ id: ROOM }),
-            countCourses: vi.fn().mockResolvedValue(0),
-            countFutureBookings: vi.fn().mockResolvedValue(1),
-            delete: vi.fn(),
+            countFutureCourses: vi.fn().mockResolvedValue(0),
+            countFutureBookings: vi.fn().mockResolvedValue(0),
+            delete: vi.fn().mockResolvedValue(true),
+            ...over,
         } as unknown as RoomRepository;
-        const r = await new DeleteRoomUseCase(rooms, () => new Date('2026-10-05T11:00:00.000Z')).execute(ROOM);
+    }
+
+    it('recusa sala com reserva futura, contando a partir do relógio de Brasília', async () => {
+        const rooms = salas({ countFutureBookings: vi.fn().mockResolvedValue(1) });
+        const r = await new DeleteRoomUseCase(rooms, AGORA).execute(ROOM);
         expect(r.error?.name).toBe('RoomHasBookingsError');
-        expect(rooms.countFutureBookings).toHaveBeenCalledWith(ROOM, new Date('2026-10-05T08:00:00.000Z'));
+        expect(rooms.countFutureBookings).toHaveBeenCalledWith(ROOM, PAREDE);
         expect(rooms.delete).not.toHaveBeenCalled();
+    });
+
+    it('recusa sala com curso que ainda não terminou', async () => {
+        const rooms = salas({ countFutureCourses: vi.fn().mockResolvedValue(1) });
+        const r = await new DeleteRoomUseCase(rooms, AGORA).execute(ROOM);
+        expect(r.error?.name).toBe('RoomHasCoursesError');
+        expect(rooms.countFutureCourses).toHaveBeenCalledWith(ROOM, PAREDE);
+        expect(rooms.delete).not.toHaveBeenCalled();
+    });
+
+    it('sala que só foi usada em curso antigo é excluída', async () => {
+        // O caso que travava: a contagem pegava TODO curso da sala, até os de
+        // anos atrás e os já excluídos, e a sala nunca mais saía da lista.
+        const rooms = salas();
+        expect(await new DeleteRoomUseCase(rooms, AGORA).execute(ROOM)).toEqual({});
+        expect(rooms.delete).toHaveBeenCalledWith(ROOM);
     });
 });

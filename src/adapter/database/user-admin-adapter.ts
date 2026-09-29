@@ -18,14 +18,15 @@ export function createUserAdminAdapter(prisma: PrismaClient): UserAdminRepositor
 export class UserAdminAdapter implements UserAdminRepository {
     constructor(private prisma: PrismaClient) {}
 
+    // Pessoa excluída não entra no painel, mesmo que o login dela tenha
+    // sobrado: a exclusão do cadastro leva o acesso junto, e esta condição é a
+    // segunda tranca (vale também para os logins criados antes da correção).
     findByUsername(username: string): Promise<UserAdminModel | null> {
-        return this.prisma.userAdmin.findFirst({ where: { username,
-isDeleted: false } });
-    }
-
-    /** Inclui soft-deleted — o unique de username no banco considera os apagados. */
-    findByUsernameAny(username: string): Promise<UserAdminModel | null> {
-        return this.prisma.userAdmin.findFirst({ where: { username } });
+        return this.prisma.userAdmin.findFirst({
+            where: { username,
+isDeleted: false,
+userData: { isDeleted: false } },
+        });
     }
 
     findByUserDataId(userDataId: string): Promise<UserAdminModel | null> {
@@ -54,8 +55,11 @@ deletedAt: null },
     }
 
     findById(id: string): Promise<UserAdminModel | null> {
-        return this.prisma.userAdmin.findFirst({ where: { id,
-isDeleted: false } });
+        return this.prisma.userAdmin.findFirst({
+            where: { id,
+isDeleted: false,
+userData: { isDeleted: false } },
+        });
     }
 
     create(data: UserAdminUncheckedCreateInput): Promise<UserAdminModel> {

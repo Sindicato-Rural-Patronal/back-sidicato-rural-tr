@@ -209,7 +209,8 @@ lt: new Date(Date.UTC(2024, 0, 1)) },
     });
 
     it('ano e texto juntos estreitam dentro do ano', () => {
-        expect(buildCourseListWhere({ year: 2023, search: 'horta' })).toEqual({
+        expect(buildCourseListWhere({ year: 2023,
+search: 'horta' })).toEqual({
             isDeleted: false,
             startTime: { gte: new Date(Date.UTC(2023, 0, 1)),
 lt: new Date(Date.UTC(2024, 0, 1)) },
@@ -218,7 +219,8 @@ lt: new Date(Date.UTC(2024, 0, 1)) },
     });
 
     it('a situacao continua valendo junto com a busca', () => {
-        expect(buildCourseListWhere({ status: 'COMPLETED', year: 2023 })).toMatchObject({
+        expect(buildCourseListWhere({ status: 'COMPLETED',
+year: 2023 })).toMatchObject({
             status: 'COMPLETED',
             startTime: { gte: new Date(Date.UTC(2023, 0, 1)) },
         });
@@ -250,7 +252,8 @@ describe('buildUserListWhere — associados em dia', () => {
     });
 
     it('convive com a busca por texto sem atropelar o OR dela', () => {
-        const where = buildUserListWhere({ activeMember: true, search: 'joao' }) as Record<string, unknown>;
+        const where = buildUserListWhere({ activeMember: true,
+search: 'joao' }) as Record<string, unknown>;
         // O OR de cima e o da busca; o da validade fica dentro do AND.
         expect(Array.isArray(where.OR)).toBe(true);
         expect(Array.isArray(where.AND)).toBe(true);

@@ -343,6 +343,7 @@ isDeleted: false } })) > 0;
     }
 
     async roomExists(roomId: string): Promise<boolean> {
-        return (await this.prisma.room.count({ where: { id: roomId } })) > 0;
+        return (await this.prisma.room.count({ where: { id: roomId,
+isDeleted: false } })) > 0;
     }
 }

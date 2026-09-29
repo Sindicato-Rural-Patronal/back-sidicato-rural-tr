@@ -21,8 +21,18 @@ export function createUnimedAdapter(prisma: PrismaClient): UnimedRepository {
 class UnimedAdapter implements UnimedRepository {
     constructor(private prisma: PrismaClient) {}
 
+    // O cadastro é 1:1 com a pessoa e o unique de userDataId no banco conta
+    // também os excluídos: sem o upsert, excluir o cadastro de alguém e
+    // cadastrar de novo estourava o unique (o usecase só enxerga os ativos).
+    // Recadastrar reaproveita a linha antiga com os dados novos.
     create(input: UnimedCreateInput): Promise<UnimedBeneficiarioModel> {
-        return this.prisma.unimedBeneficiario.create({ data: input });
+        return this.prisma.unimedBeneficiario.upsert({
+            where: { userDataId: input.userDataId },
+            create: input,
+            update: { ...input,
+isDeleted: false,
+deletedAt: null },
+        });
     }
 
     update(id: string, input: UnimedUpdateInput): Promise<UnimedBeneficiarioModel> {

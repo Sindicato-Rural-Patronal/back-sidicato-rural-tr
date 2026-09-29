@@ -27,15 +27,12 @@ export class CreateUserAdminUseCase {
     ) {}
 
     async execute(request: CreateUserAdminRequest, actorPermissions: string[] = []): Promise<CreateUserAdminResponse> {
-        // Username é unique no banco INCLUINDO soft-deletados. Se um admin ativo
-        // (de outra pessoa) usa o nome → conflito. Se só um apagado o segura,
-        // liberamos renomeando a linha antiga (permite reusar o nome).
-        const holder = await this.userAdminRepository.findByUsernameAny(request.username);
+        // Só um administrador ATIVO segura o nome de usuário: o unique do banco
+        // é parcial (migração 20260929091000_admin_username_active_unique), então
+        // excluir um administrador libera o usuário dele sem mexer na linha antiga.
+        const holder = await this.userAdminRepository.findByUsername(request.username);
         if (holder && holder.userDataId !== request.userDataId) {
-            if (!holder.isDeleted) return { error: new UsernameAlreadyExistsError() };
-            await this.userAdminRepository.update(holder.id, {
-                username: `${holder.username}__del_${holder.id.slice(0, 8)}`,
-            });
+            return { error: new UsernameAlreadyExistsError() };
         }
 
         const userData = await this.userDataRepository.findById(request.userDataId);

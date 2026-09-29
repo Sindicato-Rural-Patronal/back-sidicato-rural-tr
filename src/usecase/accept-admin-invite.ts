@@ -26,15 +26,11 @@ export class AcceptAdminInviteUseCase {
         if (!password || password.length < 8) {
             return { error: new ValidationError('Senha deve ter ao menos 8 caracteres.') };
         }
-        // Username é unique no banco INCLUINDO soft-deletados. Se um admin ativo
-        // (de outra pessoa) já usa esse nome → conflito real. Se só um admin
-        // APAGADO segura o nome, liberamos renomeando a linha antiga.
-        const holder = await this.userAdminRepo.findByUsernameAny(uname);
+        // Só um administrador ATIVO segura o nome de usuário (unique parcial no
+        // banco): o usuário de um administrador excluído volta a ficar livre.
+        const holder = await this.userAdminRepo.findByUsername(uname);
         if (holder && holder.userDataId !== inv.userDataId) {
-            if (!holder.isDeleted) return { error: new UsernameAlreadyExistsError() };
-            await this.userAdminRepo.update(holder.id, {
-                username: `${holder.username}__del_${holder.id.slice(0, 8)}`,
-            });
+            return { error: new UsernameAlreadyExistsError() };
         }
 
         // Consumo atômico (uso único): se outra requisição já consumiu, cai fora.

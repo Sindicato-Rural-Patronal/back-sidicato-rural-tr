@@ -16,7 +16,10 @@ datasource db {
 
 model UserAdmin {
   id           String @id @default(uuid())
-  username     String @unique
+  // Único entre os administradores ATIVOS, por índice parcial (migração
+  // 20260929091000_admin_username_active_unique): excluir um administrador
+  // libera o usuário dele. Índice parcial não é expressável como @unique aqui.
+  username     String
   passwordHash String
 
   isDeleted Boolean   @default(false)
@@ -210,6 +213,14 @@ model room {
   maxCapacity Int
   courses     course[]
   bookings    RoomBooking[]
+
+  // Excluir uma sala é soft-delete: os cursos antigos continuam apontando para
+  // ela (a FK é obrigatória) e a sala some das listas. O nome é unico entre as
+  // salas ativas por indice parcial (migracao 20260929090000_room_soft_delete),
+  // que nao da para escrever aqui como @@unique.
+  isDeleted   Boolean  @default(false)
+  deletedAt   DateTime?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

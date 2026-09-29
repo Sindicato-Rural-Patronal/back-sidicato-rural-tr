@@ -20,8 +20,10 @@ description: string;
 maxCapacity: number 
 },
     ): Promise<roomModel>;
+    /** Soft-delete: os cursos antigos seguem apontando para a sala. */
     delete(id: string): Promise<boolean>;
-    countCourses(roomId: string): Promise<number>;
+    /** Cursos não excluídos que terminam em `from` ou depois. */
+    countFutureCourses(roomId: string, from: Date): Promise<number>;
     /** Reservas (eventos/reuniões) não excluídas que terminam em `from` ou depois. */
     countFutureBookings(roomId: string, from: Date): Promise<number>;
 }
