@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../generated/prisma/client.js';
 import { auditRouteKey } from './audit-sentence.js';
 import { SETTING_KEYS } from '../usecase/get-site-settings.js';
 
@@ -48,11 +48,19 @@ function brl(cents: number | null | undefined): string | null {
 currency: 'BRL' }).replace(/\s/g, ' ');
 }
 
+// O modelo vem como texto (a tabela de rotas abaixo e escrita por nome), entao
+// aqui o cliente e alcancado por indice. E o unico ponto do backend em que isso
+// acontece: uma rota nova com nome de modelo errado quebra em tempo de execucao,
+// e o teste de audit-snapshot e que segura isso.
+type ModelDelegate = {findUnique(args: Row): Promise<Row | null>;};
+const delegate = (prisma: PrismaClient, model: string): ModelDelegate =>
+    (prisma as unknown as Record<string, ModelDelegate>)[model];
+
 const byFirstId = (model: string, args: Row = {}): Snapshot => (prisma, ids) =>
-    prisma[model].findUnique({ where: { id: ids[0] },
+    delegate(prisma, model).findUnique({ where: { id: ids[0] },
 ...args });
 const byLastId = (model: string, args: Row = {}): Snapshot => (prisma, ids) =>
-    prisma[model].findUnique({ where: { id: ids[ids.length - 1] },
+    delegate(prisma, model).findUnique({ where: { id: ids[ids.length - 1] },
 ...args });
 
 const nameOnly = { select: { name: true } };

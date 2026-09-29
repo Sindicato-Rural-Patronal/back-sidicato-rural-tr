@@ -1,6 +1,10 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { PropertyRepository, PropertyWithAddress } from '../../ports/external/property-repository.js';
 import type { Property } from '../../generated/prisma/client.js';
+import type {
+    PropertyUncheckedCreateInput,
+    PropertyUncheckedUpdateInput,
+} from '../../generated/prisma/models/Property.js';
 
 export function createPropertyAdapter(prisma: PrismaClient): PropertyRepository {
     return new PropertyAdapter(prisma);
@@ -16,7 +20,11 @@ export class PropertyAdapter implements PropertyRepository {
         registration?: string;
         addressId?: string;
     }): Promise<Property> {
-        return this.prisma.property.create({ data });
+        // O `data` traz os ids das relacoes soltos (userDataId/companyId), que
+        // no Prisma pertencem a variante "Unchecked" do input. O TypeScript nao
+        // escolhe o ramo da uniao sozinho a partir de um objeto com campos
+        // opcionais, dai a anotacao — que continua conferindo campo a campo.
+        return this.prisma.property.create({ data: data as PropertyUncheckedCreateInput });
     }
 
     update(
@@ -30,7 +38,7 @@ addressId?: string
         // Campos undefined são ignorados pelo Prisma: só muda o que veio.
         return this.prisma.property.update({
             where: { id },
-            data,
+            data: data as PropertyUncheckedUpdateInput,
             include: { address: true },
         }) as Promise<PropertyWithAddress>;
     }

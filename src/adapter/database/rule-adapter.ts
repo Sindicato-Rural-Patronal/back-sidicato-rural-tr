@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { RuleRepository } from '../../ports/external/rule-repository';
 import type { Permission } from '../../generated/prisma/enums';
 import type { RuleModel } from '../../generated/prisma/models';
@@ -15,6 +15,7 @@ export class RuleAdapter implements RuleRepository {
     }
     create(data: {
  name: string;
+description: string;
 permissions: Permission[] 
 }): Promise<RuleModel> {
         return this.prisma.rule.create({
@@ -33,10 +34,8 @@ permissions: Permission[]
             data,
         });
     }
-    delete(id: string): Promise<void> {
-        return this.prisma.rule.delete({
-            where: { id },
-        });
+    async delete(id: string): Promise<void> {
+        await this.prisma.rule.delete({ where: { id } });
     }
     findAll(skip?: number, take?: number): Promise<RuleModel[]> {
         return this.prisma.rule.findMany({ skip,

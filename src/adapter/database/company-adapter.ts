@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import { buildCompanyListWhere } from './list-filters.js';
 import type {
     CompanyRepository,
@@ -40,10 +40,8 @@ class CompanyAdapter implements CompanyRepository {
                 _count: { select: { members: { where: { userData: { isDeleted: false } } } } },
             },
         });
-        return rows.map(({ _count, ...c }: { _count: { members: number } } & CompanyModel) => ({
-            ...c,
-            membersCount: _count.members,
-        }));
+        return rows.map(({ _count, ...c }) => ({ ...c,
+membersCount: _count.members }));
     }
 
     count(filters: CompanyListFilters): Promise<number> {

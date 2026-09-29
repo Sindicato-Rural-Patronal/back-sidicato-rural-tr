@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../generated/prisma/client.js';
 import { userDataRouter } from './router/user-data-router.js';
 import { authRouter } from './router/auth-router.js';
 import { userAdminRouter } from './router/user-admin.js';

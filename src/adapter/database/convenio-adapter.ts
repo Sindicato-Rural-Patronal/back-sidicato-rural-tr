@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type {
     ConvenioRepository,
     ConvenioModel,
@@ -11,7 +11,7 @@ export function createConvenioAdapter(prisma: PrismaClient): ConvenioRepository 
     return new ConvenioAdapter(prisma);
 }
 
-const ORDER = [{ order: 'asc' }, { name: 'asc' }] as const;
+const ORDER = [{ order: 'asc' as const }, { name: 'asc' as const }];
 
 class ConvenioAdapter implements ConvenioRepository {
     constructor(private prisma: PrismaClient) {}

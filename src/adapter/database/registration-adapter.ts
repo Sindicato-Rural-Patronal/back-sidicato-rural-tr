@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { courseUserRegistrationModel } from '../../generated/prisma/models/courseUserRegistration.js';
 import type {
     RegistrationRepository,
@@ -182,11 +182,13 @@ deletedAt: new Date() },
     ): Promise<void> {
         await this.prisma.registrationFicha.upsert({
             where: { registrationId },
+            // Buffer e um Uint8Array no runtime; so o generico do ArrayBuffer
+            // difere. Copiar o anexo inteiro so para agradar o tipo seria caro.
             create: { registrationId,
-data,
+data: data as Uint8Array<ArrayBuffer>,
 filename,
 mimeType },
-            update: { data,
+            update: { data: data as Uint8Array<ArrayBuffer>,
 filename,
 mimeType },
         });

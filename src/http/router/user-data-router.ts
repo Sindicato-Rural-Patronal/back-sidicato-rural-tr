@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { CreateUserController } from '../controllers/create-user.js';
 import { CreateUserUseCase } from '../../usecase/create-user-data.js';
 import { createUserDataAdapter } from '../../adapter/database/user-data.js';
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import { ListUsersController } from '../controllers/list-users.js';
 import { ListUsersUseCase } from '../../usecase/list-users.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';

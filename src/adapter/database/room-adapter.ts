@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { RoomRepository } from '../../ports/external/room-repository.js';
 import type { roomModel } from '../../generated/prisma/models/room.js';
 

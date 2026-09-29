@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { MarketQuoteModel } from '../../generated/prisma/models/MarketQuote.js';
 import type {
     MarketQuoteRepository,
@@ -39,7 +39,7 @@ priceCents: { not: null } } : {},
                     { referenceDate: null },
                     { referenceDate: { lt: referenceDate } },
                     ...(period === 'AFTERNOON' ? [{ referenceDate,
-period: 'MORNING' }] : []),
+period: 'MORNING' as const }] : []),
                 ],
             },
             orderBy: [
@@ -65,6 +65,9 @@ data: { unit,
 value } });
     }
 
+    // O `where` ja descarta numeric nulo e exige referenceDate a partir de uma
+    // data — as duas colunas chegam preenchidas. O tipo do select nao tem como
+    // saber disso, dai a anotacao no retorno.
     historySince(since: Date): Promise<QuoteHistoryRow[]> {
         return this.prisma.marketQuoteHistory.findMany({
             where: { referenceDate: { gte: since },
@@ -76,7 +79,7 @@ numeric: true },
             orderBy: [{ referenceDate: 'asc' },
 { period: 'asc' },
 { createdAt: 'asc' }],
-        });
+        }) as Promise<QuoteHistoryRow[]>;
     }
 
     async dayPrices(pairs: {

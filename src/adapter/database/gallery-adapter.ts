@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type {
     GalleryRepository,
     GalleryAlbumModel,
@@ -11,8 +11,7 @@ export function createGalleryAdapter(prisma: PrismaClient): GalleryRepository {
     return new GalleryAdapter(prisma);
 }
 
-const photosInOrder = { orderBy: [{ order: 'asc' },
-{ createdAt: 'asc' }] } as const;
+const photosInOrder = { orderBy: [{ order: 'asc' as const }, { createdAt: 'asc' as const }] };
 
 class GalleryAdapter implements GalleryRepository {
     constructor(private prisma: PrismaClient) {}

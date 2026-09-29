@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { UserRelationRepository, UserRelationWithTarget } from '../../ports/external/user-relation-repository.js';
 import type { UserRelation } from '../../generated/prisma/client.js';
 

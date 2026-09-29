@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type {
     AddressRepository,
     AddressCreateInput,
@@ -16,7 +16,16 @@ export class AddressAdapter implements AddressRepository {
         return this.prisma.address.create({ data });
     }
 
-    update(id: string, data: { [K in keyof AddressCreateInput]?: AddressCreateInput[K] | null }): Promise<Address | null> {
+    // Campo vazio vai como null para limpar o que estava gravado — menos o
+    // `type`, que e NOT NULL no banco (urbano ou rural, sempre um dos dois).
+    update(
+        id: string,
+        data: {
+            [K in keyof AddressCreateInput]?: K extends 'type'
+                ? AddressCreateInput[K]
+                : AddressCreateInput[K] | null
+        },
+    ): Promise<Address | null> {
         return this.prisma.address.update({ where: { id },
 data });
     }

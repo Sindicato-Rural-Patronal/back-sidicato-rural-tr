@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import { deriveAuditEntity } from '../audit-entity.js';
 import { AUDIT_ENTITY_NOUNS, describeAuditAction } from '../audit-sentence.js';
 import { lookupTargetLabel, shouldLookupTargetLabel } from '../audit-label.js';

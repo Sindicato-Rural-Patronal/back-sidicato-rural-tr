@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createAddressAdapter } from '../../adapter/database/address-adapter.js';
 import { FetchAddressByCepUseCase } from '../../usecase/fetch-address-by-cep.js';
 import { FetchAddressByCepController } from '../controllers/fetch-address-by-cep.js';

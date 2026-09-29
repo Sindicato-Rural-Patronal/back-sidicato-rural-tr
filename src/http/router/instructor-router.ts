@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createInstructorAdapter } from '../../adapter/database/instructor-adapter.js';
 import { createUserDataAdapter } from '../../adapter/database/user-data.js';
 import { createCourseAdapter } from '../../adapter/database/course-adapter.js';
