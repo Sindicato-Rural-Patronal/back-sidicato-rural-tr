@@ -115,6 +115,9 @@ export function buildUserListWhere(filters?: UserListFilters) {
                 { OR: [{ membershipValidUntil: null }, { membershipValidUntil: { gte: hojeSemHora() } }] },
             ],
         }),
+        // O RG não entra na conta: a nova carteira de identidade usa o número do
+        // CPF, então quem tirar documento agora não tem RG para informar — exigi-lo
+        // deixaria esses cadastros marcados como incompletos para sempre.
         ...(incompleteRegistration === true && {
             // envolto em AND p/ não sobrescrever o OR da busca (search)
             AND: [
@@ -123,7 +126,6 @@ export function buildUserListWhere(filters?: UserListFilters) {
                         { avatar: null },
                         { properties: { none: {} } },
                         { cpf: null },
-                        { rg: null },
                         { birthDate: null },
                         { gender: null },
                     ],
@@ -135,7 +137,6 @@ export function buildUserListWhere(filters?: UserListFilters) {
                 { avatar: { not: null } },
                 { properties: { some: {} } },
                 { cpf: { not: null } },
-                { rg: { not: null } },
                 { birthDate: { not: null } },
                 { gender: { not: null } },
             ],
