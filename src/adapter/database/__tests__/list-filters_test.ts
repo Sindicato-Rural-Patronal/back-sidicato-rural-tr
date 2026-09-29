@@ -197,14 +197,14 @@ lt: new Date(Date.UTC(2024, 0, 1)) },
         // escolhe o ano no filtro, em vez de torcer para a busca adivinhar.
         expect(buildCourseListWhere({ search: '2023' })).toEqual({
             isDeleted: false,
-            OR: [{ name: ci('2023') }, { eventNumber: ci('2023') }],
+            OR: [{ nameSearch: { contains: '2023' } }, { name: ci('2023') }, { eventNumber: ci('2023') }],
         });
     });
 
     it('texto procura no nome E no numero do evento', () => {
         expect(buildCourseListWhere({ search: 'horta' })).toEqual({
             isDeleted: false,
-            OR: [{ name: ci('horta') }, { eventNumber: ci('horta') }],
+            OR: [{ nameSearch: { contains: 'horta' } }, { name: ci('horta') }, { eventNumber: ci('horta') }],
         });
     });
 
@@ -214,8 +214,15 @@ search: 'horta' })).toEqual({
             isDeleted: false,
             startTime: { gte: new Date(Date.UTC(2023, 0, 1)),
 lt: new Date(Date.UTC(2024, 0, 1)) },
-            OR: [{ name: ci('horta') }, { eventNumber: ci('horta') }],
+            OR: [{ nameSearch: { contains: 'horta' } }, { name: ci('horta') }, { eventNumber: ci('horta') }],
         });
+    });
+
+    it('acha o curso com acento sem o acento digitado', () => {
+        // O titulo do curso aparece no site, entao guarda acento e caixa como
+        // foi digitado; procurar e que nao pode exigir o acento certo.
+        const where = buildCourseListWhere({ search: 'MANUTENCAO' });
+        expect(where.OR).toContainEqual({ nameSearch: { contains: 'manutencao' } });
     });
 
     it('a situacao continua valendo junto com a busca', () => {
