@@ -96,6 +96,11 @@ export type UserListFilters = {
     ethnicity?: string;
     educationLevel?: string;
     incompleteRegistration?: boolean;
+    /**
+     * So os associados em dia: situacao ATIVO e validade nao vencida (validade
+     * em branco conta como em dia). Mesma regra do selo "Associado" da tela.
+     */
+    activeMember?: boolean;
 };
 
 export interface UserDataRepository {

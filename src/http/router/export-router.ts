@@ -23,7 +23,8 @@ export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClien
 
 | dataset | filtros | permissão |
 |---|---|---|
-| people | search, memberType, memberClassification, gender, ethnicity, educationLevel, incompleteRegistration | READ_USER |
+| people | search, memberType, memberClassification, gender, ethnicity, educationLevel, incompleteRegistration, activeMember | READ_USER |
+| cadastros | (nenhum — retrato completo dos 4 tipos num arquivo só) | READ_USER_ADMIN |
 | companies | search, type, isPartner | READ_USER |
 | properties | ownerIds (pessoas/empresas) | READ_USER |
 | admins | search, rulesId | READ_USER_ADMIN |

@@ -5,9 +5,12 @@ import { ValidationError } from '../errors/validation.js';
 import { RoomNotFoundError } from '../errors/not-found.js';
 import { RoomAlreadyBookedError } from '../errors/business-rule.js';
 import { conflictMessage } from './room-availability.js';
+import { nomeDoCurso } from '../lib/course-name.js';
 
 const createCourseRequestSchema = z.object({
-    name: z.string().min(1, 'Course name is required'),
+    // Titulo em branco e permitido: vira o nome generico. Cadastro de curso
+    // costuma comecar pela sala e pelas datas, para reservar a agenda.
+    name: z.preprocess(v => nomeDoCurso(typeof v === 'string' ? v : null), z.string().min(1)),
     description: z.string().min(1, 'Course description is required'),
     roomId: z.uuid('Room ID must be a valid UUID'),
     startTime: z.iso.datetime(),

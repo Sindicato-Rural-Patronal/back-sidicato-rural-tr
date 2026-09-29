@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import {
     buildAdminListWhere,
     buildCompanyListWhere,
+    buildCourseListWhere,
     buildUnimedListWhere,
     buildUserListWhere,
     searchKey,
@@ -174,5 +175,84 @@ rulesId: 'r1' });
             { userData: { email: ci('José') } },
             { userData: { email: ci('jose') } },
         ]);
+    });
+});
+
+
+describe('buildCourseListWhere', () => {
+    it('sem filtro so tira os excluidos', () => {
+        expect(buildCourseListWhere()).toEqual({ isDeleted: false });
+    });
+
+    it('o ano e filtro proprio e vira a faixa do ano inteiro', () => {
+        expect(buildCourseListWhere({ year: 2023 })).toEqual({
+            isDeleted: false,
+            startTime: { gte: new Date(Date.UTC(2023, 0, 1)),
+lt: new Date(Date.UTC(2024, 0, 1)) },
+        });
+    });
+
+    it('numero digitado na busca NAO vira ano', () => {
+        // Dois cursos com o mesmo nome em anos diferentes: quem quer o antigo
+        // escolhe o ano no filtro, em vez de torcer para a busca adivinhar.
+        expect(buildCourseListWhere({ search: '2023' })).toEqual({
+            isDeleted: false,
+            OR: [{ name: ci('2023') }, { eventNumber: ci('2023') }],
+        });
+    });
+
+    it('texto procura no nome E no numero do evento', () => {
+        expect(buildCourseListWhere({ search: 'horta' })).toEqual({
+            isDeleted: false,
+            OR: [{ name: ci('horta') }, { eventNumber: ci('horta') }],
+        });
+    });
+
+    it('ano e texto juntos estreitam dentro do ano', () => {
+        expect(buildCourseListWhere({ year: 2023, search: 'horta' })).toEqual({
+            isDeleted: false,
+            startTime: { gte: new Date(Date.UTC(2023, 0, 1)),
+lt: new Date(Date.UTC(2024, 0, 1)) },
+            OR: [{ name: ci('horta') }, { eventNumber: ci('horta') }],
+        });
+    });
+
+    it('a situacao continua valendo junto com a busca', () => {
+        expect(buildCourseListWhere({ status: 'COMPLETED', year: 2023 })).toMatchObject({
+            status: 'COMPLETED',
+            startTime: { gte: new Date(Date.UTC(2023, 0, 1)) },
+        });
+    });
+});
+
+
+describe('buildUserListWhere — associados em dia', () => {
+    it('sem o filtro, nao mexe em situacao nem validade', () => {
+        expect(buildUserListWhere()).not.toHaveProperty('memberStatus');
+    });
+
+    it('exige situacao ATIVO e validade nao vencida', () => {
+        const where = buildUserListWhere({ activeMember: true }) as Record<string, unknown>;
+        expect(where.memberStatus).toBe('ACTIVE');
+        // Validade em branco tambem conta como em dia — dai o OR.
+        const and = where.AND as { OR: unknown[] }[];
+        expect(and[0].OR).toHaveLength(2);
+        expect(and[0].OR[0]).toEqual({ membershipValidUntil: null });
+    });
+
+    it('a validade compara so pela data (vale o dia inteiro)', () => {
+        const where = buildUserListWhere({ activeMember: true }) as Record<string, unknown>;
+        const and = where.AND as { OR: { membershipValidUntil?: { gte?: Date } }[] }[];
+        const gte = and[0].OR[1].membershipValidUntil?.gte as Date;
+        expect(gte.getHours()).toBe(0);
+        expect(gte.getMinutes()).toBe(0);
+        expect(gte.getSeconds()).toBe(0);
+    });
+
+    it('convive com a busca por texto sem atropelar o OR dela', () => {
+        const where = buildUserListWhere({ activeMember: true, search: 'joao' }) as Record<string, unknown>;
+        // O OR de cima e o da busca; o da validade fica dentro do AND.
+        expect(Array.isArray(where.OR)).toBe(true);
+        expect(Array.isArray(where.AND)).toBe(true);
     });
 });

@@ -24,6 +24,8 @@ export class ListUsersController {
         const incompleteRegistration =
             rawIncomplete === true || rawIncomplete === 'true' ? true :
             rawIncomplete === false || rawIncomplete === 'false' ? false : undefined;
+        const rawActive: unknown = (request.query as Record<string, unknown>).activeMember;
+        const activeMember = rawActive === true || rawActive === 'true' ? true : undefined;
         const filters = {
             search: q.search || undefined,
             memberType: q.memberType || undefined,
@@ -32,6 +34,7 @@ export class ListUsersController {
             ethnicity: q.ethnicity || undefined,
             educationLevel: q.educationLevel || undefined,
             incompleteRegistration,
+            activeMember,
         };
         const response = await this.useCase.execute(page, limit, filters);
         if (response.error) return reply.status(400).send({ error: response.error?.message });

@@ -33,9 +33,16 @@ export const financeTransactionSchema = z.object({
         conta: z.string().optional(),
         agencia: z.string().optional(),
         cheque: z.string().optional(),
-        // Vínculo opcional com um Usuário cadastrado (origem dos dados do
-        // fornecedor). Os campos acima permanecem como snapshot da emissão.
+        // Vínculo opcional com um cadastro (origem dos dados do fornecedor). Os
+        // campos acima permanecem como snapshot da emissão.
+        //
+        // `usuarioId` é pessoa e `empresaId` é empresa. Antes da separação de
+        // pessoas e empresas (set/2026) a empresa era um UserData com CNPJ, e
+        // só `usuarioId` dava conta; desde então fornecedor pessoa jurídica
+        // ficou sem como ser vinculado. Os dois campos existem porque um
+        // fornecedor é uma coisa OU a outra.
         usuarioId: z.string().uuid().optional(),
+        empresaId: z.string().uuid().optional(),
     }).nullable().optional(),
 });
 

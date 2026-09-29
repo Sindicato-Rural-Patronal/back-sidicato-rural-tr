@@ -67,7 +67,10 @@ avatar: string | null
 
 export type CourseListFilters = {
     status?: CourseStatus;
+    /** Titulo ou numero do evento. */
     search?: string;
+    /** Ano de inicio do curso. Filtro proprio, separado da busca por texto. */
+    year?: number;
 };
 
 export interface CourseRepository {
@@ -75,6 +78,8 @@ export interface CourseRepository {
     findById(id: string): Promise<CourseWithDetails | null>;
     findAll(filters?: CourseListFilters, skip?: number, take?: number): Promise<CourseWithDetails[]>;
     count(filters?: CourseListFilters): Promise<number>;
+    /** Anos que tem curso cadastrado, do mais recente para o mais antigo. */
+    years(): Promise<number[]>;
     update(id: string, data: CourseUpdateData): Promise<courseModel | null>;
     delete(id: string): Promise<boolean>;
     /**

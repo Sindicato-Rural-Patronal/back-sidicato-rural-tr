@@ -3,6 +3,7 @@ import type { MarketQuoteModel } from '../../generated/prisma/models/MarketQuote
 import type {
     MarketQuoteRepository,
     DailyQuoteEntry,
+    DayPriceRow,
     QuoteHistoryRow,
 } from '../../ports/external/market-quote-repository.js';
 import type { QuotePeriod } from '../../lib/quote-products.js';
@@ -76,6 +77,28 @@ numeric: true },
 { period: 'asc' },
 { createdAt: 'asc' }],
         });
+    }
+
+    async dayPrices(pairs: { id: string; date: Date }[]): Promise<DayPriceRow[]> {
+        if (pairs.length === 0) return [];
+        const rows = await this.prisma.marketQuoteHistory.findMany({
+            where: {
+                numeric: { not: null },
+                OR: pairs.map(p => ({ marketQuoteId: p.id,
+referenceDate: p.date })),
+            },
+            select: { marketQuoteId: true,
+period: true,
+numeric: true },
+        });
+        // O historico guarda em reais (numeric = priceCents / 100); a tela
+        // trabalha em centavos, entao volta multiplicado.
+        type Linha = { marketQuoteId: string; period: QuotePeriod | null; numeric: number | null };
+        return (rows as Linha[]).map(r => ({
+            marketQuoteId: r.marketQuoteId,
+            period: r.period,
+            priceCents: Math.round((r.numeric ?? 0) * 100),
+        }));
     }
 
     async saveDaily(entries: DailyQuoteEntry[]): Promise<void> {

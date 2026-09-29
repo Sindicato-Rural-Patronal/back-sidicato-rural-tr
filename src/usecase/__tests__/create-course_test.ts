@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CreateCourseUseCase } from '../create-course.js';
 import type { CourseRepository } from '../../ports/external/course-repository.js';
 import type { RoomRepository } from '../../ports/external/room-repository.js';
+import { CURSO_SEM_NOME } from '../../lib/course-name.js';
 
 // Reunião que já ocupa a sala (curso e reservas dividem a agenda).
 const CONFLICT = {
@@ -42,12 +43,19 @@ describe('CreateCourseUseCase', () => {
     beforeEach(() => vi.clearAllMocks());
 
     describe('validação de input', () => {
-        it('falha se nome estiver vazio', async () => {
+        it('nome vazio nao e erro: vira o nome generico', async () => {
+            // O cadastro do curso costuma comecar pela sala e pelas datas, para
+            // ja reservar a agenda; o titulo vem depois.
+            vi.mocked(mockRoomRepo.findById).mockResolvedValue({ id: validInput.roomId } as never);
+            vi.mocked(mockCourseRepo.findRoomConflict).mockResolvedValue(null);
+            vi.mocked(mockCourseRepo.create).mockResolvedValue({ id: 'curso-1' } as never);
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
             const result = await uc.execute({ ...validInput,
-name: '' });
-            expect(result.error).toBeDefined();
-            expect(result.error?.message).toContain('Course name is required');
+name: '   ' });
+            expect(result.error).toBeUndefined();
+            expect(mockCourseRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({ name: CURSO_SEM_NOME }),
+            );
         });
 
         it('falha se roomId não for UUID válido', async () => {
