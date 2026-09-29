@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import { LoginUserAdminController } from '../controllers/login-user-admin.js';
 import { RefreshAdminTokenController } from '../controllers/refresh-admin-token.js';
 import { LoginUserAdminUseCase } from '../../usecase/login-user-admin.js';

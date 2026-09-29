@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../generated/prisma/client.js';
 import { decodeToken } from '../lib/auth.js';
 import { deriveAuditEntity, loginAuditMethod, LOGIN_PATH, skipAudit } from '../lib/audit-entity.js';
 import { lookupTargetLabel, bodyLabel, shouldLookupTargetLabel, loginUsername } from '../lib/audit-label.js';

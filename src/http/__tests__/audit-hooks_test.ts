@@ -3,6 +3,7 @@ import fastify, { type FastifyInstance } from 'fastify';
 import rateLimit from '@fastify/rate-limit';
 import jwt from 'jsonwebtoken';
 import { registerAuditHooks, fillAuditLocationLater } from '../audit-hooks.js';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 
 // Hooks da auditoria num app mínimo, com um prisma falso (sem banco).
 
@@ -47,7 +48,8 @@ update: vi.fn().mockResolvedValue({}) },
     };
     app = fastify();
     await app.register(rateLimit, { global: false });
-    registerAuditHooks(app, prisma);
+    // O dublê só tem as tabelas que os hooks tocam.
+    registerAuditHooks(app, prisma as unknown as PrismaClient);
 
     app.patch('/users/:id', async () => {
         person = { ...person!,

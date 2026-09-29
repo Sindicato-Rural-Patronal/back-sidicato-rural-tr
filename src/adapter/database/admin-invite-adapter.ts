@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { AdminInviteModel } from '../../generated/prisma/models/AdminInvite.js';
 import type { AdminInviteRepository } from '../../ports/external/admin-invite-repository.js';
 

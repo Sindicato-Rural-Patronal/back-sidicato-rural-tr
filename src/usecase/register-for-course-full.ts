@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../generated/prisma/client.js';
 import type { AddressCreateInput } from '../ports/external/address-repository.js';
 import { createCourseAdapter } from '../adapter/database/course-adapter.js';
 import { createUserDataAdapter } from '../adapter/database/user-data.js';

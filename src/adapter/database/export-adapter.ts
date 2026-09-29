@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type {
     AdminExportRow,
     AuditLogExportRow,
@@ -209,7 +209,15 @@ phone: true,
 email: true } },
             },
         });
-        const titularIds = [...new Set(rows.map((r: { titularId: string | null }) => r.titularId).filter(Boolean))];
+        // `filter(Boolean)` nao tira o null do TIPO: sem isto o null ia parar
+        // dentro do `in` da consulta seguinte.
+        const titularIds = [
+            ...new Set(
+                rows
+                    .map((r: { titularId: string | null }) => r.titularId)
+                    .filter((id): id is string => !!id),
+            ),
+        ];
         const titulares: {
  id: string;
 name: string 

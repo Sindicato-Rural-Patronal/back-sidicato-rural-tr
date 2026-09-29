@@ -1,7 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { FinancialCategoryModel } from '../../generated/prisma/models/FinancialCategory.js';
 import type { FinancialTransactionModel } from '../../generated/prisma/models/FinancialTransaction.js';
+import type {
+    FinancialTransactionUncheckedCreateInput,
+    FinancialTransactionUncheckedUpdateInput,
+} from '../../generated/prisma/models/FinancialTransaction.js';
 import type { FinancialAccountModel } from '../../generated/prisma/models/FinancialAccount.js';
 import type { FinanceRecurringTransactionModel } from '../../generated/prisma/models/FinanceRecurringTransaction.js';
 import type { FinancePaymentMethodModel } from '../../generated/prisma/models/FinancePaymentMethod.js';
@@ -185,13 +189,20 @@ transferId: null },
 isDeleted: false } });
     }
 
+    // Os ids das relacoes (categoryId, accountId) vao soltos no `data`, que no
+    // Prisma e a variante "Unchecked" do input; o TypeScript nao escolhe o ramo
+    // da uniao sozinho. A anotacao continua conferindo campo a campo.
     createTransaction(data: FinanceTransactionCreateInput): Promise<FinancialTransactionModel> {
-        return this.prisma.financialTransaction.create({ data });
+        return this.prisma.financialTransaction.create({
+            data: data as FinancialTransactionUncheckedCreateInput,
+        });
     }
 
     updateTransaction(id: string, data: FinanceTransactionUpdateInput): Promise<FinancialTransactionModel> {
-        return this.prisma.financialTransaction.update({ where: { id },
-data });
+        return this.prisma.financialTransaction.update({
+            where: { id },
+            data: data as FinancialTransactionUncheckedUpdateInput,
+        });
     }
 
     async softDeleteTransaction(id: string): Promise<boolean> {
@@ -247,8 +258,10 @@ deletedAt: new Date() },
         size: number,
     ): Promise<FinanceAttachmentMeta> {
         return this.prisma.financialAttachment.create({
+            // Buffer e um Uint8Array no runtime; so o generico do ArrayBuffer
+            // difere. Copiar o comprovante inteiro so pelo tipo seria caro.
             data: { transactionId,
-data,
+data: data as Uint8Array<ArrayBuffer>,
 filename,
 mimeType,
 size },

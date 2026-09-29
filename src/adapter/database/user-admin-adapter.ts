@@ -1,4 +1,5 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
+import type { InputJsonValue } from '../../generated/prisma/internal/prismaNamespace.js';
 import { buildAdminListWhere } from './list-filters.js';
 import type {
     UserAdminRepository,
@@ -93,8 +94,11 @@ data });
     }
 
     async updateDashboardPrefs(id: string, prefs: Record<string, unknown>): Promise<void> {
-        await this.prisma.userAdmin.update({ where: { id },
-data: { dashboardPrefs: prefs } });
+        await this.prisma.userAdmin.update({
+            where: { id },
+            // JSON livre: o formato e conferido no usecase, nao aqui.
+            data: { dashboardPrefs: prefs as InputJsonValue },
+        });
     }
 
     async delete(id: string): Promise<void> {

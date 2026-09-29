@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import { buildCourseListWhere } from './list-filters.js';
 import { findRoomOccupants } from './room-booking-adapter.js';
 import type {

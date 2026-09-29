@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { DashboardRepository, QuotePeriod } from '../../ports/external/dashboard-repository.js';
 
 export function createDashboardAdapter(prisma: PrismaClient): DashboardRepository {

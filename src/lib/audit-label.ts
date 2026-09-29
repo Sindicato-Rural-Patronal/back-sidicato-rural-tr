@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../generated/prisma/client.js';
 import { deriveAuditEntity } from './audit-entity.js';
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;

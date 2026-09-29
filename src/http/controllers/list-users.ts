@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { ListUsersUseCase } from '../../usecase/list-users.js';
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { requirePermission } from '../lib/require-permission.js';
+import type { UserListFilters } from '../../ports/external/user-data-repository.js';
 
 export class ListUsersController {
     constructor(
@@ -15,7 +16,10 @@ export class ListUsersController {
             null
         )
             return;
-        const q = request.query as Record<string, string>;
+        // Genero, etnia e escolaridade sao colunas enum no banco. O schema da
+        // rota (user-data-router.ts) ja recusa valor fora da lista antes de
+        // chegar aqui, entao a query pode ser lida com os tipos do enum.
+        const q = request.query as Record<string, string> & Pick<UserListFilters, 'gender' | 'ethnicity' | 'educationLevel'>;
         const page = Math.max(1, Number(q.page) || 1);
         const limit = Math.min(100, Math.max(1, Number(q.limit) || 20));
         // Fastify coage a query (schema type: 'boolean') para boolean real,

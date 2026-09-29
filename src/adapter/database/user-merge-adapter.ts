@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { UserDataUpdateInput } from '../../ports/external/user-data-repository.js';
 import type {
     DuplicateGroup,
