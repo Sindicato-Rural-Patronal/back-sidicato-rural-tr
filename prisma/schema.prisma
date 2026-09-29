@@ -132,6 +132,15 @@ model UserInstructor {
   userData   UserData @relation(fields: [userDataId], references: [id])
   userDataId String   @unique
 
+  // Remover instrutor e soft-delete: a escala em curso (CourseInstructor) e FK
+  // obrigatoria sem cascade, entao apagar a linha nao funcionava para quem ja
+  // tinha dado aula — o erro morria num catch mudo e a rota respondia 200.
+  // Colunas criadas na migracao 20260929150000_user_instructor_soft_delete.
+  // O unique de userDataId conta as linhas excluidas, por isso `promote` faz
+  // upsert (revive a linha) em vez de create.
+  isDeleted  Boolean  @default(false)
+  deletedAt  DateTime?
+
   courseAssignments CourseInstructor[]
 }
 
