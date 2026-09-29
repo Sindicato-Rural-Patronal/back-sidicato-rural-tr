@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import { CreateRuleController } from '../controllers/create-rule.js';
 import { CreateRuleUseCase } from '../../usecase/create-rule.js';
 import { UpdateRuleController } from '../controllers/update-rule.js';

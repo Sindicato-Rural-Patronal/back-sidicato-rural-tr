@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { CreateUserController } from '../controllers/create-user.js';
 import { CreateUserUseCase } from '../../usecase/create-user-data.js';
 import { createUserDataAdapter } from '../../adapter/database/user-data.js';
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import { ListUsersController } from '../controllers/list-users.js';
 import { ListUsersUseCase } from '../../usecase/list-users.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
@@ -85,7 +85,7 @@ description: 'Etnia' },
 enum: ['NO_FORMAL_EDUCATION', 'INCOMPLETE_PRIMARY', 'COMPLETE_PRIMARY', 'INCOMPLETE_SECONDARY', 'COMPLETE_SECONDARY', 'INCOMPLETE_HIGHER', 'COMPLETE_HIGHER', 'POSTGRADUATE'],
 description: 'Nível de escolaridade' },
                         incompleteRegistration: { type: 'boolean',
-description: 'true = só cadastros incompletos (sem avatar, sem propriedades, cpf, birthDate ou gender nulos (o RG não entra: a nova identidade usa o número do CPF)) | false = só cadastros completos' },
+description: 'true = só cadastros incompletos: sem avatar, sem propriedades, ou cpf/birthDate/gender nulos. O RG não entra na conta (a identidade nova usa o número do CPF) | false = só cadastros completos' },
                         activeMember: { type: 'boolean',
 description: 'true = só associados em dia (situação ATIVO e validade não vencida; validade em branco conta como em dia)' },
                     },

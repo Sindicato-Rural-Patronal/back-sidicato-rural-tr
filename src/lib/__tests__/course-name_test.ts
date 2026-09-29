@@ -17,9 +17,10 @@ describe('nomeDoCurso', () => {
         expect(nomeDoCurso('  PODA  ')).toBe('PODA');
     });
 
-    it('o generico e em caixa alta, como os outros titulos', () => {
-        // O formulario do painel grava titulo em maiuscula; um "Curso sem nome"
-        // em caixa baixa destoaria dos vizinhos na lista.
-        expect(CURSO_SEM_NOME).toBe(CURSO_SEM_NOME.toUpperCase());
+    it('o generico e escrito como frase, nao aos gritos', () => {
+        // O titulo do curso aparece no site: o formulario do painel deixou de
+        // forcar maiuscula, e o generico acompanha.
+        expect(CURSO_SEM_NOME).not.toBe(CURSO_SEM_NOME.toUpperCase());
+        expect(CURSO_SEM_NOME).toBe('Curso sem nome');
     });
 });

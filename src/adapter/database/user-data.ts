@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import { buildUserListWhere } from './list-filters.js';
 import type { UserDataUncheckedCreateInput, UserDataModel } from '../../generated/prisma/models';
 import type {

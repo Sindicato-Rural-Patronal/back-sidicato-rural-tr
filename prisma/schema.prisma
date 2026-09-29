@@ -165,6 +165,11 @@ model Rule {
 model course {
   id          String   @id @default(uuid())
   name        String
+  // Título minúsculo e sem acento, para a busca do painel. Preenchido por
+  // trigger no banco (migração 20260929120000_course_booking_search) — a
+  // aplicação nunca grava. O título aparece no site, então guarda acento e
+  // caixa como foi digitado; quem normaliza para procurar é esta coluna.
+  nameSearch  String?
   description String
   startTime   DateTime
   endTime     DateTime
@@ -242,6 +247,8 @@ model RoomBooking {
   id                    String      @id @default(uuid())
   type                  BookingType
   title                 String
+  // Igual ao nameSearch do curso: minúsculo e sem acento, por trigger.
+  titleSearch           String?
   description           String?
   roomId                String
   room                  room        @relation(fields: [roomId], references: [id], onDelete: Cascade)

@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { UserInstructorModel, CourseInstructorModel } from '../../generated/prisma/models.js';
 import type {
     InstructorRepository,

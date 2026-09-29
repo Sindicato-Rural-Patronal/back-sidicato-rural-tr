@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type {
     BookingType,
     ConflictGuard,
@@ -14,6 +14,7 @@ import type {
     PublicEventItem,
 } from '../../ports/external/room-booking-repository.js';
 import { courseDay, deadlineTime } from '../../lib/course-registration-rules.js';
+import { searchKey } from './list-filters.js';
 
 export function createRoomBookingAdapter(prisma: PrismaClient): RoomBookingRepository {
     return new RoomBookingAdapter(prisma);
@@ -36,6 +37,9 @@ id: { in: f.ids } };
         ...(f.type && { type: f.type }),
         ...(search && {
             OR: [
+                // Sem acento: o titulo do evento vai para o site e agora guarda
+                // acento e caixa como foi digitado (coluna titleSearch, trigger).
+                { titleSearch: { contains: searchKey(search) } },
                 { title: insensitive(search) },
                 { description: insensitive(search) },
                 { responsibleName: insensitive(search) },

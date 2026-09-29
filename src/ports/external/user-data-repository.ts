@@ -5,6 +5,16 @@ import type {
 import type { AddressModel } from '../../generated/prisma/models/Address.js';
 import type { UserRelation } from '../../generated/prisma/client.js';
 import type { Property } from '../../generated/prisma/client.js';
+// Colunas enum do banco. Tipar como `string` aqui deixava passar qualquer
+// texto ate o Prisma, que so reclama em tempo de execucao; os usecases ja
+// validam com z.enum, e agora o tipo diz a mesma coisa.
+import type {
+    Gender,
+    MaritalStatus,
+    Ethnicity,
+    EducationLevel,
+    MemberStatus,
+} from '../../generated/prisma/client.js';
 
 export type UserDataUpdateInput = Partial<{
     name: string;
@@ -15,7 +25,7 @@ export type UserDataUpdateInput = Partial<{
 
     // Identity
     nickname: string | null;
-    maritalStatus: string | null;
+    maritalStatus: MaritalStatus | null;
     phone2: string | null;
     phone3: string | null;
 
@@ -32,9 +42,9 @@ export type UserDataUpdateInput = Partial<{
     nationality: string | null;
 
     // Profile
-    gender: string | null;
-    ethnicity: string | null;
-    educationLevel: string | null;
+    gender: Gender | null;
+    ethnicity: Ethnicity | null;
+    educationLevel: EducationLevel | null;
     functionalCategory: string | null;
     specialNeeds: boolean;
 
@@ -45,7 +55,7 @@ export type UserDataUpdateInput = Partial<{
     memberType: string | null;
     boardPosition: string | null;
     boardMember: boolean;
-    memberStatus: string | null;
+    memberStatus: MemberStatus | null;
     memberSince: Date | string | null;
     membershipValidUntil: Date | string | null;
     memberNotes: string | null;
@@ -92,9 +102,9 @@ export type UserListFilters = {
     search?: string;
     memberType?: string;
     memberClassification?: string;
-    gender?: string;
-    ethnicity?: string;
-    educationLevel?: string;
+    gender?: Gender;
+    ethnicity?: Ethnicity;
+    educationLevel?: EducationLevel;
     incompleteRegistration?: boolean;
     /**
      * So os associados em dia: situacao ATIVO e validade nao vencida (validade

@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import { AUDIT_RETENTION_KEY, parseRetentionDays } from '../../usecase/audit-retention.js';
 
 // Limpeza da trilha de auditoria conforme o tempo de guarda configurado no

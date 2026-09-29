@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client/extension';
+import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { SiteSettingsRepository } from '../../ports/external/site-settings-repository.js';
 
 export function createSiteSettingsAdapter(prisma: PrismaClient): SiteSettingsRepository {
