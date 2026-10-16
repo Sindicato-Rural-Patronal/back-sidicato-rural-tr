@@ -346,6 +346,8 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 
 > Presença: `attended` vem em `GET /admin/courses/:courseId/registrations` e na planilha `registrations` (coluna "Presença": Presente / Faltou / vazio). O painel mostra os botões Presente/Faltou quando o curso já começou (em andamento, concluído ou chegou o dia do início) ; o sistema não emite certificado (quem emite é a FAEP). `COMPLETED` se comporta como `IN_PROGRESS` na visibilidade (fora de `GET /courses`, página abre pelo link) e nunca aceita inscrição.
 
+> **Vagas** (`lockCourseSeats` em `registration-adapter.ts`): toda gravação que conta as inscrições e insere — `createWithCapacity` (`register`, `register-by-cpf`, inscrição pela equipe) e o `register-full` — trava as vagas do curso (`pg_advisory_xact_lock`) antes de contar, em READ COMMITTED. Inscrições ao mesmo tempo entram uma de cada vez: nunca passa da lotação e quem chega depois da última vaga ouve 409 "Curso lotado". O `register-full` acha a pessoa pelo CPF dentro da transação, tenta de novo (até 3 vezes) num conflito de escrita que ainda apareça (`isPrismaSerializationError` reconhece o P2034 e o `DriverAdapterError` `TransactionWriteConflict` do adapter-pg) e manda o erro inesperado para o `apiErrorHandler` (log + 500 genérico), em vez de devolver a mensagem do Prisma como 400.
+>
 > Inscrição pública (`register` e `register-full`): e-mail opcional; a pessoa é achada **só pelo CPF** (`findByCpf`) — e-mail/telefone iguais aos de outra pessoa não vinculam, criam cadastro próprio. CPF criado ao mesmo tempo por outra inscrição → 409 "CPF já cadastrado para outra pessoa.".
 
 ### Notícias
