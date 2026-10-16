@@ -134,9 +134,11 @@ endTime: b.endTime })),
     ].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
 }
 
-// Serializa as gravações de reserva da mesma sala (duas pessoas marcando o mesmo
-// horário ao mesmo tempo): trava liberada no fim da transação.
-async function lockRoom(tx: PrismaClient, roomId: string): Promise<void> {
+// Serializa as gravações que ocupam a mesma sala (duas pessoas marcando o mesmo
+// horário ao mesmo tempo): trava liberada no fim da transação. Reservas e cursos
+// usam a MESMA chave (course-adapter.ts), senão um curso e uma reserva gravados
+// juntos passariam os dois pela checagem de conflito.
+export async function lockRoom(tx: PrismaClient, roomId: string): Promise<void> {
     await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`room-booking:${roomId}`}))`;
 }
 

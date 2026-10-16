@@ -7,6 +7,9 @@ import { RoomAlreadyBookedError } from '../errors/business-rule.js';
 import { conflictMessage } from './room-availability.js';
 import { nomeDoCurso } from '../lib/course-name.js';
 
+/** O curso ocupa a sala de `startTime` a `endTime`: término antes do início não bloquearia nada. */
+export const COURSE_END_BEFORE_START = 'O término do curso precisa ser depois do início.';
+
 const createCourseRequestSchema = z.object({
     // Titulo em branco e permitido: vira o nome generico. Cadastro de curso
     // costuma comecar pela sala e pelas datas, para reservar a agenda.
@@ -22,6 +25,9 @@ const createCourseRequestSchema = z.object({
     observations: z.string().optional(),
     eventNumber: z.string().optional(),
     minStudents: z.number().int().min(0).optional(),
+}).refine(d => new Date(d.endTime) > new Date(d.startTime), {
+    message: COURSE_END_BEFORE_START,
+    path: ['endTime'],
 });
 
 type CreateCourseRequest = z.input<typeof createCourseRequestSchema>;
@@ -68,13 +74,9 @@ export class CreateCourseUseCase {
         const start = new Date(startTime);
         const end = new Date(endTime);
 
-        // Sala ocupada por outro curso ou por uma reserva (evento/reunião).
-        const conflict = await this.courseRepository.findRoomConflict(roomId, start, end);
-        if (conflict) {
-            return { error: new RoomAlreadyBookedError(conflictMessage(conflict)) };
-        }
-
-        const course = await this.courseRepository.create({
+        // Sala ocupada por outro curso ou por uma reserva (evento/reunião):
+        // conferido e gravado na mesma transação, com a sala travada.
+        const written = await this.courseRepository.createInRoom({
             name,
             description,
             roomId,
@@ -88,10 +90,9 @@ export class CreateCourseUseCase {
             eventNumber,
             minStudents,
         });
-
-        if (!course) {
-            return { error: new Error('Failed to create course') };
+        if (written.conflict) {
+            return { error: new RoomAlreadyBookedError(conflictMessage(written.conflict)) };
         }
-        return { courseId: course.id };
+        return { courseId: written.result.id };
     }
 }
