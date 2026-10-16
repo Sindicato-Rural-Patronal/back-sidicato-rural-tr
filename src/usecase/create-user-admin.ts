@@ -2,9 +2,12 @@ import type { UserAdminRepository } from '../ports/external/user-admin-repositor
 import type { UserDataRepository } from '../ports/external/user-data-repository.js';
 import type { RuleRepository } from '../ports/external/rule-repository.js';
 import { hash } from 'bcrypt';
+import { z } from 'zod';
 import { UsernameAlreadyExistsError, AdminAccountAlreadyExistsError } from '../errors/conflict.js';
 import { UserDataNotFoundError, RoleNotFoundError } from '../errors/not-found.js';
 import { ForbiddenError } from '../errors/auth.js';
+import { ValidationError } from '../errors/validation.js';
+import { exceedsActor } from './admin-guards.js';
 import { isPrismaUniqueViolation } from '../lib/prisma-errors.js';
 
 type CreateUserAdminRequest = {
@@ -13,6 +16,13 @@ type CreateUserAdminRequest = {
     userDataId: string;
     userRole: string;
 };
+
+// Mesmo mínimo de senha do convite e da edição: antes o cadastro direto
+// aceitava senha vazia (e o login com ela funcionava) e usuário em branco.
+const credentialsSchema = z.object({
+    username: z.string().trim().min(1, 'Informe o usuário.'),
+    password: z.string().min(8, 'A senha deve ter ao menos 8 caracteres.'),
+});
 
 type CreateUserAdminResponse = {
     error?: Error;
@@ -27,10 +37,17 @@ export class CreateUserAdminUseCase {
     ) {}
 
     async execute(request: CreateUserAdminRequest, actorPermissions: string[] = []): Promise<CreateUserAdminResponse> {
+        const credentials = credentialsSchema.safeParse({ username: request.username,
+password: request.password });
+        if (!credentials.success) {
+            return { error: new ValidationError(credentials.error.issues[0].message) };
+        }
+        const { username, password } = credentials.data;
+
         // Só um administrador ATIVO segura o nome de usuário: o unique do banco
         // é parcial (migração 20260929091000_admin_username_active_unique), então
         // excluir um administrador libera o usuário dele sem mexer na linha antiga.
-        const holder = await this.userAdminRepository.findByUsername(request.username);
+        const holder = await this.userAdminRepository.findByUsername(username);
         if (holder && holder.userDataId !== request.userDataId) {
             return { error: new UsernameAlreadyExistsError() };
         }
@@ -54,12 +71,11 @@ export class CreateUserAdminUseCase {
             return { error: new RoleNotFoundError() };
         }
         // Anti-escalonamento: não atribuir uma regra com permissões além das do ator.
-        const escalates = (roleToAssign.permissions as string[]).some(p => !actorPermissions.includes(p));
-        if (escalates) {
+        if (exceedsActor(roleToAssign.permissions as string[], actorPermissions)) {
             return { error: new ForbiddenError('Você não pode atribuir uma regra com permissões além das suas.') };
         }
 
-        const hashedPassword = await hash(request.password, 10);
+        const hashedPassword = await hash(password, 10);
 
         try {
             // Se havia um admin removido para esse associado, reaproveita a linha.
@@ -67,7 +83,7 @@ export class CreateUserAdminUseCase {
                 const reactivated = await this.userAdminRepository.reactivate(
                     existingAdminForUserData.id,
                     {
-                        username: request.username,
+                        username,
                         passwordHash: hashedPassword,
                         rulesId: request.userRole,
                     },
@@ -76,7 +92,7 @@ export class CreateUserAdminUseCase {
             }
 
             const newAdmin = await this.userAdminRepository.create({
-                username: request.username,
+                username,
                 passwordHash: hashedPassword,
                 userDataId: request.userDataId,
                 rulesId: request.userRole,

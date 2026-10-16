@@ -179,7 +179,7 @@ READ_AUDIT     UPDATE_AUDIT   (ver a trilha · configurar o tempo de guarda)
 | `GET` | `/admin/me` | `GetCurrentAdminUseCase` | JWT (qualquer admin) |
 | `PATCH` | `/admin/me/preferences` | `UpdateAdminPreferencesUseCase` | JWT (qualquer admin) |
 | `GET` | `/admin/users/admins` | `ListUserAdminsUseCase` | `READ_USER_ADMIN` |
-| `POST` | `/admin/users` | `CreateUserAdminUseCase` | `CREATE_USER_ADMIN` |
+| `POST` | `/admin/users` | `CreateUserAdminUseCase` (senha com 8+ caracteres e usuário não vazio, gravado sem os espaços das pontas → senão 400) | `CREATE_USER_ADMIN` |
 | `PATCH` | `/admin/users/:id` | `UpdateUserAdminUseCase` | `UPDATE_USER_ADMIN` |
 | `DELETE` | `/admin/users/:id` | `DeleteUserAdminUseCase` | `DELETE_USER_ADMIN` |
 
