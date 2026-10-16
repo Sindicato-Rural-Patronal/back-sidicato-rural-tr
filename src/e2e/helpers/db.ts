@@ -20,6 +20,9 @@ export function createTestPrisma(): PrismaClient {
 /**
  * Wipe all application tables in safe dependency order.
  * Called in beforeAll of each E2E test file for isolation.
+ * O CASCADE só alcança tabela com FK para as listadas: `AdminInvite` não tem FK
+ * (userDataId e rulesId são texto), por isso vai na lista, senão o convite de
+ * uma rodada sobrava para a próxima.
  */
 export async function cleanDatabase(prisma: PrismaClient): Promise<void> {
     await prisma.$executeRawUnsafe(`
@@ -39,6 +42,7 @@ export async function cleanDatabase(prisma: PrismaClient): Promise<void> {
             "UserRelation",
             "UserInstructor",
             "UserAdmin",
+            "AdminInvite",
             "UserData",
             "Rule",
             "Address",
