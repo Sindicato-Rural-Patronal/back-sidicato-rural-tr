@@ -177,6 +177,7 @@ READ_AUDIT     UPDATE_AUDIT   (ver a trilha · configurar o tempo de guarda)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
 | `GET` | `/admin/me` | `GetCurrentAdminUseCase` | JWT (qualquer admin) |
+| `PATCH` | `/admin/me` | `UpdateMeUseCase` (nome, usuário, senha; trocar a senha exige `currentPassword`) | JWT (qualquer admin) |
 | `PATCH` | `/admin/me/preferences` | `UpdateAdminPreferencesUseCase` | JWT (qualquer admin) |
 | `GET` | `/admin/users/admins` | `ListUserAdminsUseCase` | `READ_USER_ADMIN` |
 | `POST` | `/admin/users` | `CreateUserAdminUseCase` (senha com 8+ caracteres e usuário não vazio, gravado sem os espaços das pontas → senão 400) | `CREATE_USER_ADMIN` |
@@ -185,6 +186,8 @@ READ_AUDIT     UPDATE_AUDIT   (ver a trilha · configurar o tempo de guarda)
 
 > `GET /admin/me` retorna `{ userId, userDataId, username, name, avatar, rulesId, ruleName, permissions[], dashboardPrefs }`.
 > `userId` = UserAdmin.id (igual ao JWT). `userDataId` = UserData.id vinculado.
+>
+> **Minha conta** (`PATCH /admin/me`, `usecase/update-me.ts`): `{ name?, username?, password?, currentPassword? }`. Trocar a senha exige `currentPassword` (a atual) junto com `password` (a nova, 8+ caracteres): sem ela → 400 "Informe a senha atual para trocar a senha."; errada → 400 "Senha atual incorreta." — 400 e não 401, porque o painel trata 401 como sessão vencida. Com erro nada do pedido é gravado. Nome e usuário sozinhos não pedem a senha. Limite de 10 pedidos por 5 minutos por IP (429). Os tokens já emitidos continuam valendo depois da troca (não há versão de token).
 >
 > **Anti-escalonamento** (`usecase/admin-guards.ts`): as permissões não são hierárquicas, então "mais forte" = tem alguma permissão que o ator não tem (`exceedsActor`). Quem pede só cria, convida, edita ou exclui admin cuja regra (a atual **e** a nova) cabe nas suas permissões, e só edita regra que cabe nelas (mesmo só para renomear ou tirar permissões) → senão 403. Excluir admin — ou a pessoa dele, que leva o login junto — passa por `checkAdminRemoval`: não a si mesmo (400), não quem é mais forte (403), nunca o último admin ativo (400).
 >
