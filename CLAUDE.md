@@ -367,6 +367,8 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 | `POST` | `/admin/banners/:id/image` | `UploadBannerImageUseCase` | `UPDATE_BANNER` |
 | `PATCH` | `/admin/banners/reorder` | `ReorderBannersUseCase` | `UPDATE_BANNER` |
 
+Link do botão (`buttons[].url`, `bannerButtonSchema` em `create-banner.ts`, usado também na edição): só caminho do site (`/cursos`, `#contato`) ou endereço `http(s)://` completo; `javascript:`, `data:`, `//outro.site` e endereço sem esquema → 400 "Link do botão: …". `GET /banners` é pública e o link vai direto num `<a href>` da home.
+
 `startDate`/`endDate` são instantes; o painel manda o dia escolhido em Brasília (`AAAA-MM-DDT00:00:00.000-03:00` e `…T23:59:59.999-03:00`). `GET /banners` mostra os ativos com início ≤ agora ≤ término (vazio não limita). A migration `20260919120000_banner_dates_brasilia` somou 3h às datas antigas gravadas como 00:00:00.000Z / 23:59:59.999Z.
 
 ### Contatos (Formulário público)
