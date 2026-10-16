@@ -178,6 +178,7 @@ describe('Valid token, insufficient permission → 403', () => {
         const createRes = await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(superToken),
             payload: { name: 'Perm Target',
 email: 'permtarget@test.com',
 phone: '44911110080',

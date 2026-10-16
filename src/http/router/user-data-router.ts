@@ -28,7 +28,10 @@ export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaCli
     const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
     const instructorRepository = createInstructorAdapter(prisma);
 
-    const createUserController = new CreateUserController(new CreateUserUseCase(userRepository));
+    const createUserController = new CreateUserController(
+        new CreateUserUseCase(userRepository),
+        getAdminPermissions,
+    );
     const listUsersController = new ListUsersController(
         new ListUsersUseCase(userRepository),
         getAdminPermissions,
@@ -335,7 +338,8 @@ nullable: true },
             schema: {
                 tags: ['Users'],
                 summary: 'Create worker user',
-                description: `Creates a new UserData (rural worker). Public route — no authentication required.
+                security: [{ bearerAuth: [] }],
+                description: `Creates a new UserData (rural worker). Requires \`CREATE_USER\` — it is the admin panel's form; public course registration has its own routes.
 
 **Business rules:**
 - \`cpf\` must be unique per user — returns 409 ("CPF já cadastrado para outra pessoa.") if the CPF is already registered
@@ -374,6 +378,8 @@ nullable: true },
 format: 'date-time' },
                         },
                     },
+                    401: errorResponse,
+                    403: errorResponse,
                     409: {
                         description: 'CPF already registered',
                         type: 'object',

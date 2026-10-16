@@ -35,6 +35,7 @@ describe('POST /users', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(token),
             payload: {
                 name: 'João Silva',
                 email: 'joao.silva@test.com',
@@ -56,6 +57,7 @@ email: string
         await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(token),
             payload: { name: 'First',
 email: 'dup@test.com',
 phone: '44911110002',
@@ -64,6 +66,7 @@ cpf: '52223330274' },
         const res = await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(token),
             payload: { name: 'Second',
 email: 'other@test.com',
 phone: '44911110003',
@@ -77,6 +80,7 @@ cpf: '52223330274' },
         const res = await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(token),
             payload: { name: 'Missing Fields' },
         });
         expect(res.statusCode).toBeGreaterThanOrEqual(400);
@@ -86,6 +90,7 @@ cpf: '52223330274' },
         const res = await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(token),
             payload: { name: 'Bad Email',
 email: 'not-an-email',
 phone: '44911110006',
@@ -137,6 +142,7 @@ describe('GET /admin/users/:id', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(token),
             payload: { name: 'Detail User',
 email: 'detail@test.com',
 phone: '44911110010',
@@ -184,6 +190,7 @@ describe('PATCH /users/:id', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(token),
             payload: { name: 'Update Target',
 email: 'update@test.com',
 phone: '44911110020',
@@ -265,6 +272,7 @@ describe('DELETE /users/:id', () => {
         const createRes = await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(token),
             payload: { name: 'To Delete',
 email: 'todelete@test.com',
 phone: '44911110030',
@@ -284,6 +292,7 @@ cpf: '52223333028' },
         const createRes = await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(token),
             payload: { name: 'Ghost User',
 email: 'ghost@test.com',
 phone: '44911110031',
@@ -307,6 +316,7 @@ headers: bearer(token) });
         const createRes = await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(token),
             payload: { name: 'Vanish User',
 email: 'vanish@test.com',
 phone: '44911110032',
@@ -348,6 +358,7 @@ describe('POST /admin/users/:id/properties', () => {
         const res = await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(token),
             payload: { name: 'Addr User',
 email: 'addruser@test.com',
 phone: '44911110040',
@@ -398,6 +409,7 @@ describe('POST /admin/users/:id/relations', () => {
         const resA = await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(token),
             payload: { name: 'Rel User A',
 email: 'relA@test.com',
 phone: '44911110050',
@@ -406,6 +418,7 @@ cpf: '52223335071' },
         const resB = await app.inject({
             method: 'POST',
             url: '/users',
+            headers: bearer(token),
             payload: { name: 'Rel User B',
 email: 'relB@test.com',
 phone: '44911110051',

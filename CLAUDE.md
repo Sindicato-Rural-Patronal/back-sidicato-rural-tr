@@ -128,7 +128,7 @@ READ_AUDIT     UPDATE_AUDIT   (ver a trilha · configurar o tempo de guarda)
 ### Usuários (UserData)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
-| `POST` | `/users` | `CreateUserUseCase` | Pública |
+| `POST` | `/users` | `CreateUserUseCase` (formulário do painel; a inscrição pública tem rotas próprias) | `CREATE_USER` |
 | `GET` | `/admin/users` | `ListUsersUseCase` | `READ_USER` |
 | `GET` | `/admin/users/:id` | `GetUserDetailUseCase` | `READ_USER` |
 | `PATCH` | `/users/:id` | `UpdateUserDataUseCase` | `UPDATE_USER` |
