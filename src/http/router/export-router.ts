@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
+import type { Permission } from '../../generated/prisma/enums.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
 import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { AUDIT_EXPORT_LIMIT, createExportAdapter } from '../../adapter/database/export-adapter.js';
@@ -24,7 +25,7 @@ export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClien
 | dataset | filtros | permissão |
 |---|---|---|
 | people | search, memberType, memberClassification, gender, ethnicity, educationLevel, incompleteRegistration, activeMember | READ_USER |
-| cadastros | (nenhum — retrato completo dos 4 tipos num arquivo só) | READ_USER_ADMIN |
+| cadastros | (nenhum — retrato completo dos 4 tipos num arquivo só) | READ_USER_ADMIN + READ_USER |
 | companies | search, type, isPartner | READ_USER |
 | properties | ownerIds (pessoas/empresas) | READ_USER |
 | admins | search, rulesId | READ_USER_ADMIN |
@@ -57,8 +58,13 @@ additionalProperties: true } }),
 
     async function handle(req: FastifyRequest<{ Params: { dataset: ExportDataset } }>, reply: FastifyReply, input: unknown) {
         const { dataset } = req.params;
-        const actorId = await requirePermission(req, reply, EXPORT_DATASETS[dataset].permission, getAdminPermissions);
+        const spec: {
+ permission: Permission;
+alsoRequires?: Permission 
+} = EXPORT_DATASETS[dataset];
+        const actorId = await requirePermission(req, reply, spec.permission, getAdminPermissions);
         if (actorId === null) return;
+        if (spec.alsoRequires && (await requirePermission(req, reply, spec.alsoRequires, getAdminPermissions)) === null) return;
 
         const r = await exportData.execute(dataset, input);
         if (r.error || !r.result) return reply.status(errorToStatus(r.error)).send({ error: r.error?.message });

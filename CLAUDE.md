@@ -208,7 +208,7 @@ READ_AUDIT     UPDATE_AUDIT   (ver a trilha · configurar o tempo de guarda)
 |--------|------|----------|--------------|
 | `GET` · `POST` | `/admin/export/:dataset` | `ExportDataUseCase` — CSV (`;`, BOM, tudo entre aspas, fórmula neutralizada com `'`). POST recebe os parâmetros no corpo JSON (listas como array; é o que o painel usa, seleção grande não cabe na URL) | por conjunto (abaixo) |
 
-- Conjuntos: `people`, `companies`, `properties`, `unimed` (READ_USER), `admins` (READ_USER_ADMIN), `courses`, `registrations`, `room-bookings` (READ_COURSE), `contact-messages` (READ_CONTACT), `audit-logs` (READ_AUDIT).
+- Conjuntos: `people`, `companies`, `properties`, `unimed` (READ_USER), `admins` (READ_USER_ADMIN), `courses`, `registrations`, `room-bookings` (READ_COURSE), `contact-messages` (READ_CONTACT), `audit-logs` (READ_AUDIT), `cadastros` (relatório com pessoas, empresas, propriedades e administradores num arquivo só: READ_USER_ADMIN **e** READ_USER — traz CPF e RG de todas as pessoas, e as permissões não são hierárquicas; `alsoRequires` em `EXPORT_DATASETS`).
 - `room-bookings` aceita `from`, `to` (AAAA-MM-DD), `roomId`, `type` e `search`; colunas Tipo, Título, Sala, Início, Término (DD/MM/AAAA HH:MM, hora gravada), Responsável, Descrição, Série (Sim/Não).
 - `ids` exporta só esses (seleção ou um registro; lista vazia → 400); sem `ids`, os mesmos filtros da listagem (`adapter/database/list-filters.ts`, compartilhado com os adapters das listas). `properties` aceita `ownerIds`; `registrations` aceita `courseIds`.
 - Headers: `Content-Disposition` (`pessoas-AAAA-MM-DD.csv`, ou `pessoa-<nome>-AAAA-MM-DD.csv` para um registro) e `X-Export-Count`.
