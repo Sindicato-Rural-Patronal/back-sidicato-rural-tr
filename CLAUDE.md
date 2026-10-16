@@ -173,7 +173,8 @@ O que o use case **lança** (em vez de devolver) cai no `apiErrorHandler` (`http
 - P2003 → 409 "Registro em uso e não pode ser removido.";
 - erro com `statusCode` < 500 (ex.: 429 do rate limit) → esse status com a mensagem;
 - o resto → 500 "Erro interno do servidor." e `request.log.error`.
-- Atenção: JSON malformado no corpo hoje cai aqui como 500 (o parser de `index.ts` não põe `statusCode`). Também dá 500 o `.parse` do Zod que lança em `list-unimed` e nos filtros do financeiro.
+- `ValidationError` lançado tem `statusCode = 400` → 400 com a mensagem. Filtro de consulta validado com `parseQuery` (`errors/validation.ts`) sai assim: "Parâmetro inválido: <campo>".
+- Atenção: JSON malformado no corpo hoje cai aqui como 500 (o parser de `index.ts` não põe `statusCode`).
 
 **Regra das listagens:** sempre 200, com lista vazia ou página zerada. 404 só em detalhe ou ação sobre id inexistente.
 
@@ -400,7 +401,7 @@ Beneficiário 1:1 com a pessoa; aqui ficam só os campos do plano.
   - `grauDependencia`: TITULAR, CONJUGE, FILHO(A), ENTEADO(A), PAI/MAE, OUTRO.
   - Fora da lista → 400, **menos** quando é o valor que já estava gravado no registro (legado). `plano` e `tipoDependente` são texto livre.
 - **CNS:** gravado só com dígitos, 15 dígitos, com a mesma folga para o valor antigo.
-- **Filtro inválido:** `userDataId` que não é UUID hoje dá 500 (`.parse`).
+- **Filtro inválido:** `userDataId` que não é UUID → 400 "Parâmetro inválido: userDataId".
 
 ### Convênios (`convenio-router.ts`, `usecase/convenio-usecases.ts`)
 Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, destaques).
@@ -755,10 +756,11 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 - Filtros `from`, `to` (inclui o dia inteiro), `type`, `categoryId`, `accountId`, `method` (sem diferenciar maiúsculas), `search` (descrição).
 - Ordem por data desc.
 - `totals: { incomeCents, expenseCents }` somam todos os filtrados, sem transferências nem "só nota".
-- Filtro com formato inválido hoje dá 500 (`.parse`).
+- Filtro com formato inválido → 400 "Parâmetro inválido: <campo>" (vale também para resumo, exportação e fechamentos).
 
 **Resumo** → `{ balanceAllTimeCents, periodInCents, periodOutCents, periodResultCents, byCategory, byMonth, byAccount }`.
 - Sem `from`, são os últimos 12 meses.
+- "Só nota" fica fora também do saldo por caixa (`byAccount`), então a soma das caixas fecha com `balanceAllTimeCents`.
 - Excluir categoria ou caixa é soft e não é barrado por lançamentos. O saldo de caixa excluído cai em "Sem caixa".
 
 **Recorrência** (`FinanceRecurringTransaction`):
