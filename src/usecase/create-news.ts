@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { NewsRepository } from '../ports/external/news-repository.js';
 import { ValidationError } from '../errors/validation.js';
+import { nowWallClock } from './news-visibility.js';
 
 const createNewsRequestSchema = z.object({
     title: z.string().min(1, 'Title is required'),
@@ -42,9 +43,10 @@ export class CreateNewsUseCase {
             summary,
             status,
             // Agendada: a data mostrada ao leitor é a que ela entra no ar.
+            // Publicada agora: hora "de parede" de Brasília, como o agendamento.
             publishedAt: publishedAt
                 ? new Date(publishedAt)
-                : (publishAt ?? (status === 'PUBLISHED' ? new Date() : undefined)),
+                : (publishAt ?? (status === 'PUBLISHED' ? nowWallClock() : undefined)),
             publishAt,
         });
 
