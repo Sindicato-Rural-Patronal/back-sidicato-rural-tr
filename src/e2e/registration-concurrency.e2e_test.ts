@@ -97,7 +97,7 @@ describe.each<Rota>(['register', 'register-by-cpf'])('POST /courses/:id/%s ao me
     // do `createWithCapacity` nunca roda e quem perde a corrida leva 500, com vaga
     // sobrando. Medido: 6 pedidos para 5 vagas → só 1 a 4 entram, o resto 500.
     // Quando a correção entrar, este teste quebra: troque `it.fails` por `it`.
-    it.fails('N+1 pedidos para N vagas: N entram, 1 ouve "lotado", ninguém leva 500', async () => {
+    it('N+1 pedidos para N vagas: N entram, 1 ouve "lotado", ninguém leva 500', async () => {
         const { statuses, active } = await burst(rota, 5, 6);
         expect(statuses).toEqual([201, 201, 201, 201, 201, 409]);
         expect(active).toBe(5);
