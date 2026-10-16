@@ -713,7 +713,7 @@ properties: { filename: { type: 'string' } } },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Download the attached enrollment form (PDF)',
-                description: 'Retorna o PDF anexado (inline). Requer admin autenticado.',
+                description: 'Retorna o PDF anexado (inline). Requer READ_COURSE (mesma permissão de ver as inscrições).',
                 security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
