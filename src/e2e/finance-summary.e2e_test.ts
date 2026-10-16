@@ -244,7 +244,7 @@ description: 'NOTA SEM CAIXA' });
     // Uma nota de empenho de R$ 99,99 na CAIXA A tira R$ 99,99 do saldo dela,
     // e a soma das caixas deixa de bater com o saldo histórico (que só soma
     // IN e OUT). Quando a correção entrar, troque `it.fails` por `it`.
-    it.fails('não mexe no saldo de nenhuma caixa', async () => {
+    it('não mexe no saldo de nenhuma caixa', async () => {
         const depois = await summary();
         expect(saldos(depois)).toEqual(saldos(antes));
         expect(depois.byAccount.reduce((sum, a) => sum + a.balanceCents, 0)).toBe(depois.balanceAllTimeCents);

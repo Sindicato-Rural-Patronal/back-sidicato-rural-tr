@@ -327,6 +327,9 @@ type: 'OUT' },
         const activeAccountIds = new Set((accounts as FinancialAccountModel[]).map(a => a.id));
         const acctBal = new Map<string, number>();
         for (const g of grouped) {
+            // "Só nota" (sem tipo) não é dinheiro: fica fora do saldo, como no
+            // saldo histórico. Antes caía no `-1` e tirava o valor da caixa.
+            if (g.type !== 'IN' && g.type !== 'OUT') continue;
             const key = g.accountId && activeAccountIds.has(g.accountId) ? g.accountId : '__none';
             const delta = (g._sum.amountCents ?? 0) * (g.type === 'IN' ? 1 : -1);
             acctBal.set(key, (acctBal.get(key) ?? 0) + delta);
