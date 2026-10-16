@@ -349,10 +349,11 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 | `POST` | `/news` | `CreateNewsUseCase` | `CREATE_NEWS` |
 | `PATCH` | `/news/:newsId` | `UpdateNewsUseCase` | `UPDATE_NEWS` |
 | `DELETE` | `/news/:newsId` | `DeleteNewsUseCase` | `DELETE_NEWS` |
-| `POST` | `/news/:newsId/banner` | `UploadNewsBannerUseCase` | `UPDATE_NEWS` |
-| `POST` | `/news/:newsId/image` | `UploadNewsBlockImageUseCase` | `UPDATE_NEWS` |
+| `POST` | `/news/:newsId/banner` | `UploadNewsBannerUseCase` (capa, até 1920 px) | `UPDATE_NEWS` |
+| `POST` | `/news/:newsId/image` | `UploadNewsBlockImageUseCase` (imagem do texto, até 1600 px) | `UPDATE_NEWS` |
 | `GET` | `/admin/news` | `ListAllNewsUseCase` (filtros `status` = PUBLISHED/SCHEDULED/UNPUBLISHED e `search` por título) | `READ_NEWS` |
 
+- **Imagens** (capa e bloco): `validateImageUpload` (JPG, PNG, WEBP ou GIF, até 15 MB) e `toJpeg` (`lib/image-upload.ts`) — o bucket é público, então o arquivo gravado é sempre um JPEG gerado pelo sharp (girado pelo EXIF, reduzido sem aumentar), nunca o que o cliente mandou; arquivo que não é imagem → 400, notícia inexistente → 404.
 - **Agendamento** (`usecase/news-visibility.ts`): `publishAt` é hora "de parede" de Brasília rotulada em UTC (como os cursos). `null`/ausente = no ar assim que o status for PUBLISHED; no futuro = só aparece depois (lista e detalhe públicos comparam com `nowWallClock()`). Rascunho nunca guarda agendamento e voltar para rascunho descarta o que havia. Quando a notícia é agendada e `publishedAt` não vem no corpo, a data mostrada ao leitor passa a ser a do agendamento. `publishAt` no corpo de `POST /news` e `PATCH /news/:newsId` (null = publicar agora).
 
 ### Banners
