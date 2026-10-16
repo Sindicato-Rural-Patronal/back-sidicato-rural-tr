@@ -51,6 +51,28 @@ jobs:
       - name: Unit tests
         run: npm run test:run
 
+      # O schema.prisma tem de descrever o banco que as migrations criam. Aplica
+      # todas elas num banco vazio e compara o resultado com o schema: qualquer
+      # diferença reprova, e o SQL impresso é o que falta para os dois baterem.
+      # Sem isto, divergência só aparece quando algum teste passa pelo campo: em
+      # 29/09 o schema perdeu as colunas de soft-delete do Company e o que se viu
+      # foram 20 E2E com 500, sem apontar a causa. A comparação não enxerga o
+      # que o schema não expressa (índice parcial, trigger, CHECK), por isso
+      # essas coisas não acusam diferença.
+      - name: Schema × migrations
+        env:
+          DATABASE_URL: postgresql://sind:sind@localhost:5432/sindicato_e2e
+        run: |
+          npx prisma migrate deploy
+          set +e
+          npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script --exit-code
+          code=$?
+          set -e
+          if [ "$code" = 2 ]; then
+            echo "::error title=Schema × migrations::O schema.prisma não bate com o banco criado pelas migrations. O SQL acima leva o banco ao schema: ou falta uma migration, ou o schema está errado."
+          fi
+          exit $code
+
       # Aplica todas as migrations num Postgres descartável e roda a API de
       # verdade (rotas, validação, permissões) contra ele.
       - name: E2E tests
