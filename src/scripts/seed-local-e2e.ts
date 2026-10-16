@@ -12,20 +12,11 @@ import {
     E2E_ADMIN_USERNAME,
     E2E_ADMIN_PASSWORD,
 } from '../e2e/helpers/db.js';
-import type { Permission } from '../generated/prisma/enums.js';
+import { Permission } from '../generated/prisma/enums.js';
 
-const ALL_PERMISSIONS: Permission[] = [
-    'CREATE_USER', 'UPDATE_USER', 'DELETE_USER', 'READ_USER',
-    'CREATE_COURSE', 'UPDATE_COURSE', 'DELETE_COURSE', 'READ_COURSE',
-    'CREATE_RULE', 'UPDATE_RULE', 'DELETE_RULE', 'READ_RULE',
-    'CREATE_USER_ADMIN', 'UPDATE_USER_ADMIN', 'DELETE_USER_ADMIN', 'READ_USER_ADMIN',
-    'CREATE_NEWS', 'UPDATE_NEWS', 'DELETE_NEWS', 'READ_NEWS',
-    'READ_CONTACT', 'UPDATE_CONTACT',
-    'CREATE_BANNER', 'UPDATE_BANNER', 'DELETE_BANNER', 'READ_BANNER',
-    'CREATE_MARKET_QUOTE', 'UPDATE_MARKET_QUOTE', 'DELETE_MARKET_QUOTE', 'READ_MARKET_QUOTE',
-    'READ_AUDIT',
-    'CREATE_FINANCE', 'UPDATE_FINANCE', 'DELETE_FINANCE', 'READ_FINANCE',
-];
+// Todas as do enum: uma lista escrita à mão ficava para trás a cada permissão
+// nova (faltavam UPDATE_AUDIT e as de convênio).
+const ALL_PERMISSIONS: Permission[] = Object.values(Permission);
 
 const url = process.env.DATABASE_URL ?? '';
 if (!/localhost|127\.0\.0\.1/.test(url)) {
