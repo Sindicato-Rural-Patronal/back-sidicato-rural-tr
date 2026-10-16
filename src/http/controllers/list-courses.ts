@@ -8,7 +8,11 @@ export class ListCoursesController {
         const q = request.query as Record<string, string>;
         const page = Math.max(1, Number(q.page) || 1);
         const limit = Math.min(100, Math.max(1, Number(q.limit) || 20));
-        const response = await this.useCase.execute(true, page, limit);
+        // Sem `ended=exclude` os terminados vêm no fim (o /cursos do site tem o filtro "Encerrados").
+        const ended = q.ended === 'exclude' ? 'exclude' : 'include';
+        const response = await this.useCase.execute({ page,
+limit,
+ended });
         return reply.status(200).send(response.result);
     }
 }

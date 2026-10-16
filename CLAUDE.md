@@ -235,7 +235,7 @@ READ_AUDIT     UPDATE_AUDIT   (ver a trilha · configurar o tempo de guarda)
 ### Cursos
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
-| `GET` | `/courses` | `ListCoursesUseCase` | Pública |
+| `GET` | `/courses?page&limit[&ended=include\|exclude]` | `ListCoursesUseCase` — só `PUBLIC`. Primeiro os que não terminaram (em andamento e próximos, início crescente), depois os terminados (do mais recente). "Terminou" = o dia do fim já passou em Brasília (no último dia, não). `ended=exclude` tira os terminados (e do `total`); padrão `include` | Pública |
 | `GET` | `/courses/:courseId` | `GetCourseDetailUseCase` | Pública |
 | `POST` | `/courses` | `CreateCourseUseCase` (aceita `eventNumber`, `minStudents`) + `CopyCourseExtrasUseCase` ao duplicar: `copyCoverFromCourseId` baixa a capa e envia de novo pelo upload de capa (arquivo próprio — a capa fica em `courses/<id>/banner.jpg` e trocar a de um curso mudaria a do outro), `copyInstructorsFromCourseId` + `instructorAssignmentIds` copiam instrutores; resposta `{ id, coverCopied?, instructorsCopied? }`; falha na cópia não desfaz o curso (responde 201 dizendo o que não veio); a capa só é baixada do próprio storage (`lib/download-image.ts`: origem do `SUPABASE_URL`, sem redirecionamento); galeria não é copiada | `CREATE_COURSE` (+ `UPDATE_COURSE` para copiar capa/instrutores) |
 | `PATCH` | `/courses/:courseId` | `UpdateCourseUseCase` | `UPDATE_COURSE` |

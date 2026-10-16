@@ -71,12 +71,19 @@ export type CourseListFilters = {
     search?: string;
     /** Ano de inicio do curso. Filtro proprio, separado da busca por texto. */
     year?: number;
+    /** So os que ainda nao terminaram neste instante (hora de parede): `endTime >= endsFrom`. */
+    endsFrom?: Date;
+    /** So os que ja terminaram: `endTime < endedBefore`. */
+    endedBefore?: Date;
 };
+
+/** Ordem pelo inicio do curso: `asc` = mais cedo primeiro (padrao). */
+export type CourseListOrder = 'asc' | 'desc';
 
 export interface CourseRepository {
     create(course: CourseCreateData): Promise<courseModel>;
     findById(id: string): Promise<CourseWithDetails | null>;
-    findAll(filters?: CourseListFilters, skip?: number, take?: number): Promise<CourseWithDetails[]>;
+    findAll(filters?: CourseListFilters, skip?: number, take?: number, order?: CourseListOrder): Promise<CourseWithDetails[]>;
     count(filters?: CourseListFilters): Promise<number>;
     /** Anos que tem curso cadastrado, do mais recente para o mais antigo. */
     years(): Promise<number[]>;

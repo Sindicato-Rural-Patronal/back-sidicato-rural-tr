@@ -8,6 +8,7 @@ import type {
     CourseCreateData,
     CourseUpdateData,
     CourseListFilters,
+    CourseListOrder,
 } from '../../ports/external/course-repository.js';
 import type { RoomOccupant } from '../../ports/external/room-booking-repository.js';
 import type { courseModel } from '../../generated/prisma/models/course.js';
@@ -53,11 +54,16 @@ isDeleted: false },
         }) as Promise<CourseWithDetails | null>;
     }
 
-    findAll(filters?: CourseListFilters, skip?: number, take?: number): Promise<CourseWithDetails[]> {
+    findAll(
+        filters?: CourseListFilters,
+        skip?: number,
+        take?: number,
+        order: CourseListOrder = 'asc',
+    ): Promise<CourseWithDetails[]> {
         return this.prisma.course.findMany({
             where: buildCourseListWhere(filters),
             include: courseIncludes,
-            orderBy: { startTime: 'asc' },
+            orderBy: [{ startTime: order }, { id: 'asc' }],
             skip,
             take,
         }) as Promise<CourseWithDetails[]>;
