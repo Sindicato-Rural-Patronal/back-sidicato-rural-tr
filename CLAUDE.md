@@ -747,8 +747,15 @@ npm run prisma:studio    # interface visual do banco
 npx vitest run           # testes unitários
 DATABASE_TEST_URL=postgresql://USER:SENHA@localhost:PORTA/BANCO npm run test:e2e
 # E2E: banco LOCAL descartável (recusa host que não seja localhost); aplica as
-# migrations com `migrate deploy` e limpa as tabelas entre testes. O CI
-# (.github/workflows/ci.yml) roda lint, tsc, unitários e E2E com Postgres 16.
+# migrations com `migrate deploy` e limpa as tabelas entre testes. Sem
+# DATABASE_TEST_URL no comando vale o do .env.test; com ele, testes E migrations
+# vão para o banco pedido (dá para cada um rodar no seu banco).
+# O CI (.github/workflows/ci.yml) roda lint, tsc, unitários, "Schema × migrations"
+# (migrate deploy num banco vazio + `prisma migrate diff --exit-code` contra o
+# schema.prisma: qualquer diferença — migration faltando ou schema errado,
+# inclusive um DEFAULT que só existe no banco — deixa o CI vermelho) e E2E,
+# com Postgres 16. Mexeu no schema.prisma? A migration tem de levar o banco
+# exatamente ao schema.
 ```
 
 ## Observações importantes

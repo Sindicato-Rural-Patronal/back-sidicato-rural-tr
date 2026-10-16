@@ -2,8 +2,10 @@ import { execSync } from 'node:child_process';
 import { config } from 'dotenv';
 
 export async function setup() {
-    config({ path: '.env.test',
-override: true });
+    // Sem `override`: um DATABASE_TEST_URL passado no comando vale mais que o
+    // do .env.test, como no vitest.config.e2e.ts. Com override, os testes iam
+    // para o banco pedido e as migrations para o do .env.test.
+    config({ path: '.env.test' });
 
     const dbUrl = process.env.DATABASE_TEST_URL;
     if (!dbUrl) {

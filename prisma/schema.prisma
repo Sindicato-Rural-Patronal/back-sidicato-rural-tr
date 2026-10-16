@@ -85,7 +85,8 @@ model UserData {
   // Membership
   memberClassification String?
   // CAD/PRO do associado — até 5 por usuário (validado na aplicação).
-  cadPro           String[]
+  // DEFAULT '{}' vem da migração 20260911160000_cadpro_array.
+  cadPro           String[] @default([])
   familyIncome     String?
   memberType       String?
   boardPosition    String?
@@ -529,7 +530,8 @@ model FinanceRecurringTransaction {
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
   createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  // A migração 20260923100000 criou a coluna com DEFAULT CURRENT_TIMESTAMP.
+  updatedAt DateTime  @default(now()) @updatedAt
 
   @@index([active])
 }
@@ -545,7 +547,8 @@ model FinancePaymentMethod {
   isDeleted Boolean  @default(false)
   deletedAt DateTime?
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // A migração 20260923100000 criou a coluna com DEFAULT CURRENT_TIMESTAMP.
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 // Financeiro: fechamento/conferência mensal de um caixa. Guarda o saldo que o
