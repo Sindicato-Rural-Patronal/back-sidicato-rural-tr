@@ -42,7 +42,7 @@ export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaCli
         new UpdateInstructorUseCase(instructorRepository),
     );
     const deleteUserController = new DeleteUserController(
-        new DeleteUserDataUseCase(userRepository),
+        new DeleteUserDataUseCase(userRepository, userAdminRepository, ruleRepository),
         getAdminPermissions,
     );
     const getUserDetailController = new GetUserDetailController(
@@ -513,6 +513,9 @@ properties: { message: { type: 'string' } } },
             schema: {
                 tags: ['Users'],
                 summary: 'Delete worker user',
+                description: `Exclusão lógica. Leva junto login, convite não usado, inscrições ativas, escala de instrutor, Unimed, propriedades, relações, contato público e vínculos com empresas. Requer \`DELETE_USER\`.
+
+Se a pessoa tem login no painel, valem também as travas de excluir administrador: exige \`DELETE_USER_ADMIN\` (403), não a si mesmo (400), não quem tem permissões além das suas (403) e nunca o último administrador ativo (400).`,
                 security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
@@ -521,6 +524,7 @@ properties: { message: { type: 'string' } } },
                 },
                 response: {
                     204: { type: 'null' },
+                    400: errorResponse,
                     401: errorResponse,
                     403: errorResponse,
                     404: errorResponse,

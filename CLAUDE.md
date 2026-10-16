@@ -132,7 +132,7 @@ READ_AUDIT     UPDATE_AUDIT   (ver a trilha · configurar o tempo de guarda)
 | `GET` | `/admin/users` | `ListUsersUseCase` | `READ_USER` |
 | `GET` | `/admin/users/:id` | `GetUserDetailUseCase` | `READ_USER` |
 | `PATCH` | `/users/:id` | `UpdateUserDataUseCase` | `UPDATE_USER` |
-| `DELETE` | `/users/:id` | `DeleteUserDataUseCase` (soft; leva junto login, convite não usado, inscrições ativas, escala de instrutor, Unimed, propriedades, relações, contato público e vínculos com empresas) | `DELETE_USER` |
+| `DELETE` | `/users/:id` | `DeleteUserDataUseCase` (soft; leva junto login, convite não usado, inscrições ativas, escala de instrutor, Unimed, propriedades, relações, contato público e vínculos com empresas). Pessoa com login no painel: exige também `DELETE_USER_ADMIN` e passa pelas travas de excluir admin (`checkAdminRemoval`) | `DELETE_USER` |
 | `PUT` | `/admin/users/:id/address` | `UpsertUserAddressUseCase` | `UPDATE_USER` |
 | `GET` | `/admin/users/:id/relations` | `ListUserRelationsUseCase` | `READ_USER` |
 | `POST` | `/admin/users/:id/relations` | `AddUserRelationUseCase` | `UPDATE_USER` |
