@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FinanceRepository, FinanceSummary } from '../ports/external/finance-repository.js';
+import { parseQuery } from '../errors/validation.js';
 
 const querySchema = z.object({
     from: z.preprocess(v => (v === '' || v == null ? undefined : v), z.coerce.date().optional()),
@@ -10,7 +11,7 @@ export class FinanceSummaryUseCase {
     constructor(private readonly repo: FinanceRepository) {}
 
     async execute(query: unknown): Promise<FinanceSummary> {
-        const q = querySchema.parse(query ?? {});
+        const q = parseQuery(querySchema, query);
         const now = new Date();
         // Padrão: últimos 12 meses. UTC + aritmética por getTime() — consistente
         // com list/export, sem depender do fuso do servidor.

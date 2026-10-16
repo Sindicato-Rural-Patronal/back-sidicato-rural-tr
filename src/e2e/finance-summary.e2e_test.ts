@@ -255,7 +255,7 @@ describe('parâmetros', () => {
     // BUG (SR-017): o use case faz `querySchema.parse(query)` sem tratar o erro;
     // data que não é data estoura ZodError e a rota responde 500 em vez de 400.
     // Quando a correção entrar, troque `it.fails` por `it`.
-    it.fails('data inválida → 400', async () => {
+    it('data inválida → 400', async () => {
         const res = await app.inject({ method: 'GET',
 url: '/admin/finance/summary?from=ontem',
 headers: bearer(token) });

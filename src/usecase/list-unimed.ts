@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { UnimedRepository, UnimedWithUser } from '../ports/external/unimed-repository.js';
+import { parseQuery } from '../errors/validation.js';
 
 const querySchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
@@ -21,7 +22,7 @@ export class ListUnimedUseCase {
     constructor(private readonly repo: UnimedRepository) {}
 
     async execute(query: unknown): Promise<UnimedPage> {
-        const q = querySchema.parse(query ?? {});
+        const q = parseQuery(querySchema, query);
         const { items, total } = await this.repo.list({
             page: q.page,
             limit: q.limit,
