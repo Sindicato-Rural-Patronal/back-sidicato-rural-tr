@@ -186,6 +186,8 @@ READ_AUDIT     UPDATE_AUDIT   (ver a trilha · configurar o tempo de guarda)
 > `GET /admin/me` retorna `{ userId, userDataId, username, name, avatar, rulesId, ruleName, permissions[], dashboardPrefs }`.
 > `userId` = UserAdmin.id (igual ao JWT). `userDataId` = UserData.id vinculado.
 >
+> **Anti-escalonamento** (`usecase/admin-guards.ts`): as permissões não são hierárquicas, então "mais forte" = tem alguma permissão que o ator não tem (`exceedsActor`). Quem pede só cria, convida, edita ou exclui admin cuja regra (a atual **e** a nova) cabe nas suas permissões, e só edita regra que cabe nelas (mesmo só para renomear ou tirar permissões) → senão 403. Excluir admin — ou a pessoa dele, que leva o login junto — passa por `checkAdminRemoval`: não a si mesmo (400), não quem é mais forte (403), nunca o último admin ativo (400).
+>
 > **Preferências do Painel Geral** (`usecase/admin-preferences.ts`, coluna `UserAdmin.dashboardPrefs Json?`, migration `20260924090000_admin_dashboard_prefs`): `PATCH /admin/me/preferences` com `{ dashboardPrefs: {...} }`, self-service — o admin só mexe nas próprias (o id vem do token), sem permissão de gestão. O conteúdo é livre (o painel decide: cartões escondidos, ordem, filtro do calendário…) e **substitui o objeto inteiro**; precisa ser um objeto simples (null, array ou outro tipo → 400) de no máximo 4 KB em JSON (`MAX_PREFS_BYTES`). Responde `{ dashboardPrefs }` e o valor volta em `GET /admin/me` — `null` enquanto o admin nunca salvou (o painel cai no layout padrão).
 
 ### Contatos públicos (`public-contact-router.ts`, use cases em `usecase/public-contact-usecases.ts`)
@@ -674,7 +676,7 @@ const rule = await ruleRepository.findById(admin.rulesId);
 const canDo = rule.permissions.includes('CREATE_COURSE');
 ```
 
-No `CreateUserAdminUseCase`, o token é passado como `creatorToken` no request — o próprio use case faz a verificação de permissão.
+Nas rotas de gestão de admins e regras o controller passa as permissões de quem pede (`getAdminPermissions.execute(actorId)`) ao use case, que faz o anti-escalonamento (`usecase/admin-guards.ts`, ver Administradores).
 
 Para extrair o token do header no controller:
 ```ts

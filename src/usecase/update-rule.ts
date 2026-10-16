@@ -4,6 +4,7 @@ import { Permission } from '../generated/prisma/browser.js';
 import { ValidationError } from '../errors/validation.js';
 import { ForbiddenError } from '../errors/auth.js';
 import { RuleNotFoundError } from '../errors/not-found.js';
+import { exceedsActor } from './admin-guards.js';
 
 export const updateRuleRequestSchema = z.object({
     ruleId: z.string().min(1),
@@ -29,10 +30,13 @@ export class UpdateRuleUseCase {
             return { error: new RuleNotFoundError() };
         }
 
-        // Anti-escalonamento: não incluir na regra permissões além das do ator.
+        // Anti-escalonamento: não mexer em regra mais forte que a do ator (dava
+        // para esvaziar a SUPER_RULE), nem pôr nela permissões além das dele.
+        if (exceedsActor(rule.permissions as string[], actorPermissions)) {
+            return { error: new ForbiddenError('Você não pode alterar uma regra com permissões além das suas.') };
+        }
         if (request.permissions) {
-            const escalates = request.permissions.some(p => !actorPermissions.includes(p));
-            if (escalates) {
+            if (exceedsActor(request.permissions, actorPermissions)) {
                 return { error: new ForbiddenError('Você não pode conceder permissões além das suas.') };
             }
         }
