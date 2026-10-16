@@ -325,9 +325,9 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 ### Inscrições
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
-| `POST` | `/courses/:courseId/register` | `RegisterForCourseUseCase` | Pública |
-| `POST` | `/courses/:courseId/register-by-cpf` | `RegisterForCourseByCpfUseCase` | Pública |
-| `POST` | `/courses/:courseId/register-full` | `RegisterForCourseFullUseCase` (cria a pessoa com rg, nascimento e endereço como propriedade principal) | Pública |
+| `POST` | `/courses/:courseId/register` | `RegisterForCourseUseCase` | Pública (10/min por IP) |
+| `POST` | `/courses/:courseId/register-by-cpf` | `RegisterForCourseByCpfUseCase` | Pública (10/min por IP) |
+| `POST` | `/courses/:courseId/register-full` | `RegisterForCourseFullUseCase` (cria a pessoa com rg, nascimento e endereço como propriedade principal) | Pública (10/min por IP) |
 | `GET` | `/admin/courses/:courseId/registrations` | `ListCourseRegistrationsUseCase` (userData traz memberStatus, membershipValidUntil, boardPosition, `publicContact.title` e `companyMemberships` só de empresas parceiras ativas — selos do painel) | `READ_COURSE` |
 | `DELETE` | `/admin/registrations/:registrationId` | `CancelRegistrationUseCase` | `UPDATE_COURSE` |
 | `POST` | `/admin/courses/:courseId/registrations` | `AdminRegisterPersonUseCase` (`usecase/admin-course-registrations.ts`) — `{ userDataId }`; inscrição pela equipe, já confirmada; ignora prazo, status e fim do curso; só respeita a lotação (`createWithCapacity`). Já inscrita → 409 "Pessoa já inscrita neste curso"; lotado → 409; pessoa/curso inexistente → 404 | `UPDATE_COURSE` |
@@ -371,7 +371,7 @@ No painel, a unidade trocada só vai para o site no "Salvar cotações", junto c
 ### Contatos (Formulário público)
 | Método | Path | Use Case | Autenticação |
 |--------|------|----------|--------------|
-| `POST` | `/contacts/message` | `CreateContactMessageUseCase` | Pública |
+| `POST` | `/contacts/message` | `CreateContactMessageUseCase` | Pública (10/min por IP) |
 | `GET` | `/admin/contacts/messages` | `ListContactMessagesUseCase` | `READ_CONTACT` |
 | `PATCH` | `/admin/contacts/messages/:messageId` | `MarkContactMessageReadUseCase` (sempre marca como lida) | `UPDATE_CONTACT` |
 | `PATCH` | `/admin/contacts/messages/:messageId/unread` | `MarkContactMessageReadUseCase` com `read = false` — rota própria para a auditoria saber qual das duas foi | `UPDATE_CONTACT` |
@@ -660,6 +660,8 @@ O `StorageRepository` é instanciado via `createStorageAdapter()` (sem parâmetr
 ## Autenticação
 
 O JWT é gerado por `signAdminToken` (em `usecase/login-user-admin.ts`) com payload `{ userId, username, role, authTime }` e expiração de 8h (`ADMIN_TOKEN_TTL`); `authTime` = momento do login (segundos), preservado na renovação. `userId` no payload = `UserAdmin.id`. `POST /auth/refresh` (`RefreshAdminTokenUseCase`) troca um token ainda válido por um novo de 8h se o admin continua existindo (não excluído, com regra) e o login foi há no máximo 24h (`ADMIN_SESSION_MAX_SECONDS`; token sem `authTime` conta do `iat`); senão → 401. Login e refresh têm rate limit de 10 por 5 minutos, contado por IP de quem acessa (`trustProxy: 1` em `index.ts`: em produção a API só é acessível pelo proxy do Coolify). O painel renova sozinho enquanto está em uso.
+
+As rotas públicas que recebem CPF ou dados pessoais têm limite próprio por IP, com o mesmo mecanismo (`config.rateLimit` na rota, `http/lib/public-rate-limit.ts`): inscrição (`register`, `register-by-cpf`, `register-full`) e `POST /contacts/message` com 10 por minuto, `GET /users/lookup-cpf/:cpf` com 20 por minuto. Cada rota conta separado; o excesso responde 429 `{ error: "Muitas tentativas seguidas. Aguarde um minuto e tente de novo." }`. Sem isso só valia o global de 600/min. Os E2E só veem os limites com `createTestApp(prisma, { rateLimit: true })` — o app padrão deles fica sem o plugin.
 
 Para rotas protegidas, verificar o token e checar a permissão na `Rule` do admin:
 ```ts
