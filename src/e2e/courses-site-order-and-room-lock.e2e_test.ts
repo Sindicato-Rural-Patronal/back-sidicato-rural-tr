@@ -128,6 +128,29 @@ headers: bearer(token),
     });
 });
 
+describe('mensagens de validação em português', () => {
+    const post = (payload: Record<string, unknown>) => app.inject({ method: 'POST',
+url: '/courses',
+headers: bearer(token),
+payload });
+
+    it('descrição vazia e término antes do início', async () => {
+        const res = await post({ name: 'X',
+description: '',
+roomId,
+startTime: `${day(50)}T12:00:00.000Z`,
+endTime: `${day(50)}T08:00:00.000Z` });
+        expect(res.statusCode).toBe(400);
+        expect(JSON.parse(res.body).error).toBe('Informe a descrição do curso. O término do curso precisa ser depois do início.');
+    });
+
+    it('campo obrigatório que não veio (JSON schema) sai em português', async () => {
+        const res = await post({ name: 'X' });
+        expect(res.statusCode).toBe(400);
+        expect(JSON.parse(res.body).error).toMatch(/^Informe o campo "/);
+    });
+});
+
 describe('trava de sala ao gravar curso', () => {
     it('curso e reserva no mesmo horário, ao mesmo tempo: só um entra', async () => {
         const slot = { startTime: `${day(60)}T08:00:00.000Z`,

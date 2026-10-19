@@ -45,8 +45,8 @@ export class AddPropertyUseCase {
     async execute(request: AddPropertyRequest): Promise<AddPropertyResponse> {
         const { userDataId, name, registration, address } = request;
 
-        if (!name.trim()) return { error: new ValidationError('Property name is required') };
-        if (!address) return { error: new ValidationError('Address is required') };
+        if (!name.trim()) return { error: new ValidationError('Informe o nome da propriedade.') };
+        if (!address) return { error: new ValidationError('Informe o endereço da propriedade.') };
 
         const user = await this.userDataRepository.findById(userDataId);
         if (!user) return { error: new UserDataNotFoundError() };

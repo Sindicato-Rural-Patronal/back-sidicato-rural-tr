@@ -7,9 +7,9 @@ import { ROOM_NAMES, isRoomName, normalizeRoomName } from '../lib/room-names.js'
 export const roomNameMessage = `Escolha uma sala da lista: ${ROOM_NAMES.join(', ')}`;
 
 const createRoomRequestSchema = z.object({
-    name: z.string().min(1, 'Room name is required'),
-    description: z.string().min(1, 'Room description is required'),
-    maxCapacity: z.number().int().positive('Max capacity must be a positive integer'),
+    name: z.string().min(1, 'Informe o nome da sala.'),
+    description: z.string().min(1, 'Informe a descrição da sala.'),
+    maxCapacity: z.number().int().positive('A capacidade máxima precisa ser um número inteiro maior que zero.'),
 });
 
 type CreateRoomRequest = z.infer<typeof createRoomRequestSchema>;

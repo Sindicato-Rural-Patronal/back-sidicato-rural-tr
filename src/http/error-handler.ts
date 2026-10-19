@@ -1,4 +1,5 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
+import { validationMessage } from './validation-message.js';
 import { isPrismaUniqueViolation, isPrismaFkViolation } from '../lib/prisma-errors.js';
 
 // Rede de segurança para erros não tratados: mapeia P2002 (unicidade) para 409
@@ -12,7 +13,7 @@ statusCode?: number
     reply: FastifyReply,
 ) {
     if (error.validation) {
-        return reply.status(400).send({ error: error.message });
+        return reply.status(400).send({ error: validationMessage(error.validation, 'Dados inválidos.') });
     }
     if (isPrismaUniqueViolation(error)) {
         return reply.status(409).send({ error: 'Registro já existe (dados únicos em conflito).' });

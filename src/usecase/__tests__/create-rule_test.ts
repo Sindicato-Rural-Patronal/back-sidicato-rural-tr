@@ -23,7 +23,7 @@ describe('CreateRuleUseCase', () => {
             const result = await uc.execute({ ...validInput,
 name: '' });
             expect(result.error).toBeDefined();
-            expect(result.error?.message).toContain('Rule name is required');
+            expect(result.error?.message).toContain('Informe o nome da regra.');
         });
 
         it('falha se array de permissões estiver vazio', async () => {
@@ -31,7 +31,7 @@ name: '' });
             const result = await uc.execute({ ...validInput,
 permissions: [] });
             expect(result.error).toBeDefined();
-            expect(result.error?.message).toContain('At least one permission is required');
+            expect(result.error?.message).toContain('Escolha ao menos uma permissão.');
         });
 
         it('falha se permissão inválida for passada', async () => {

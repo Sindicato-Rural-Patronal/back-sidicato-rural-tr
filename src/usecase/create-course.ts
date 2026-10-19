@@ -14,8 +14,8 @@ const createCourseRequestSchema = z.object({
     // Titulo em branco e permitido: vira o nome generico. Cadastro de curso
     // costuma comecar pela sala e pelas datas, para reservar a agenda.
     name: z.preprocess(v => nomeDoCurso(typeof v === 'string' ? v : null), z.string().min(1)),
-    description: z.string().min(1, 'Course description is required'),
-    roomId: z.uuid('Room ID must be a valid UUID'),
+    description: z.string().min(1, 'Informe a descrição do curso.'),
+    roomId: z.uuid('Escolha uma sala válida.'),
     startTime: z.iso.datetime(),
     endTime: z.iso.datetime(),
     status: z.enum(['PUBLIC', 'PRIVATE', 'UNPUBLISHED'] as const).default('UNPUBLISHED'),
@@ -47,7 +47,7 @@ export class CreateCourseUseCase {
         const validation = createCourseRequestSchema.safeParse(request);
         if (!validation.success) {
             return {
-                error: new ValidationError(validation.error.issues.map(e => e.message).join(', ')),
+                error: new ValidationError(validation.error.issues.map(e => e.message).join(' ')),
             };
         }
 

@@ -17,7 +17,7 @@ export class UploadNewsBannerController {
             return;
         const { newsId } = request.params;
         const data = await request.file();
-        if (!data) return reply.status(400).send({ error: 'No file provided' });
+        if (!data) return reply.status(400).send({ error: 'Nenhum arquivo enviado.' });
         const buffer = await data.toBuffer();
         const response = await this.uploadNewsBannerUseCase.execute(newsId, buffer, data.mimetype);
         if (response.error) return reply.status(errorToStatus(response.error)).send({ error: response.error.message });

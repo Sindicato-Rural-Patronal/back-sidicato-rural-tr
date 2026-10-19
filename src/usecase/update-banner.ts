@@ -16,7 +16,7 @@ const schema = z
     })
     .refine(
         d => !(d.startDate && d.endDate && d.startDate >= d.endDate),
-        { message: 'startDate must be before endDate' },
+        { message: 'A data de início precisa ser antes da data de término.' },
     );
 
 type Response = {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { COURSE_END_BEFORE_START, CreateCourseUseCase } from '../create-course.js';
 import type { CourseRepository } from '../../ports/external/course-repository.js';
 import type { RoomRepository } from '../../ports/external/room-repository.js';
+import '../../lib/zod-config.js';
 import { CURSO_SEM_NOME } from '../../lib/course-name.js';
 
 // Reunião que já ocupa a sala (curso e reservas dividem a agenda).
@@ -62,6 +63,24 @@ name: '   ' });
 roomId: 'nao-e-uuid' });
             expect(result.error).toBeDefined();
             expect(result.error).toBeDefined();
+        });
+    });
+
+    describe('mensagens em português', () => {
+        it.each([
+            ['descrição vazia', { description: '' }, 'Informe a descrição do curso.'],
+            ['sala que não é UUID', { roomId: 'nao-e-uuid' }, 'Escolha uma sala válida.'],
+        ])('%s', async (_caso, over, message) => {
+            const result = await new CreateCourseUseCase(mockCourseRepo, mockRoomRepo).execute({ ...validInput,
+...over });
+            expect(result.error?.name).toBe('ValidationError');
+            expect(result.error?.message).toBe(message);
+        });
+
+        it('campo que não veio sai em português, sem "undefined"', async () => {
+            const { description: _omit, ...semDescricao } = validInput;
+            const result = await new CreateCourseUseCase(mockCourseRepo, mockRoomRepo).execute(semDescricao as never);
+            expect(result.error?.message).toBe('Informe o campo description.');
         });
     });
 

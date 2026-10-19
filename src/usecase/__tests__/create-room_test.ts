@@ -31,7 +31,7 @@ describe('CreateRoomUseCase', () => {
             const result = await uc.execute({ ...validInput,
 name: '' });
             expect(result.error).toBeDefined();
-            expect(result.error?.message).toContain('Room name is required');
+            expect(result.error?.message).toContain('Informe o nome da sala.');
         });
 
         it('falha se descrição estiver vazia', async () => {
@@ -39,7 +39,7 @@ name: '' });
             const result = await uc.execute({ ...validInput,
 description: '' });
             expect(result.error).toBeDefined();
-            expect(result.error?.message).toContain('Room description is required');
+            expect(result.error?.message).toContain('Informe a descrição da sala.');
         });
 
         it('falha se capacidade máxima for zero', async () => {
@@ -47,7 +47,7 @@ description: '' });
             const result = await uc.execute({ ...validInput,
 maxCapacity: 0 });
             expect(result.error).toBeDefined();
-            expect(result.error?.message).toContain('Max capacity must be a positive integer');
+            expect(result.error?.message).toContain('A capacidade máxima precisa ser um número inteiro maior que zero.');
         });
 
         it('falha se capacidade máxima for negativa', async () => {

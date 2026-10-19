@@ -25,7 +25,7 @@ describe('CreateNewsUseCase', () => {
             const result = await uc.execute({ ...validInput,
 title: '' });
             expect(result.error).toBeDefined();
-            expect(result.error?.message).toContain('Title is required');
+            expect(result.error?.message).toContain('Informe o título da notícia.');
         });
 
         it('falha se conteúdo estiver vazio', async () => {
@@ -33,7 +33,7 @@ title: '' });
             const result = await uc.execute({ ...validInput,
 content: '' });
             expect(result.error).toBeDefined();
-            expect(result.error?.message).toContain('Content is required');
+            expect(result.error?.message).toContain('Informe o conteúdo da notícia.');
         });
     });
 

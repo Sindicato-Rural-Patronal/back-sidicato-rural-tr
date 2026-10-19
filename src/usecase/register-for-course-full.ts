@@ -72,7 +72,7 @@ export class RegisterForCourseFullUseCase {
     async execute(request: Request): Promise<Response> {
         const parsed = schema.safeParse(request);
         if (!parsed.success) {
-            return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid data') };
+            return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Dados inválidos.') };
         }
         const { courseId, name, phone, email, cpf, rg, birthDate, address } = parsed.data;
 

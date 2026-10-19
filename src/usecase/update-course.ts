@@ -45,7 +45,7 @@ export class UpdateCourseUseCase {
         const validation = updateCourseBodySchema.safeParse(body);
         if (!validation.success) {
             return {
-                error: new ValidationError(validation.error.issues.map(e => e.message).join(', ')),
+                error: new ValidationError(validation.error.issues.map(e => e.message).join(' ')),
             };
         }
 

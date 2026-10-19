@@ -5,8 +5,8 @@ import { ValidationError } from '../errors/validation.js';
 import { ForbiddenError } from '../errors/auth.js';
 
 export const createRuleRequestSchema = z.object({
-    name: z.string().min(1, 'Rule name is required'),
-    permissions: z.array(z.enum(Permission)).min(1, 'At least one permission is required'),
+    name: z.string().min(1, 'Informe o nome da regra.'),
+    permissions: z.array(z.enum(Permission)).min(1, 'Escolha ao menos uma permissão.'),
     description: z.string().optional(),
 });
 export type CreateRuleRequest = z.infer<typeof createRuleRequestSchema>;
