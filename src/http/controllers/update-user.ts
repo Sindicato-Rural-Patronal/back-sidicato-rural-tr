@@ -1,8 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { UpdateUserDataUseCase, UpdateUserDataRequest } from '../../usecase/update-user-data.js';
 import type { UpdateInstructorUseCase } from '../../usecase/update-instructor.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
 import { InstructorNotFoundError } from '../../errors/not-found.js';
 
 type InstructorFields = {
@@ -17,7 +16,6 @@ type Body = Omit<UpdateUserDataRequest, 'userId'> & InstructorFields;
 export class UpdateUserController {
     constructor(
         private readonly useCase: UpdateUserDataUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
         private readonly updateInstructorUseCase?: UpdateInstructorUseCase,
     ) {}
 
@@ -28,12 +26,6 @@ export class UpdateUserController {
         }>,
         reply: FastifyReply,
     ) {
-        if (
-            (await requirePermission(request, reply, 'UPDATE_USER', this.getAdminPermissions)) ===
-            null
-        )
-            return;
-
         const { id } = request.params;
         const { bio, linkedin, instagram, facebook, ...userBody } = request.body;
 

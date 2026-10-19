@@ -1,14 +1,12 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { UploadAvatarUseCase } from '../../usecase/upload-avatar.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import type { UserAdminRepository } from '../../ports/external/user-admin-repository.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
 import { adminOf } from '../lib/route-auth.js';
 
 export class UploadAvatarController {
     constructor(
         private readonly uploadAvatarUseCase: UploadAvatarUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
         private readonly userAdminRepository: UserAdminRepository,
     ) {}
 
@@ -31,7 +29,6 @@ originalName: data.filename };
     }
 
     async handle(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'UPDATE_USER', this.getAdminPermissions)) === null) return;
         const parsed = await this.readFile(request, reply);
         if (!parsed) return;
 

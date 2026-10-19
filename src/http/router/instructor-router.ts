@@ -3,9 +3,6 @@ import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createInstructorAdapter } from '../../adapter/database/instructor-adapter.js';
 import { createUserDataAdapter } from '../../adapter/database/user-data.js';
 import { createCourseAdapter } from '../../adapter/database/course-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { PromoteToInstructorUseCase } from '../../usecase/promote-to-instructor.js';
 import { DemoteInstructorUseCase } from '../../usecase/demote-instructor.js';
 import { ListInstructorsUseCase } from '../../usecase/list-instructors.js';
@@ -19,41 +16,34 @@ import { RemoveInstructorFromCourseController } from '../controllers/remove-inst
 import { UpdateInstructorController } from '../controllers/update-instructor.js';
 import { UpdateInstructorUseCase } from '../../usecase/update-instructor.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
+import { requires } from '../lib/route-auth.js';
 
 export async function instructorRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const instructorRepository = createInstructorAdapter(prisma);
     const userDataRepository = createUserDataAdapter(prisma);
     const courseRepository = createCourseAdapter(prisma);
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const promoteController = new PromoteToInstructorController(
         new PromoteToInstructorUseCase(instructorRepository, userDataRepository),
-        getAdminPermissions,
     );
     const demoteController = new DemoteInstructorController(
         new DemoteInstructorUseCase(instructorRepository),
-        getAdminPermissions,
     );
     const listController = new ListInstructorsController(
         new ListInstructorsUseCase(instructorRepository),
-        getAdminPermissions,
     );
     const addToCourseController = new AddInstructorToCourseController(
         new AddInstructorToCourseUseCase(instructorRepository, courseRepository),
-        getAdminPermissions,
     );
     const removeFromCourseController = new RemoveInstructorFromCourseController(
         new RemoveInstructorFromCourseUseCase(instructorRepository),
-        getAdminPermissions,
     );
     const updateInstructorController = new UpdateInstructorController(
         new UpdateInstructorUseCase(instructorRepository),
-        getAdminPermissions,
     );
 
     fastify.post('/admin/users/:id/instructor', {
+        config: { auth: requires('UPDATE_USER') },
         schema: {
             tags: ['Instrutores'],
             summary: 'Promover usuário a instrutor',
@@ -93,6 +83,7 @@ properties: { instructorId: { type: 'string' } } },
     }, (req, res) => promoteController.handle(req as never, res));
 
     fastify.delete('/admin/users/:id/instructor', {
+        config: { auth: requires('UPDATE_USER') },
         schema: {
             tags: ['Instrutores'],
             summary: 'Remover status de instrutor',
@@ -113,6 +104,7 @@ example: '550e8400-e29b-41d4-a716-446655440000' } },
     }, (req, res) => demoteController.handle(req as never, res));
 
     fastify.patch('/admin/users/:id/instructor', {
+        config: { auth: requires('UPDATE_USER') },
         schema: {
             tags: ['Instrutores'],
             summary: 'Atualizar dados do instrutor',
@@ -152,6 +144,7 @@ properties: { message: { type: 'string' } } },
     }, (req, res) => updateInstructorController.handle(req as never, res));
 
     fastify.get('/admin/instructors', {
+        config: { auth: requires('READ_USER') },
         schema: {
             tags: ['Instrutores'],
             summary: 'Listar todos os instrutores',
@@ -186,6 +179,7 @@ nullable: true },
     }, (req, res) => listController.handle(req as Parameters<typeof listController.handle>[0], res));
 
     fastify.post('/admin/courses/:courseId/instructors', {
+        config: { auth: requires('UPDATE_COURSE') },
         schema: {
             tags: ['Instrutores'],
             summary: 'Vincular instrutor a curso',
@@ -221,6 +215,7 @@ properties: { assignmentId: { type: 'string' } } },
     }, (req, res) => addToCourseController.handle(req as never, res));
 
     fastify.delete('/admin/courses/:courseId/instructors/:assignmentId', {
+        config: { auth: requires('UPDATE_COURSE') },
         schema: {
             tags: ['Instrutores'],
             summary: 'Desvincular instrutor de curso',

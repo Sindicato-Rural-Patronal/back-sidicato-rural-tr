@@ -3,8 +3,6 @@ import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createUserDataAdapter } from '../../adapter/database/user-data.js';
 import { createPropertyAdapter } from '../../adapter/database/property-adapter.js';
 import { createAddressAdapter } from '../../adapter/database/address-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { AddPropertyUseCase } from '../../usecase/add-property.js';
 import { UpdatePropertyUseCase } from '../../usecase/update-property.js';
 import { DeletePropertyUseCase } from '../../usecase/delete-property.js';
@@ -13,8 +11,8 @@ import { AddPropertyController } from '../controllers/add-property.js';
 import { UpdatePropertyController } from '../controllers/update-property.js';
 import { DeletePropertyController } from '../controllers/delete-property.js';
 import { ListUserPropertiesController } from '../controllers/list-user-properties.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
+import { requires } from '../lib/route-auth.js';
 
 // Campos do endereço aceitos no corpo (criar e editar usam os mesmos).
 const addressBodyProperties = {
@@ -73,30 +71,24 @@ export async function userPropertyRouter(fastify: FastifyInstance, prisma: Prism
     const userDataRepository = createUserDataAdapter(prisma);
     const propertyRepository = createPropertyAdapter(prisma);
     const addressRepository = createAddressAdapter(prisma);
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const listUserPropertiesController = new ListUserPropertiesController(
         new ListUserPropertiesUseCase(propertyRepository),
-        getAdminPermissions,
     );
     const addPropertyController = new AddPropertyController(
         new AddPropertyUseCase(userDataRepository, propertyRepository, addressRepository),
-        getAdminPermissions,
     );
     const updatePropertyController = new UpdatePropertyController(
         new UpdatePropertyUseCase(propertyRepository, addressRepository),
-        getAdminPermissions,
     );
     const deletePropertyController = new DeletePropertyController(
         new DeletePropertyUseCase(propertyRepository),
-        getAdminPermissions,
     );
 
     fastify.get(
         '/admin/users/:id/properties',
         {
+            config: { auth: requires('READ_USER') },
             schema: {
                 tags: ['Admin — Properties'],
                 summary: 'List properties of a worker',
@@ -166,6 +158,7 @@ nullable: true },
     fastify.post(
         '/admin/users/:id/properties',
         {
+            config: { auth: requires('UPDATE_USER') },
             schema: {
                 tags: ['Admin — Properties'],
                 summary: 'Add a property (rural land) to a worker',
@@ -239,6 +232,7 @@ properties: { id: { type: 'string' } } },
     fastify.patch(
         '/admin/users/:id/properties/:propertyId',
         {
+            config: { auth: requires('UPDATE_USER') },
             schema: {
                 tags: ['Admin — Properties'],
                 summary: 'Update a property (rural land) of a worker',
@@ -284,6 +278,7 @@ properties: addressBodyProperties },
     fastify.delete(
         '/admin/users/:id/properties/:propertyId',
         {
+            config: { auth: requires('UPDATE_USER') },
             schema: {
                 tags: ['Admin — Properties'],
                 summary: 'Delete a property from a worker',

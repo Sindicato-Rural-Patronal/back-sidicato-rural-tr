@@ -1,12 +1,10 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { DeleteUserRelationUseCase } from '../../usecase/delete-user-relation.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
 
 export class DeleteUserRelationController {
     constructor(
         private readonly useCase: DeleteUserRelationUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(
@@ -18,12 +16,6 @@ export class DeleteUserRelationController {
         }>,
         reply: FastifyReply,
     ) {
-        if (
-            (await requirePermission(request, reply, 'UPDATE_USER', this.getAdminPermissions)) ===
-            null
-        )
-            return;
-
         const { id: userId, relationId } = request.params;
         const result = await this.useCase.execute(relationId, userId);
         if (result.error) {

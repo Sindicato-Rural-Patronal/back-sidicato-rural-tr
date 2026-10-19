@@ -1,16 +1,14 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createUserMergeAdapter } from '../../adapter/database/user-merge-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import {
     ComparePeopleForMergeUseCase,
     ListDuplicatePeopleUseCase,
     MergeUsersUseCase,
 } from '../../usecase/merge-users.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { requires } from '../lib/route-auth.js';
 
 const str = { type: 'string' };
 const nstr = { type: 'string',
@@ -47,12 +45,9 @@ export async function userMergeRouter(fastify: FastifyInstance, prisma: PrismaCl
     const duplicates = new ListDuplicatePeopleUseCase(repo);
     const compare = new ComparePeopleForMergeUseCase(repo);
     const merge = new MergeUsersUseCase(repo);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(
-        createUserAdminAdapter(prisma),
-        createRuleAdapter(prisma),
-    );
 
     fastify.get('/admin/users/duplicates', {
+        config: { auth: requires('READ_USER') },
         schema: {
             tags,
             summary: 'Possíveis cadastros duplicados',
@@ -90,11 +85,11 @@ items: duplicatePerson },
             },
         },
     }, async (req: FastifyRequest<{ Querystring: { limit?: number } }>, reply: FastifyReply) => {
-        if ((await requirePermission(req, reply, 'READ_USER', getAdminPermissions)) === null) return;
         return reply.send(await duplicates.execute({ limit: req.query.limit }));
     });
 
     fastify.get('/admin/users/merge-preview', {
+        config: { auth: requires('READ_USER') },
         schema: {
             tags,
             summary: 'Comparar dois cadastros antes de juntar',
@@ -117,13 +112,13 @@ items: duplicatePerson } } },
             },
         },
     }, async (req: FastifyRequest<{ Querystring: { ids?: string } }>, reply: FastifyReply) => {
-        if ((await requirePermission(req, reply, 'READ_USER', getAdminPermissions)) === null) return;
         const r = await compare.execute((req.query.ids ?? '').split(','));
         if (r.error) return reply.status(errorToStatus(r.error)).send({ error: r.error.message });
         return reply.send({ people: r.people });
     });
 
     fastify.post('/admin/users/merge', {
+        config: { auth: requires('DELETE_USER', 'UPDATE_USER') },
         schema: {
             tags,
             summary: 'Juntar dois cadastros da mesma pessoa',
@@ -172,8 +167,6 @@ removeId?: string
         reply: FastifyReply,
     ) => {
         // Junta dois cadastros e exclui um: exige as duas permissões.
-        if ((await requirePermission(req, reply, 'DELETE_USER', getAdminPermissions)) === null) return;
-        if ((await requirePermission(req, reply, 'UPDATE_USER', getAdminPermissions)) === null) return;
         const r = await merge.execute(req.body);
         if (r.error) return reply.status(errorToStatus(r.error)).send({ error: r.error.message });
         return reply.send(r.result);

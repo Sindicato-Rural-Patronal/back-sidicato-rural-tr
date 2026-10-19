@@ -1,21 +1,13 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { ListUsersUseCase } from '../../usecase/list-users.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission } from '../lib/require-permission.js';
 import type { UserListFilters } from '../../ports/external/user-data-repository.js';
 
 export class ListUsersController {
     constructor(
         private readonly useCase: ListUsersUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(request: FastifyRequest, reply: FastifyReply) {
-        if (
-            (await requirePermission(request, reply, 'READ_USER', this.getAdminPermissions)) ===
-            null
-        )
-            return;
         // Genero, etnia e escolaridade sao colunas enum no banco. O schema da
         // rota (user-data-router.ts) ja recusa valor fora da lista antes de
         // chegar aqui, entao a query pode ser lida com os tipos do enum.

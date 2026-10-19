@@ -1,7 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { AddUserRelationUseCase } from '../../usecase/add-user-relation.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
 
 type Body = {
     targetId: string;
@@ -11,7 +10,6 @@ type Body = {
 export class AddUserRelationController {
     constructor(
         private readonly useCase: AddUserRelationUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(
@@ -21,12 +19,6 @@ export class AddUserRelationController {
         }>,
         reply: FastifyReply,
     ) {
-        if (
-            (await requirePermission(request, reply, 'UPDATE_USER', this.getAdminPermissions)) ===
-            null
-        )
-            return;
-
         const { id } = request.params;
         const { targetId, label } = request.body;
         const result = await this.useCase.execute(id, targetId, label);

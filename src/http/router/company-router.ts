@@ -4,10 +4,7 @@ import { createCompanyAdapter } from '../../adapter/database/company-adapter.js'
 import { createUserDataAdapter } from '../../adapter/database/user-data.js';
 import { createPropertyAdapter } from '../../adapter/database/property-adapter.js';
 import { createAddressAdapter } from '../../adapter/database/address-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createStorageAdapter } from '../../adapter/storage/factory.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import {
     ListCompaniesUseCase,
     GetCompanyUseCase,
@@ -27,7 +24,7 @@ import { UpdatePropertyUseCase } from '../../usecase/update-property.js';
 import { UploadCompanyPartnerLogoUseCase } from '../../usecase/upload-company-partner-logo.js';
 import { CompanyController } from '../controllers/company-controller.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
-import { publicRoute } from '../lib/route-auth.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 // ── Schemas (Swagger + serialização) ─────────────────────────────────────────
 // fast-json-stringify descarta campos não declarados: tudo que sai está listado.
@@ -202,7 +199,6 @@ export async function companyRouter(fastify: FastifyInstance, prisma: PrismaClie
             listPartners: new ListPartnersUseCase(repo),
             reorderPartners: new ReorderPartnersUseCase(repo),
         },
-        new GetAdminPermissionsUseCase(createUserAdminAdapter(prisma), createRuleAdapter(prisma)),
     );
 
     type Id = FastifyRequest<{ Params: { id: string } }>;
@@ -220,6 +216,7 @@ propertyId: string
 }>;
 
     fastify.get('/admin/companies', {
+        config: { auth: requires('READ_USER') },
         schema: {
             tags,
 summary: 'Listar empresas',
@@ -251,6 +248,7 @@ membersCount: { type: 'integer' } } }),
 
     // Antes de /:id para não ser capturada como id.
     fastify.get('/admin/companies/titles', {
+        config: { auth: requires('READ_USER') },
         schema: {
             tags,
 summary: 'Títulos já usados nos vínculos (sugestões)',
@@ -263,6 +261,7 @@ items: str },
     }, (req: FastifyRequest, res: FastifyReply) => controller.titles(req, res));
 
     fastify.get('/admin/companies/:id', {
+        config: { auth: requires('READ_USER') },
         schema: { tags,
 summary: 'Detalhe da empresa (pessoas e propriedades)',
 security: sec,
@@ -272,6 +271,7 @@ response: { 200: companyDetail,
     }, (req: Id, res: FastifyReply) => controller.get(req, res));
 
     fastify.post('/admin/companies', {
+        config: { auth: requires('CREATE_USER') },
         schema: {
             tags,
 summary: 'Criar empresa',
@@ -285,6 +285,7 @@ required: ['name'] },
     }, (req: FastifyRequest, res: FastifyReply) => controller.create(req, res));
 
     fastify.patch('/admin/companies/:id', {
+        config: { auth: requires('UPDATE_USER') },
         schema: {
             tags,
 summary: 'Atualizar empresa',
@@ -298,6 +299,7 @@ body: companyBody,
     }, (req: Id, res: FastifyReply) => controller.update(req, res));
 
     fastify.delete('/admin/companies/:id', {
+        config: { auth: requires('DELETE_USER') },
         schema: { tags,
 summary: 'Excluir empresa (lógica)',
 security: sec,
@@ -307,6 +309,7 @@ response: { 204: { type: 'null' },
     }, (req: Id, res: FastifyReply) => controller.remove(req, res));
 
     fastify.post('/admin/companies/:id/members', {
+        config: { auth: requires('UPDATE_USER') },
         schema: {
             tags,
 summary: 'Vincular pessoa à empresa com um título',
@@ -326,6 +329,7 @@ example: 'SÓCIO' } },
     }, (req: Id, res: FastifyReply) => controller.addMember(req, res));
 
     fastify.patch('/admin/companies/:id/members/:memberId', {
+        config: { auth: requires('UPDATE_USER') },
         schema: {
             tags,
 summary: 'Alterar o título do vínculo',
@@ -343,6 +347,7 @@ properties: { title: str } },
     }, (req: Member, res: FastifyReply) => controller.updateMember(req, res));
 
     fastify.delete('/admin/companies/:id/members/:memberId', {
+        config: { auth: requires('UPDATE_USER') },
         schema: {
             tags,
 summary: 'Desvincular pessoa',
@@ -357,6 +362,7 @@ memberId: str } },
     }, (req: Member, res: FastifyReply) => controller.removeMember(req, res));
 
     fastify.post('/admin/companies/:id/properties', {
+        config: { auth: requires('UPDATE_USER') },
         schema: {
             tags,
 summary: 'Adicionar propriedade/endereço à empresa',
@@ -377,6 +383,7 @@ properties: { id: str } },
     }, (req: Id, res: FastifyReply) => controller.addProperty(req, res));
 
     fastify.patch('/admin/companies/:id/properties/:propertyId', {
+        config: { auth: requires('UPDATE_USER') },
         schema: {
             tags,
 summary: 'Editar propriedade/endereço da empresa',
@@ -399,6 +406,7 @@ additionalProperties: true } },
     }, (req: Prop, res: FastifyReply) => controller.updateProperty(req, res));
 
     fastify.delete('/admin/companies/:id/properties/:propertyId', {
+        config: { auth: requires('UPDATE_USER') },
         schema: {
             tags,
 summary: 'Remover propriedade/endereço da empresa',
@@ -413,6 +421,7 @@ propertyId: str } },
     }, (req: Prop, res: FastifyReply) => controller.removeProperty(req, res));
 
     fastify.post('/admin/companies/:id/partner-logo', {
+        config: { auth: requires('UPDATE_USER') },
         schema: {
             tags,
 summary: 'Upload do logo de parceiro (300×150, PNG)',
@@ -446,6 +455,7 @@ partnerUrl: nstr } },
     }, (req: FastifyRequest, res: FastifyReply) => controller.listPartners(req, res));
 
     fastify.patch('/admin/partners/reorder', {
+        config: { auth: requires('UPDATE_USER') },
         schema: {
             tags: ['Parceiros'],
 summary: 'Reordenar empresas parceiras',

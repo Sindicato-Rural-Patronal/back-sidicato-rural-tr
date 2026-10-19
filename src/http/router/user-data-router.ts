@@ -11,7 +11,6 @@ import { UpdateUserController } from '../controllers/update-user.js';
 import { UpdateUserDataUseCase } from '../../usecase/update-user-data.js';
 import { DeleteUserController } from '../controllers/delete-user.js';
 import { DeleteUserDataUseCase } from '../../usecase/delete-user-data.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { GetUserDetailController } from '../controllers/get-user-detail.js';
 import { GetUserDetailUseCase } from '../../usecase/get-user-detail.js';
 import { UploadAvatarController } from '../controllers/upload-avatar.js';
@@ -20,45 +19,39 @@ import { createStorageAdapter } from '../../adapter/storage/factory.js';
 import { createInstructorAdapter } from '../../adapter/database/instructor-adapter.js';
 import { UpdateInstructorUseCase } from '../../usecase/update-instructor.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
-import { loggedIn } from '../lib/route-auth.js';
+import { loggedIn, requires } from '../lib/route-auth.js';
 
 export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userRepository = createUserDataAdapter(prisma);
     const userAdminRepository = createUserAdminAdapter(prisma);
     const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
     const instructorRepository = createInstructorAdapter(prisma);
 
     const createUserController = new CreateUserController(
         new CreateUserUseCase(userRepository),
-        getAdminPermissions,
     );
     const listUsersController = new ListUsersController(
         new ListUsersUseCase(userRepository),
-        getAdminPermissions,
     );
     const updateUserController = new UpdateUserController(
         new UpdateUserDataUseCase(userRepository),
-        getAdminPermissions,
         new UpdateInstructorUseCase(instructorRepository),
     );
     const deleteUserController = new DeleteUserController(
         new DeleteUserDataUseCase(userRepository, userAdminRepository, ruleRepository),
-        getAdminPermissions,
     );
     const getUserDetailController = new GetUserDetailController(
         new GetUserDetailUseCase(userRepository),
-        getAdminPermissions,
     );
     const uploadAvatarController = new UploadAvatarController(
         new UploadAvatarUseCase(createStorageAdapter(), userRepository),
-        getAdminPermissions,
         userAdminRepository,
     );
 
     fastify.get(
         '/admin/users',
         {
+            config: { auth: requires('READ_USER') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'List workers (internal)',
@@ -133,6 +126,7 @@ nullable: true },
     fastify.get(
         '/admin/users/:id',
         {
+            config: { auth: requires('READ_USER') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'Get worker detail with relations and properties',
@@ -336,6 +330,7 @@ nullable: true },
     fastify.post(
         '/users',
         {
+            config: { auth: requires('CREATE_USER') },
             schema: {
                 tags: ['Users'],
                 summary: 'Create worker user',
@@ -400,6 +395,7 @@ format: 'date-time' },
     fastify.patch(
         '/users/:id',
         {
+            config: { auth: requires('UPDATE_USER') },
             schema: {
                 tags: ['Users'],
                 summary: 'Update worker user',
@@ -511,6 +507,7 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/users/:id',
         {
+            config: { auth: requires('DELETE_USER') },
             schema: {
                 tags: ['Users'],
                 summary: 'Delete worker user',
@@ -542,6 +539,7 @@ Se a pessoa tem login no painel, valem também as travas de excluir administrado
     fastify.post(
         '/admin/users/:id/avatar',
         {
+            config: { auth: requires('UPDATE_USER') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'Upload avatar for a worker',
