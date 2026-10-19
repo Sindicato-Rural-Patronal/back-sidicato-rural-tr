@@ -5,9 +5,9 @@ import { createTestApp } from './helpers/create-test-app.js';
 import { createTestPrisma, cleanDatabase } from './helpers/db.js';
 
 // Vagas com inscrições chegando ao mesmo tempo, contra o Postgres de verdade:
-// `register` e `register-by-cpf` contam e inserem numa transação Serializable
-// (`RegistrationAdapter.createWithCapacity`). O `register-full` tem caminho
-// próprio e fica para quando a SR-016 terminar.
+// `register-by-cpf` conta e insere com as vagas travadas
+// (`RegistrationAdapter.createWithCapacity`), e o `register-full` faz o mesmo
+// na própria transação (`lockCourseSeats`).
 
 let app: FastifyInstance;
 let prisma: PrismaClient;
@@ -42,7 +42,7 @@ maxCapacity: seats } });
     });
 }
 
-type Rota = 'register' | 'register-by-cpf';
+type Rota = 'register-full' | 'register-by-cpf';
 
 /** Dispara `requests` inscrições ao mesmo tempo num curso de `seats` vagas. */
 async function burst(rota: Rota, seats: number, requests: number) {
@@ -58,7 +58,7 @@ cpf })) });
             app.inject({
                 method: 'POST',
                 url: `/courses/${course.id}/${rota}`,
-                payload: rota === 'register' ? { name: `INSCRITO ${i}`,
+                payload: rota === 'register-full' ? { name: `INSCRITO ${i}`,
 phone: '44990000001',
 cpf } : { cpf,
 phoneEnd: '0001' },
@@ -84,7 +84,7 @@ afterAll(async () => {
     await prisma.$disconnect();
 });
 
-describe.each<Rota>(['register', 'register-by-cpf'])('POST /courses/:id/%s ao mesmo tempo', rota => {
+describe.each<Rota>(['register-full', 'register-by-cpf'])('POST /courses/:id/%s ao mesmo tempo', rota => {
     it('nunca passa da lotação: 8 pedidos para 3 vagas', async () => {
         const { responses, active } = await burst(rota, 3, 8);
         expect(active).toBeLessThanOrEqual(3);

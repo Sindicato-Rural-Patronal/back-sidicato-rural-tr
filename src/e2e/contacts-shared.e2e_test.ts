@@ -159,7 +159,7 @@ cpf: '11144477735' },
         // Mesmo telefone e e-mail da família Silva, CPF diferente: pessoa nova.
         const res = await app.inject({
             method: 'POST',
-            url: `/courses/${courseId}/register`,
+            url: `/courses/${courseId}/register-full`,
             payload: { name: 'JOAO SILVA FILHO',
 email: '',
 phone: '44933330001',

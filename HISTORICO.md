@@ -2,7 +2,11 @@
 
 O que mudou e por quê. As regras que valem hoje estão no `CLAUDE.md`. Este arquivo serve para entender de onde veio uma regra ou um dado estranho no banco. As entradas mais novas ficam no topo.
 
-## 19/10/2026: SR-025
+## 19/10/2026: SR-023 e SR-025
+
+- **Rotas fechadas pela decisão 001 (SR-023).**
+  - `POST /courses/:id/register` saiu. O site nunca a usou (usa `register-by-cpf` e `register-full`), e ela criava pessoa e inscrição e vinculava pelo CPF sem conferir o telefone.
+  - `GET /rooms` passou a exigir `READ_COURSE` e `GET /address/cep/:cep` o login: só o painel as usa. A do CEP, aberta, emprestava o IP do servidor para consultas ao ViaCEP.
 
 - **Consulta e inscrição por CPF confirmam o telefone (SR-025).**
   - `GET /users/lookup-cpf/:cpf` dizia, para qualquer CPF, se havia cadastro e o primeiro nome. Filiação a sindicato é dado sensível na LGPD (art. 5º, II), e o CPF ia na URL, para os logs da API e do proxy.

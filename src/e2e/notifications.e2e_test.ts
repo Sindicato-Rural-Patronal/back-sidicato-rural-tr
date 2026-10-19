@@ -109,7 +109,7 @@ url: '/admin/notifications' });
     it('inscrição pública gera evento visível só para quem tem READ_COURSE', async () => {
         const res = await app.inject({
             method: 'POST',
-            url: `/courses/${ids.course}/register`,
+            url: `/courses/${ids.course}/register-full`,
             payload: { name: 'JOAO NOTIFICADO',
 phone: '44911112222',
 cpf: '52998224725' },

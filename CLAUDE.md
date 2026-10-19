@@ -149,7 +149,7 @@ Conferência de conflito em use case enxerga só os ativos; sem uma das duas sa�
 - **Global:** 600/min. O IP real vem do proxy por `trustProxy` em `index.ts`; a decisão 002 da Arquitetura trata da topologia.
 - **Login e refresh:** 10 a cada 5 min.
 - **`PATCH /admin/me`:** 10 a cada 5 min.
-- **Rotas públicas** (`http/lib/public-rate-limit.ts`): inscrição (`register`, `register-by-cpf`, `register-full`) e `POST /contacts/message` com 10/min; `POST /users/lookup-cpf` com 20/min.
+- **Rotas públicas** (`http/lib/public-rate-limit.ts`): inscrição (`register-by-cpf`, `register-full`) e `POST /contacts/message` com 10/min; `POST /users/lookup-cpf` com 20/min.
 - Cada rota conta separado. O excesso nas rotas públicas responde 429 `{ error: "Muitas tentativas seguidas. Aguarde um minuto e tente de novo." }`; no login, a mensagem padrão do plugin.
 - **Por CPF** (`lib/cpf-attempt-limiter.ts`, na memória do processo): 5 erros na última hora para o mesmo CPF, somando a consulta, o `register-by-cpf` e o `register-full`, → 429 "Muitas tentativas com este CPF. Aguarde uma hora ou procure o Sindicato.", até com o par certo. Conta erro também para CPF sem cadastro, para o 429 não revelar quem tem. Ver Inscrições.
 
@@ -221,7 +221,7 @@ Autenticação na última coluna: **Pública**, **Login** (qualquer admin) ou a 
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
 | `GET` | `/` | `{ status: 'ok', uptime }` | Pública |
-| `GET` | `/address/cep/:cep` | `FetchAddressByCepUseCase`, endereço pelo CEP; CEP inexistente → 404 "CEP not found" | Pública |
+| `GET` | `/address/cep/:cep` | `FetchAddressByCepUseCase`, endereço pelo CEP; CEP inexistente → 404 "CEP not found". Só o painel usa: aberta, emprestava o IP do servidor para consultas ao ViaCEP | Login |
 
 ### Login
 | Método | Path | O que faz | Auth |
@@ -483,7 +483,6 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
 | `POST` | `/users/lookup-cpf` | `{ cpf, phoneEnd }` → `{ found, name }`, com o nome mascarado ("João D. S.") só quando os dois batem; CPF inválido, sem cadastro ou telefone que não confere → o mesmo `{ found: false, name: null }`; `phoneEnd` sem 4 dígitos → 400; 20/min por IP; limite por CPF (429). Não vai para a auditoria | Pública |
-| `POST` | `/courses/:courseId/register` | `{ name, phone, cpf, email? }` → 201 `{ registrationId, userDataId }` (cria a pessoa se o CPF é novo); 10/min | Pública |
 | `POST` | `/courses/:courseId/register-by-cpf` | `{ cpf, phoneEnd }` → 201; **CPF sem cadastro ou telefone que não confere → o mesmo 404** "Não encontramos cadastro com este CPF e telefone." (o site segue para o `register-full`); `phoneEnd` sem 4 dígitos → 400; 10/min; limite por CPF (429) | Pública |
 | `POST` | `/courses/:courseId/register-full` | `{ name, phone, cpf, email?, rg?, birthDate?, address? }` → 201; CPF novo: cria a pessoa com o endereço como propriedade principal; CPF com cadastro: só inscreve se `phone` confere (ver abaixo), senão 409 `IdentityNotConfirmedError`; 10/min; limite por CPF (429) | Pública |
 | `GET` | `/admin/courses/:courseId/registrations` | inscritos com `confirmed`, `attended`, `ficha` (metadados), selos (memberStatus, membershipValidUntil, boardPosition, contato público, empresas parceiras) | `READ_COURSE` |
@@ -499,7 +498,7 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 | `GET` | `/admin/registrations/:registrationId/ficha` | o PDF, inline; sem ficha → 404 "Ficha não encontrada." | `READ_COURSE` |
 | `DELETE` | `/admin/registrations/:registrationId/ficha` | remove → 204 | `UPDATE_COURSE` |
 
-**Regras da inscrição pública** (`lib/course-registration-rules.ts`, as três rotas), todas → 409:
+**Regras da inscrição pública** (`lib/course-registration-rules.ts`, as duas rotas), todas → 409:
 - `UNPUBLISHED`/`IN_PROGRESS` → `RegistrationsUnavailableError`;
 - `COMPLETED` ou o dia do fim já passou (em Brasília; no último dia ainda aceita) → `CourseEndedError`;
 - prazo passado → `RegistrationDeadlinePassedError`. Prazo gravado sem hora (00:00) vale até o fim do dia; com hora, fecha quando o relógio de Brasília passa dela;
@@ -514,10 +513,9 @@ O site usa a mesma regra (`utils/course-status.ts` no front).
 - **`register-full`:** o telefone completo, pelos últimos 8 dígitos (ignora DDD e o nono dígito de cadastro antigo). Não confere, ou o cadastro não tem telefone → 409 genérico; nada é vinculado nem alterado. O cadastro existente nunca é sobrescrito pelo formulário.
 - E-mail e telefone iguais aos de outra pessoa, com CPF novo, criam cadastro próprio.
 - CPF criado ao mesmo tempo por outra inscrição → 409 "CPF já cadastrado para outra pessoa.".
-- O `register` (sem telefone) ainda vincula só pelo CPF; sai na SR-023.
 
 **Vagas** (`lockCourseSeats` em `registration-adapter.ts`):
-- Quem conta e insere trava as vagas do curso (`pg_advisory_xact_lock`) antes de contar, em READ COMMITTED: `createWithCapacity` (que atende `register`, `register-by-cpf` e a inscrição pela equipe) e o `register-full`.
+- Quem conta e insere trava as vagas do curso (`pg_advisory_xact_lock`) antes de contar, em READ COMMITTED: `createWithCapacity` (que atende o `register-by-cpf` e a inscrição pela equipe) e o `register-full`.
 - Inscrições ao mesmo tempo entram uma de cada vez: nunca passa da lotação, e quem chega depois da última vaga ouve 409.
 - O `register-full` tenta de novo (até 3 vezes) num conflito de escrita que ainda apareça. `isPrismaSerializationError` reconhece o P2034 e o `DriverAdapterError` `TransactionWriteConflict` do adapter-pg.
 - O erro inesperado vai para o `apiErrorHandler` (log + 500 genérico).
@@ -530,7 +528,7 @@ O site usa a mesma regra (`utils/course-status.ts` no front).
 ### Salas
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
-| `GET` | `/rooms` | salas ativas | Pública |
+| `GET` | `/rooms` | salas ativas (só o painel usa) | `READ_COURSE` |
 | `POST` | `/rooms` | `{ name, description, maxCapacity }`; nome da lista fixa (`lib/room-names.ts`: AUDITORIO, COZINHA, SALA DE VIDEO CONFERENCIA, SALA 1, SALA 2, SALA APL), normalizado; repetido entre as ativas → 409 | `CREATE_COURSE` |
 | `PATCH` | `/rooms/:roomId` | editar; pode manter nome antigo, trocar exige nome da lista | `UPDATE_COURSE` |
 | `DELETE` | `/rooms/:roomId` | soft; curso ou reserva que **ainda não terminou** na sala → 409 | `DELETE_COURSE` |
@@ -692,7 +690,7 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 | `PATCH` | `/admin/notifications/read` | `{ ids?: string[] }` (sem `ids` = todos os visíveis; `[]` = nenhum) → `{ updated }` | Login |
 
 **Eventos** (`Notification`, `lib/notification-events.ts`):
-- Só ações públicas ou self-service: `COURSE_REGISTRATION` (`READ_COURSE`; as três inscrições públicas), `CONTACT_MESSAGE` (`READ_CONTACT`) e `INVITE_ACCEPTED` (`READ_USER_ADMIN`).
+- Só ações públicas ou self-service: `COURSE_REGISTRATION` (`READ_COURSE`; as duas inscrições públicas), `CONTACT_MESSAGE` (`READ_CONTACT`) e `INVITE_ACCEPTED` (`READ_USER_ADMIN`).
 - O que a equipe faz no painel não gera evento.
 - Publicar nunca derruba a ação (`publishSafely`).
 

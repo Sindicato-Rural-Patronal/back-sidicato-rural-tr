@@ -6,7 +6,6 @@ import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapte
 import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createCourseAdapter } from '../../adapter/database/course-adapter.js';
 import { createNotificationPublisher } from '../../adapter/database/notification-adapter.js';
-import { RegisterForCourseUseCase } from '../../usecase/register-for-course.js';
 import { RegisterForCourseByCpfUseCase } from '../../usecase/register-for-course-by-cpf.js';
 import { RegisterForCourseFullUseCase } from '../../usecase/register-for-course-full.js';
 import { LookupUserByCpfUseCase } from '../../usecase/lookup-user-by-cpf.js';
@@ -17,7 +16,6 @@ import { StartCourseUseCase } from '../../usecase/start-course.js';
 import { UploadRegistrationFichaUseCase } from '../../usecase/upload-registration-ficha.js';
 import { GetRegistrationFichaUseCase } from '../../usecase/get-registration-ficha.js';
 import { DeleteRegistrationFichaUseCase } from '../../usecase/delete-registration-ficha.js';
-import { RegisterForCourseController } from '../controllers/register-for-course.js';
 import { RegisterForCourseByCpfController } from '../controllers/register-for-course-by-cpf.js';
 import { RegisterForCourseFullController } from '../controllers/register-for-course-full.js';
 import { LookupUserByCpfController } from '../controllers/lookup-user-by-cpf.js';
@@ -64,9 +62,6 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
     // gasta as tentativas das outras.
     const cpfAttempts = new CpfAttemptLimiter();
 
-    const registerController = new RegisterForCourseController(
-        new RegisterForCourseUseCase(courseRepository, userDataRepository, registrationRepository, notifications),
-    );
     const registerByCpfController = new RegisterForCourseByCpfController(
         new RegisterForCourseByCpfUseCase(courseRepository, userDataRepository, registrationRepository, notifications, cpfAttempts),
     );
@@ -123,64 +118,6 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
     const setUnmarkedAttendanceController = new SetUnmarkedAttendanceController(
         new SetUnmarkedAttendanceUseCase(courseRepository, registrationRepository),
         getAdminPermissions,
-    );
-
-    fastify.post(
-        '/courses/:courseId/register',
-        {
-            config: publicFormRateLimit,
-            schema: {
-                tags: ['Registrations'],
-                summary: 'Register for a course',
-                description:
-                    'Public. Looks up existing UserData by CPF — if found, associates the registration; otherwise creates a new record. E-mail is optional and may repeat between people.',
-                params: {
-                    type: 'object',
-                    required: ['courseId'],
-                    properties: { courseId: { type: 'string' } },
-                },
-                body: {
-                    type: 'object',
-                    required: ['name', 'phone', 'cpf'],
-                    properties: {
-                        name: { type: 'string',
-example: 'João da Silva' },
-                        phone: { type: 'string',
-example: '44999990001' },
-                        // Opcional; sem format para aceitar vazio (formato conferido no use case).
-                        email: { type: 'string',
-nullable: true,
-example: 'joao@example.com' },
-                        cpf: { type: 'string',
-example: '52998224725' },
-                    },
-                },
-                response: {
-                    201: {
-                        type: 'object',
-                        properties: {
-                            registrationId: { type: 'string' },
-                            userDataId: { type: 'string' },
-                        },
-                    },
-                    400: errorResponse,
-                    404: errorResponse,
-                    409: errorResponse,
-                },
-            },
-        },
-        (
-            req: FastifyRequest<{
-                Params: { courseId: string };
-                Body: {
-                    name: string;
-                    phone: string;
-                    email?: string | null;
-                    cpf: string;
-                };
-            }>,
-            res: FastifyReply,
-        ) => registerController.handle(req, res),
     );
 
     fastify.post(

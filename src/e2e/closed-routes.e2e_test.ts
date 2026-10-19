@@ -216,7 +216,6 @@ blocked };
 
     it.each([
         ['POST', '/users/lookup-cpf', PUBLIC_LOOKUP_LIMIT],
-        ['POST', `/courses/${course}/register`, PUBLIC_FORM_LIMIT],
         ['POST', `/courses/${course}/register-by-cpf`, PUBLIC_FORM_LIMIT],
         ['POST', `/courses/${course}/register-full`, PUBLIC_FORM_LIMIT],
         ['POST', '/contacts/message', PUBLIC_FORM_LIMIT],

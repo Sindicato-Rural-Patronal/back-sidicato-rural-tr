@@ -204,7 +204,7 @@ url: `/courses/${ids.course}` });
     it('recusa inscrição pública', async () => {
         const res = await app.inject({
             method: 'POST',
-            url: `/courses/${ids.course}/register`,
+            url: `/courses/${ids.course}/register-full`,
             payload: { name: 'VISITANTE PRESENCA',
 email: 'visitante.presenca@test.com',
 phone: '44933339999',

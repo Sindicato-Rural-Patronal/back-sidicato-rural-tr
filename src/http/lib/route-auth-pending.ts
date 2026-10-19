@@ -3,7 +3,6 @@
 // lista só encolhe: cada router migrado tira as suas, e o teste de inventário
 // reprova rota que já declarou e continua aqui. Some no fim da migração.
 export const ROUTE_AUTH_PENDING: readonly string[] = [
-    'GET /address/cep/:cep',
     'GET /admin/audit-logs',
     'GET /admin/audit-settings',
     'PATCH /admin/audit-settings',
@@ -149,13 +148,11 @@ export const ROUTE_AUTH_PENDING: readonly string[] = [
     'POST /courses/:courseId/banner',
     'POST /courses/:courseId/gallery',
     'DELETE /courses/:courseId/gallery/:photoId',
-    'POST /courses/:courseId/register',
     'POST /news',
     'DELETE /news/:newsId',
     'PATCH /news/:newsId',
     'POST /news/:newsId/banner',
     'POST /news/:newsId/image',
-    'GET /rooms',
     'POST /rooms',
     'DELETE /rooms/:roomId',
     'PATCH /rooms/:roomId',

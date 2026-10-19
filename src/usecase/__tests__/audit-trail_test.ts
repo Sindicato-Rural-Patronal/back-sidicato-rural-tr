@@ -77,7 +77,7 @@ describe('auditoria: rotas fora da trilha', () => {
         expect(shouldLookupTargetLabel('PATCH', '/admin/site-settings')).toBe(true);
         expect(shouldLookupTargetLabel('POST', '/admin/courses/' + ID + '/start')).toBe(true);
         expect(shouldLookupTargetLabel('POST', '/admin/banners')).toBe(false);
-        expect(shouldLookupTargetLabel('POST', '/courses/' + ID + '/register')).toBe(false);
+        expect(shouldLookupTargetLabel('POST', '/courses/' + ID + '/register-full')).toBe(false);
     });
 });
 

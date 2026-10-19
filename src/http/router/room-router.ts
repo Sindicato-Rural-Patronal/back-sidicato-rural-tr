@@ -13,6 +13,7 @@ import { DeleteRoomController } from '../controllers/delete-room.js';
 import { DeleteRoomUseCase } from '../../usecase/delete-room.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
+import { requires } from '../lib/route-auth.js';
 
 const roomProperties = {
     id: { type: 'string' },
@@ -46,19 +47,23 @@ export async function roomRouter(fastify: FastifyInstance, prisma: PrismaClient)
     fastify.get(
         '/rooms',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags: ['Rooms'],
                 summary: 'List rooms',
                 description: `Returns all registered rooms, ordered by name.
 
 **Business rules:**
-- Public route — no authentication required
+- Exige \`READ_COURSE\`: só o painel usa (agenda, curso e configurações)
 - The \`maxCapacity\` field of each room determines the maximum number of enrollments for any course held in it
 - Use this route to populate the room selector in the course creation form`,
                 querystring: paginationQuerystring,
+                security: [{ bearerAuth: [] }],
                 response: {
                     200: pagedResponse({ type: 'object',
 properties: roomProperties }),
+                    401: errorResponse,
+                    403: errorResponse,
                 },
             },
         },
