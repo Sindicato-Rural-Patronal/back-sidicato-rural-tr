@@ -80,7 +80,7 @@ describe('AddPropertyUseCase', () => {
             const result = await uc.execute({ userDataId: 'user-001',
 name: 'Fazenda' } as any);
             expect(result.error).toBeDefined();
-            expect(result.error?.message).toBe('Address is required');
+            expect(result.error?.message).toBe('Informe o endereço da propriedade.');
             expect(mockPropertyRepo.create).not.toHaveBeenCalled();
         });
     });

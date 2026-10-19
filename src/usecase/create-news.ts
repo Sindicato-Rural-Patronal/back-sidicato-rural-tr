@@ -4,8 +4,8 @@ import { ValidationError } from '../errors/validation.js';
 import { nowWallClock } from './news-visibility.js';
 
 const createNewsRequestSchema = z.object({
-    title: z.string().min(1, 'Title is required'),
-    content: z.string().min(1, 'Content is required'),
+    title: z.string().min(1, 'Informe o título da notícia.'),
+    content: z.string().min(1, 'Informe o conteúdo da notícia.'),
     summary: z.string().optional(),
     status: z.enum(['PUBLISHED', 'UNPUBLISHED'] as const).default('UNPUBLISHED'),
     publishedAt: z.iso.datetime().optional(),

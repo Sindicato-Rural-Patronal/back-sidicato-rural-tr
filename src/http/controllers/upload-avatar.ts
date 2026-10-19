@@ -19,7 +19,7 @@ originalName: string
 } | null
     > {
         const data = await request.file();
-        if (!data) { reply.status(400).send({ error: 'No file uploaded' }); return null; }
+        if (!data) { reply.status(400).send({ error: 'Nenhum arquivo enviado.' }); return null; }
         const chunks: Buffer[] = [];
         for await (const chunk of data.file) chunks.push(chunk);
         const fileBuffer = Buffer.concat(chunks);

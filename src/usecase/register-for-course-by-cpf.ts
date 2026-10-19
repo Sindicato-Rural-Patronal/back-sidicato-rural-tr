@@ -36,7 +36,7 @@ export class RegisterForCourseByCpfUseCase {
         const parsed = schema.safeParse(request);
         if (!parsed.success) {
             return {
-                error: new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid data'),
+                error: new ValidationError(parsed.error.issues[0]?.message ?? 'Dados inválidos.'),
             };
         }
 

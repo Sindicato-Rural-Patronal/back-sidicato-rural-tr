@@ -7,7 +7,7 @@ export class UploadBannerImageController {
 
     async handle(req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
         const data = await req.file();
-        if (!data) return reply.status(400).send({ error: 'No file uploaded' });
+        if (!data) return reply.status(400).send({ error: 'Nenhum arquivo enviado.' });
 
         const chunks: Buffer[] = [];
         for await (const chunk of data.file) chunks.push(chunk);

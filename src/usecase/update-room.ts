@@ -7,9 +7,9 @@ import { isRoomName, normalizeRoomName } from '../lib/room-names.js';
 import { roomNameMessage } from './create-room.js';
 
 const updateRoomRequestSchema = z.object({
-    name: z.string().min(1, 'Room name is required'),
-    description: z.string().min(1, 'Room description is required'),
-    maxCapacity: z.number().int().positive('Max capacity must be a positive integer'),
+    name: z.string().min(1, 'Informe o nome da sala.'),
+    description: z.string().min(1, 'Informe a descrição da sala.'),
+    maxCapacity: z.number().int().positive('A capacidade máxima precisa ser um número inteiro maior que zero.'),
 });
 
 type UpdateRoomRequest = z.infer<typeof updateRoomRequestSchema>;
