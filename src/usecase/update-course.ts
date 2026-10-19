@@ -6,6 +6,7 @@ import { CourseNotFoundError, RoomNotFoundError } from '../errors/not-found.js';
 import { RoomAlreadyBookedError } from '../errors/business-rule.js';
 import { conflictMessage } from './room-availability.js';
 import { nomeDoCurso } from '../lib/course-name.js';
+import { COURSE_END_BEFORE_START } from './create-course.js';
 
 const updateCourseBodySchema = z.object({
     // Apagar o titulo na edicao devolve o nome generico, em vez de recusar.
@@ -68,15 +69,10 @@ export class UpdateCourseUseCase {
         const newStart = data.startTime ? new Date(data.startTime) : existing.startTime;
         const newEnd = data.endTime ? new Date(data.endTime) : existing.endTime;
 
-        if (data.roomId || data.startTime || data.endTime) {
-            // Sala ocupada por outro curso ou por uma reserva (evento/reunião).
-            const conflict = await this.courseRepository.findRoomConflict(
-                newRoomId,
-                newStart,
-                newEnd,
-                courseId,
-            );
-            if (conflict) return { error: new RoomAlreadyBookedError(conflictMessage(conflict)) };
+        // Só quando a edição mexe nas datas: um curso antigo com datas trocadas
+        // continua editável no resto (status, capa...) até alguém corrigi-las.
+        if ((data.startTime || data.endTime) && newEnd <= newStart) {
+            return { error: new ValidationError(COURSE_END_BEFORE_START) };
         }
 
         const updatePayload: Parameters<CourseRepository['update']>[1] = {
@@ -92,8 +88,21 @@ export class UpdateCourseUseCase {
             status: data.status as CourseStatus | undefined,
         };
 
+        // Mudou sala ou horário: sala ocupada por outro curso ou por uma reserva
+        // (evento/reunião) é conferida e gravada na mesma transação, com a sala travada.
+        if (data.roomId || data.startTime || data.endTime) {
+            const written = await this.courseRepository.updateInRoom(courseId, updatePayload, {
+                roomId: newRoomId,
+                startTime: newStart,
+                endTime: newEnd,
+            });
+            if (written.conflict) return { error: new RoomAlreadyBookedError(conflictMessage(written.conflict)) };
+            if (!written.result) return { error: new CourseNotFoundError() };
+            return {};
+        }
+
         const updated = await this.courseRepository.update(courseId, updatePayload);
-        if (!updated) return { error: new Error('Failed to update course') };
+        if (!updated) return { error: new CourseNotFoundError() };
 
         return {};
     }

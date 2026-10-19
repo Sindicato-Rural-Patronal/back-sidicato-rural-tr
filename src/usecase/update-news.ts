@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { NewsRepository } from '../ports/external/news-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { NewsNotFoundError } from '../errors/not-found.js';
+import { isScheduled, nowWallClock } from './news-visibility.js';
 
 const updateNewsRequestSchema = z.object({
     newsId: z.string().uuid(),
@@ -33,9 +34,12 @@ export class UpdateNewsUseCase {
         const existing = await this.newsRepository.findById(newsId);
         if (!existing) return { error: new NewsNotFoundError() };
 
-        // Voltar para rascunho descarta o agendamento.
+        // O status que vale é o que a notícia terá depois do pedido: um PATCH sem
+        // `status` num rascunho também não guarda agendamento.
+        const status = updateData.status ?? existing.status;
+        // Rascunho nunca guarda agendamento (voltar para rascunho o descarta).
         const nextPublishAt =
-            updateData.status === 'UNPUBLISHED'
+            status === 'UNPUBLISHED'
                 ? null
                 : publishAt !== undefined
                   ? publishAt
@@ -51,15 +55,37 @@ export class UpdateNewsUseCase {
                     ? publishedAt
                         ? new Date(publishedAt)
                         : null
-                    : // Agendada: a data mostrada ao leitor é a que ela entra no ar.
-                      (nextPublishAt ??
-                      (updateData.status === 'PUBLISHED' && !existing.publishedAt
-                          ? new Date()
-                          : undefined)),
+                    : nextPublishedAt(status, nextPublishAt, existing),
         });
 
         if (!updated) return { error: new Error('Failed to update news') };
 
         return {};
     }
+}
+
+/**
+ * Data mostrada ao leitor quando o pedido não a manda. Hora "de parede" de
+ * Brasília com Z, a mesma convenção do `publishAt` (antes o "agora" era o
+ * instante real em UTC e a data saía errada perto da meia-noite).
+ * - Agendada: a data é a do agendamento.
+ * - Entrando no ar agora: hoje, se ainda não tinha data ou se a que tinha era
+ *   de um agendamento que não chegou ("publicar agora" uma agendada).
+ * - Senão (já estava no ar, ou continua agendada/rascunho): não mexe.
+ */
+function nextPublishedAt(
+    status: 'PUBLISHED' | 'UNPUBLISHED',
+    nextPublishAt: Date | null | undefined,
+    existing: {
+ publishAt: Date | null;
+publishedAt: Date | null 
+},
+): Date | undefined {
+    if (nextPublishAt) return nextPublishAt;
+    if (status !== 'PUBLISHED') return undefined;
+    const now = nowWallClock();
+    const publishAt = nextPublishAt === undefined ? existing.publishAt : nextPublishAt;
+    if (isScheduled(publishAt, now)) return undefined;
+    if (!existing.publishedAt || existing.publishedAt.getTime() > now.getTime()) return now;
+    return undefined;
 }

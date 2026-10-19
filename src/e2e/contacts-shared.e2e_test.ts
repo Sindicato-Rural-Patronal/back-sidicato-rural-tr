@@ -61,11 +61,13 @@ describe('POST /users — contato compartilhado', () => {
 phone: '44933330001' };
         const a = await app.inject({ method: 'POST',
 url: '/users',
+headers: bearer(token),
 payload: { name: 'JOSE SILVA',
 cpf: '74012583077',
 ...shared } });
         const b = await app.inject({ method: 'POST',
 url: '/users',
+headers: bearer(token),
 payload: { name: 'ANA SILVA',
 cpf: '74012583158',
 ...shared } });
@@ -81,6 +83,7 @@ cpf: '74012583158',
     it('cria pessoa sem e-mail (ausente ou vazio vira null)', async () => {
         const semCampo = await app.inject({ method: 'POST',
 url: '/users',
+headers: bearer(token),
 payload: { name: 'PEDRO SEM EMAIL',
 phone: '44933330002',
 cpf: '74012583239' } });
@@ -91,6 +94,7 @@ cpf: '74012583239' } });
 
         const vazio = await app.inject({ method: 'POST',
 url: '/users',
+headers: bearer(token),
 payload: { name: 'LUCIA SEM EMAIL',
 email: '',
 phone: '44933330003',
@@ -111,6 +115,7 @@ headers: bearer(token) });
     it('apagar o e-mail na edição grava null', async () => {
         const res = await app.inject({ method: 'POST',
 url: '/users',
+headers: bearer(token),
 payload: { name: 'CARLOS EDITA',
 email: 'carlos@test.com',
 phone: '44933330004',
@@ -127,6 +132,7 @@ payload: { email: '' } });
     it('CPF repetido continua sendo 409 com mensagem clara', async () => {
         const res = await app.inject({ method: 'POST',
 url: '/users',
+headers: bearer(token),
 payload: { name: 'OUTRO JOSE',
 phone: '44933330009',
 cpf: '740.125.830-77' } });

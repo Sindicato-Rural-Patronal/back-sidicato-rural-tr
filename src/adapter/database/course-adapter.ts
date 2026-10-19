@@ -1,15 +1,16 @@
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { semRegistro } from './prisma-errors.js';
 import { buildCourseListWhere } from './list-filters.js';
-import { findRoomOccupants } from './room-booking-adapter.js';
+import { findRoomOccupants, lockRoom } from './room-booking-adapter.js';
 import type {
     CourseRepository,
     CourseWithDetails,
     CourseCreateData,
     CourseUpdateData,
     CourseListFilters,
+    CourseListOrder,
+    RoomGuardedWrite,
 } from '../../ports/external/course-repository.js';
-import type { RoomOccupant } from '../../ports/external/room-booking-repository.js';
 import type { courseModel } from '../../generated/prisma/models/course.js';
 import type { CoursePhotoModel } from '../../generated/prisma/models.js';
 
@@ -37,14 +38,6 @@ avatar: true } } },
 export class CourseAdapter implements CourseRepository {
     constructor(private prisma: PrismaClient) {}
 
-    create(data: CourseCreateData): Promise<courseModel> {
-        const { roomId, ...rest } = data;
-        return this.prisma.course.create({
-            data: { ...rest,
-room: { connect: { id: roomId } } },
-        });
-    }
-
     findById(id: string): Promise<CourseWithDetails | null> {
         return this.prisma.course.findFirst({
             where: { id,
@@ -53,11 +46,16 @@ isDeleted: false },
         }) as Promise<CourseWithDetails | null>;
     }
 
-    findAll(filters?: CourseListFilters, skip?: number, take?: number): Promise<CourseWithDetails[]> {
+    findAll(
+        filters?: CourseListFilters,
+        skip?: number,
+        take?: number,
+        order: CourseListOrder = 'asc',
+    ): Promise<CourseWithDetails[]> {
         return this.prisma.course.findMany({
             where: buildCourseListWhere(filters),
             include: courseIncludes,
-            orderBy: { startTime: 'asc' },
+            orderBy: [{ startTime: order }, { id: 'asc' }],
             skip,
             take,
         }) as Promise<CourseWithDetails[]>;
@@ -138,14 +136,46 @@ deletedAt: new Date() },
         }
     }
 
-    // Cursos e reservas (eventos/reuniões) dividem a agenda da sala.
-    async findRoomConflict(
-        roomId: string,
-        startTime: Date,
-        endTime: Date,
-        excludeCourseId?: string,
-    ): Promise<RoomOccupant | null> {
-        const occupants = await findRoomOccupants(this.prisma, roomId, startTime, endTime, { courseId: excludeCourseId });
-        return occupants[0] ?? null;
+    // Cursos e reservas (eventos/reuniões) dividem a agenda da sala: a checagem
+    // e a gravação ficam na mesma transação, com a sala travada.
+    createInRoom(data: CourseCreateData): Promise<RoomGuardedWrite<courseModel>> {
+        const { roomId, ...rest } = data;
+        return this.prisma.$transaction(async (tx: unknown) => {
+            const t = tx as PrismaClient;
+            await lockRoom(t, roomId);
+            const [conflict] = await findRoomOccupants(t, roomId, data.startTime, data.endTime);
+            if (conflict) return { conflict };
+            const result = await t.course.create({ data: { ...rest,
+room: { connect: { id: roomId } } } });
+            return { result };
+        });
+    }
+
+    async updateInRoom(
+        id: string,
+        data: CourseUpdateData,
+        slot: {
+ roomId: string;
+startTime: Date;
+endTime: Date 
+},
+    ): Promise<RoomGuardedWrite<courseModel | null>> {
+        try {
+            return await this.prisma.$transaction(async (tx: unknown) => {
+                const t = tx as PrismaClient;
+                await lockRoom(t, slot.roomId);
+                const [conflict] = await findRoomOccupants(t, slot.roomId, slot.startTime, slot.endTime, { courseId: id });
+                if (conflict) return { conflict };
+                const { roomId, ...rest } = data;
+                const result = await t.course.update({
+                    where: { id },
+                    data: roomId ? { ...rest,
+room: { connect: { id: roomId } } } : rest,
+                });
+                return { result };
+            });
+        } catch (e) {
+            return { result: semRegistro(e, null) };
+        }
     }
 }

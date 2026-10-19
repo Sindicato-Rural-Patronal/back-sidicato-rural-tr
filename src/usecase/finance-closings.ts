@@ -3,7 +3,7 @@ import type {
     FinanceRepository,
     FinanceMonthlyClosingModel,
 } from '../ports/external/finance-repository.js';
-import { ValidationError } from '../errors/validation.js';
+import { ValidationError, parseQuery } from '../errors/validation.js';
 import { NotFoundError } from '../errors/not-found.js';
 import { ConflictError } from '../errors/conflict.js';
 import { isMonth } from './finance-recurrences.js';
@@ -67,7 +67,7 @@ export class ListFinanceClosingsUseCase {
     constructor(private readonly repo: FinanceRepository) {}
 
     async execute(query: unknown): Promise<FinanceMonthlyClosingModel[]> {
-        const q = listSchema.parse(query ?? {});
+        const q = parseQuery(listSchema, query);
         return this.repo.listClosings({ accountId: q.accountId,
 year: q.year });
     }

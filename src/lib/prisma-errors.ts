@@ -21,14 +21,27 @@ export function isPrismaFkViolation(error: unknown): boolean {
     );
 }
 
-/** Falha de serialização de transação (P2034) — conflito de escrita concorrente. */
+/**
+ * Conflito de escrita concorrente numa transação (Postgres 40001/40P01): quem
+ * perde pode tentar de novo. Chega de dois jeitos: como P2034 do Prisma ou,
+ * com o driver adapter (`@prisma/adapter-pg`), como `DriverAdapterError` sem
+ * `code` e com `cause.kind: 'TransactionWriteConflict'`. Só o P2034 era
+ * reconhecido, então a nova tentativa do `createWithCapacity` e do
+ * `register-full` nunca rodava e quem perdia a corrida levava 500.
+ */
 export function isPrismaSerializationError(error: unknown): boolean {
-    return (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        (error as { code?: unknown }).code === 'P2034'
-    );
+    let current: unknown = error;
+    // A causa pode vir embrulhada (erro do Prisma → erro do adapter).
+    for (let depth = 0; depth < 4 && typeof current === 'object' && current !== null; depth++) {
+        const e = current as {
+ code?: unknown;
+kind?: unknown;
+cause?: unknown 
+};
+        if (e.code === 'P2034' || e.kind === 'TransactionWriteConflict') return true;
+        current = e.cause;
+    }
+    return false;
 }
 
 /**

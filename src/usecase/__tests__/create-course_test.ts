@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CreateCourseUseCase } from '../create-course.js';
+import { COURSE_END_BEFORE_START, CreateCourseUseCase } from '../create-course.js';
 import type { CourseRepository } from '../../ports/external/course-repository.js';
 import type { RoomRepository } from '../../ports/external/room-repository.js';
 import { CURSO_SEM_NOME } from '../../lib/course-name.js';
@@ -14,8 +14,7 @@ const CONFLICT = {
 };
 
 const mockCourseRepo = {
-    create: vi.fn(),
-    findRoomConflict: vi.fn(),
+    createInRoom: vi.fn(),
     findById: vi.fn(),
     findAll: vi.fn(),
     update: vi.fn(),
@@ -47,13 +46,12 @@ describe('CreateCourseUseCase', () => {
             // O cadastro do curso costuma comecar pela sala e pelas datas, para
             // ja reservar a agenda; o titulo vem depois.
             vi.mocked(mockRoomRepo.findById).mockResolvedValue({ id: validInput.roomId } as never);
-            vi.mocked(mockCourseRepo.findRoomConflict).mockResolvedValue(null);
-            vi.mocked(mockCourseRepo.create).mockResolvedValue({ id: 'curso-1' } as never);
+            vi.mocked(mockCourseRepo.createInRoom).mockResolvedValue({ result: { id: 'curso-1' } } as never);
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
             const result = await uc.execute({ ...validInput,
 name: '   ' });
             expect(result.error).toBeUndefined();
-            expect(mockCourseRepo.create).toHaveBeenCalledWith(
+            expect(mockCourseRepo.createInRoom).toHaveBeenCalledWith(
                 expect.objectContaining({ name: CURSO_SEM_NOME }),
             );
         });
@@ -64,6 +62,20 @@ name: '   ' });
 roomId: 'nao-e-uuid' });
             expect(result.error).toBeDefined();
             expect(result.error).toBeDefined();
+        });
+    });
+
+    describe('término depois do início', () => {
+        it.each([
+            ['término antes do início', '2026-07-01T12:00:00.000Z', '2026-07-01T08:00:00.000Z'],
+            ['término igual ao início', '2026-07-01T08:00:00.000Z', '2026-07-01T08:00:00.000Z'],
+        ])('recusa %s, sem gravar', async (_caso, startTime, endTime) => {
+            const result = await new CreateCourseUseCase(mockCourseRepo, mockRoomRepo).execute({ ...validInput,
+startTime,
+endTime });
+            expect(result.error?.name).toBe('ValidationError');
+            expect(result.error?.message).toBe(COURSE_END_BEFORE_START);
+            expect(mockCourseRepo.createInRoom).not.toHaveBeenCalled();
         });
     });
 
@@ -78,7 +90,7 @@ roomId: 'nao-e-uuid' });
 
         it('falha se sala já ocupada no período', async () => {
             vi.mocked(mockRoomRepo.findById).mockResolvedValue({ id: validInput.roomId } as any);
-            vi.mocked(mockCourseRepo.findRoomConflict).mockResolvedValue(CONFLICT);
+            vi.mocked(mockCourseRepo.createInRoom).mockResolvedValue({ conflict: CONFLICT });
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
             const result = await uc.execute(validInput);
             expect(result.error).toBeDefined();
@@ -89,8 +101,7 @@ roomId: 'nao-e-uuid' });
     describe('criação bem-sucedida', () => {
         it('retorna courseId ao criar curso válido', async () => {
             vi.mocked(mockRoomRepo.findById).mockResolvedValue({ id: validInput.roomId } as any);
-            vi.mocked(mockCourseRepo.findRoomConflict).mockResolvedValue(null);
-            vi.mocked(mockCourseRepo.create).mockResolvedValue({ id: 'course-abc' } as any);
+            vi.mocked(mockCourseRepo.createInRoom).mockResolvedValue({ result: { id: 'course-abc' } } as any);
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
             const result = await uc.execute(validInput);
             expect(result.error).toBeUndefined();
@@ -99,26 +110,28 @@ roomId: 'nao-e-uuid' });
 
         it('grava nº do evento e mínimo de alunos informados na criação', async () => {
             vi.mocked(mockRoomRepo.findById).mockResolvedValue({ id: validInput.roomId } as any);
-            vi.mocked(mockCourseRepo.findRoomConflict).mockResolvedValue(null);
-            vi.mocked(mockCourseRepo.create).mockResolvedValue({ id: 'course-abc' } as any);
+            vi.mocked(mockCourseRepo.createInRoom).mockResolvedValue({ result: { id: 'course-abc' } } as any);
             const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
             await uc.execute({ ...validInput,
 eventNumber: '261676',
 minStudents: 8 });
-            expect(mockCourseRepo.create).toHaveBeenCalledWith(
+            expect(mockCourseRepo.createInRoom).toHaveBeenCalledWith(
                 expect.objectContaining({ eventNumber: '261676',
 minStudents: 8 }),
             );
         });
 
-        it('falha se repositório retornar null na criação', async () => {
+        // A checagem e a gravação são uma chamada só (sala travada no adapter):
+        // não existe mais um "confere, depois grava" separado no use case.
+        it('passa sala e horário para a gravação que confere a sala', async () => {
             vi.mocked(mockRoomRepo.findById).mockResolvedValue({ id: validInput.roomId } as any);
-            vi.mocked(mockCourseRepo.findRoomConflict).mockResolvedValue(null);
-            vi.mocked(mockCourseRepo.create).mockResolvedValue(null as any);
-            const uc = new CreateCourseUseCase(mockCourseRepo, mockRoomRepo);
-            const result = await uc.execute(validInput);
-            expect(result.error).toBeDefined();
-            expect(result.error?.message).toBe('Failed to create course');
+            vi.mocked(mockCourseRepo.createInRoom).mockResolvedValue({ result: { id: 'course-abc' } } as any);
+            await new CreateCourseUseCase(mockCourseRepo, mockRoomRepo).execute(validInput);
+            expect(mockCourseRepo.createInRoom).toHaveBeenCalledWith(expect.objectContaining({
+                roomId: validInput.roomId,
+                startTime: new Date(validInput.startTime),
+                endTime: new Date(validInput.endTime),
+            }));
         });
     });
 });

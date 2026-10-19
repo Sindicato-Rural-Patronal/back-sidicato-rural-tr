@@ -14,7 +14,7 @@ import { DeleteUserAdminUseCase } from '../../usecase/delete-user-admin.js';
 import { GetCurrentAdminController } from '../controllers/get-current-admin.js';
 import { GetCurrentAdminUseCase } from '../../usecase/get-current-admin.js';
 import { UpdateMeController } from '../controllers/update-me.js';
-import { UpdateMeUseCase } from '../../usecase/update-me.js';
+import { CURRENT_PASSWORD_REQUIRED, CURRENT_PASSWORD_WRONG, UpdateMeUseCase } from '../../usecase/update-me.js';
 import { AdminPreferencesController } from '../controllers/admin-preferences.js';
 import { MAX_PREFS_BYTES, UpdateAdminPreferencesUseCase } from '../../usecase/admin-preferences.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
@@ -129,17 +129,31 @@ additionalProperties: true },
     fastify.patch(
         '/admin/me',
         {
+            // Cada pedido com senha confere a senha atual: limite como o do login,
+            // para um token vazado não servir de força bruta da senha.
+            config: { rateLimit: { max: 10,
+timeWindow: '5 minutes' } },
             schema: {
                 tags: ['Admin — Auth'],
                 summary: 'Update own profile (name/username/password)',
-                description: 'Self-service: qualquer admin autenticado edita os próprios dados. Sem permissão de gestão.',
+                description: `Self-service: qualquer admin autenticado edita os próprios dados. Sem permissão de gestão.
+
+**Trocar a senha** exige \`currentPassword\` (a senha atual) junto com \`password\` (a nova, 8+ caracteres):
+- sem \`currentPassword\` → 400 "${CURRENT_PASSWORD_REQUIRED}"
+- \`currentPassword\` errada → 400 "${CURRENT_PASSWORD_WRONG}" (400 e não 401: o painel trata 401 como sessão vencida)
+- com erro, nada do pedido é gravado (nem nome nem usuário).
+
+Nome e usuário sozinhos não pedem a senha atual. Limite de 10 pedidos por 5 minutos por IP (429).`,
                 security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     properties: {
                         name: { type: 'string' },
                         username: { type: 'string' },
-                        password: { type: 'string' },
+                        password: { type: 'string',
+description: 'Senha nova (8+ caracteres). Exige currentPassword.' },
+                        currentPassword: { type: 'string',
+description: 'Senha atual; obrigatória quando password vem.' },
                     },
                 },
                 response: {
@@ -148,6 +162,7 @@ properties: { message: { type: 'string' } } },
                     400: errorResponse,
                     401: errorResponse,
                     409: errorResponse,
+                    429: errorResponse,
                 },
             },
         },

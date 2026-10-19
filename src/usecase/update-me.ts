@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { hash } from 'bcrypt';
+import { compare, hash } from 'bcrypt';
 import type { UserAdminRepository } from '../ports/external/user-admin-repository.js';
 import type { UserDataRepository } from '../ports/external/user-data-repository.js';
 import { ValidationError } from '../errors/validation.js';
@@ -10,7 +10,11 @@ const schema = z.object({
     name: z.string().min(1).optional(),
     username: z.string().min(3, 'Usuário deve ter ao menos 3 caracteres').optional(),
     password: z.string().min(8, 'A senha deve ter ao menos 8 caracteres').optional(),
+    currentPassword: z.string().optional(),
 });
+
+export const CURRENT_PASSWORD_REQUIRED = 'Informe a senha atual para trocar a senha.';
+export const CURRENT_PASSWORD_WRONG = 'Senha atual incorreta.';
 
 // Self-service: o admin logado edita os PRÓPRIOS dados. Sem perm de gestão —
 // só precisa estar autenticado (o adminId vem do token).
@@ -29,6 +33,16 @@ export class UpdateMeUseCase {
         if (!admin) return { error: new AdminNotFoundError() };
 
         const d = parsed.data;
+
+        // Trocar a senha pede a senha atual: sem isso, um token vazado (ou uma
+        // aba esquecida aberta) virava posse definitiva da conta. Nada é gravado
+        // se ela faltar ou não bater, nem o nome e o usuário do mesmo pedido.
+        if (d.password) {
+            if (!d.currentPassword) return { error: new ValidationError(CURRENT_PASSWORD_REQUIRED) };
+            if (!(await compare(d.currentPassword, admin.passwordHash))) {
+                return { error: new ValidationError(CURRENT_PASSWORD_WRONG) };
+            }
+        }
 
         if (d.username) {
             const conflict = await this.userAdminRepo.findByUsername(d.username);

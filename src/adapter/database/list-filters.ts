@@ -177,6 +177,12 @@ export function buildCourseListWhere(filters?: CourseListFilters) {
             startTime: { gte: new Date(Date.UTC(year, 0, 1)),
 lt: new Date(Date.UTC(year + 1, 0, 1)) },
         }),
+        ...((filters?.endsFrom || filters?.endedBefore) && {
+            endTime: {
+                ...(filters.endsFrom && { gte: filters.endsFrom }),
+                ...(filters.endedBefore && { lt: filters.endedBefore }),
+            },
+        }),
         // Sem acento, como nas pessoas: o titulo do curso aparece no site e
         // agora guarda acento e caixa como foi digitado, entao "manutencao"
         // precisa achar "Manutencao" e "Manutencao" tambem.

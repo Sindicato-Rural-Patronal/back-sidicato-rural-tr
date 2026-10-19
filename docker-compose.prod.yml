@@ -5,8 +5,10 @@
 # SEM DOMÍNIO (atual): acesso direto via porta 3000, sem Traefik.
 # COM DOMÍNIO: remover `ports`, descomentar bloco de labels Traefik abaixo.
 #
-# CI/CD (normal): GitHub Actions builda no ghcr.io, VPS faz pull.
-# Build local (emergência):
+# Não há workflow publicando imagem no ghcr.io: o único workflow é o CI
+# (.github/workflows/ci.yml), que só testa. A `image:` abaixo é de uma
+# configuração antiga; sem `--build` o compose tentaria baixar uma imagem que
+# ninguém atualiza. Build local:
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 #
 # Required env vars (.env.production): DATABASE_URL, JWT_SECRET, CORS_ORIGIN,

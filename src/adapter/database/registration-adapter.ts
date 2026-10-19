@@ -6,7 +6,19 @@ import type {
     RegistrationWithUserData,
     RegistrationFichaFile,
 } from '../../ports/external/registration-repository.js';
-import { isPrismaSerializationError } from '../../lib/prisma-errors.js';
+
+/**
+ * Trava as vagas do curso até o fim da transação (pg_advisory_xact_lock). Toda
+ * gravação que conta as inscrições e insere (`createWithCapacity` e o
+ * `register-full`) pega esta trava ANTES de contar, em READ COMMITTED: cada
+ * consulta depois dela já vê o que a anterior gravou. Antes era Serializable
+ * com nova tentativa, mas o conflito do driver adapter não era reconhecido
+ * (nova tentativa nunca rodava) e, mesmo reconhecido, várias inscrições ao
+ * mesmo tempo esgotavam as tentativas e quem perdia levava 500.
+ */
+export async function lockCourseSeats(tx: PrismaClient, courseId: string): Promise<void> {
+    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`course-seats:${courseId}`}))`;
+}
 
 const userDataSelect = {
     id: true,
@@ -59,32 +71,22 @@ userDataId },
         maxCapacity: number,
         options?: { confirmed?: boolean },
     ): Promise<courseUserRegistrationModel | 'FULL'> {
-        // Serializable + retry: conta e insere na mesma transação para que
-        // inscrições concorrentes não estourem a capacidade da sala.
-        for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-                return await this.prisma.$transaction(
-                    async (tx: unknown) => {
-                        const t = tx as PrismaClient;
-                        const count = await t.courseUserRegistration.count({
-                            where: { courseId,
+        // Conta e insere com as vagas do curso travadas: as inscrições do mesmo
+        // curso entram uma de cada vez e ninguém estoura a lotação.
+        return this.prisma.$transaction(async (tx: unknown) => {
+            const t = tx as PrismaClient;
+            await lockCourseSeats(t, courseId);
+            const count = await t.courseUserRegistration.count({
+                where: { courseId,
 isDeleted: false },
-                        });
-                        if (count >= maxCapacity) return 'FULL' as const;
-                        return await t.courseUserRegistration.create({
-                            data: { courseId,
+            });
+            if (count >= maxCapacity) return 'FULL' as const;
+            return await t.courseUserRegistration.create({
+                data: { courseId,
 userDataId,
 confirmed: options?.confirmed ?? false },
-                        });
-                    },
-                    { isolationLevel: 'Serializable' },
-                );
-            } catch (e) {
-                if (isPrismaSerializationError(e) && attempt < 2) continue;
-                throw e;
-            }
-        }
-        return 'FULL';
+            });
+        });
     }
 
     findById(id: string): Promise<RegistrationWithUserData | null> {

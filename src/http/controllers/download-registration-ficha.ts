@@ -1,7 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { GetRegistrationFichaUseCase } from '../../usecase/get-registration-ficha.js';
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requireAuth } from '../lib/require-permission.js';
+import { requirePermission } from '../lib/require-permission.js';
 
 export class DownloadRegistrationFichaController {
     constructor(
@@ -13,7 +13,8 @@ export class DownloadRegistrationFichaController {
         request: FastifyRequest<{ Params: { registrationId: string } }>,
         reply: FastifyReply,
     ) {
-        if ((await requireAuth(request, reply, this.getAdminPermissions)) === null) return;
+        // A ficha traz dados pessoais: mesma permissão de ver as inscrições.
+        if ((await requirePermission(request, reply, 'READ_COURSE', this.getAdminPermissions)) === null) return;
         const ficha = await this.useCase.execute(request.params.registrationId);
         if (!ficha) return reply.status(404).send({ error: 'Ficha não encontrada.' });
 

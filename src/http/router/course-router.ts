@@ -304,8 +304,21 @@ properties: courseDetailProperties },
             schema: {
                 tags: ['Courses'],
                 summary: 'List courses',
-                description: `Returns all **public** courses. Ordered by start date (nearest first).`,
-                querystring: paginationQuerystring,
+                description: `Cursos **públicos** (\`status: PUBLIC\`) do site, paginados.
+
+**Ordem:** primeiro os que ainda não terminaram (em andamento e próximos), do início mais cedo para o mais tarde; depois os terminados, do mais recente para o mais antigo. "Terminou" = o dia do fim já passou em Brasília (no último dia ainda não terminou), a mesma regra da inscrição. A página atravessa os dois grupos e \`total\` conta os dois.
+
+**\`ended\`:** \`include\` (padrão) traz os terminados no fim; \`exclude\` deixa só os que não terminaram (é o que a home do site precisa).`,
+                querystring: {
+                    type: 'object',
+                    properties: {
+                        ...paginationQuerystring.properties,
+                        ended: { type: 'string',
+enum: ['include', 'exclude'],
+default: 'include',
+description: 'Cursos que já terminaram: no fim da lista (include) ou fora dela (exclude).' },
+                    },
+                },
                 response: {
                     200: pagedResponse({
                         type: 'object',

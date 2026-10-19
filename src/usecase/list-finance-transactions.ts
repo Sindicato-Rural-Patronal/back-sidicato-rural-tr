@@ -4,6 +4,7 @@ import type {
     FinanceTransactionSum,
     FinanceTransactionWithCategory,
 } from '../ports/external/finance-repository.js';
+import { parseQuery } from '../errors/validation.js';
 
 /** Filtros dos lançamentos (lista e exportação usam os mesmos). */
 export const financeFiltersSchema = z.object({
@@ -62,7 +63,7 @@ export class ListFinanceTransactionsUseCase {
     constructor(private readonly repo: FinanceRepository) {}
 
     async execute(query: unknown): Promise<FinanceTransactionsPage> {
-        const q = querySchema.parse(query ?? {});
+        const q = parseQuery(querySchema, query);
         const filters = {
             from: q.from,
             to: endOfDay(q.to),

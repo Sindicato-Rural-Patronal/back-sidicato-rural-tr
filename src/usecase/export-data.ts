@@ -84,15 +84,18 @@ title: 'Reservas de sala',
 file: 'reservas-de-sala',
 single: 'reserva' },
     // Relatorio de cadastros: os quatro tipos num arquivo so. Pede
-    // READ_USER_ADMIN (a permissao mais alta das secoes) porque traz tambem os
-    // administradores; quem so tem READ_USER continua com as exportacoes de
-    // cada tipo, que ja existem.
+    // READ_USER_ADMIN porque traz os administradores e READ_USER porque traz
+    // CPF, RG e endereco de todas as pessoas (as permissoes nao sao
+    // hierarquicas: uma nao implica a outra). Quem so tem READ_USER continua
+    // com as exportacoes de cada tipo, que ja existem.
     cadastros: { permission: 'READ_USER_ADMIN',
+alsoRequires: 'READ_USER',
 title: 'Relatório de cadastros',
 file: 'relatorio-de-cadastros',
 single: 'cadastro' },
 } as const satisfies Record<string, {
  permission: Permission;
+alsoRequires?: Permission;
 title: string;
 file: string;
 single: string 

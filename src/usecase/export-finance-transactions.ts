@@ -1,6 +1,7 @@
 import type { FinanceRepository } from '../ports/external/finance-repository.js';
 import { csvDate, csvMoney, toCsv, type CsvColumn } from '../lib/csv.js';
 import { endOfDay, financeFiltersSchema } from './list-finance-transactions.js';
+import { parseQuery } from '../errors/validation.js';
 
 type Row = Awaited<ReturnType<FinanceRepository['listTransactionsForExport']>>[number];
 
@@ -30,7 +31,7 @@ export class ExportFinanceTransactionsUseCase {
     constructor(private readonly repo: FinanceRepository) {}
 
     async execute(query: unknown): Promise<string> {
-        const q = financeFiltersSchema.parse(query ?? {});
+        const q = parseQuery(financeFiltersSchema, query);
         const rows = await this.repo.listTransactionsForExport({
             from: q.from,
             to: endOfDay(q.to),
