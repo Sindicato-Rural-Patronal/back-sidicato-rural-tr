@@ -17,6 +17,7 @@ import {
 import { UploadConvenioLogoUseCase } from '../../usecase/upload-convenio-logo.js';
 import { ConvenioController } from '../controllers/convenio-controller.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { publicRoute } from '../lib/route-auth.js';
 
 // ── Schemas (Swagger + serialização) ─────────────────────────────────────────
 // A resposta é serializada pelo fast-json-stringify, que descarta campos não
@@ -110,6 +111,7 @@ export async function convenioRouter(fastify: FastifyInstance, prisma: PrismaCli
     fastify.get(
         '/convenios',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Convênios'],
                 summary: 'Menu de convênios ativos (público)',
@@ -138,6 +140,7 @@ export async function convenioRouter(fastify: FastifyInstance, prisma: PrismaCli
     fastify.get(
         '/convenios/:slug',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Convênios'],
                 summary: 'Página pública de um convênio',

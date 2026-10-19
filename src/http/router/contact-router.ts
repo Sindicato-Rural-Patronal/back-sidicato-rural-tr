@@ -16,6 +16,7 @@ import { DeleteContactMessageUseCase } from '../../usecase/delete-contact-messag
 import { requirePermission } from '../lib/require-permission.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
 import { publicFormRateLimit } from '../lib/public-rate-limit.js';
+import { publicRoute } from '../lib/route-auth.js';
 
 export async function contactRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const repo = createContactMessageAdapter(prisma);
@@ -33,7 +34,8 @@ export async function contactRouter(fastify: FastifyInstance, prisma: PrismaClie
     fastify.post(
         '/contacts/message',
         {
-            config: publicFormRateLimit,
+            config: { ...publicFormRateLimit,
+auth: publicRoute() },
             schema: {
                 tags: ['Contatos — Formulário'],
                 summary: 'Enviar mensagem de contato',

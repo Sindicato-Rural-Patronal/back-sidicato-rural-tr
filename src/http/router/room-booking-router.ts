@@ -18,6 +18,7 @@ import { MAX_OCCURRENCES } from '../../usecase/room-availability.js';
 import type { Permission } from '../../generated/prisma/enums.js';
 import { errorToStatus, requirePermission } from '../lib/require-permission.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { publicRoute } from '../lib/route-auth.js';
 
 const str = { type: 'string' };
 const nstr = { type: 'string',
@@ -126,6 +127,7 @@ export async function roomBookingRouter(fastify: FastifyInstance, prisma: Prisma
     fastify.get(
         '/events',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags,
                 summary: 'Eventos publicados no site',

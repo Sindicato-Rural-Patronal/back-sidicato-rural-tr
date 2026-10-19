@@ -15,6 +15,7 @@ import {
 import type { Permission } from '../../generated/prisma/enums.js';
 import { requirePermission, errorToStatus } from '../lib/require-permission.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { publicRoute } from '../lib/route-auth.js';
 
 const str = { type: 'string' };
 const nstr = { type: 'string',
@@ -60,6 +61,7 @@ export async function publicContactRouter(fastify: FastifyInstance, prisma: Pris
         reply.status(errorToStatus(error)).send({ error: error.message });
 
     fastify.get('/contacts', {
+        config: { auth: publicRoute() },
         schema: {
             tags,
             summary: 'Contatos públicos (página Contato)',

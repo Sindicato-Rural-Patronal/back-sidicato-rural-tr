@@ -20,6 +20,7 @@ import { createStorageAdapter } from '../../adapter/storage/factory.js';
 import { createInstructorAdapter } from '../../adapter/database/instructor-adapter.js';
 import { UpdateInstructorUseCase } from '../../usecase/update-instructor.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
+import { loggedIn } from '../lib/route-auth.js';
 
 export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userRepository = createUserDataAdapter(prisma);
@@ -577,6 +578,7 @@ properties: { avatarUrl: { type: 'string' } } },
     fastify.post(
         '/admin/me/avatar',
         {
+            config: { auth: loggedIn() },
             schema: {
                 tags: ['Admin — Auth'],
                 summary: 'Upload own avatar (self-service)',

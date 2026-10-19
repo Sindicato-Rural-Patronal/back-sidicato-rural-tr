@@ -21,6 +21,7 @@ import { UploadBannerImageController } from '../controllers/upload-banner-image.
 import { ReorderBannersController } from '../controllers/reorder-banners.js';
 import { requirePermission } from '../lib/require-permission.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
+import { publicRoute } from '../lib/route-auth.js';
 
 const buttonSchema = {
     type: 'object',
@@ -127,6 +128,7 @@ export async function bannerRouter(fastify: FastifyInstance, prisma: PrismaClien
     fastify.get(
         '/banners',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Banners'],
                 summary: 'Listar banners ativos (home)',

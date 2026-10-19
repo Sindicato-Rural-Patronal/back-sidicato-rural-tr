@@ -13,6 +13,7 @@ import { RevokeAdminInviteUseCase } from '../../usecase/revoke-admin-invite.js';
 import { AdminInviteController } from '../controllers/admin-invite-controller.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { publicRoute } from '../lib/route-auth.js';
 
 export async function adminInviteRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const inviteRepo = createAdminInviteAdapter(prisma);
@@ -124,6 +125,7 @@ rulesId: string
     fastify.get(
         '/invites/:token',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Invites'],
                 summary: 'Public: view an invite (person + rule) if valid',
@@ -149,6 +151,7 @@ ruleName: { type: 'string' } },
     fastify.post(
         '/invites/:token/accept',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Invites'],
                 summary: 'Public: accept an invite — set username + password',

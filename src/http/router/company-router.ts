@@ -27,6 +27,7 @@ import { UpdatePropertyUseCase } from '../../usecase/update-property.js';
 import { UploadCompanyPartnerLogoUseCase } from '../../usecase/upload-company-partner-logo.js';
 import { CompanyController } from '../controllers/company-controller.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
+import { publicRoute } from '../lib/route-auth.js';
 
 // ── Schemas (Swagger + serialização) ─────────────────────────────────────────
 // fast-json-stringify descarta campos não declarados: tudo que sai está listado.
@@ -426,6 +427,7 @@ properties: { partnerLogoUrl: str } },
 
     // ── Parceiros ───────────────────────────────────────────────────────────
     fastify.get('/partners', {
+        config: { auth: publicRoute() },
         schema: {
             tags: ['Parceiros'],
             summary: 'Listar parceiros públicos',

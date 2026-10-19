@@ -50,6 +50,7 @@ import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 import { publicFormRateLimit, publicLookupRateLimit } from '../lib/public-rate-limit.js';
 import { CpfAttemptLimiter } from '../../lib/cpf-attempt-limiter.js';
+import { publicRoute } from '../lib/route-auth.js';
 
 export async function registrationRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const courseRepository = createCourseAdapter(prisma);
@@ -185,7 +186,8 @@ example: '52998224725' },
     fastify.post(
         '/courses/:courseId/register-by-cpf',
         {
-            config: publicFormRateLimit,
+            config: { ...publicFormRateLimit,
+auth: publicRoute() },
             schema: {
                 tags: ['Registrations'],
                 summary: 'Register for a course with CPF and the last 4 phone digits',
@@ -237,7 +239,8 @@ phoneEnd: string
     fastify.post(
         '/users/lookup-cpf',
         {
-            config: publicLookupRateLimit,
+            config: { ...publicLookupRateLimit,
+auth: publicRoute() },
             schema: {
                 tags: ['Registrations'],
                 summary: 'Look up a participant by CPF and the last 4 phone digits',
@@ -280,7 +283,8 @@ phoneEnd: string
     fastify.post(
         '/courses/:courseId/register-full',
         {
-            config: publicFormRateLimit,
+            config: { ...publicFormRateLimit,
+auth: publicRoute() },
             schema: {
                 tags: ['Registrations'],
                 summary: 'Register a new participant with full data',

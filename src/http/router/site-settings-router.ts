@@ -8,6 +8,7 @@ import { UpdateSiteSettingsUseCase } from '../../usecase/update-site-settings.js
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { SiteSettingsController } from '../controllers/site-settings-controller.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { publicRoute } from '../lib/route-auth.js';
 
 // Todos os campos são texto (vazio = não preenchido).
 const settingFields = [
@@ -52,6 +53,7 @@ export async function siteSettingsRouter(fastify: FastifyInstance, prisma: Prism
     fastify.get(
         '/site-settings',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Site Settings'],
                 summary: 'Configurações públicas do site (redes sociais, dados do sindicato, Sobre, fonte das cotações)',

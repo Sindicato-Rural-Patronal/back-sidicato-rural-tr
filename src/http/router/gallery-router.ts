@@ -18,6 +18,7 @@ import {
 } from '../../usecase/gallery-usecases.js';
 import { GalleryController } from '../controllers/gallery-controller.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { publicRoute } from '../lib/route-auth.js';
 
 // fast-json-stringify descarta campos não declarados: tudo que sai está listado.
 const str = { type: 'string' };
@@ -119,6 +120,7 @@ photoId: string
 }>;
 
     fastify.get('/galleries', {
+        config: { auth: publicRoute() },
         schema: {
             tags,
             summary: 'Galerias da home (público)',

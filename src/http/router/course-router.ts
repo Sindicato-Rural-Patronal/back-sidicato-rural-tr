@@ -31,6 +31,7 @@ import { createInstructorAdapter } from '../../adapter/database/instructor-adapt
 import { downloadImage } from '../../lib/download-image.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 import { requirePermission } from '../lib/require-permission.js';
+import { publicRoute } from '../lib/route-auth.js';
 
 const courseDetailProperties = {
     id: { type: 'string',
@@ -301,6 +302,7 @@ properties: courseDetailProperties },
     fastify.get(
         '/courses',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Courses'],
                 summary: 'List courses',
@@ -333,6 +335,7 @@ description: 'Cursos que já terminaram: no fim da lista (include) ou fora dela 
     fastify.get(
         '/courses/:courseId',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Courses'],
                 summary: 'Course detail',

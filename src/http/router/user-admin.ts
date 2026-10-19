@@ -19,6 +19,7 @@ import { AdminPreferencesController } from '../controllers/admin-preferences.js'
 import { MAX_PREFS_BYTES, UpdateAdminPreferencesUseCase } from '../../usecase/admin-preferences.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
+import { loggedIn } from '../lib/route-auth.js';
 
 export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userAdminRepository = createUserAdminAdapter(prisma);
@@ -44,20 +45,18 @@ export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaCl
     );
     const getCurrentAdminController = new GetCurrentAdminController(
         new GetCurrentAdminUseCase(userAdminRepository, ruleRepository, userDataRepository),
-        getAdminPermissions,
     );
     const updateMeController = new UpdateMeController(
         new UpdateMeUseCase(userAdminRepository, userDataRepository),
-        getAdminPermissions,
     );
     const adminPreferencesController = new AdminPreferencesController(
         new UpdateAdminPreferencesUseCase(userAdminRepository),
-        getAdminPermissions,
     );
 
     fastify.get(
         '/admin/me',
         {
+            config: { auth: loggedIn() },
             schema: {
                 tags: ['Admin — Auth'],
                 summary: 'Get current admin profile and permissions',
@@ -97,6 +96,7 @@ items: { type: 'string' } },
     fastify.patch(
         '/admin/me/preferences',
         {
+            config: { auth: loggedIn() },
             schema: {
                 tags: ['Admin — Auth'],
                 summary: 'Salvar as preferências do Painel Geral deste admin',
@@ -131,7 +131,8 @@ additionalProperties: true },
         {
             // Cada pedido com senha confere a senha atual: limite como o do login,
             // para um token vazado não servir de força bruta da senha.
-            config: { rateLimit: { max: 10,
+            config: { auth: loggedIn(),
+rateLimit: { max: 10,
 timeWindow: '5 minutes' } },
             schema: {
                 tags: ['Admin — Auth'],

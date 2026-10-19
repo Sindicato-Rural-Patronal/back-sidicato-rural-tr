@@ -14,6 +14,7 @@ import { UpdateQuoteUnitUseCase } from '../../usecase/update-quote-unit.js';
 import { QUOTE_UNITS } from '../../lib/quote-products.js';
 import { createSiteSettingsAdapter } from '../../adapter/database/site-settings-adapter.js';
 import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { publicRoute } from '../lib/route-auth.js';
 
 const marketQuoteProperties = {
     morningCents: { type: ['integer', 'null'],
@@ -59,6 +60,7 @@ export async function marketQuoteRouter(fastify: FastifyInstance, prisma: Prisma
     fastify.get(
         '/market-quotes',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Market Quotes'],
                 summary: 'Cotações da home (público)',
@@ -73,6 +75,7 @@ export async function marketQuoteRouter(fastify: FastifyInstance, prisma: Prisma
     fastify.get(
         '/market-quotes/history',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Market Quotes'],
                 summary: 'Histórico das cotações (público)',

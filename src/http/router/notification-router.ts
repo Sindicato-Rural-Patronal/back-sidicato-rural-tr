@@ -2,13 +2,11 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createNotificationAdapter } from '../../adapter/database/notification-adapter.js';
 import { createPendingNotificationsAdapter } from '../../adapter/database/pending-notifications-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { computePendingNotifications } from '../../usecase/pending-notifications.js';
 import { ListNotificationsUseCase, MarkNotificationsReadUseCase } from '../../usecase/notifications.js';
 import { NotificationController } from '../controllers/notification-controller.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { loggedIn } from '../lib/route-auth.js';
 
 const str = { type: 'string' };
 const nstr = { type: 'string',
@@ -46,17 +44,16 @@ enum: ['info', 'warning'] },
 export async function notificationRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const repo = createNotificationAdapter(prisma);
     const pendingRepo = createPendingNotificationsAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(createUserAdminAdapter(prisma), createRuleAdapter(prisma));
 
     const controller = new NotificationController(
         new ListNotificationsUseCase(repo, (permissions, now) => computePendingNotifications(pendingRepo, permissions, now)),
         new MarkNotificationsReadUseCase(repo),
-        getAdminPermissions,
     );
 
     fastify.get(
         '/admin/notifications',
         {
+            config: { auth: loggedIn() },
             schema: {
                 tags,
                 summary: 'Sino do painel: eventos e pendências',
@@ -88,6 +85,7 @@ items: pendingSchema },
     fastify.patch(
         '/admin/notifications/read',
         {
+            config: { auth: loggedIn() },
             schema: {
                 tags,
                 summary: 'Marcar notificações como lidas',

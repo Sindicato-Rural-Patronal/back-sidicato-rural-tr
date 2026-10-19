@@ -21,6 +21,7 @@ import { UploadNewsBlockImageUseCase } from '../../usecase/upload-news-block-ima
 import { UploadNewsBlockImageController } from '../controllers/upload-news-block-image.js';
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
+import { publicRoute } from '../lib/route-auth.js';
 
 const newsProperties = {
     id: { type: 'string' },
@@ -81,6 +82,7 @@ export async function newsRouter(fastify: FastifyInstance, prisma: PrismaClient)
     fastify.get(
         '/news',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['News'],
                 summary: 'List published news',
@@ -99,6 +101,7 @@ properties: newsProperties }),
     fastify.get(
         '/news/:newsId',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['News'],
                 summary: 'News detail',
