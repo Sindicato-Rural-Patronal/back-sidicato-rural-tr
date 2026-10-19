@@ -4,8 +4,8 @@ import type { GetAdminInviteUseCase } from '../../usecase/get-admin-invite.js';
 import type { AcceptAdminInviteUseCase } from '../../usecase/accept-admin-invite.js';
 import type { ListAdminInvitesUseCase } from '../../usecase/list-admin-invites.js';
 import type { RevokeAdminInviteUseCase } from '../../usecase/revoke-admin-invite.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
+import { adminOf } from '../lib/route-auth.js';
 
 export class AdminInviteController {
     constructor(
@@ -14,18 +14,13 @@ export class AdminInviteController {
         private readonly acceptUseCase: AcceptAdminInviteUseCase,
         private readonly listUseCase: ListAdminInvitesUseCase,
         private readonly revokeUseCase: RevokeAdminInviteUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async list(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_USER_ADMIN', this.getAdminPermissions)) === null)
-            return;
         return reply.send(await this.listUseCase.execute());
     }
 
     async revoke(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'CREATE_USER_ADMIN', this.getAdminPermissions)) === null)
-            return;
         const r = await this.revokeUseCase.execute(request.params.id);
         if (r.error) return reply.status(errorToStatus(r.error)).send({ error: r.error.message });
         return reply.status(204).send();
@@ -40,14 +35,7 @@ rulesId: string
 }>,
         reply: FastifyReply,
     ) {
-        const actorId = await requirePermission(
-            request,
-            reply,
-            'CREATE_USER_ADMIN',
-            this.getAdminPermissions,
-        );
-        if (actorId === null) return;
-        const actorPerms = (await this.getAdminPermissions.execute(actorId)) ?? [];
+        const actorPerms = [...adminOf(request).permissions];
         const { userDataId, rulesId } = request.body;
         const r = await this.createUseCase.execute(userDataId, rulesId, actorPerms);
         if (r.error) return reply.status(errorToStatus(r.error)).send({ error: r.error.message });

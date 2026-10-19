@@ -11,16 +11,14 @@ import { AcceptAdminInviteUseCase } from '../../usecase/accept-admin-invite.js';
 import { ListAdminInvitesUseCase } from '../../usecase/list-admin-invites.js';
 import { RevokeAdminInviteUseCase } from '../../usecase/revoke-admin-invite.js';
 import { AdminInviteController } from '../controllers/admin-invite-controller.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
-import { publicRoute } from '../lib/route-auth.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 export async function adminInviteRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const inviteRepo = createAdminInviteAdapter(prisma);
     const userDataRepo = createUserDataAdapter(prisma);
     const ruleRepo = createRuleAdapter(prisma);
     const userAdminRepo = createUserAdminAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepo, ruleRepo);
 
     const controller = new AdminInviteController(
         new CreateAdminInviteUseCase(inviteRepo, userDataRepo, ruleRepo, userAdminRepo),
@@ -28,12 +26,12 @@ export async function adminInviteRouter(fastify: FastifyInstance, prisma: Prisma
         new AcceptAdminInviteUseCase(inviteRepo, userAdminRepo, userDataRepo, createNotificationPublisher(prisma)),
         new ListAdminInvitesUseCase(inviteRepo, userDataRepo, ruleRepo),
         new RevokeAdminInviteUseCase(inviteRepo),
-        getAdminPermissions,
     );
 
     fastify.post(
         '/admin/invites',
         {
+            config: { auth: requires('CREATE_USER_ADMIN') },
             schema: {
                 tags: ['Admin — Invites'],
                 summary: 'Create an admin invite (person + rule) → token/link',
@@ -72,6 +70,7 @@ rulesId: string
     fastify.get(
         '/admin/invites',
         {
+            config: { auth: requires('READ_USER_ADMIN') },
             schema: {
                 tags: ['Admin — Invites'],
                 summary: 'List pending admin invites (no token exposed)',
@@ -102,6 +101,7 @@ rulesId: string
     fastify.delete(
         '/admin/invites/:id',
         {
+            config: { auth: requires('CREATE_USER_ADMIN') },
             schema: {
                 tags: ['Admin — Invites'],
                 summary: 'Revoke a pending admin invite',

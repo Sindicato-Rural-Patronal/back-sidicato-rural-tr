@@ -17,31 +17,25 @@ import { UpdateMeController } from '../controllers/update-me.js';
 import { CURRENT_PASSWORD_REQUIRED, CURRENT_PASSWORD_WRONG, UpdateMeUseCase } from '../../usecase/update-me.js';
 import { AdminPreferencesController } from '../controllers/admin-preferences.js';
 import { MAX_PREFS_BYTES, UpdateAdminPreferencesUseCase } from '../../usecase/admin-preferences.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
-import { loggedIn } from '../lib/route-auth.js';
+import { loggedIn, requires } from '../lib/route-auth.js';
 
 export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userAdminRepository = createUserAdminAdapter(prisma);
     const userDataRepository = createUserDataAdapter(prisma);
     const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const createUserAdminController = new CreateUserAdminController(
         new CreateUserAdminUseCase(userAdminRepository, userDataRepository, ruleRepository),
-        getAdminPermissions,
     );
     const listUserAdminsController = new ListUserAdminsController(
         new ListUserAdminsUseCase(userAdminRepository),
-        getAdminPermissions,
     );
     const updateUserAdminController = new UpdateUserAdminController(
         new UpdateUserAdminUseCase(userAdminRepository, ruleRepository),
-        getAdminPermissions,
     );
     const deleteUserAdminController = new DeleteUserAdminController(
         new DeleteUserAdminUseCase(userAdminRepository, ruleRepository),
-        getAdminPermissions,
     );
     const getCurrentAdminController = new GetCurrentAdminController(
         new GetCurrentAdminUseCase(userAdminRepository, ruleRepository, userDataRepository),
@@ -173,6 +167,7 @@ properties: { message: { type: 'string' } } },
     fastify.get(
         '/admin/users/admins',
         {
+            config: { auth: requires('READ_USER_ADMIN') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'List admin users (internal)',
@@ -237,6 +232,7 @@ nullable: true },
     fastify.post(
         '/admin/users',
         {
+            config: { auth: requires('CREATE_USER_ADMIN') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'Create admin user',
@@ -303,6 +299,7 @@ example: '550e8400-e29b-41d4-a716-446655440000' },
     fastify.patch(
         '/admin/users/:id',
         {
+            config: { auth: requires('UPDATE_USER_ADMIN') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'Update admin user',
@@ -345,6 +342,7 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/admin/users/:id',
         {
+            config: { auth: requires('DELETE_USER_ADMIN') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'Delete admin user',

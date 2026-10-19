@@ -1,20 +1,18 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createSiteSettingsAdapter } from '../../adapter/database/site-settings-adapter.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import {
     AUDIT_RETENTION_OPTIONS,
     GetAuditRetentionUseCase,
     UpdateAuditRetentionUseCase,
 } from '../../usecase/audit-retention.js';
 import { purgeOldAuditLogs, resetAuditCleanupClock } from '../../adapter/database/audit-cleanup.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 import { buildAuditLogWhere } from '../../adapter/database/list-filters.js';
 import { describeAuditAction } from '../../lib/audit-sentence.js';
 import { describeUserAgent } from '../../lib/user-agent.js';
+import { requires } from '../lib/route-auth.js';
 
 // Valor de antes/depois: texto, número, sim/não ou vazio.
 const auditValue = { type: ['string', 'number', 'boolean', 'null'] };
@@ -37,9 +35,6 @@ nullable: true },
 };
 
 export async function auditRouter(fastify: FastifyInstance, prisma: PrismaClient) {
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
     const siteSettingsRepository = createSiteSettingsAdapter(prisma);
     const getAuditRetention = new GetAuditRetentionUseCase(siteSettingsRepository);
     const updateAuditRetention = new UpdateAuditRetentionUseCase(siteSettingsRepository);
@@ -61,6 +56,7 @@ total };
     fastify.get(
         '/admin/audit-logs',
         {
+            config: { auth: requires('READ_AUDIT') },
             schema: {
                 tags: ['Admin — Audit'],
                 summary: 'List admin audit trail',
@@ -144,7 +140,6 @@ q?: string;
             }>,
             res: FastifyReply,
         ) => {
-            if (!(await requirePermission(req, res, 'READ_AUDIT', getAdminPermissions))) return;
             const page = Number(req.query.page) || 1;
             const limit = Number(req.query.limit) || 30;
             const skip = (page - 1) * limit;
@@ -208,6 +203,7 @@ username: true },
     fastify.get(
         '/admin/audit-settings',
         {
+            config: { auth: requires('READ_AUDIT') },
             schema: {
                 tags: ['Admin — Audit'],
                 summary: 'Tempo de guarda da trilha de auditoria',
@@ -220,7 +216,6 @@ username: true },
             },
         },
         async (req: FastifyRequest, res: FastifyReply) => {
-            if (!(await requirePermission(req, res, 'READ_AUDIT', getAdminPermissions))) return;
             const [{ retentionDays }, extent] = await Promise.all([
                 getAuditRetention.execute(),
                 trailExtent(),
@@ -236,6 +231,7 @@ options: [...AUDIT_RETENTION_OPTIONS],
     fastify.patch(
         '/admin/audit-settings',
         {
+            config: { auth: requires('UPDATE_AUDIT') },
             schema: {
                 tags: ['Admin — Audit'],
                 summary: 'Mudar o tempo de guarda da trilha (apaga o que passou do prazo)',
@@ -257,7 +253,6 @@ maximum: 3650 } },
             },
         },
         async (req: FastifyRequest<{ Body: { retentionDays?: number } }>, res: FastifyReply) => {
-            if (!(await requirePermission(req, res, 'UPDATE_AUDIT', getAdminPermissions))) return;
             const result = await updateAuditRetention.execute(req.body);
             if (result.error) {
                 return res.status(errorToStatus(result.error)).send({ error: result.error.message });

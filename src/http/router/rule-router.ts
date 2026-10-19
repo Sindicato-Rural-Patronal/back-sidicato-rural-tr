@@ -10,9 +10,9 @@ import { ListRulesUseCase } from '../../usecase/list-rules.js';
 import { DeleteRuleController } from '../controllers/delete-rule.js';
 import { DeleteRuleUseCase } from '../../usecase/delete-rule.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 import { Permission } from '../../generated/prisma/enums.js';
+import { requires } from '../lib/route-auth.js';
 
 // Sempre a lista do Prisma: permissão nova no enum já vale nas regras.
 const PERMISSIONS_ENUM = Object.values(Permission);
@@ -20,28 +20,24 @@ const PERMISSIONS_ENUM = Object.values(Permission);
 export async function ruleRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const ruleRepository = createRuleAdapter(prisma);
     const userAdminRepository = createUserAdminAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const createRuleController = new CreateRuleController(
         new CreateRuleUseCase(ruleRepository),
-        getAdminPermissions,
     );
     const updateRuleController = new UpdateRuleController(
         new UpdateRuleUseCase(ruleRepository),
-        getAdminPermissions,
     );
     const listRulesController = new ListRulesController(
         new ListRulesUseCase(ruleRepository),
-        getAdminPermissions,
     );
     const deleteRuleController = new DeleteRuleController(
         new DeleteRuleUseCase(ruleRepository, userAdminRepository),
-        getAdminPermissions,
     );
 
     fastify.get(
         '/admin/rules',
         {
+            config: { auth: requires('READ_RULE') },
             schema: {
                 tags: ['Admin — Rules'],
                 summary: 'List permission rules (internal)',
@@ -72,6 +68,7 @@ items: { type: 'string' } },
     fastify.post(
         '/rules',
         {
+            config: { auth: requires('CREATE_RULE') },
             schema: {
                 tags: ['Rules'],
                 summary: 'Create permission rule',
@@ -121,6 +118,7 @@ format: 'date-time' },
     fastify.patch(
         '/rules/:ruleId',
         {
+            config: { auth: requires('UPDATE_RULE') },
             schema: {
                 tags: ['Rules'],
                 summary: 'Update permission rule',
@@ -163,6 +161,7 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/rules/:ruleId',
         {
+            config: { auth: requires('DELETE_RULE') },
             schema: {
                 tags: ['Rules'],
                 summary: 'Delete permission rule',

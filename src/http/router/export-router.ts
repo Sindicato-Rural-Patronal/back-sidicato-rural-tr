@@ -1,18 +1,15 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { Permission } from '../../generated/prisma/enums.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { AUDIT_EXPORT_LIMIT, createExportAdapter } from '../../adapter/database/export-adapter.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { EXPORT_DATASETS, ExportDataUseCase, type ExportDataset } from '../../usecase/export-data.js';
-import { errorToStatus, requirePermission } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
+import { adminOf, requiresFrom } from '../lib/route-auth.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
 import { fillAuditLocationLater } from '../audit-hooks.js';
 import { requestContext } from '../../lib/request-context.js';
 
 export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClient) {
-    const getAdminPermissions = new GetAdminPermissionsUseCase(createUserAdminAdapter(prisma), createRuleAdapter(prisma));
     const repo = createExportAdapter(prisma);
     const exportData = new ExportDataUseCase(repo);
 
@@ -56,15 +53,21 @@ additionalProperties: true } }),
 403: errorResponse },
     });
 
-    async function handle(req: FastifyRequest<{ Params: { dataset: ExportDataset } }>, reply: FastifyReply, input: unknown) {
-        const { dataset } = req.params;
+    // A permissão depende do conjunto (do caminho): `cadastros` pede duas.
+    // Conjunto inexistente → só o login, e a validação do schema responde 400.
+    const auth = requiresFrom(req => {
         const spec: {
  permission: Permission;
 alsoRequires?: Permission 
-} = EXPORT_DATASETS[dataset];
-        const actorId = await requirePermission(req, reply, spec.permission, getAdminPermissions);
-        if (actorId === null) return;
-        if (spec.alsoRequires && (await requirePermission(req, reply, spec.alsoRequires, getAdminPermissions)) === null) return;
+} | undefined =
+            EXPORT_DATASETS[(req.params as { dataset: string }).dataset as ExportDataset];
+        if (!spec) return null;
+        return spec.alsoRequires ? [spec.permission, spec.alsoRequires] : [spec.permission];
+    });
+
+    async function handle(req: FastifyRequest<{ Params: { dataset: ExportDataset } }>, reply: FastifyReply, input: unknown) {
+        const { dataset } = req.params;
+        const actorId = adminOf(req).id;
 
         const r = await exportData.execute(dataset, input);
         if (r.error || !r.result) return reply.status(errorToStatus(r.error)).send({ error: r.error?.message });
@@ -91,12 +94,14 @@ alsoRequires?: Permission
 
     fastify.get(
         '/admin/export/:dataset',
-        { schema: schema('GET') },
+        { config: { auth },
+schema: schema('GET') },
         (req: FastifyRequest<{ Params: { dataset: ExportDataset } }>, reply: FastifyReply) => handle(req, reply, req.query),
     );
     fastify.post(
         '/admin/export/:dataset',
-        { schema: schema('POST') },
+        { config: { auth },
+schema: schema('POST') },
         (req: FastifyRequest<{ Params: { dataset: ExportDataset } }>, reply: FastifyReply) => handle(req, reply, req.body ?? {}),
     );
 }
