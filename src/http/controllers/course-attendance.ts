@@ -3,13 +3,11 @@ import type {
     SetRegistrationAttendanceUseCase,
     SetUnmarkedAttendanceUseCase,
 } from '../../usecase/course-attendance.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
 
 export class SetRegistrationAttendanceController {
     constructor(
         private readonly useCase: SetRegistrationAttendanceUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(
@@ -19,10 +17,6 @@ export class SetRegistrationAttendanceController {
         }>,
         reply: FastifyReply,
     ) {
-        if (
-            (await requirePermission(request, reply, 'UPDATE_COURSE', this.getAdminPermissions)) === null
-        )
-            return;
         const response = await this.useCase.execute(request.params.registrationId, request.body?.attended);
         if (response.error) {
             return reply.status(errorToStatus(response.error)).send({ error: response.error.message });
@@ -34,7 +28,6 @@ export class SetRegistrationAttendanceController {
 export class SetUnmarkedAttendanceController {
     constructor(
         private readonly useCase: SetUnmarkedAttendanceUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(
@@ -44,10 +37,6 @@ export class SetUnmarkedAttendanceController {
         }>,
         reply: FastifyReply,
     ) {
-        if (
-            (await requirePermission(request, reply, 'UPDATE_COURSE', this.getAdminPermissions)) === null
-        )
-            return;
         const response = await this.useCase.execute(request.params.courseId, request.body?.attended);
         if (response.error) {
             return reply.status(errorToStatus(response.error)).send({ error: response.error.message });

@@ -1,12 +1,9 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { DeleteCoursePhotoUseCase } from '../../usecase/delete-course-photo.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission } from '../lib/require-permission.js';
 
 export class DeleteCoursePhotoController {
     constructor(
         private readonly useCase: DeleteCoursePhotoUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(
@@ -18,11 +15,6 @@ export class DeleteCoursePhotoController {
         }>,
         reply: FastifyReply,
     ) {
-        if (
-            (await requirePermission(request, reply, 'UPDATE_COURSE', this.getAdminPermissions)) ===
-            null
-        )
-            return;
         const { photoId } = request.params;
         const response = await this.useCase.execute(photoId);
         if (response.error) {

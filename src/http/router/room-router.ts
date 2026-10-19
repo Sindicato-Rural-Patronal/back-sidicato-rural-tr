@@ -1,8 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createRoomAdapter } from '../../adapter/database/room-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { CreateRoomController } from '../controllers/create-room.js';
 import { CreateRoomUseCase } from '../../usecase/create-room.js';
 import { ListRoomsController } from '../controllers/list-rooms.js';
@@ -11,7 +9,6 @@ import { UpdateRoomController } from '../controllers/update-room.js';
 import { UpdateRoomUseCase } from '../../usecase/update-room.js';
 import { DeleteRoomController } from '../controllers/delete-room.js';
 import { DeleteRoomUseCase } from '../../usecase/delete-room.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 import { requires } from '../lib/route-auth.js';
 
@@ -26,22 +23,16 @@ const roomProperties = {
 
 export async function roomRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const roomRepository = createRoomAdapter(prisma);
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const createRoomController = new CreateRoomController(
         new CreateRoomUseCase(roomRepository),
-        getAdminPermissions,
     );
     const listRoomsController = new ListRoomsController(new ListRoomsUseCase(roomRepository));
     const updateRoomController = new UpdateRoomController(
         new UpdateRoomUseCase(roomRepository),
-        getAdminPermissions,
     );
     const deleteRoomController = new DeleteRoomController(
         new DeleteRoomUseCase(roomRepository),
-        getAdminPermissions,
     );
 
     fastify.get(
@@ -81,6 +72,7 @@ limit?: number
     fastify.post(
         '/rooms',
         {
+            config: { auth: requires('CREATE_COURSE') },
             schema: {
                 tags: ['Rooms'],
                 summary: 'Create room',
@@ -120,6 +112,7 @@ properties: { id: { type: 'string' } } },
     fastify.patch(
         '/rooms/:roomId',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Rooms'],
                 summary: 'Update room',
@@ -169,6 +162,7 @@ maxCapacity: number
     fastify.delete(
         '/rooms/:roomId',
         {
+            config: { auth: requires('DELETE_COURSE') },
             schema: {
                 tags: ['Rooms'],
                 summary: 'Delete room',

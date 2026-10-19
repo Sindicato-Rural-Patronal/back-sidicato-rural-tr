@@ -1,20 +1,12 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { AddCoursePhotoUseCase } from '../../usecase/add-course-photo.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission } from '../lib/require-permission.js';
 
 export class AddCoursePhotoController {
     constructor(
         private readonly useCase: AddCoursePhotoUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(request: FastifyRequest<{ Params: { courseId: string } }>, reply: FastifyReply) {
-        if (
-            (await requirePermission(request, reply, 'UPDATE_COURSE', this.getAdminPermissions)) ===
-            null
-        )
-            return;
         const { courseId } = request.params;
 
         const data = await request.file();

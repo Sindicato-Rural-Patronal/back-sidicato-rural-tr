@@ -2,8 +2,6 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createRegistrationAdapter } from '../../adapter/database/registration-adapter.js';
 import { createUserDataAdapter } from '../../adapter/database/user-data.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createCourseAdapter } from '../../adapter/database/course-adapter.js';
 import { createNotificationPublisher } from '../../adapter/database/notification-adapter.js';
 import { RegisterForCourseByCpfUseCase } from '../../usecase/register-for-course-by-cpf.js';
@@ -44,19 +42,15 @@ import {
     SetRegistrationAttendanceController,
     SetUnmarkedAttendanceController,
 } from '../controllers/course-attendance.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 import { publicFormRateLimit, publicLookupRateLimit } from '../lib/public-rate-limit.js';
 import { CpfAttemptLimiter } from '../../lib/cpf-attempt-limiter.js';
-import { publicRoute } from '../lib/route-auth.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 export async function registrationRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const courseRepository = createCourseAdapter(prisma);
     const userDataRepository = createUserDataAdapter(prisma);
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
     const registrationRepository = createRegistrationAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
     const notifications = createNotificationPublisher(prisma);
     // Um contador só para a consulta e as duas inscrições por CPF: errar numa
     // gasta as tentativas das outras.
@@ -73,51 +67,39 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
     );
     const listController = new ListCourseRegistrationsController(
         new ListCourseRegistrationsUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const cancelController = new CancelRegistrationController(
         new CancelRegistrationUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const setConfirmedController = new SetRegistrationConfirmedController(
         new SetRegistrationConfirmedUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const startCourseController = new StartCourseController(
         new StartCourseUseCase(courseRepository, registrationRepository),
-        getAdminPermissions,
     );
     const uploadFichaController = new UploadRegistrationFichaController(
         new UploadRegistrationFichaUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const downloadFichaController = new DownloadRegistrationFichaController(
         new GetRegistrationFichaUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const deleteFichaController = new DeleteRegistrationFichaController(
         new DeleteRegistrationFichaUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const adminRegisterController = new AdminRegisterPersonController(
         new AdminRegisterPersonUseCase(courseRepository, userDataRepository, registrationRepository),
-        getAdminPermissions,
     );
     const confirmAllController = new ConfirmAllRegistrationsController(
         new ConfirmAllRegistrationsUseCase(courseRepository, registrationRepository),
-        getAdminPermissions,
     );
     const completeCourseController = new CompleteCourseController(
         new CompleteCourseUseCase(courseRepository),
-        getAdminPermissions,
     );
     const setAttendanceController = new SetRegistrationAttendanceController(
         new SetRegistrationAttendanceUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const setUnmarkedAttendanceController = new SetUnmarkedAttendanceController(
         new SetUnmarkedAttendanceUseCase(courseRepository, registrationRepository),
-        getAdminPermissions,
     );
 
     fastify.post(
@@ -323,6 +305,7 @@ nullable: true } } } },
     fastify.get(
         '/admin/courses/:courseId/registrations',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'List course registrations',
@@ -381,6 +364,7 @@ limit?: number
     fastify.post(
         '/admin/courses/:courseId/registrations',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Register a person from the admin panel',
@@ -420,6 +404,7 @@ properties: { registrationId: { type: 'string' } } },
     fastify.patch(
         '/admin/courses/:courseId/registrations/confirm-all',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Confirm all unconfirmed registrations of a course',
@@ -446,6 +431,7 @@ properties: { confirmed: { type: 'integer' } } },
     fastify.delete(
         '/admin/registrations/:registrationId',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Cancel registration',
@@ -470,6 +456,7 @@ properties: { confirmed: { type: 'integer' } } },
     fastify.patch(
         '/admin/registrations/:registrationId/confirm',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Confirm or unconfirm a registration',
@@ -505,6 +492,7 @@ Body: { confirmed: boolean }
     fastify.post(
         '/admin/courses/:courseId/start',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Start the course',
@@ -533,6 +521,7 @@ properties: { message: { type: 'string' } } },
     fastify.patch(
         '/admin/courses/:courseId/complete',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Courses'],
                 summary: 'Mark the course as completed',
@@ -567,6 +556,7 @@ enum: ['COMPLETED'] },
     fastify.patch(
         '/admin/registrations/:registrationId/attendance',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Mark attendance of a registration',
@@ -611,6 +601,7 @@ nullable: true },
     fastify.patch(
         '/admin/courses/:courseId/registrations/attendance',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Mark attendance of every unmarked confirmed registration',
@@ -652,6 +643,7 @@ properties: { updated: { type: 'integer' } } },
     fastify.post(
         '/admin/registrations/:registrationId/ficha',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Attach the filled/scanned enrollment form (PDF)',
@@ -681,6 +673,7 @@ properties: { filename: { type: 'string' } } },
     fastify.get(
         '/admin/registrations/:registrationId/ficha',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Download the attached enrollment form (PDF)',
@@ -704,6 +697,7 @@ properties: { filename: { type: 'string' } } },
     fastify.delete(
         '/admin/registrations/:registrationId/ficha',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Remove the attached enrollment form',

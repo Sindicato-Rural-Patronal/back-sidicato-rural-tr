@@ -13,8 +13,6 @@ import { ListCoursesController } from '../controllers/list-courses.js';
 import { ListCoursesUseCase } from '../../usecase/list-courses.js';
 import { ListAllCoursesController } from '../controllers/list-all-courses.js';
 import { ListAllCoursesUseCase } from '../../usecase/list-all-courses.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { UpdateCourseController } from '../controllers/update-course.js';
 import { UpdateCourseUseCase } from '../../usecase/update-course.js';
 import { DeleteCourseController } from '../controllers/delete-course.js';
@@ -25,13 +23,11 @@ import { DeleteCoursePhotoController } from '../controllers/delete-course-photo.
 import { DeleteCoursePhotoUseCase } from '../../usecase/delete-course-photo.js';
 import { GetAdminCourseDetailController } from '../controllers/get-admin-course-detail.js';
 import { GetAdminCourseDetailUseCase } from '../../usecase/get-admin-course-detail.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { CopyCourseExtrasUseCase } from '../../usecase/copy-course-extras.js';
 import { createInstructorAdapter } from '../../adapter/database/instructor-adapter.js';
 import { downloadImage } from '../../lib/download-image.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
-import { requirePermission } from '../lib/require-permission.js';
-import { publicRoute } from '../lib/route-auth.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 const courseDetailProperties = {
     id: { type: 'string',
@@ -139,14 +135,10 @@ export async function courseRouter(fastify: FastifyInstance, prisma: PrismaClien
     const courseRepository = createCourseAdapter(prisma);
     const roomRepository = createRoomAdapter(prisma);
     const storage = createStorageAdapter();
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const uploadBannerUseCase = new UploadCourseBannerUseCase(storage, courseRepository);
     const createCourseController = new CreateCourseController(
         new CreateCourseUseCase(courseRepository, roomRepository),
-        getAdminPermissions,
         new CopyCourseExtrasUseCase(
             courseRepository,
             createInstructorAdapter(prisma),
@@ -156,7 +148,6 @@ export async function courseRouter(fastify: FastifyInstance, prisma: PrismaClien
     );
     const uploadBannerController = new UploadBannerCourseController(
         uploadBannerUseCase,
-        getAdminPermissions,
     );
     const getCourseDetailController = new GetCourseDetailController(
         new GetCourseDetailUseCase(courseRepository),
@@ -166,32 +157,27 @@ export async function courseRouter(fastify: FastifyInstance, prisma: PrismaClien
     );
     const listAllCoursesController = new ListAllCoursesController(
         new ListAllCoursesUseCase(courseRepository),
-        getAdminPermissions,
     );
     const updateCourseController = new UpdateCourseController(
         new UpdateCourseUseCase(courseRepository, roomRepository),
-        getAdminPermissions,
     );
     const deleteCourseController = new DeleteCourseController(
         new DeleteCourseUseCase(courseRepository),
-        getAdminPermissions,
     );
     const addCoursePhotoController = new AddCoursePhotoController(
         new AddCoursePhotoUseCase(courseRepository, storage),
-        getAdminPermissions,
     );
     const deleteCoursePhotoController = new DeleteCoursePhotoController(
         new DeleteCoursePhotoUseCase(courseRepository),
-        getAdminPermissions,
     );
     const getAdminCourseDetailController = new GetAdminCourseDetailController(
         new GetAdminCourseDetailUseCase(courseRepository),
-        getAdminPermissions,
     );
 
     fastify.get(
         '/admin/courses',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags: ['Admin — Courses'],
                 summary: 'List all courses (card listing)',
@@ -254,6 +240,7 @@ nullable: true },
     fastify.get(
         '/admin/courses/years',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags: ['Admin — Courses'],
                 summary: 'Anos com curso cadastrado (admin)',
@@ -268,7 +255,6 @@ items: { type: 'integer' } },
             },
         },
         async (req: FastifyRequest, res: FastifyReply) => {
-            if ((await requirePermission(req, res, 'READ_COURSE', getAdminPermissions)) === null) return;
             return res.status(200).send(await courseRepository.years());
         },
     );
@@ -276,6 +262,7 @@ items: { type: 'integer' } },
     fastify.get(
         '/admin/courses/:courseId',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags: ['Admin — Courses'],
                 summary: 'Get course full detail (admin)',
@@ -365,6 +352,7 @@ properties: courseDetailProperties },
     fastify.post(
         '/courses',
         {
+            config: { auth: requires('CREATE_COURSE') },
             schema: {
                 tags: ['Courses'],
                 summary: 'Create course',
@@ -450,6 +438,7 @@ items: { type: 'string' } },
     fastify.post(
         '/courses/:courseId/banner',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Courses'],
                 summary: 'Upload course banner',
@@ -488,6 +477,7 @@ nullable: true } } },
     fastify.patch(
         '/courses/:courseId',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Courses'],
                 summary: 'Edit course',
@@ -567,6 +557,7 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/courses/:courseId',
         {
+            config: { auth: requires('DELETE_COURSE') },
             schema: {
                 tags: ['Courses'],
                 summary: 'Delete course',
@@ -598,6 +589,7 @@ description: 'Course deleted successfully' },
     fastify.post(
         '/courses/:courseId/gallery',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Courses'],
                 summary: 'Upload photo to course gallery',
@@ -635,6 +627,7 @@ description: 'Course deleted successfully' },
     fastify.delete(
         '/courses/:courseId/gallery/:photoId',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Courses'],
                 summary: 'Remove photo from course gallery',

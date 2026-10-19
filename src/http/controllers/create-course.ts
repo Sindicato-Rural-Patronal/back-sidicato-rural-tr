@@ -1,8 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CreateCourseUseCase } from '../../usecase/create-course.js';
 import type { CopyCourseExtrasUseCase } from '../../usecase/copy-course-extras.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission } from '../lib/require-permission.js';
+import { adminOf } from '../lib/route-auth.js';
 
 type CreateCourseBody = {
     name: string;
@@ -26,13 +25,10 @@ type CreateCourseBody = {
 export class CreateCourseController {
     constructor(
         private readonly createCourseUseCase: CreateCourseUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
         private readonly copyExtrasUseCase?: CopyCourseExtrasUseCase,
     ) {}
 
     async handle(request: FastifyRequest, reply: FastifyReply) {
-        const adminId = await requirePermission(request, reply, 'CREATE_COURSE', this.getAdminPermissions);
-        if (adminId === null) return;
         const {
             copyCoverFromCourseId,
             copyInstructorsFromCourseId,
@@ -41,11 +37,9 @@ export class CreateCourseController {
         } = request.body as CreateCourseBody;
         const wantsCopy = !!(copyCoverFromCourseId || copyInstructorsFromCourseId);
         // Capa e instrutores de outro curso são alterações de curso (UPDATE_COURSE).
-        if (wantsCopy) {
-            const permissions = (await this.getAdminPermissions.execute(adminId)) ?? [];
-            if (!permissions.includes('UPDATE_COURSE')) {
-                return reply.status(403).send({ error: 'Sem permissão para copiar capa e instrutores de outro curso.' });
-            }
+        // Depende do corpo: fica aqui, e não na declaração da rota (decisão 001).
+        if (wantsCopy && !adminOf(request).has('UPDATE_COURSE')) {
+            return reply.status(403).send({ error: 'Sem permissão para copiar capa e instrutores de outro curso.' });
         }
         const response = await this.createCourseUseCase.execute({
             ...body,

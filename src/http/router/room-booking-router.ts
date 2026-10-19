@@ -1,9 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createRoomBookingAdapter } from '../../adapter/database/room-booking-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import {
     CreateRoomBookingUseCase,
     DeleteRoomBookingUseCase,
@@ -15,10 +12,9 @@ import {
     UpdateRoomBookingUseCase,
 } from '../../usecase/room-booking-usecases.js';
 import { MAX_OCCURRENCES } from '../../usecase/room-availability.js';
-import type { Permission } from '../../generated/prisma/enums.js';
-import { errorToStatus, requirePermission } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
-import { publicRoute } from '../lib/route-auth.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 const str = { type: 'string' };
 const nstr = { type: 'string',
@@ -117,10 +113,7 @@ export async function roomBookingRouter(fastify: FastifyInstance, prisma: Prisma
     const update = new UpdateRoomBookingUseCase(repo);
     const remove = new DeleteRoomBookingUseCase(repo);
     const publicEvents = new ListPublicEventsUseCase(repo);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(createUserAdminAdapter(prisma), createRuleAdapter(prisma));
 
-    const can = (req: FastifyRequest, reply: FastifyReply, perm: Permission) =>
-        requirePermission(req, reply, perm, getAdminPermissions);
     const fail = (reply: FastifyReply, error: Error) => reply.status(errorToStatus(error)).send({ error: error.message });
 
     // ─── Rota pública ──────────────────────────────────────────────────────
@@ -145,6 +138,7 @@ items: publicEventObject } },
     fastify.get(
         '/admin/room-bookings',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags,
                 summary: 'Listar reservas de sala (eventos e reuniões)',
@@ -165,7 +159,6 @@ items: bookingObject },
             },
         },
         async (req: FastifyRequest, reply: FastifyReply) => {
-            if ((await can(req, reply, 'READ_COURSE')) === null) return;
             const r = await list.execute(req.query);
             if (r.error) return fail(reply, r.error);
             return reply.send(r.bookings);
@@ -175,6 +168,7 @@ items: bookingObject },
     fastify.get(
         '/admin/room-schedule',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags,
                 summary: 'Agenda das salas (cursos + reservas)',
@@ -190,7 +184,6 @@ items: scheduleObject },
             },
         },
         async (req: FastifyRequest, reply: FastifyReply) => {
-            if ((await can(req, reply, 'READ_COURSE')) === null) return;
             const r = await schedule.execute(req.query);
             if (r.error) return fail(reply, r.error);
             return reply.send(r.items);
@@ -200,6 +193,7 @@ items: scheduleObject },
     fastify.post(
         '/admin/room-bookings',
         {
+            config: { auth: requires('CREATE_COURSE') },
             schema: {
                 tags,
                 summary: 'Criar reserva de sala (com repetição opcional)',
@@ -250,7 +244,6 @@ seriesId: nstr },
             },
         },
         async (req: FastifyRequest, reply: FastifyReply) => {
-            if ((await can(req, reply, 'CREATE_COURSE')) === null) return;
             const r = await create.execute(req.body);
             if (r.error) return fail(reply, r.error);
             return reply.status(201).send({ ids: r.ids,
@@ -261,6 +254,7 @@ seriesId: r.seriesId ?? null });
     fastify.patch(
         '/admin/room-bookings/:id',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags,
                 summary: 'Editar uma ocorrência da reserva',
@@ -289,7 +283,6 @@ seriesId: r.seriesId ?? null });
             },
         },
         async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-            if ((await can(req, reply, 'UPDATE_COURSE')) === null) return;
             const r = await update.execute(req.params.id, req.body);
             if (r.error) return fail(reply, r.error);
             return reply.send(r.booking);
@@ -299,6 +292,7 @@ seriesId: r.seriesId ?? null });
     fastify.delete(
         '/admin/room-bookings/:id',
         {
+            config: { auth: requires('DELETE_COURSE') },
             schema: {
                 tags,
                 summary: 'Excluir reserva (uma ou desta em diante na série)',
@@ -320,7 +314,6 @@ properties: { deleted: { type: 'integer' } } },
  Params: { id: string };
 Querystring: { scope?: string } 
 }>, reply: FastifyReply) => {
-            if ((await can(req, reply, 'DELETE_COURSE')) === null) return;
             const r = await remove.execute(req.params.id, req.query.scope);
             if (r.error) return fail(reply, r.error);
             return reply.send({ deleted: r.deleted });
