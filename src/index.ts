@@ -1,4 +1,5 @@
 import fastify from 'fastify';
+import './lib/zod-config.js';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
