@@ -1,10 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createConvenioAdapter } from '../../adapter/database/convenio-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createStorageAdapter } from '../../adapter/storage/factory.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import {
     ListConvenioMenuUseCase,
     ListConveniosUseCase,
@@ -17,7 +14,7 @@ import {
 import { UploadConvenioLogoUseCase } from '../../usecase/upload-convenio-logo.js';
 import { ConvenioController } from '../controllers/convenio-controller.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
-import { publicRoute } from '../lib/route-auth.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 // ── Schemas (Swagger + serialização) ─────────────────────────────────────────
 // A resposta é serializada pelo fast-json-stringify, que descarta campos não
@@ -82,10 +79,6 @@ properties: { id: { type: 'string' } } };
 
 export async function convenioRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const repo = createConvenioAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(
-        createUserAdminAdapter(prisma),
-        createRuleAdapter(prisma),
-    );
 
     const controller = new ConvenioController(
         {
@@ -98,7 +91,6 @@ export async function convenioRouter(fastify: FastifyInstance, prisma: PrismaCli
             remove: new DeleteConvenioUseCase(repo),
             uploadLogo: new UploadConvenioLogoUseCase(repo, createStorageAdapter()),
         },
-        getAdminPermissions,
     );
 
     const adminSecurity = [{ bearerAuth: [] }];
@@ -159,6 +151,7 @@ properties: { slug: { type: 'string' } } },
     fastify.get(
         '/admin/convenios',
         {
+            config: { auth: requires('READ_CONVENIO') },
             schema: {
                 tags: ['Convênios'],
                 summary: 'Listar convênios (admin)',
@@ -175,6 +168,7 @@ items: convenioObject },
     fastify.get(
         '/admin/convenios/:id',
         {
+            config: { auth: requires('READ_CONVENIO') },
             schema: {
                 tags: ['Convênios'],
                 summary: 'Detalhe do convênio (admin)',
@@ -190,6 +184,7 @@ items: convenioObject },
     fastify.post(
         '/admin/convenios',
         {
+            config: { auth: requires('CREATE_CONVENIO') },
             schema: {
                 tags: ['Convênios'],
                 summary: 'Criar convênio',
@@ -207,6 +202,7 @@ required: ['slug', 'name', 'title'] },
     fastify.patch(
         '/admin/convenios/:id',
         {
+            config: { auth: requires('UPDATE_CONVENIO') },
             schema: {
                 tags: ['Convênios'],
                 summary: 'Atualizar convênio',
@@ -225,6 +221,7 @@ required: ['slug', 'name', 'title'] },
     fastify.delete(
         '/admin/convenios/:id',
         {
+            config: { auth: requires('DELETE_CONVENIO') },
             schema: {
                 tags: ['Convênios'],
                 summary: 'Excluir convênio',
@@ -242,6 +239,7 @@ required: ['slug', 'name', 'title'] },
     fastify.post(
         '/admin/convenios/:id/logo',
         {
+            config: { auth: requires('UPDATE_CONVENIO') },
             schema: {
                 tags: ['Convênios'],
                 summary: 'Upload do logo do convênio',

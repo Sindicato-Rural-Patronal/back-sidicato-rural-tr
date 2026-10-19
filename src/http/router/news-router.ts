@@ -1,8 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createNewsAdapter } from '../../adapter/database/news-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createStorageAdapter } from '../../adapter/storage/factory.js';
 import { CreateNewsUseCase } from '../../usecase/create-news.js';
 import { ListNewsUseCase } from '../../usecase/list-news.js';
@@ -19,9 +17,8 @@ import { DeleteNewsController } from '../controllers/delete-news.js';
 import { UploadNewsBannerController } from '../controllers/upload-news-banner.js';
 import { UploadNewsBlockImageUseCase } from '../../usecase/upload-news-block-image.js';
 import { UploadNewsBlockImageController } from '../controllers/upload-news-block-image.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
-import { publicRoute } from '../lib/route-auth.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 const newsProperties = {
     id: { type: 'string' },
@@ -43,38 +40,29 @@ nullable: true },
 
 export async function newsRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const newsRepository = createNewsAdapter(prisma);
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
     const storage = createStorageAdapter();
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const createNewsController = new CreateNewsController(
         new CreateNewsUseCase(newsRepository),
-        getAdminPermissions,
     );
     const listNewsController = new ListNewsController(new ListNewsUseCase(newsRepository));
     const listAllNewsController = new ListAllNewsController(
         new ListNewsUseCase(newsRepository),
-        getAdminPermissions,
     );
     const getNewsDetailController = new GetNewsDetailController(
         new GetNewsDetailUseCase(newsRepository),
     );
     const updateNewsController = new UpdateNewsController(
         new UpdateNewsUseCase(newsRepository),
-        getAdminPermissions,
     );
     const deleteNewsController = new DeleteNewsController(
         new DeleteNewsUseCase(newsRepository),
-        getAdminPermissions,
     );
     const uploadBannerController = new UploadNewsBannerController(
         new UploadNewsBannerUseCase(storage, newsRepository),
-        getAdminPermissions,
     );
     const uploadBlockImageController = new UploadNewsBlockImageController(
         new UploadNewsBlockImageUseCase(storage, newsRepository),
-        getAdminPermissions,
     );
 
     // ─── Public routes ─────────────────────────────────────────────────────────
@@ -126,6 +114,7 @@ properties: newsProperties },
     fastify.get(
         '/admin/news',
         {
+            config: { auth: requires('READ_NEWS') },
             schema: {
                 tags: ['Admin — News'],
                 summary: 'List all news (internal)',
@@ -166,6 +155,7 @@ properties: newsProperties }),
     fastify.post(
         '/news',
         {
+            config: { auth: requires('CREATE_NEWS') },
             schema: {
                 tags: ['News'],
                 summary: 'Create news',
@@ -211,6 +201,7 @@ properties: { id: { type: 'string' } } },
     fastify.patch(
         '/news/:newsId',
         {
+            config: { auth: requires('UPDATE_NEWS') },
             schema: {
                 tags: ['News'],
                 summary: 'Update news',
@@ -263,6 +254,7 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/news/:newsId',
         {
+            config: { auth: requires('DELETE_NEWS') },
             schema: {
                 tags: ['News'],
                 summary: 'Delete news',
@@ -287,6 +279,7 @@ properties: { message: { type: 'string' } } },
     fastify.post(
         '/news/:newsId/banner',
         {
+            config: { auth: requires('UPDATE_NEWS') },
             schema: {
                 tags: ['News'],
                 summary: 'Upload news banner',
@@ -314,6 +307,7 @@ properties: { url: { type: 'string' } } },
     fastify.post(
         '/news/:newsId/image',
         {
+            config: { auth: requires('UPDATE_NEWS') },
             schema: {
                 tags: ['News'],
                 summary: 'Upload image for news content block',

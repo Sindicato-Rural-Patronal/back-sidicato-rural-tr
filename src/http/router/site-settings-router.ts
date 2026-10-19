@@ -1,14 +1,11 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createSiteSettingsAdapter } from '../../adapter/database/site-settings-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { GetSiteSettingsUseCase } from '../../usecase/get-site-settings.js';
 import { UpdateSiteSettingsUseCase } from '../../usecase/update-site-settings.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { SiteSettingsController } from '../controllers/site-settings-controller.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
-import { publicRoute } from '../lib/route-auth.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 // Todos os campos são texto (vazio = não preenchido).
 const settingFields = [
@@ -40,14 +37,10 @@ const settingsBody = {
 
 export async function siteSettingsRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const repo = createSiteSettingsAdapter(prisma);
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const controller = new SiteSettingsController(
         new GetSiteSettingsUseCase(repo),
         new UpdateSiteSettingsUseCase(repo),
-        getAdminPermissions,
     );
 
     fastify.get(
@@ -67,6 +60,7 @@ properties: settingsProperties } },
     fastify.get(
         '/admin/site-settings',
         {
+            config: { auth: requires('READ_BANNER') },
             schema: {
                 tags: ['Site Settings'],
                 summary: 'Site settings (admin)',
@@ -85,6 +79,7 @@ properties: settingsProperties },
     fastify.patch(
         '/admin/site-settings',
         {
+            config: { auth: requires('UPDATE_BANNER') },
             schema: {
                 tags: ['Site Settings'],
                 summary: 'Update site settings (admin)',

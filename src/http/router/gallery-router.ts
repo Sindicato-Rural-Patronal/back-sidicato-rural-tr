@@ -1,10 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createGalleryAdapter } from '../../adapter/database/gallery-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createStorageAdapter } from '../../adapter/storage/factory.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import {
     ListGalleriesUseCase,
     CreateGalleryUseCase,
@@ -18,7 +15,7 @@ import {
 } from '../../usecase/gallery-usecases.js';
 import { GalleryController } from '../controllers/gallery-controller.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
-import { publicRoute } from '../lib/route-auth.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 // fast-json-stringify descarta campos não declarados: tudo que sai está listado.
 const str = { type: 'string' };
@@ -108,7 +105,6 @@ export async function galleryRouter(fastify: FastifyInstance, prisma: PrismaClie
             removePhoto: new DeleteGalleryPhotoUseCase(repo, storage),
             reorderPhotos: new ReorderGalleryPhotosUseCase(repo),
         },
-        new GetAdminPermissionsUseCase(createUserAdminAdapter(prisma), createRuleAdapter(prisma)),
     );
 
     type Id = FastifyRequest<{ Params: { id: string } }>;
@@ -131,6 +127,7 @@ items: albumWithPhotos } },
     }, (req: FastifyRequest, res: FastifyReply) => controller.listPublic(req, res));
 
     fastify.get('/admin/galleries', {
+        config: { auth: requires('READ_BANNER') },
         schema: {
             tags,
 summary: 'Todas as galerias, com fotos',
@@ -143,6 +140,7 @@ items: albumWithPhotos },
     }, (req: FastifyRequest, res: FastifyReply) => controller.listAdmin(req, res));
 
     fastify.post('/admin/galleries', {
+        config: { auth: requires('CREATE_BANNER') },
         schema: {
             tags,
 summary: 'Criar galeria',
@@ -156,6 +154,7 @@ required: ['title'] },
 
     // Antes de /:id para "reorder" não ser lido como id.
     fastify.patch('/admin/galleries/reorder', {
+        config: { auth: requires('UPDATE_BANNER') },
         schema: { tags,
 summary: 'Reordenar galerias',
 security: sec,
@@ -165,6 +164,7 @@ response: { 200: ok,
     }, (req: FastifyRequest, res: FastifyReply) => controller.reorder(req, res));
 
     fastify.patch('/admin/galleries/:id', {
+        config: { auth: requires('UPDATE_BANNER') },
         schema: {
             tags,
 summary: 'Atualizar galeria',
@@ -177,6 +177,7 @@ body: albumBody,
     }, (req: Id, res: FastifyReply) => controller.update(req, res));
 
     fastify.delete('/admin/galleries/:id', {
+        config: { auth: requires('DELETE_BANNER') },
         schema: { tags,
 summary: 'Excluir galeria (e as fotos)',
 security: sec,
@@ -186,6 +187,7 @@ response: { 204: { type: 'null' },
     }, (req: Id, res: FastifyReply) => controller.remove(req, res));
 
     fastify.post('/admin/galleries/:id/photos', {
+        config: { auth: requires('UPDATE_BANNER') },
         schema: {
             tags,
             summary: 'Enviar foto (multipart, campo "file")',
@@ -199,6 +201,7 @@ response: { 204: { type: 'null' },
     }, (req: Id, res: FastifyReply) => controller.uploadPhoto(req, res));
 
     fastify.patch('/admin/galleries/:id/photos/reorder', {
+        config: { auth: requires('UPDATE_BANNER') },
         schema: { tags,
 summary: 'Reordenar fotos da galeria',
 security: sec,
@@ -209,6 +212,7 @@ response: { 200: ok,
     }, (req: Id, res: FastifyReply) => controller.reorderPhotos(req, res));
 
     fastify.patch('/admin/galleries/:id/photos/:photoId', {
+        config: { auth: requires('UPDATE_BANNER') },
         schema: {
             tags,
             summary: 'Editar legenda da foto',
@@ -222,6 +226,7 @@ properties: { caption: nstr } },
     }, (req: Photo, res: FastifyReply) => controller.updatePhoto(req, res));
 
     fastify.delete('/admin/galleries/:id/photos/:photoId', {
+        config: { auth: requires('UPDATE_BANNER') },
         schema: { tags,
 summary: 'Excluir foto',
 security: sec,
