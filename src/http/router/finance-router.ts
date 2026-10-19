@@ -1,8 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createFinanceAdapter } from '../../adapter/database/finance-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { ListFinanceCategoriesUseCase } from '../../usecase/list-finance-categories.js';
 import { CreateFinanceCategoryUseCase } from '../../usecase/create-finance-category.js';
 import { UpdateFinanceCategoryUseCase } from '../../usecase/update-finance-category.js';
@@ -41,8 +39,8 @@ import {
     DeleteFinanceClosingUseCase,
 } from '../../usecase/finance-closings.js';
 import { FinanceController } from '../controllers/finance-controller.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { requires } from '../lib/route-auth.js';
 
 const categoryProperties = {
     id: { type: 'string' },
@@ -188,9 +186,6 @@ example: 'PIX' },
 
 export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const repo = createFinanceAdapter(prisma);
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const controller = new FinanceController(
         new ListFinanceCategoriesUseCase(repo),
@@ -224,7 +219,6 @@ export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClie
         new PreviewFinanceClosingUseCase(repo),
         new CreateFinanceClosingUseCase(repo),
         new DeleteFinanceClosingUseCase(repo),
-        getAdminPermissions,
     );
 
     const tags = ['Finance'];
@@ -234,6 +228,7 @@ export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClie
     fastify.get(
         '/admin/finance/categories',
         {
+            config: { auth: requires('READ_FINANCE') },
             schema: {
                 tags,
                 summary: 'List financial categories',
@@ -258,6 +253,7 @@ properties: categoryProperties } },
     fastify.post(
         '/admin/finance/categories',
         {
+            config: { auth: requires('CREATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Create financial category',
@@ -278,6 +274,7 @@ properties: categoryProperties },
     fastify.patch(
         '/admin/finance/categories/:id',
         {
+            config: { auth: requires('UPDATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Update financial category',
@@ -304,6 +301,7 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/admin/finance/categories/:id',
         {
+            config: { auth: requires('DELETE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Delete (soft) financial category',
@@ -327,6 +325,7 @@ properties: { id: { type: 'string' } } },
     fastify.get(
         '/admin/finance/accounts',
         {
+            config: { auth: requires('READ_FINANCE') },
             schema: {
                 tags,
                 summary: 'List cash accounts',
@@ -351,6 +350,7 @@ properties: accountProperties } },
     fastify.post(
         '/admin/finance/accounts',
         {
+            config: { auth: requires('CREATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Create cash account',
@@ -371,6 +371,7 @@ properties: accountProperties },
     fastify.patch(
         '/admin/finance/accounts/:id',
         {
+            config: { auth: requires('UPDATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Update cash account',
@@ -397,6 +398,7 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/admin/finance/accounts/:id',
         {
+            config: { auth: requires('DELETE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Delete (soft) cash account',
@@ -420,6 +422,7 @@ properties: { id: { type: 'string' } } },
     fastify.get(
         '/admin/finance/transactions',
         {
+            config: { auth: requires('READ_FINANCE') },
             schema: {
                 tags,
                 summary: 'List financial transactions',
@@ -478,6 +481,7 @@ additionalProperties: true } },
     fastify.get(
         '/admin/finance/transactions/export',
         {
+            config: { auth: requires('READ_FINANCE') },
             schema: {
                 tags,
                 summary: 'Export transactions as CSV',
@@ -506,6 +510,7 @@ enum: ['IN', 'OUT'] },
     fastify.post(
         '/admin/finance/transactions',
         {
+            config: { auth: requires('CREATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Create financial transaction',
@@ -524,6 +529,7 @@ enum: ['IN', 'OUT'] },
     fastify.post(
         '/admin/finance/transfers',
         {
+            config: { auth: requires('CREATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Transfer between cash accounts',
@@ -560,6 +566,7 @@ properties: { message: { type: 'string' } } },
     fastify.patch(
         '/admin/finance/transactions/:id',
         {
+            config: { auth: requires('UPDATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Update financial transaction',
@@ -586,6 +593,7 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/admin/finance/transactions/:id',
         {
+            config: { auth: requires('DELETE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Delete (soft) financial transaction',
@@ -609,6 +617,7 @@ properties: { id: { type: 'string' } } },
     fastify.post(
         '/admin/finance/transactions/:id/attachments',
         {
+            config: { auth: requires('UPDATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Attach a receipt (PDF/image) to a transaction',
@@ -643,6 +652,7 @@ properties: { id: { type: 'string' } } },
     fastify.get(
         '/admin/finance/attachments/:attachmentId',
         {
+            config: { auth: requires('READ_FINANCE') },
             schema: {
                 tags,
                 summary: 'Download a transaction receipt (inline)',
@@ -662,6 +672,7 @@ properties: { attachmentId: { type: 'string' } } },
     fastify.delete(
         '/admin/finance/attachments/:attachmentId',
         {
+            config: { auth: requires('UPDATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Remove a transaction receipt',
@@ -683,6 +694,7 @@ properties: { attachmentId: { type: 'string' } } },
     fastify.get(
         '/admin/finance/recurrences',
         {
+            config: { auth: requires('READ_FINANCE') },
             schema: {
                 tags,
                 summary: 'List recurring transactions',
@@ -707,6 +719,7 @@ additionalProperties: true } },
     fastify.post(
         '/admin/finance/recurrences',
         {
+            config: { auth: requires('CREATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Create recurring transaction',
@@ -728,6 +741,7 @@ additionalProperties: true },
     fastify.patch(
         '/admin/finance/recurrences/:id',
         {
+            config: { auth: requires('UPDATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Update recurring transaction',
@@ -754,6 +768,7 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/admin/finance/recurrences/:id',
         {
+            config: { auth: requires('DELETE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Delete (soft) recurring transaction',
@@ -777,6 +792,7 @@ properties: { id: { type: 'string' } } },
     fastify.post(
         '/admin/finance/recurrences/generate',
         {
+            config: { auth: requires('CREATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Generate missing recurring entries',
@@ -797,6 +813,7 @@ properties: { created: { type: 'integer' } } },
     fastify.get(
         '/admin/finance/payment-methods',
         {
+            config: { auth: requires('READ_FINANCE') },
             schema: {
                 tags,
                 summary: 'List payment methods',
@@ -821,6 +838,7 @@ properties: paymentMethodProperties } },
     fastify.post(
         '/admin/finance/payment-methods',
         {
+            config: { auth: requires('CREATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Create payment method',
@@ -843,6 +861,7 @@ properties: paymentMethodProperties },
     fastify.patch(
         '/admin/finance/payment-methods/:id',
         {
+            config: { auth: requires('UPDATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Update payment method',
@@ -870,6 +889,7 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/admin/finance/payment-methods/:id',
         {
+            config: { auth: requires('DELETE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Delete (soft) payment method',
@@ -893,6 +913,7 @@ properties: { id: { type: 'string' } } },
     fastify.get(
         '/admin/finance/closings',
         {
+            config: { auth: requires('READ_FINANCE') },
             schema: {
                 tags,
                 summary: 'List monthly closings',
@@ -918,6 +939,7 @@ additionalProperties: true } },
     fastify.get(
         '/admin/finance/closings/preview',
         {
+            config: { auth: requires('READ_FINANCE') },
             schema: {
                 tags,
                 summary: 'Preview a monthly closing',
@@ -945,6 +967,7 @@ additionalProperties: true },
     fastify.post(
         '/admin/finance/closings',
         {
+            config: { auth: requires('CREATE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Close a month for a cash account',
@@ -979,6 +1002,7 @@ additionalProperties: true },
     fastify.delete(
         '/admin/finance/closings/:id',
         {
+            config: { auth: requires('DELETE_FINANCE') },
             schema: {
                 tags,
                 summary: 'Reopen a closed month',
@@ -1002,6 +1026,7 @@ properties: { id: { type: 'string' } } },
     fastify.get(
         '/admin/finance/summary',
         {
+            config: { auth: requires('READ_FINANCE') },
             schema: {
                 tags,
                 summary: 'Financial summary (KPIs + charts)',

@@ -36,8 +36,8 @@ import type {
     CreateFinanceClosingUseCase,
     DeleteFinanceClosingUseCase,
 } from '../../usecase/finance-closings.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
+import { adminOf } from '../lib/route-auth.js';
 
 type IdParams = { id: string };
 
@@ -74,32 +74,27 @@ export class FinanceController {
         private readonly previewClosing: PreviewFinanceClosingUseCase,
         private readonly createClosing: CreateFinanceClosingUseCase,
         private readonly deleteClosing: DeleteFinanceClosingUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     // ── Categorias ──────────────────────────────────────────────────────────
     async getCategories(request: FastifyRequest<{ Querystring: { all?: string } }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_FINANCE', this.getAdminPermissions)) === null) return;
         const includeInactive = request.query.all === 'true';
         return reply.send(await this.listCategories.execute(includeInactive));
     }
 
     async postCategory(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'CREATE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.createCategory.execute(request.body);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(201).send(res.category);
     }
 
     async patchCategory(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'UPDATE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.updateCategory.execute(request.params.id, request.body);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(200).send({ message: 'ok' });
     }
 
     async removeCategory(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'DELETE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.deleteCategory.execute(request.params.id);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(204).send();
@@ -107,27 +102,23 @@ export class FinanceController {
 
     // ── Contas / caixas ─────────────────────────────────────────────────────
     async getAccounts(request: FastifyRequest<{ Querystring: { all?: string } }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_FINANCE', this.getAdminPermissions)) === null) return;
         const includeInactive = request.query.all === 'true';
         return reply.send(await this.listAccounts.execute(includeInactive));
     }
 
     async postAccount(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'CREATE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.createAccount.execute(request.body);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(201).send(res.account);
     }
 
     async patchAccount(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'UPDATE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.updateAccount.execute(request.params.id, request.body);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(200).send({ message: 'ok' });
     }
 
     async removeAccount(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'DELETE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.deleteAccount.execute(request.params.id);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(204).send();
@@ -135,12 +126,10 @@ export class FinanceController {
 
     // ── Lançamentos ─────────────────────────────────────────────────────────
     async getTransactions(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_FINANCE', this.getAdminPermissions)) === null) return;
         return reply.send(await this.listTransactions.execute(request.query));
     }
 
     async exportTransactions(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_FINANCE', this.getAdminPermissions)) === null) return;
         const csv = await this.exportUseCase.execute(request.query);
         reply.header('Content-Type', 'text/csv; charset=utf-8');
         reply.header('Content-Disposition', 'attachment; filename="lancamentos.csv"');
@@ -149,30 +138,26 @@ export class FinanceController {
     }
 
     async postTransaction(request: FastifyRequest, reply: FastifyReply) {
-        const actorId = await requirePermission(request, reply, 'CREATE_FINANCE', this.getAdminPermissions);
-        if (actorId === null) return;
+        const actorId = adminOf(request).id;
         const res = await this.createTransaction.execute(request.body, actorId);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(201).send(res.transaction);
     }
 
     async postTransfer(request: FastifyRequest, reply: FastifyReply) {
-        const actorId = await requirePermission(request, reply, 'CREATE_FINANCE', this.getAdminPermissions);
-        if (actorId === null) return;
+        const actorId = adminOf(request).id;
         const res = await this.createTransfer.execute(request.body, actorId);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(201).send({ message: 'ok' });
     }
 
     async patchTransaction(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'UPDATE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.updateTransaction.execute(request.params.id, request.body);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(200).send({ message: 'ok' });
     }
 
     async removeTransaction(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'DELETE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.deleteTransaction.execute(request.params.id);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(204).send();
@@ -180,7 +165,6 @@ export class FinanceController {
 
     // ── Comprovantes ──────────────────────────────────────────────────────────
     async uploadAttachment(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'UPDATE_FINANCE', this.getAdminPermissions)) === null) return;
 
         const file = await request.file();
         if (!file) return reply.status(400).send({ error: 'Nenhum arquivo enviado.' });
@@ -203,7 +187,6 @@ export class FinanceController {
     }
 
     async downloadAttachment(request: FastifyRequest<{ Params: { attachmentId: string } }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_FINANCE', this.getAdminPermissions)) === null) return;
         const file = await this.getAttachmentUseCase.execute(request.params.attachmentId);
         if (!file) return reply.status(404).send({ error: 'Comprovante não encontrado.' });
         reply.type(file.mimeType);
@@ -212,7 +195,6 @@ export class FinanceController {
     }
 
     async removeAttachment(request: FastifyRequest<{ Params: { attachmentId: string } }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'UPDATE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.deleteAttachmentUseCase.execute(request.params.attachmentId);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(204).send();
@@ -220,26 +202,22 @@ export class FinanceController {
 
     // ── Recorrentes ─────────────────────────────────────────────────────────
     async getRecurrences(request: FastifyRequest<{ Querystring: { all?: string } }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_FINANCE', this.getAdminPermissions)) === null) return;
         return reply.send(await this.listRecurrences.execute(request.query.all === 'true'));
     }
 
     async postRecurrence(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'CREATE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.createRecurrence.execute(request.body);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(201).send(res.recurrence);
     }
 
     async patchRecurrence(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'UPDATE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.updateRecurrence.execute(request.params.id, request.body);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(200).send({ message: 'ok' });
     }
 
     async removeRecurrence(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'DELETE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.deleteRecurrence.execute(request.params.id);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(204).send();
@@ -247,32 +225,27 @@ export class FinanceController {
 
     // Chamado quando a tela do Financeiro abre: cria os lançamentos que faltam.
     async postGenerateRecurrences(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'CREATE_FINANCE', this.getAdminPermissions)) === null) return;
         return reply.send(await this.generateRecurrences.execute());
     }
 
     // ── Formas de pagamento ─────────────────────────────────────────────────
     async getPaymentMethods(request: FastifyRequest<{ Querystring: { all?: string } }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_FINANCE', this.getAdminPermissions)) === null) return;
         return reply.send(await this.listPaymentMethods.execute(request.query.all === 'true'));
     }
 
     async postPaymentMethod(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'CREATE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.createPaymentMethod.execute(request.body);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(201).send(res.method);
     }
 
     async patchPaymentMethod(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'UPDATE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.updatePaymentMethod.execute(request.params.id, request.body);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(200).send({ message: 'ok' });
     }
 
     async removePaymentMethod(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'DELETE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.deletePaymentMethod.execute(request.params.id);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(204).send();
@@ -280,27 +253,23 @@ export class FinanceController {
 
     // ── Fechamento mensal ───────────────────────────────────────────────────
     async getClosings(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_FINANCE', this.getAdminPermissions)) === null) return;
         return reply.send(await this.listClosings.execute(request.query));
     }
 
     async getClosingPreview(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.previewClosing.execute(request.query);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.send(res.preview);
     }
 
     async postClosing(request: FastifyRequest, reply: FastifyReply) {
-        const actorId = await requirePermission(request, reply, 'CREATE_FINANCE', this.getAdminPermissions);
-        if (actorId === null) return;
+        const actorId = adminOf(request).id;
         const res = await this.createClosing.execute(request.body, actorId);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(201).send(res.closing);
     }
 
     async removeClosing(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'DELETE_FINANCE', this.getAdminPermissions)) === null) return;
         const res = await this.deleteClosing.execute(request.params.id);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
         return reply.status(204).send();
@@ -308,7 +277,6 @@ export class FinanceController {
 
     // ── Dashboard ───────────────────────────────────────────────────────────
     async getSummary(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_FINANCE', this.getAdminPermissions)) === null) return;
         return reply.send(await this.summaryUseCase.execute(request.query));
     }
 }
