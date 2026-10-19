@@ -68,6 +68,7 @@ describe('auditoria: rotas fora da trilha', () => {
         expect(skipAudit('/invites/abc/accept')).toBe(true);
         expect(skipAudit('/admin/export/people')).toBe(true);
         expect(skipAudit('/admin/notifications/read')).toBe(true);
+        expect(skipAudit('/users/lookup-cpf')).toBe(true);
         expect(skipAudit('/admin/banners')).toBe(false);
     });
 

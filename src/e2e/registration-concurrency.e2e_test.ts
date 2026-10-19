@@ -60,7 +60,8 @@ cpf })) });
                 url: `/courses/${course.id}/${rota}`,
                 payload: rota === 'register' ? { name: `INSCRITO ${i}`,
 phone: '44990000001',
-cpf } : { cpf },
+cpf } : { cpf,
+phoneEnd: '0001' },
             }),
         ),
     );

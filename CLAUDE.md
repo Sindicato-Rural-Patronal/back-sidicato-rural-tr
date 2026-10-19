@@ -149,8 +149,9 @@ Conferência de conflito em use case enxerga só os ativos; sem uma das duas sa�
 - **Global:** 600/min. O IP real vem do proxy por `trustProxy` em `index.ts`; a decisão 002 da Arquitetura trata da topologia.
 - **Login e refresh:** 10 a cada 5 min.
 - **`PATCH /admin/me`:** 10 a cada 5 min.
-- **Rotas públicas** (`http/lib/public-rate-limit.ts`): inscrição (`register`, `register-by-cpf`, `register-full`) e `POST /contacts/message` com 10/min; `GET /users/lookup-cpf/:cpf` com 20/min.
+- **Rotas públicas** (`http/lib/public-rate-limit.ts`): inscrição (`register`, `register-by-cpf`, `register-full`) e `POST /contacts/message` com 10/min; `POST /users/lookup-cpf` com 20/min.
 - Cada rota conta separado. O excesso nas rotas públicas responde 429 `{ error: "Muitas tentativas seguidas. Aguarde um minuto e tente de novo." }`; no login, a mensagem padrão do plugin.
+- **Por CPF** (`lib/cpf-attempt-limiter.ts`, na memória do processo): 5 erros na última hora para o mesmo CPF, somando a consulta, o `register-by-cpf` e o `register-full`, → 429 "Muitas tentativas com este CPF. Aguarde uma hora ou procure o Sindicato.", até com o par certo. Conta erro também para CPF sem cadastro, para o 429 não revelar quem tem. Ver Inscrições.
 
 ## Erros
 
@@ -164,6 +165,7 @@ ConflictError      → 409
 BusinessRuleError  → 409
 ForbiddenError     → 403
 AuthError          → 401
+TooManyAttemptsError → 429
 qualquer outro     → 400   (ValidationError, Error, e também error ausente)
 ```
 
@@ -184,9 +186,10 @@ Classes (`src/errors/`; as bases aceitam mensagem opcional e são usadas direto 
 |---|---|
 | `AuthError` (`auth.ts`) | `InvalidCredentialsError` "Invalid username or password" |
 | `ForbiddenError` (`auth.ts`, estende `Error`) | mensagem por parâmetro (padrão "Sem permissão para esta ação.") |
-| `BusinessRuleError` (`business-rule.ts`) | `RoomAlreadyBookedError` (mensagem por parâmetro: "Sala ocupada: …"), `RegistrationsUnavailableError`, `RegistrationDeadlinePassedError` "Prazo de inscrição encerrado.", `CourseFullError` "Curso lotado — sem vagas disponíveis." |
+| `BusinessRuleError` (`business-rule.ts`) | `RoomAlreadyBookedError` (mensagem por parâmetro: "Sala ocupada: …"), `RegistrationsUnavailableError`, `RegistrationDeadlinePassedError` "Prazo de inscrição encerrado.", `CourseFullError` "Curso lotado — sem vagas disponíveis.", `IdentityNotConfirmedError` "Não foi possível confirmar seu cadastro pelo site. Procure o Sindicato para fazer a inscrição." |
 | `ConflictError` (`conflict.ts`, 18 filhas) | `CpfAlreadyInUseError` "CPF já cadastrado para outra pessoa.", `RgAlreadyInUseError`, `RuleInUseError`, `RoomNameAlreadyExistsError`, `RoomHasCoursesError`, `RoomHasBookingsError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `CourseRegistrationAlreadyExistsError`, `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError`, `UnimedBeneficiarioAlreadyExistsError`, `ConvenioSlugAlreadyExistsError`, `CompanyCnpjAlreadyExistsError`, `PublicContactAlreadyExistsError`, `CompanyMemberAlreadyExistsError`, `MergeDifferentCpfError`, `MergeBothHaveLoginError` |
-| `NotFoundError` (`not-found.ts`, 29 filhas) | `CourseNotFoundError` "Course not found", `UserNotFoundError`, `UserDataNotFoundError` "Invalid userDataId: user not found", `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError`, `UserRelationNotFoundError`, `PropertyNotFoundError`, `AddressNotFoundError` "CEP not found", `InstructorNotFoundError`, `ContactMessageNotFoundError`, `BannerNotFoundError`, `MarketQuoteNotFoundError`, `AdminInviteInvalidError` "Convite inválido, expirado ou já utilizado.", `FinanceCategoryNotFoundError`, `FinanceTransactionNotFoundError`, `UnimedBeneficiarioNotFoundError`, `GalleryAlbumNotFoundError`, `GalleryPhotoNotFoundError`, `ConvenioNotFoundError`, `CompanyNotFoundError`, `PublicContactNotFoundError`, `CompanyMemberNotFoundError`, `RoomBookingNotFoundError` |
+| `NotFoundError` (`not-found.ts`, 30 filhas) | `CourseNotFoundError` "Course not found", `UserNotFoundError`, `UserDataNotFoundError` "Invalid userDataId: user not found", `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError`, `UserRelationNotFoundError`, `PropertyNotFoundError`, `AddressNotFoundError` "CEP not found", `InstructorNotFoundError`, `ContactMessageNotFoundError`, `BannerNotFoundError`, `MarketQuoteNotFoundError`, `AdminInviteInvalidError` "Convite inválido, expirado ou já utilizado.", `FinanceCategoryNotFoundError`, `FinanceTransactionNotFoundError`, `UnimedBeneficiarioNotFoundError`, `GalleryAlbumNotFoundError`, `GalleryPhotoNotFoundError`, `ConvenioNotFoundError`, `CompanyNotFoundError`, `PublicContactNotFoundError`, `CompanyMemberNotFoundError`, `RoomBookingNotFoundError`, `CpfPhoneNotFoundError` "Não encontramos cadastro com este CPF e telefone." |
+| `TooManyAttemptsError` (`too-many-attempts.ts`, estende `Error`, `statusCode = 429`) | "Muitas tentativas com este CPF. Aguarde uma hora ou procure o Sindicato." |
 | `ValidationError` (`validation.ts`, estende `Error`) | mensagem obrigatória → 400 |
 
 Fora de `src/errors/`:
@@ -479,10 +482,10 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 ### Inscrições (`registration-router.ts`)
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
-| `GET` | `/users/lookup-cpf/:cpf` | `{ found, name }`, com o nome mascarado ("João D. S."); CPF inválido ou sem cadastro → `{ found: false, name: null }`; 20/min por IP | Pública |
+| `POST` | `/users/lookup-cpf` | `{ cpf, phoneEnd }` → `{ found, name }`, com o nome mascarado ("João D. S.") só quando os dois batem; CPF inválido, sem cadastro ou telefone que não confere → o mesmo `{ found: false, name: null }`; `phoneEnd` sem 4 dígitos → 400; 20/min por IP; limite por CPF (429). Não vai para a auditoria | Pública |
 | `POST` | `/courses/:courseId/register` | `{ name, phone, cpf, email? }` → 201 `{ registrationId, userDataId }` (cria a pessoa se o CPF é novo); 10/min | Pública |
-| `POST` | `/courses/:courseId/register-by-cpf` | `{ cpf }` → 201; **CPF sem cadastro → 404** (o site segue para o `register-full`); 10/min | Pública |
-| `POST` | `/courses/:courseId/register-full` | `{ name, phone, cpf, email?, rg?, birthDate?, address? }` → 201; cria a pessoa com o endereço como propriedade principal; 10/min | Pública |
+| `POST` | `/courses/:courseId/register-by-cpf` | `{ cpf, phoneEnd }` → 201; **CPF sem cadastro ou telefone que não confere → o mesmo 404** "Não encontramos cadastro com este CPF e telefone." (o site segue para o `register-full`); `phoneEnd` sem 4 dígitos → 400; 10/min; limite por CPF (429) | Pública |
+| `POST` | `/courses/:courseId/register-full` | `{ name, phone, cpf, email?, rg?, birthDate?, address? }` → 201; CPF novo: cria a pessoa com o endereço como propriedade principal; CPF com cadastro: só inscreve se `phone` confere (ver abaixo), senão 409 `IdentityNotConfirmedError`; 10/min; limite por CPF (429) | Pública |
 | `GET` | `/admin/courses/:courseId/registrations` | inscritos com `confirmed`, `attended`, `ficha` (metadados), selos (memberStatus, membershipValidUntil, boardPosition, contato público, empresas parceiras) | `READ_COURSE` |
 | `POST` | `/admin/courses/:courseId/registrations` | inscrição pela equipe `{ userDataId }`, já confirmada; ignora prazo, status e fim; respeita a lotação | `UPDATE_COURSE` |
 | `PATCH` | `/admin/registrations/:registrationId/confirm` | `{ confirmed: boolean }` (confirma ou desconfirma) | `UPDATE_COURSE` |
@@ -505,9 +508,13 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 
 O site usa a mesma regra (`utils/course-status.ts` no front).
 
-**Pessoa na inscrição:**
-- A pessoa é achada **só pelo CPF**. E-mail e telefone iguais aos de outra pessoa criam cadastro próprio.
+**Pessoa na inscrição** (SR-025, `lib/phone-match.ts`). Filiação a sindicato é dado sensível (LGPD): só o CPF não pode dizer quem tem cadastro nem inscrever outra pessoa.
+- A pessoa é achada pelo CPF e **confirmada pelo telefone**, sempre contra os três do cadastro (`phone`, `phone2`, `phone3`), comparando só os dígitos (máscara e DDI 55 não contam).
+- **Consulta e `register-by-cpf`:** os 4 últimos dígitos (`phoneEnd`). CPF sem cadastro e telefone que não confere dão a mesma resposta, com a mesma consulta ao banco.
+- **`register-full`:** o telefone completo, pelos últimos 8 dígitos (ignora DDD e o nono dígito de cadastro antigo). Não confere, ou o cadastro não tem telefone → 409 genérico; nada é vinculado nem alterado. O cadastro existente nunca é sobrescrito pelo formulário.
+- E-mail e telefone iguais aos de outra pessoa, com CPF novo, criam cadastro próprio.
 - CPF criado ao mesmo tempo por outra inscrição → 409 "CPF já cadastrado para outra pessoa.".
+- O `register` (sem telefone) ainda vincula só pelo CPF; sai na SR-023.
 
 **Vagas** (`lockCourseSeats` em `registration-adapter.ts`):
 - Quem conta e insere trava as vagas do curso (`pg_advisory_xact_lock`) antes de contar, em READ COMMITTED: `createWithCapacity` (que atende `register`, `register-by-cpf` e a inscrição pela equipe) e o `register-full`.
@@ -656,7 +663,7 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 
 **O que é gravado:**
 - O hook grava toda mutação com sucesso: método, caminho, `entity` (`deriveAuditEntity`) e `targetLabel` (nome do alvo).
-- Fica fora (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (que grava a própria linha), `/admin/notifications/read` e `/auth/login` (que tem registro próprio).
+- Fica fora (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (que grava a própria linha), `/admin/notifications/read`, `/users/lookup-cpf` (consulta, não grava) e `/auth/login` (que tem registro próprio).
 
 **Login:** 2xx → `LOGIN`; 401 → `LOGIN_FAILED`; 429 → `LOGIN_BLOCKED`; `targetLabel` = usuário digitado. A senha nunca é lida.
 

@@ -14,7 +14,10 @@ import {
 } from '../errors/conflict.js';
 import { isValidCpf } from '../lib/cpf.js';
 import { checkCourseAcceptsRegistration } from '../lib/course-registration-rules.js';
-import { CourseFullError } from '../errors/business-rule.js';
+import { CourseFullError, IdentityNotConfirmedError } from '../errors/business-rule.js';
+import { TooManyAttemptsError } from '../errors/too-many-attempts.js';
+import { phoneMatches } from '../lib/phone-match.js';
+import type { CpfAttemptLimiter } from '../lib/cpf-attempt-limiter.js';
 import { isPrismaSerializationError, isPrismaUniqueViolation, uniqueViolationFields } from '../lib/prisma-errors.js';
 import { personEmailSchema } from '../lib/person-email.js';
 import type { NotificationPublisher } from '../ports/external/notification-repository.js';
@@ -57,8 +60,13 @@ const MAX_ATTEMPTS = 3;
 /**
  * Inscrição pública completa: cria o participante com os dados da ficha simples
  * (rg, nascimento) e registra o endereço como propriedade principal, depois
- * inscreve no curso. Se já existir alguém com o mesmo CPF, apenas inscreve (e-mail e
- * telefone podem repetir entre pessoas e não identificam ninguém).
+ * inscreve no curso.
+ *
+ * CPF que já tem cadastro (SR-025): só inscreve a pessoa se o telefone digitado
+ * for um dos três do cadastro (últimos 8 dígitos, `phoneMatches`). Senão, ou se
+ * o cadastro não tem telefone, nada é vinculado nem alterado: 409 genérico
+ * mandando procurar o Sindicato, e a tentativa conta no limite por CPF. O
+ * cadastro existente nunca é sobrescrito com o que veio do formulário.
  *
  * Toda a criação (user → endereço → propriedade → primaryProperty → inscrição)
  * roda numa transação: falha no meio não deixa registros órfãos.
@@ -67,6 +75,7 @@ export class RegisterForCourseFullUseCase {
     constructor(
         private readonly prisma: PrismaClient,
         private readonly notifications: NotificationPublisher,
+        private readonly attempts: CpfAttemptLimiter,
     ) {}
 
     async execute(request: Request): Promise<Response> {
@@ -159,7 +168,13 @@ personName: string
             // inscrição acabou de criar com o mesmo CPF.
             let userData = await userRepo.findByCpf(cpf);
             const personName = userData?.name ?? name;
-            if (!userData) {
+            if (userData) {
+                if (this.attempts.isBlocked(cpf)) throw new TooManyAttemptsError();
+                if (!phoneMatches(userData, phone)) {
+                    this.attempts.recordFailure(cpf);
+                    throw new IdentityNotConfirmedError();
+                }
+            } else {
                 userData = await userRepo.create({
                     name,
                     phone,
@@ -209,6 +224,8 @@ personName };
 function knownRegistrationError(e: unknown): Error | null {
     if (e instanceof CourseRegistrationAlreadyExistsError) return e;
     if (e instanceof CourseFullError) return e;
+    if (e instanceof IdentityNotConfirmedError) return e;
+    if (e instanceof TooManyAttemptsError) return e;
     const fields = uniqueViolationFields(e);
     // CPF primeiro: o índice "UserData_cpf_active_unique" também tem "active" no nome.
     if (fields.some(f => f.includes('cpf'))) return new CpfAlreadyInUseError();

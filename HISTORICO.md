@@ -2,6 +2,15 @@
 
 O que mudou e por quê. As regras que valem hoje estão no `CLAUDE.md`. Este arquivo serve para entender de onde veio uma regra ou um dado estranho no banco. As entradas mais novas ficam no topo.
 
+## 19/10/2026: SR-025
+
+- **Consulta e inscrição por CPF confirmam o telefone (SR-025).**
+  - `GET /users/lookup-cpf/:cpf` dizia, para qualquer CPF, se havia cadastro e o primeiro nome. Filiação a sindicato é dado sensível na LGPD (art. 5º, II), e o CPF ia na URL, para os logs da API e do proxy.
+  - `register-by-cpf` respondia 404 para CPF sem cadastro (a mesma pergunta por outro caminho) e inscrevia qualquer pessoa para quem soubesse o CPF dela. `register-full` com CPF já cadastrado vinculava a inscrição só pelo CPF.
+  - Pediu-se o final do telefone, e não a data de nascimento, porque todo cadastro tem telefone e muitos não têm nascimento (decisão 001 da Arquitetura).
+  - Os 4 dígitos sozinhos se adivinham trocando de IP: daí o limite de 5 erros por hora por CPF, que conta também CPF sem cadastro.
+  - Quem trocou de telefone e não avisou o Sindicato não se inscreve mais pelo site com o CPF que já tem cadastro: a mensagem manda procurar o Sindicato.
+
 ## 16/10/2026: SR-006, SR-007, SR-012, SR-016 e SR-022
 
 - **Rotas abertas demais (SR-006).**

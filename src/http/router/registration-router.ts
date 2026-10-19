@@ -49,6 +49,7 @@ import {
 import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 import { publicFormRateLimit, publicLookupRateLimit } from '../lib/public-rate-limit.js';
+import { CpfAttemptLimiter } from '../../lib/cpf-attempt-limiter.js';
 
 export async function registrationRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const courseRepository = createCourseAdapter(prisma);
@@ -58,18 +59,21 @@ export async function registrationRouter(fastify: FastifyInstance, prisma: Prism
     const registrationRepository = createRegistrationAdapter(prisma);
     const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
     const notifications = createNotificationPublisher(prisma);
+    // Um contador só para a consulta e as duas inscrições por CPF: errar numa
+    // gasta as tentativas das outras.
+    const cpfAttempts = new CpfAttemptLimiter();
 
     const registerController = new RegisterForCourseController(
         new RegisterForCourseUseCase(courseRepository, userDataRepository, registrationRepository, notifications),
     );
     const registerByCpfController = new RegisterForCourseByCpfController(
-        new RegisterForCourseByCpfUseCase(courseRepository, userDataRepository, registrationRepository, notifications),
+        new RegisterForCourseByCpfUseCase(courseRepository, userDataRepository, registrationRepository, notifications, cpfAttempts),
     );
     const registerFullController = new RegisterForCourseFullController(
-        new RegisterForCourseFullUseCase(prisma, notifications),
+        new RegisterForCourseFullUseCase(prisma, notifications, cpfAttempts),
     );
     const lookupByCpfController = new LookupUserByCpfController(
-        new LookupUserByCpfUseCase(userDataRepository),
+        new LookupUserByCpfUseCase(userDataRepository, cpfAttempts),
     );
     const listController = new ListCourseRegistrationsController(
         new ListCourseRegistrationsUseCase(registrationRepository),
@@ -184,9 +188,9 @@ example: '52998224725' },
             config: publicFormRateLimit,
             schema: {
                 tags: ['Registrations'],
-                summary: 'Register for a course by CPF only',
+                summary: 'Register for a course with CPF and the last 4 phone digits',
                 description:
-                    'Public. Looks up existing UserData by CPF — if found, registers for the course; if not found, returns 404 so the client can redirect to the full registration flow.',
+                    'Pública. Inscreve quem já tem cadastro: o CPF e os 4 últimos dígitos de um dos telefones do cadastro (só dígitos; máscara e DDI 55 não contam). CPF sem cadastro **e** telefone que não confere dão o mesmo 404 "Não encontramos cadastro com este CPF e telefone." (o site segue para o `register-full`). 5 erros na hora para o mesmo CPF (somando consulta e inscrições) → 429. `phoneEnd` sem 4 dígitos → 400.',
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -194,10 +198,13 @@ example: '52998224725' },
                 },
                 body: {
                     type: 'object',
-                    required: ['cpf'],
+                    required: ['cpf', 'phoneEnd'],
                     properties: {
                         cpf: { type: 'string',
 example: '52998224725' },
+                        phoneEnd: { type: 'string',
+description: 'Os 4 últimos dígitos do telefone',
+example: '0001' },
                     },
                 },
                 response: {
@@ -211,31 +218,41 @@ example: '52998224725' },
                     400: errorResponse,
                     404: errorResponse,
                     409: errorResponse,
+                    429: errorResponse,
                 },
             },
         },
         (
             req: FastifyRequest<{
  Params: { courseId: string };
-Body: { cpf: string } 
+Body: {
+ cpf: string;
+phoneEnd: string 
+}
 }>,
             res: FastifyReply,
         ) => registerByCpfController.handle(req, res),
     );
 
-    fastify.get(
-        '/users/lookup-cpf/:cpf',
+    fastify.post(
+        '/users/lookup-cpf',
         {
             config: publicLookupRateLimit,
             schema: {
                 tags: ['Registrations'],
-                summary: 'Look up a participant by CPF',
+                summary: 'Look up a participant by CPF and the last 4 phone digits',
                 description:
-                    'Public. Returns whether a UserData exists for the CPF and a masked name to confirm identity. Does not register.',
-                params: {
+                    'Pública. POST para o CPF não ir na URL (nem nos logs). Com o CPF e os 4 últimos dígitos de um dos telefones do cadastro, devolve `{ found: true, name }` com o nome mascarado ("João D. S."). CPF inválido, sem cadastro ou telefone que não confere: o mesmo `{ found: false, name: null }`. 5 erros na hora para o mesmo CPF (somando consulta e inscrições) → 429. `phoneEnd` sem 4 dígitos → 400. Não inscreve.',
+                body: {
                     type: 'object',
-                    required: ['cpf'],
-                    properties: { cpf: { type: 'string' } },
+                    required: ['cpf', 'phoneEnd'],
+                    properties: {
+                        cpf: { type: 'string',
+example: '52998224725' },
+                        phoneEnd: { type: 'string',
+description: 'Os 4 últimos dígitos do telefone',
+example: '0001' },
+                    },
                 },
                 response: {
                     200: {
@@ -246,10 +263,17 @@ Body: { cpf: string }
 nullable: true },
                         },
                     },
+                    400: errorResponse,
+                    429: errorResponse,
                 },
             },
         },
-        (req: FastifyRequest<{ Params: { cpf: string } }>, res: FastifyReply) =>
+        (req: FastifyRequest<{
+ Body: {
+ cpf: string;
+phoneEnd: string 
+} 
+}>, res: FastifyReply) =>
             lookupByCpfController.handle(req, res),
     );
 
@@ -261,7 +285,7 @@ nullable: true },
                 tags: ['Registrations'],
                 summary: 'Register a new participant with full data',
                 description:
-                    'Public. Creates the participant (with rg/birthDate and address as their primary property) and registers for the course. If a UserData already exists for the CPF, only registers. E-mail is optional.',
+                    'Pública. CPF sem cadastro: cria a pessoa (com rg, nascimento e o endereço como propriedade principal) e inscreve. CPF que já tem cadastro: só inscreve se `phone` for um dos três telefones do cadastro (últimos 8 dígitos; máscara e DDI 55 não contam); senão, ou se o cadastro não tem telefone, nada é vinculado nem alterado → 409 "Não foi possível confirmar seu cadastro pelo site. Procure o Sindicato para fazer a inscrição.". O cadastro existente nunca é sobrescrito. E-mail é opcional. 5 erros na hora para o mesmo CPF → 429.',
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -306,6 +330,7 @@ enum: ['URBAN', 'RURAL'] },
                     400: errorResponse,
                     404: errorResponse,
                     409: errorResponse,
+                    429: errorResponse,
                 },
             },
         },

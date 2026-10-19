@@ -28,3 +28,12 @@ export class CourseFullError extends BusinessRuleError {
         this.name = 'CourseFullError';
     }
 }
+
+// Inscrição completa com CPF que já tem cadastro e telefone que não confere:
+// nada é vinculado nem alterado (SR-025).
+export class IdentityNotConfirmedError extends BusinessRuleError {
+    constructor() {
+        super('Não foi possível confirmar seu cadastro pelo site. Procure o Sindicato para fazer a inscrição.');
+        this.name = 'IdentityNotConfirmedError';
+    }
+}

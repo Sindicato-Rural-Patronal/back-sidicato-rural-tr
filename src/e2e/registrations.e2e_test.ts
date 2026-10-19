@@ -52,18 +52,40 @@ maxCapacity: seats } });
     return course.id;
 }
 
-async function person(name: string, cpf: string | null = nextCpf()) {
+/** Telefone padrão das pessoas de teste: final 0000. */
+const PHONE = '44991230000';
+
+type Phones = {
+ phone?: string;
+phone2?: string | null;
+phone3?: string | null 
+};
+
+async function person(name: string, cpf: string | null = nextCpf(), phones: Phones = {}) {
     const p = await prisma.userData.create({ data: { name,
-phone: '44991230000',
+phone: PHONE,
+...phones,
 cpf } });
     return { id: p.id,
 cpf: cpf ?? '' };
 }
 
-const byCpf = (courseId: string, cpf: string) =>
+const byCpf = (courseId: string, cpf: string, phoneEnd = '0000') =>
     app.inject({ method: 'POST',
 url: `/courses/${courseId}/register-by-cpf`,
-payload: { cpf } });
+payload: { cpf,
+phoneEnd } });
+
+const full = (courseId: string, payload: Record<string, unknown>) =>
+    app.inject({ method: 'POST',
+url: `/courses/${courseId}/register-full`,
+payload });
+
+const lookupRaw = (cpf: string, phoneEnd: string) =>
+    app.inject({ method: 'POST',
+url: '/users/lookup-cpf',
+payload: { cpf,
+phoneEnd } });
 
 async function listRegistrations(courseId: string): Promise<RegistrationItem[]> {
     const res = await app.inject({
@@ -102,18 +124,19 @@ afterAll(async () => {
     await prisma.$disconnect();
 });
 
-describe('GET /users/lookup-cpf/:cpf', () => {
-    const lookup = async (cpf: string) => {
-        const res = await app.inject({ method: 'GET',
-url: `/users/lookup-cpf/${cpf}` });
+describe('POST /users/lookup-cpf', () => {
+    const lookup = async (cpf: string, phoneEnd = '0000') => {
+        const res = await lookupRaw(cpf, phoneEnd);
         expect(res.statusCode, res.body).toBe(200);
         return JSON.parse(res.body) as {
  found: boolean;
-name: string | null 
+name: string | null
 };
     };
+    const NOT_FOUND = { found: false,
+name: null };
 
-    it('cadastro achado: devolve só o primeiro nome e as iniciais', async () => {
+    it('CPF e final do telefone certos: devolve só o primeiro nome e as iniciais', async () => {
         const p = await person('MARIA APARECIDA SOUZA');
         expect(await lookup(p.cpf)).toEqual({ found: true,
 name: 'MARIA A. S.' });
@@ -121,27 +144,99 @@ name: 'MARIA A. S.' });
 
     it('acha com o CPF digitado com máscara e o cadastro antigo gravado com máscara', async () => {
         const cpf = nextCpf();
-        await person('JOAO LEGADO', masked(cpf));
-        expect(await lookup(masked(cpf))).toEqual({ found: true,
+        await person('JOAO LEGADO', masked(cpf), { phone: '(44) 3624-5678' });
+        expect(await lookup(masked(cpf), '5678')).toEqual({ found: true,
 name: 'JOAO L.' });
-        expect(await lookup(cpf)).toEqual({ found: true,
+        expect(await lookup(cpf, '5678')).toEqual({ found: true,
 name: 'JOAO L.' });
     });
 
-    it('CPF válido sem cadastro e CPF inválido: não achado, sem nome', async () => {
-        expect(await lookup(nextCpf())).toEqual({ found: false,
-name: null });
-        expect(await lookup('12345678900')).toEqual({ found: false,
-name: null });
+    it('confere com o segundo e o terceiro telefone, com DDI e máscara', async () => {
+        const p = await person('TRES FONES', nextCpf(), { phone2: '+55 44 98888-1111',
+phone3: '5544977772222' });
+        expect((await lookup(p.cpf, '1111')).found).toBe(true);
+        expect((await lookup(p.cpf, '2222')).found).toBe(true);
     });
 
-    it('pessoa excluída não é achada', async () => {
+    it('telefone que não confere e CPF sem cadastro: a mesma resposta, letra por letra', async () => {
+        const p = await person('MARIA ERRADA');
+        const wrong = await lookupRaw(p.cpf, '9999');
+        const missing = await lookupRaw(nextCpf(), '0000');
+        expect(wrong.statusCode).toBe(200);
+        expect(missing.statusCode).toBe(200);
+        expect(wrong.body).toBe(missing.body);
+        expect(JSON.parse(wrong.body)).toEqual(NOT_FOUND);
+    });
+
+    it('CPF inválido e pessoa excluída: não achado', async () => {
+        expect(await lookup('12345678900')).toEqual(NOT_FOUND);
         const p = await person('PESSOA EXCLUIDA LOOKUP');
         await prisma.userData.update({ where: { id: p.id },
 data: { isDeleted: true,
 deletedAt: new Date() } });
-        expect(await lookup(p.cpf)).toEqual({ found: false,
-name: null });
+        expect(await lookup(p.cpf)).toEqual(NOT_FOUND);
+    });
+
+    it('final sem 4 dígitos ou faltando → 400', async () => {
+        const p = await person('SEM FINAL');
+        expect((await lookupRaw(p.cpf, '12')).statusCode).toBe(400);
+        const res = await app.inject({ method: 'POST',
+url: '/users/lookup-cpf',
+payload: { cpf: p.cpf } });
+        expect(res.statusCode).toBe(400);
+    });
+
+    it('a consulta antiga, com o CPF na URL, não existe mais', async () => {
+        const p = await person('URL ANTIGA');
+        const res = await app.inject({ method: 'GET',
+url: `/users/lookup-cpf/${p.cpf}` });
+        expect(res.statusCode).toBe(404);
+    });
+
+    it('não vai para a auditoria', async () => {
+        const p = await person('SEM AUDITORIA');
+        await lookup(p.cpf);
+        expect(await prisma.auditLog.count({ where: { path: { contains: 'lookup-cpf' } } })).toBe(0);
+    });
+});
+
+describe('Limite de erros por CPF', () => {
+    const found = async (cpf: string) => (JSON.parse((await lookupRaw(cpf, '0000')).body) as { found: boolean }).found;
+
+    it('5 erros na hora → 429, até com o par certo, com ou sem cadastro, somando consulta e inscrições', async () => {
+        const courseId = await courseWithSeats(10);
+        const p = await person('ALVO DE TENTATIVAS');
+        const unknown = nextCpf();
+        for (const cpf of [p.cpf, unknown]) {
+            for (let i = 0; i < 3; i++) expect((await lookupRaw(cpf, `999${i}`)).statusCode).toBe(200);
+            expect((await byCpf(courseId, cpf, '9993')).statusCode).toBe(404);
+            expect((await byCpf(courseId, cpf, '9994')).statusCode).toBe(404);
+        }
+        for (const cpf of [p.cpf, unknown]) {
+            const blocked = await lookupRaw(cpf, '0000');
+            expect(blocked.statusCode, blocked.body).toBe(429);
+            expect(JSON.parse(blocked.body).error).toBe('Muitas tentativas com este CPF. Aguarde uma hora ou procure o Sindicato.');
+            expect((await byCpf(courseId, cpf, '0000')).statusCode).toBe(429);
+        }
+        const res = await full(courseId, { name: 'ALVO',
+phone: PHONE,
+cpf: p.cpf });
+        expect(res.statusCode, res.body).toBe(429);
+        expect(await listRegistrations(courseId)).toEqual([]);
+
+        // Outro CPF segue normal.
+        expect(await found((await person('OUTRA PESSOA')).cpf)).toBe(true);
+    });
+
+    it('o register-full com telefone errado também conta', async () => {
+        const courseId = await courseWithSeats(10);
+        const p = await person('ALVO DO FULL');
+        for (let i = 0; i < 5; i++) {
+            expect((await full(courseId, { name: 'X',
+phone: `4498888000${i}`,
+cpf: p.cpf })).statusCode).toBe(409);
+        }
+        expect((await lookupRaw(p.cpf, '0000')).statusCode).toBe(429);
     });
 });
 
@@ -166,10 +261,25 @@ entityId: body.registrationId } });
         expect(event?.body).toBe('ANA INSCRITA');
     });
 
-    it('CPF sem cadastro → 404 e nada é criado', async () => {
+    it('CPF sem cadastro e telefone que não confere: o mesmo 404, e nada é criado', async () => {
         const courseId = await courseWithSeats(10);
-        const res = await byCpf(courseId, nextCpf());
-        expect(res.statusCode, res.body).toBe(404);
+        const missing = await byCpf(courseId, nextCpf());
+        const wrong = await byCpf(courseId, (await person('TELEFONE ERRADO')).cpf, '9999');
+        expect(missing.statusCode, missing.body).toBe(404);
+        expect(wrong.statusCode, wrong.body).toBe(404);
+        expect(wrong.body).toBe(missing.body);
+        expect(JSON.parse(wrong.body).error).toBe('Não encontramos cadastro com este CPF e telefone.');
+        expect(await listRegistrations(courseId)).toEqual([]);
+    });
+
+    it('final do telefone faltando ou sem 4 dígitos → 400', async () => {
+        const courseId = await courseWithSeats(10);
+        const p = await person('SEM FINAL BY CPF');
+        expect((await byCpf(courseId, p.cpf, '1')).statusCode).toBe(400);
+        const res = await app.inject({ method: 'POST',
+url: `/courses/${courseId}/register-by-cpf`,
+payload: { cpf: p.cpf } });
+        expect(res.statusCode).toBe(400);
         expect(await listRegistrations(courseId)).toEqual([]);
     });
 
@@ -192,6 +302,70 @@ entityId: body.registrationId } });
         const res = await byCpf(hidden, (await person('TERCEIRA')).cpf);
         expect(res.statusCode, res.body).toBe(409);
         expect(await listRegistrations(hidden)).toEqual([]);
+    });
+});
+
+describe('POST /courses/:id/register-full com CPF que já tem cadastro', () => {
+    it('telefone confere (com máscara, DDI ou sem DDD): inscreve a pessoa existente sem mexer no cadastro', async () => {
+        const p = await person('DONA DO CADASTRO', nextCpf(), { phone: '(44) 99123-4567' });
+        for (const [i, phone] of ['44991234567', '+55 (44) 99123-4567', '99123-4567'].entries()) {
+            const courseId = await courseWithSeats(10);
+            const res = await full(courseId, { name: `OUTRO NOME ${i}`,
+phone,
+email: 'novo@test.com',
+cpf: p.cpf,
+rg: '123',
+address: { city: 'CIDADE NOVA' } });
+            expect(res.statusCode, res.body).toBe(201);
+            expect(JSON.parse(res.body).userDataId).toBe(p.id);
+        }
+        const row = await prisma.userData.findUniqueOrThrow({ where: { id: p.id } });
+        expect(row).toMatchObject({ name: 'DONA DO CADASTRO',
+phone: '(44) 99123-4567',
+email: null,
+rg: null,
+primaryPropertyId: null });
+        expect(await prisma.userData.count({ where: { cpf: p.cpf } })).toBe(1);
+    });
+
+    it('cadastro antigo com 8 dígitos confere com o celular de 9 dígitos', async () => {
+        const p = await person('CELULAR ANTIGO', nextCpf(), { phone: '9123-4567' });
+        const res = await full(await courseWithSeats(10), { name: 'X',
+phone: '44991234567',
+cpf: p.cpf });
+        expect(res.statusCode, res.body).toBe(201);
+    });
+
+    it('telefone que não confere ou cadastro sem telefone: 409 genérico, nada vinculado nem alterado', async () => {
+        const courseId = await courseWithSeats(10);
+        const other = await person('TELEFONE DIFERENTE');
+        const noPhone = await person('SEM TELEFONE', nextCpf(), { phone: '' });
+        for (const p of [other, noPhone]) {
+            const res = await full(courseId, { name: 'INVASOR',
+phone: '44988887777',
+email: 'invasor@test.com',
+cpf: p.cpf,
+address: { city: 'X' } });
+            expect(res.statusCode, res.body).toBe(409);
+            expect(JSON.parse(res.body).error).toBe('Não foi possível confirmar seu cadastro pelo site. Procure o Sindicato para fazer a inscrição.');
+            const row = await prisma.userData.findUniqueOrThrow({ where: { id: p.id } });
+            expect(row.name).not.toBe('INVASOR');
+            expect(row.email).toBeNull();
+            expect(row.primaryPropertyId).toBeNull();
+            expect(await prisma.userData.count({ where: { cpf: p.cpf } })).toBe(1);
+        }
+        expect(await listRegistrations(courseId)).toEqual([]);
+        expect(await prisma.notification.count({ where: { type: 'COURSE_REGISTRATION',
+body: 'INVASOR' } })).toBe(0);
+    });
+
+    it('CPF sem cadastro continua criando a pessoa', async () => {
+        const cpf = nextCpf();
+        const res = await full(await courseWithSeats(10), { name: 'PESSOA NOVA FULL',
+phone: '44977776666',
+cpf });
+        expect(res.statusCode, res.body).toBe(201);
+        expect(await prisma.userData.count({ where: { cpf } })).toBe(1);
     });
 });
 

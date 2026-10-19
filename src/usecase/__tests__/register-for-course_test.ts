@@ -5,6 +5,7 @@ import type { UserDataRepository } from '../../ports/external/user-data-reposito
 import type { RegistrationRepository } from '../../ports/external/registration-repository.js';
 import type { NotificationPublisher } from '../../ports/external/notification-repository.js';
 import { RegisterForCourseByCpfUseCase } from '../register-for-course-by-cpf.js';
+import { CpfAttemptLimiter } from '../../lib/cpf-attempt-limiter.js';
 
 const mockCourseRepo = {
     findById: vi.fn(),
@@ -249,7 +250,10 @@ email: '' });
         const succeed = () => {
             vi.mocked(mockCourseRepo.findById).mockResolvedValue(publishedCourse as any);
             vi.mocked(mockUserDataRepo.findByCpf).mockResolvedValue({ id: 'ud-001',
-name: 'João Cadastrado' } as any);
+name: 'João Cadastrado',
+phone: '(44) 99123-0001',
+phone2: null,
+phone3: null } as any);
             vi.mocked(mockRegistrationRepo.findByUserDataAndCourse).mockResolvedValue(null);
             vi.mocked(mockRegistrationRepo.createWithCapacity).mockResolvedValue({ id: 'reg-001' } as any);
         };
@@ -295,9 +299,10 @@ name: 'João' } as any);
             succeed();
             vi.mocked(mockPublisher.publish).mockRejectedValueOnce(new Error('banco fora'));
             const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-            const uc = new RegisterForCourseByCpfUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo, mockPublisher);
+            const uc = new RegisterForCourseByCpfUseCase(mockCourseRepo, mockUserDataRepo, mockRegistrationRepo, mockPublisher, new CpfAttemptLimiter());
             const result = await uc.execute({ courseId: validInput.courseId,
-cpf: validInput.cpf });
+cpf: validInput.cpf,
+phoneEnd: '0001' });
             expect(result.error).toBeUndefined();
             expect(result.registrationId).toBe('reg-001');
             expect(mockPublisher.publish).toHaveBeenCalledWith(expect.objectContaining({

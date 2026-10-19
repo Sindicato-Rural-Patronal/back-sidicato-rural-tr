@@ -2,7 +2,10 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { RegisterForCourseByCpfUseCase } from '../../usecase/register-for-course-by-cpf.js';
 import { errorToStatus } from '../lib/require-permission.js';
 
-type Body = { cpf: string };
+type Body = {
+ cpf: string;
+phoneEnd: string 
+};
 type Params = { courseId: string };
 
 export class RegisterForCourseByCpfController {
@@ -16,9 +19,10 @@ Body: Body
         reply: FastifyReply,
     ) {
         const { courseId } = request.params;
-        const { cpf } = request.body;
+        const { cpf, phoneEnd } = request.body;
         const response = await this.useCase.execute({ courseId,
-cpf });
+cpf,
+phoneEnd });
         if (response.error) {
             return reply
                 .status(errorToStatus(response.error))

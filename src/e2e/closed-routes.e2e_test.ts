@@ -215,7 +215,7 @@ blocked };
     const course = '00000000-0000-4000-8000-000000000001';
 
     it.each([
-        ['GET', '/users/lookup-cpf/52998224725', PUBLIC_LOOKUP_LIMIT],
+        ['POST', '/users/lookup-cpf', PUBLIC_LOOKUP_LIMIT],
         ['POST', `/courses/${course}/register`, PUBLIC_FORM_LIMIT],
         ['POST', `/courses/${course}/register-by-cpf`, PUBLIC_FORM_LIMIT],
         ['POST', `/courses/${course}/register-full`, PUBLIC_FORM_LIMIT],
