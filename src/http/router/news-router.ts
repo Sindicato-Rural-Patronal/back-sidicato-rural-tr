@@ -120,7 +120,6 @@ properties: newsProperties },
                 summary: 'List all news (internal)',
                 description:
                     'Returns all news regardless of status. Requires READ_NEWS permission.',
-                security: [{ bearerAuth: [] }],
                 querystring: {
                     type: 'object',
                     properties: {
@@ -159,7 +158,6 @@ properties: newsProperties }),
             schema: {
                 tags: ['News'],
                 summary: 'Create news',
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['title', 'content'],
@@ -205,7 +203,6 @@ properties: { id: { type: 'string' } } },
             schema: {
                 tags: ['News'],
                 summary: 'Update news',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['newsId'],
@@ -258,7 +255,6 @@ properties: { message: { type: 'string' } } },
             schema: {
                 tags: ['News'],
                 summary: 'Delete news',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['newsId'],
@@ -283,7 +279,6 @@ properties: { message: { type: 'string' } } },
             schema: {
                 tags: ['News'],
                 summary: 'Upload news banner',
-                security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
                 params: {
                     type: 'object',
@@ -311,7 +306,6 @@ properties: { url: { type: 'string' } } },
             schema: {
                 tags: ['News'],
                 summary: 'Upload image for news content block',
-                security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
                 params: {
                     type: 'object',

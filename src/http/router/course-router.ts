@@ -182,7 +182,6 @@ export async function courseRouter(fastify: FastifyInstance, prisma: PrismaClien
                 tags: ['Admin — Courses'],
                 summary: 'List all courses (card listing)',
                 description: `Returns **all** courses with minimal card data. Requires JWT token with \`READ_COURSE\` permission. Use \`GET /admin/courses/:courseId\` for full detail.`,
-                security: [{ bearerAuth: [] }],
                 querystring: {
                     type: 'object',
                     properties: {
@@ -245,7 +244,6 @@ nullable: true },
                 tags: ['Admin — Courses'],
                 summary: 'Anos com curso cadastrado (admin)',
                 description: 'Anos de inicio dos cursos, do mais recente para o mais antigo. Requer `READ_COURSE`.',
-                security: [{ bearerAuth: [] }],
                 response: {
                     200: { type: 'array',
 items: { type: 'integer' } },
@@ -267,7 +265,6 @@ items: { type: 'integer' } },
                 tags: ['Admin — Courses'],
                 summary: 'Get course full detail (admin)',
                 description: `Returns all fields of a course. Requires JWT token with \`READ_COURSE\` permission. Use this when opening the edit/view dialog.`,
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -374,7 +371,6 @@ properties: courseDetailProperties },
 - \`copyCoverFromCourseId\` — copia a capa desse curso para um arquivo próprio do curso novo (não reaproveita a URL: trocar a capa de um mudaria a do outro). Resposta traz \`coverCopied\` (false = enviar a capa pela edição)
 - \`copyInstructorsFromCourseId\` — copia os instrutores (título e categoria); \`instructorAssignmentIds\` limita a esses vínculos. Resposta traz \`instructorsCopied\`
 - A galeria não é copiada; se a cópia falhar o curso continua criado`,
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['name', 'description', 'roomId', 'startTime', 'endTime'],
@@ -451,7 +447,6 @@ items: { type: 'string' } },
 - A ~640px WebP thumbnail is generated too (\`thumbUrl\`, saved as \`coverImageThumb\`, used by the cards); \`null\` if it could not be generated
 - Uploading a new banner overwrites the previous one (and its thumbnail)
 - \`courseId\` must be an existing course ID`,
-                security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
                 params: {
                     type: 'object',
@@ -488,7 +483,6 @@ nullable: true } } },
 - If \`roomId\` is changed, the room must exist and be available for the period
 - If \`startTime\` or \`endTime\` is changed, room availability is re-validated
 - The \`status\` field controls course visibility`,
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -567,7 +561,6 @@ properties: { message: { type: 'string' } } },
 - This operation is irreversible
 - Also removes registrations (\`courseUserRegistration\`) and gallery photos (\`CoursePhoto\`) linked to the course
 - The banner in storage is **not** removed automatically`,
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -599,7 +592,6 @@ description: 'Course deleted successfully' },
 - Send as \`multipart/form-data\` with the file in the \`file\` field
 - Optional \`caption\` field for the photo caption
 - Returns the \`photoId\` needed to remove the photo via \`DELETE /courses/:courseId/gallery/:photoId\``,
-                security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
                 params: {
                     type: 'object',
@@ -636,7 +628,6 @@ description: 'Course deleted successfully' },
 **Business rules:**
 - Use the \`photoId\` returned by \`POST /courses/:courseId/gallery\`
 - The file in storage is **not** removed, only the database record`,
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId', 'photoId'],

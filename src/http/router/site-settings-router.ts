@@ -64,7 +64,6 @@ properties: settingsProperties } },
             schema: {
                 tags: ['Site Settings'],
                 summary: 'Site settings (admin)',
-                security: [{ bearerAuth: [] }],
                 response: {
                     200: { type: 'object',
 properties: settingsProperties },
@@ -83,7 +82,6 @@ properties: settingsProperties },
             schema: {
                 tags: ['Site Settings'],
                 summary: 'Update site settings (admin)',
-                security: [{ bearerAuth: [] }],
                 body: settingsBody,
                 response: {
                     200: { type: 'object',

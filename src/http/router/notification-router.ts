@@ -12,7 +12,6 @@ const str = { type: 'string' };
 const nstr = { type: 'string',
 nullable: true };
 const tags = ['Admin — Notificações'];
-const security = [{ bearerAuth: [] }];
 
 const eventSchema = {
     type: 'object',
@@ -62,7 +61,6 @@ export async function notificationRouter(fastify: FastifyInstance, prisma: Prism
 - \`events\`: inscrições em curso, mensagens de contato e convites aceitos dos últimos 30 dias (mais recentes primeiro, até 50); \`read\` = este admin já leu.
 - \`unreadCount\`: eventos não lidos na janela.
 - \`pending\`: pendências calculadas na hora (não são gravadas); \`pendingCount\` = tamanho da lista.`,
-                security,
                 response: {
                     200: {
                         type: 'object',
@@ -90,7 +88,6 @@ items: pendingSchema },
                 tags,
                 summary: 'Marcar notificações como lidas',
                 description: 'Sem `ids`: todos os eventos visíveis ainda não lidos por este admin. Com `ids`: só esses (se visíveis). Responde quantos foram marcados agora.',
-                security,
                 body: {
                     type: 'object',
                     nullable: true,

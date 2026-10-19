@@ -93,7 +93,6 @@ auth: loggedIn() },
 - Send the current token in the \`Authorization: Bearer <token>\` header (no body)
 - An expired or invalid token, or an admin that was removed (or has no rule), gets \`401\` — a new login is required
 - The admin panel calls this automatically while in use, so an active session does not expire`,
-                security: [{ bearerAuth: [] }],
                 response: {
                     200: tokenResponse('Token renewed'),
                     401: errorBody('Invalid or expired token, or admin not found'),

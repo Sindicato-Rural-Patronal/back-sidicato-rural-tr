@@ -92,7 +92,6 @@ export async function userPropertyRouter(fastify: FastifyInstance, prisma: Prism
             schema: {
                 tags: ['Admin — Properties'],
                 summary: 'List properties of a worker',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -162,7 +161,6 @@ nullable: true },
             schema: {
                 tags: ['Admin — Properties'],
                 summary: 'Add a property (rural land) to a worker',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -238,7 +236,6 @@ properties: { id: { type: 'string' } } },
                 summary: 'Update a property (rural land) of a worker',
                 description:
                     'Todos os campos são opcionais: o que não vier fica como está. Propriedade de outra pessoa responde 404.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: {
@@ -282,7 +279,6 @@ properties: addressBodyProperties },
             schema: {
                 tags: ['Admin — Properties'],
                 summary: 'Delete a property from a worker',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: {

@@ -96,7 +96,6 @@ export async function dashboardRouter(fastify: FastifyInstance, prisma: PrismaCl
 **\`READ_USER_ADMIN\`**: \`totalAdmins\` (contas de acesso ao painel) · **\`READ_CONTACT\`**: \`unreadMessages\` (mensagens de contato não lidas)
 
 **\`READ_MARKET_QUOTE\`**: \`quotesToday\` — \`{ launched, period }\`: se já houve lançamento hoje (Brasília) e qual foi o último período (\`MORNING\`/\`AFTERNOON\`, null quando nada foi lançado). É o fato puro: a regra de quando cobrar (dias úteis, a partir das 11h) fica no sino.`,
-                security: [{ bearerAuth: [] }],
                 response: {
                     200: statsResponse,
                     401: errorResponse,

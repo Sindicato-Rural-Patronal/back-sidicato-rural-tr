@@ -15,7 +15,6 @@ const nstr = { type: 'string',
 nullable: true };
 const int = { type: 'integer' };
 const tags = ['Admin — Users'];
-const sec = [{ bearerAuth: [] }];
 
 const duplicatePerson = {
     type: 'object',
@@ -53,7 +52,6 @@ export async function userMergeRouter(fastify: FastifyInstance, prisma: PrismaCl
             summary: 'Possíveis cadastros duplicados',
             description:
                 'Grupos de pessoas ativas com o mesmo nome normalizado, telefone ou e-mail, em que pelo menos uma está sem CPF.',
-            security: sec,
             querystring: {
                 type: 'object',
                 properties: { limit: { type: 'integer',
@@ -94,7 +92,6 @@ items: duplicatePerson },
             tags,
             summary: 'Comparar dois cadastros antes de juntar',
             description: 'Os dois cadastros de `ids` (separados por vírgula) com os mesmos números da lista de duplicados.',
-            security: sec,
             querystring: {
                 type: 'object',
                 required: ['ids'],
@@ -129,7 +126,6 @@ items: duplicatePerson } } },
 **Campos vazios** do cadastro que fica são preenchidos com o que havia no removido (CPF, RG, nascimento, e-mail, telefone…); nada preenchido é sobrescrito.
 
 **Recusa:** mesmo id, cadastro já excluído, CPFs diferentes (409) e os dois com login (409).`,
-            security: sec,
             body: {
                 type: 'object',
                 required: ['keepId', 'removeId'],

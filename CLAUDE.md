@@ -50,7 +50,7 @@ src/
     error-handler.ts       apiErrorHandler
     router/                um plugin Fastify por módulo (schema Swagger + handler)
     controllers/           leem a request, checam permissão, chamam o use case
-    lib/                   require-permission.ts, public-rate-limit.ts, swagger-schemas.ts
+    lib/                   route-auth.ts (acesso por rota), require-permission.ts (errorToStatus), public-rate-limit.ts, swagger-schemas.ts
   usecase/                 regras de negócio (sem Fastify; Prisma só pelos ports)
   ports/external/          interfaces dos repositórios
   adapter/database/        implementações Prisma dos ports; list-filters.ts; prisma-errors.ts
@@ -115,11 +115,20 @@ Conferência de conflito em use case enxerga só os ativos; sem uma das duas sa�
 - `POST /auth/refresh` troca um token ainda válido por outro de 8 h, enquanto o admin existir (não excluído, com regra) e o login tiver sido há no máximo 24 h (`ADMIN_SESSION_MAX_SECONDS`). Fora disso → 401.
 - O painel renova sozinho. O header é `Authorization: Bearer <token>`.
 
-**Checagem por rota**, no controller (`http/lib/require-permission.ts`), com estas respostas em todas as rotas:
-- `requirePermission(req, reply, 'X', getAdminPermissions)`: sem token ou token inválido → 401 `{ error: "Unauthorized" }`; admin excluído/sem regra → 401 `{ error: "Admin not found" }`; sem a permissão → 403 `{ error: "Forbidden" }`.
-- `requireAuth(...)`: só o login (rotas de "Minha conta" e o sino).
-- Rota com duas permissões chama `requirePermission` duas vezes (junção de cadastros, exportação `cadastros`).
-- O `security` do schema Swagger é só documentação. Rota nova sem checagem fica aberta, e nenhum teste avisa (a decisão 001 da Arquitetura propõe declarar na rota).
+**Acesso declarado na rota** (`http/lib/route-auth.ts`, decisão 001 da Arquitetura). Toda rota diz o que exige em `config.auth`:
+- `publicRoute()`: qualquer um.
+- `loggedIn()`: qualquer admin com login válido ("Minha conta", o sino, o Painel Geral, `/auth/refresh`, CEP).
+- `requires('X', 'Y')`: todas as permissões listadas (a junção de cadastros pede duas).
+- `requiresFrom(req => [...] | null)`: calculada por params/query, nunca pelo corpo; `null` = só o login. Só a exportação usa (`cadastros` pede duas).
+
+Um hook `onRequest`, num plugin que envolve todos os routers (`registerRouters`), confere antes de ler o corpo. As respostas são as mesmas em todas as rotas:
+- sem token ou token inválido → 401 `{ error: "Unauthorized" }`; admin excluído/sem regra → 401 `{ error: "Admin not found" }`; sem a permissão → 403 `{ error: "Forbidden" }`;
+- rota **sem** declaração → 500 `{ error: "Rota sem regra de acesso." }`: fica fechada, não aberta;
+- como a checagem vem antes da validação, sem token ou sem permissão o 401/403 aparece antes de qualquer 400/404.
+
+O hook preenche `request.admin` (`{ id, permissions, has(p) }`), lido uma vez por request. Os controllers pegam quem chamou com `adminOf(request)`. Fica no handler só o que depende do registro (as travas de "Anti-escalonamento") ou do corpo (criar curso copiando capa/instrutores pede também `UPDATE_COURSE`, com `request.admin.has`).
+
+O teste de inventário (`http/__tests__/route-auth-inventory_test.ts`) monta todas as rotas e reprova rota sem declaração, rota pública fora de `ROTAS_PUBLICAS` e rota pública que grava ou recebe CPF sem limite próprio. **Rota pública nova entra em `ROTAS_PUBLICAS`, com o motivo.**
 
 **Permissões.**
 - Não são hierárquicas: `READ_USER_ADMIN` não inclui `READ_USER`.
@@ -861,8 +870,8 @@ Helpers que não são adapters:
 
 1. **Port** em `ports/external/foo-repository.ts` e **adapter** em `adapter/database/foo-adapter.ts` (`createFooAdapter(prisma)`, `semRegistro` no `catch`).
 2. **Use case** em `usecase/`: valida com Zod (`safeParse`, nunca `parse`) e devolve `{ error?, ...resultado }`.
-3. **Controller** em `http/controllers/`: checa a permissão primeiro (`requirePermission`/`requireAuth`) e responde com `errorToStatus`.
-4. **Router** em `http/router/`: schema Swagger com `tags`, `summary`, `description`, `body`/`params`/`querystring`, `response` e `security: [{ bearerAuth: [] }]` quando protegida. Registrado em `http/register-routers.ts`, o que já vale para o servidor e para os E2E.
+3. **Controller** em `http/controllers/`: não confere permissão (a rota declara); quem chamou é `adminOf(request)`. Responde com `errorToStatus`.
+4. **Router** em `http/router/`: `config: { auth: requires('X') }` (ou `publicRoute()`, `loggedIn()`, `requiresFrom`) e schema Swagger com `tags`, `summary`, `description`, `body`/`params`/`querystring` e `response`. O `security` e a permissão na descrição saem da declaração. Registrado em `http/register-routers.ts`, o que já vale para o servidor e para os E2E.
 5. **Auditoria:** rota que edita um registro → `SNAPSHOTS` (`lib/audit-snapshot.ts`); ação diferente de criar/editar/excluir → `SPECIAL` (`lib/audit-sentence.ts`); entidade nova → `AUDIT_ENTITY_NOUNS`.
 6. **Permissão nova** → enum no schema + migration que a concede (ver Autenticação).
 7. **Testes:** unitário do use case e, para rota protegida, E2E com 401 sem token e 403 sem a permissão.
@@ -874,6 +883,7 @@ Helpers que não são adapters:
 
 - `http://localhost:3000/docs`. Fora de produção sempre sobe; em produção, só com `ENABLE_DOCS=true`.
 - Rotas protegidas: login em `POST /auth/login`, depois **Authorize** com o token.
+- O `security` (`bearerAuth`) e a linha "Exige: …" no fim da descrição saem do `config.auth` da rota (`documentAuth` em `http/lib/route-auth.ts`); não escreva à mão.
 
 ## Comandos, testes e CI
 

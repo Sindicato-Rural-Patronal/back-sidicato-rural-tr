@@ -39,7 +39,6 @@ Cada exportação fica registrada na auditoria (ação "Exportou").`;
         tags: ['Admin — Export'],
         summary: `Exportar dados em CSV (${method})`,
         description,
-        security: [{ bearerAuth: [] }],
         params: {
             type: 'object',
             required: ['dataset'],

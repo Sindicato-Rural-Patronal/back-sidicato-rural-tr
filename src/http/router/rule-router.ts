@@ -41,7 +41,6 @@ export async function ruleRouter(fastify: FastifyInstance, prisma: PrismaClient)
             schema: {
                 tags: ['Admin — Rules'],
                 summary: 'List permission rules (internal)',
-                security: [{ bearerAuth: [] }],
                 querystring: paginationQuerystring,
                 response: {
                     200: pagedResponse({
@@ -72,7 +71,6 @@ items: { type: 'string' } },
             schema: {
                 tags: ['Rules'],
                 summary: 'Create permission rule',
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['name', 'permissions'],
@@ -122,7 +120,6 @@ format: 'date-time' },
             schema: {
                 tags: ['Rules'],
                 summary: 'Update permission rule',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['ruleId'],
@@ -166,7 +163,6 @@ properties: { message: { type: 'string' } } },
                 tags: ['Rules'],
                 summary: 'Delete permission rule',
                 description: 'Remove uma regra. Falha com 409 se houver admin ativo usando-a.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['ruleId'],

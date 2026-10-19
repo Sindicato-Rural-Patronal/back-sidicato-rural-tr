@@ -32,7 +32,6 @@ export async function userRelationRouter(fastify: FastifyInstance, prisma: Prism
             schema: {
                 tags: ['Admin — Relations'],
                 summary: 'List relations of a worker',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -79,7 +78,6 @@ nullable: true },
                 tags: ['Admin — Relations'],
                 summary: 'Link two worker records as related',
                 description: 'Creates a bidirectional relation between two workers. The inverse relation (B→A) is created automatically with no label.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -120,7 +118,6 @@ properties: { id: { type: 'string' } } },
                 tags: ['Admin — Relations'],
                 summary: 'Remove a relation between two workers',
                 description: 'Deletes the relation and its inverse automatically.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: {

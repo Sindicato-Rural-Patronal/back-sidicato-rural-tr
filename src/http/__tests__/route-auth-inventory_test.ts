@@ -3,7 +3,6 @@ import fastify, { type FastifyInstance } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { registerRouters } from '../register-routers.js';
 import { routeKey, type RouteAuthEntry } from '../lib/route-auth.js';
-import { ROUTE_AUTH_PENDING } from '../lib/route-auth-pending.js';
 
 // Toda rota da API declara o que exige (decisão 001, SR-023). Monta as rotas
 // de verdade, sem banco (os routers só usam o Prisma dentro dos handlers), e
@@ -66,26 +65,12 @@ describe('inventário de autorização das rotas', () => {
         expect(new Set(keys(routes())).size).toBe(routes().length);
     });
 
-    it('toda rota declara o que exige, ou ainda está na lista de pendentes', () => {
-        const pending = new Set(ROUTE_AUTH_PENDING);
-        const undeclared = keys(routes().filter(r => !r.auth && !pending.has(routeKey(r.method, r.url))));
-        expect(undeclared).toEqual([]);
+    it('toda rota declara o que exige', () => {
+        expect(keys(routes().filter(r => !r.auth))).toEqual([]);
     });
 
-    it('a lista de pendentes só tem rotas que existem e ainda não declararam', () => {
-        const byKey = new Map(routes().map(r => [routeKey(r.method, r.url), r]));
-        const wrong = ROUTE_AUTH_PENDING.filter(k => !byKey.has(k) || byKey.get(k)!.auth);
-        expect(wrong).toEqual([]);
-        expect(new Set(ROUTE_AUTH_PENDING).size).toBe(ROUTE_AUTH_PENDING.length);
-    });
-
-    it('as rotas públicas são exatamente as de ROTAS_PUBLICAS (as pendentes ainda não contam)', () => {
-        const declaredPublic = keys(routes().filter(r => r.auth?.kind === 'public'));
-        expect(declaredPublic.filter(k => !(k in ROTAS_PUBLICAS))).toEqual([]);
-
-        const pending = new Set(ROUTE_AUTH_PENDING);
-        const missing = Object.keys(ROTAS_PUBLICAS).filter(k => !declaredPublic.includes(k) && !pending.has(k));
-        expect(missing).toEqual([]);
+    it('as rotas públicas são exatamente as de ROTAS_PUBLICAS', () => {
+        expect(keys(routes().filter(r => r.auth?.kind === 'public'))).toEqual(Object.keys(ROTAS_PUBLICAS).sort());
     });
 
     it('rota pública que grava ou recebe CPF tem limite por IP próprio', () => {

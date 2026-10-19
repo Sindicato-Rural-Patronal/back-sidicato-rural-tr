@@ -2,7 +2,6 @@ import type { FastifyInstance, FastifyRequest, RouteOptions } from 'fastify';
 import type { Permission } from '../../generated/prisma/enums.js';
 import { decodeToken } from '../../lib/auth.js';
 import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { ROUTE_AUTH_PENDING } from './route-auth-pending.js';
 
 // Autorização declarada na rota (decisão 001 da Arquitetura, SR-023).
 //
@@ -16,7 +15,12 @@ import { ROUTE_AUTH_PENDING } from './route-auth-pending.js';
 //
 // Um hook `onRequest` faz a checagem antes do parse do corpo, então upload sem
 // permissão é recusado sem ser lido. Rota sem declaração responde 500 (fica
-// fechada, não aberta) e o teste de inventário reprova.
+// fechada, não aberta) e o teste de inventário reprova. Rota pública nova entra
+// também em ROTAS_PUBLICAS (http/__tests__/route-auth-inventory_test.ts), com
+// o motivo.
+//
+// A declaração também escreve o Swagger: rota não pública ganha `bearerAuth` e
+// a permissão no fim da descrição.
 
 export type AdminContext = {
     id: string;
@@ -63,7 +67,7 @@ export type RouteAuthEntry = {
     rateLimited: boolean;
 };
 
-/** "GET /admin/users/:id": a chave das rotas na lista de pendentes e nos testes. */
+/** "GET /admin/users/:id": a chave das rotas nos testes e no log. */
 export const routeKey = (method: string, url: string) => `${method} ${url}`;
 
 type PermissionsSource = Pick<GetAdminPermissionsUseCase, 'execute'>;
@@ -71,8 +75,6 @@ type PermissionsSource = Pick<GetAdminPermissionsUseCase, 'execute'>;
 type Options = {
     /** Recebe uma linha por rota (para os testes). */
     inventory?: RouteAuthEntry[];
-    /** Rotas que ainda conferem no controller. Os testes do hook passam a sua. */
-    pending?: readonly string[];
 };
 
 /**
@@ -83,13 +85,13 @@ export function withRouteAuth(
     app: FastifyInstance,
     getAdminPermissions: PermissionsSource,
     registerApiRoutes: (api: FastifyInstance) => void,
-    { inventory, pending = ROUTE_AUTH_PENDING }: Options = {},
+    { inventory }: Options = {},
 ) {
-    const pendingSet = new Set(pending);
     if (!app.hasRequestDecorator('admin')) app.decorateRequest('admin', null);
 
     app.register(async api => {
         api.addHook('onRoute', (route: RouteOptions) => {
+            documentAuth(route);
             if (!inventory) return;
             const methods = Array.isArray(route.method) ? route.method : [route.method];
             for (const method of methods) {
@@ -103,7 +105,7 @@ export function withRouteAuth(
         });
 
         api.addHook('onRequest', async (request, reply) => {
-            const denied = await checkRouteAuth(request, getAdminPermissions, pendingSet);
+            const denied = await checkRouteAuth(request, getAdminPermissions);
             if (denied) {
                 if (denied.status === 500) request.log.error({ route: routeOf(request) }, 'Rota sem regra de acesso');
                 return reply.status(denied.status).send({ error: denied.error });
@@ -112,6 +114,29 @@ export function withRouteAuth(
 
         registerApiRoutes(api);
     });
+}
+
+/** O que a rota exige, em texto, para o Swagger. */
+function describeAuth(auth: RouteAuth): string {
+    if (auth.kind === 'requires') return `Exige: ${auth.permissions.join(' e ')}.`;
+    if (auth.kind === 'requiresFrom') return 'Exige login e a permissão do conjunto pedido.';
+    return 'Exige login.';
+}
+
+/**
+ * O Swagger passa a dizer a verdade sozinho: o `security` e a permissão saem
+ * da declaração. O @fastify/swagger guarda a referência da rota e lê o schema
+ * só ao montar o documento, então vê a troca feita aqui.
+ */
+function documentAuth(route: RouteOptions) {
+    const auth = route.config?.auth;
+    if (!auth || auth.kind === 'public') return;
+    const schema = (route.schema ?? {}) as { description?: string };
+    route.schema = {
+        ...schema,
+        security: [{ bearerAuth: [] }],
+        description: [schema.description, describeAuth(auth)].filter(Boolean).join('\n\n'),
+    } as RouteOptions['schema'];
 }
 
 function routeOf(request: FastifyRequest): string {
@@ -129,18 +154,13 @@ error: string
 async function checkRouteAuth(
     request: FastifyRequest,
     getAdminPermissions: PermissionsSource,
-    pending: ReadonlySet<string>,
 ): Promise<Denied> {
     // Sem rota (404 do Fastify): não há o que conferir.
     if (!request.routeOptions.url) return null;
 
     const auth = request.routeOptions.config?.auth;
-    if (!auth) {
-        // Ainda confere do jeito antigo, dentro do controller.
-        if (pending.has(routeOf(request))) return null;
-        return { status: 500,
+    if (!auth) return { status: 500,
 error: 'Rota sem regra de acesso.' };
-    }
     if (auth.kind === 'public') return null;
 
     const token = request.headers['authorization']?.replace('Bearer ', '') ?? '';

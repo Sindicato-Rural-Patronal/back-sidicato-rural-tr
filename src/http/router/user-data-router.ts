@@ -55,7 +55,6 @@ export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaCli
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'List workers (internal)',
-                security: [{ bearerAuth: [] }],
                 querystring: {
                     type: 'object',
                     properties: {
@@ -130,7 +129,6 @@ nullable: true },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'Get worker detail with relations and properties',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -334,7 +332,6 @@ nullable: true },
             schema: {
                 tags: ['Users'],
                 summary: 'Create worker user',
-                security: [{ bearerAuth: [] }],
                 description: `Creates a new UserData (rural worker). Requires \`CREATE_USER\` — it is the admin panel's form; public course registration has its own routes.
 
 **Business rules:**
@@ -399,7 +396,6 @@ format: 'date-time' },
             schema: {
                 tags: ['Users'],
                 summary: 'Update worker user',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -514,7 +510,6 @@ properties: { message: { type: 'string' } } },
                 description: `Exclusão lógica. Leva junto login, convite não usado, inscrições ativas, escala de instrutor, Unimed, propriedades, relações, contato público e vínculos com empresas. Requer \`DELETE_USER\`.
 
 Se a pessoa tem login no painel, valem também as travas de excluir administrador: exige \`DELETE_USER_ADMIN\` (403), não a si mesmo (400), não quem tem permissões além das suas (403) e nunca o último administrador ativo (400).`,
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -549,7 +544,6 @@ Se a pessoa tem login no painel, valem também as travas de excluir administrado
 - Send as \`multipart/form-data\` with the file in the \`file\` field
 - The URL is saved to \`UserData.avatar\` and returned in \`avatarUrl\`
 - Uploading a new avatar overwrites the previous URL (old file remains in storage)`,
-                security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
                 params: {
                     type: 'object',
@@ -581,7 +575,6 @@ properties: { avatarUrl: { type: 'string' } } },
                 tags: ['Admin — Auth'],
                 summary: 'Upload own avatar (self-service)',
                 description: 'O admin logado troca a própria foto. Auth-only, sem permissão de gestão. multipart/form-data no campo `file`.',
-                security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
                 response: {
                     200: { type: 'object',

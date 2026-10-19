@@ -60,7 +60,6 @@ total };
             schema: {
                 tags: ['Admin — Audit'],
                 summary: 'List admin audit trail',
-                security: [{ bearerAuth: [] }],
                 querystring: {
                     type: 'object',
                     properties: {
@@ -207,7 +206,6 @@ username: true },
             schema: {
                 tags: ['Admin — Audit'],
                 summary: 'Tempo de guarda da trilha de auditoria',
-                security: [{ bearerAuth: [] }],
                 response: {
  200: auditSettingsResponse,
 401: errorResponse,
@@ -235,7 +233,6 @@ options: [...AUDIT_RETENTION_OPTIONS],
             schema: {
                 tags: ['Admin — Audit'],
                 summary: 'Mudar o tempo de guarda da trilha (apaga o que passou do prazo)',
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['retentionDays'],

@@ -35,7 +35,6 @@ export async function adminInviteRouter(fastify: FastifyInstance, prisma: Prisma
             schema: {
                 tags: ['Admin — Invites'],
                 summary: 'Create an admin invite (person + rule) → token/link',
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['userDataId', 'rulesId'],
@@ -74,7 +73,6 @@ rulesId: string
             schema: {
                 tags: ['Admin — Invites'],
                 summary: 'List pending admin invites (no token exposed)',
-                security: [{ bearerAuth: [] }],
                 response: {
                     200: {
                         type: 'array',
@@ -105,7 +103,6 @@ rulesId: string
             schema: {
                 tags: ['Admin — Invites'],
                 summary: 'Revoke a pending admin invite',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['id'],

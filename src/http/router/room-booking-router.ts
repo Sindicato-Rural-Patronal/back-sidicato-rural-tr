@@ -94,7 +94,6 @@ description: `Último dia (AAAA-MM-DD), obrigatório; até ${MAX_RANGE_DAYS} dia
 const idParams = { type: 'object',
 required: ['id'],
 properties: { id: str } };
-const sec = [{ bearerAuth: [] }];
 const tags = ['Reservas de sala'];
 const errs = { 400: errorResponse,
 401: errorResponse,
@@ -143,7 +142,6 @@ items: publicEventObject } },
                 tags,
                 summary: 'Listar reservas de sala (eventos e reuniões)',
                 description: `Reservas não excluídas que sobrepõem o período [from 00:00, to 23:59:59], por início. Sem paginação. ${timeNote}`,
-                security: sec,
                 querystring: {
                     type: 'object',
                     properties: {
@@ -175,7 +173,6 @@ items: bookingObject },
                 description: `Cursos não excluídos de **qualquer status** (inclusive UNPUBLISHED e COMPLETED; \`status\` vem preenchido) e reservas que sobrepõem o período, por início. É o que o calendário do Painel Geral consome — não é preciso paginar \`/admin/courses\`.
 
 Em \`kind: COURSE\` também vêm \`enrolled\`, \`maxStudents\` (capacidade da sala), \`registrationDeadline\` (dia, AAAA-MM-DD) e \`registrationDeadlineTime\` ("HH:MM" ou null = dia inteiro); em evento/reunião os quatro são null. ${timeNote}`,
-                security: sec,
                 querystring: { type: 'object',
 properties: rangeQuery },
                 response: { 200: { type: 'array',
@@ -198,7 +195,6 @@ items: scheduleObject },
                 tags,
                 summary: 'Criar reserva de sala (com repetição opcional)',
                 description: `Cria o evento/reunião. \`repeat\` cria uma ocorrência por semana (WEEKLY) ou por mês no mesmo dia (MONTHLY; mês sem o dia é pulado) até \`until\` inclusive, no máximo ${MAX_OCCURRENCES}. Todas as ocorrências são checadas antes: se alguma bate com curso ou reserva na mesma sala → 409 "Sala ocupada: …" e nada é criado. Encostar (terminar quando o outro começa) é permitido. ${timeNote}`,
-                security: sec,
                 body: {
                     type: 'object',
                     required: ['type', 'title', 'roomId', 'startTime', 'endTime'],
@@ -259,7 +255,6 @@ seriesId: r.seriesId ?? null });
                 tags,
                 summary: 'Editar uma ocorrência da reserva',
                 description: `Muda só esta ocorrência (as outras da série ficam como estão). Mudando sala ou horário, checa conflito sem contar ela mesma → 409. \`description\`, \`responsibleUserDataId\` e \`responsibleName\` aceitam null para limpar. ${timeNote}`,
-                security: sec,
                 params: idParams,
                 body: {
                     type: 'object',
@@ -297,7 +292,6 @@ seriesId: r.seriesId ?? null });
                 tags,
                 summary: 'Excluir reserva (uma ou desta em diante na série)',
                 description: 'Exclusão lógica. `scope=one` (padrão) só esta; `scope=future` esta e as seguintes da mesma série.',
-                security: sec,
                 params: idParams,
                 querystring: { type: 'object',
 properties: { scope: { type: 'string',

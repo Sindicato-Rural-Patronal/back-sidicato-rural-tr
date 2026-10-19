@@ -4,6 +4,11 @@ O que mudou e por quê. As regras que valem hoje estão no `CLAUDE.md`. Este arq
 
 ## 19/10/2026: SR-023 e SR-025
 
+- **Acesso declarado na rota (SR-023, decisão 001).**
+  - Cada controller conferia a permissão do seu jeito (`requirePermission`, `requireAuth`, closures `can()`, `decodeToken` à mão), e rota que esquecia ficava aberta sem nenhum teste perceber: foi assim com o `POST /users` e a ficha de inscrição (SR-006).
+  - Passou a valer `config.auth` em toda rota, conferido por um hook antes de ler o corpo; rota sem declaração responde 500. Um teste de inventário monta as 190 rotas e reprova a que não declarou.
+  - A migração foi router por router, com uma lista de pendentes que encolheu até sumir. `requirePermission` e `requireAuth` não existem mais.
+  - O `security` do Swagger, antes escrito à mão em 169 lugares, passou a sair da declaração.
 - **Rotas fechadas pela decisão 001 (SR-023).**
   - `POST /courses/:id/register` saiu. O site nunca a usou (usa `register-by-cpf` e `register-full`), e ela criava pessoa e inscrição e vinculava pelo CPF sem conferir o telefone.
   - `GET /rooms` passou a exigir `READ_COURSE` e `GET /address/cep/:cep` o login: só o painel as usa. A do CEP, aberta, emprestava o IP do servidor para consultas ao ViaCEP.

@@ -123,7 +123,6 @@ nullable: true },
             schema: {
                 tags: ['Market Quotes'],
                 summary: 'Produtos da cotação (admin)',
-                security: [{ bearerAuth: [] }],
                 response: {
                     200: quoteList,
                     401: errorResponse,
@@ -147,7 +146,6 @@ nullable: true },
 - Produto que não vier no corpo mantém o último preço.
 - Relançar o mesmo dia/período substitui o lançamento anterior.
 - A variação é calculada contra o lançamento anterior do produto.`,
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['period', 'prices'],
@@ -189,7 +187,6 @@ example: 12050 },
                 tags: ['Market Quotes'],
                 summary: 'Trocar a unidade do produto',
                 description: 'Unidade exibida no preço e no histórico (saca, tonelada, quilo, arroba). `null` = sem unidade. Os preços gravados não mudam.',
-                security: [{ bearerAuth: [] }],
                 params: { type: 'object',
 required: ['id'],
 properties: { id: { type: 'string' } } },
@@ -225,7 +222,6 @@ properties: marketQuoteProperties },
             schema: {
                 tags: ['Market Quotes'],
                 summary: 'Fonte exibida na faixa de cotações (ex.: Cvale)',
-                security: [{ bearerAuth: [] }],
                 body: { type: 'object',
 required: ['source'],
 properties: { source: { type: 'string' } } },

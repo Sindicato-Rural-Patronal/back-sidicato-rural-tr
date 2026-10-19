@@ -157,7 +157,6 @@ export async function unimedRouter(fastify: FastifyInstance, prisma: PrismaClien
     );
 
     const tags = ['Unimed'];
-    const sec = [{ bearerAuth: [] }];
 
     fastify.get(
         '/admin/unimed',
@@ -168,7 +167,6 @@ export async function unimedRouter(fastify: FastifyInstance, prisma: PrismaClien
                 summary: 'List Unimed beneficiaries (admin)',
                 description: 'Paginado. ?search filtra pelo nome ou CPF do usuário vinculado; '
                     + '?userDataId traz os cadastros da pessoa (o dela e os em que ela é o titular).',
-                security: sec,
                 querystring: {
                     type: 'object',
                     properties: {
@@ -200,7 +198,6 @@ default: 20 },
             schema: {
                 tags,
                 summary: 'Get a Unimed beneficiary (admin)',
-                security: sec,
                 params: { type: 'object',
 required: ['id'],
 properties: { id: { type: 'string' } } },
@@ -223,7 +220,6 @@ properties: { id: { type: 'string' } } },
             schema: {
                 tags,
                 summary: 'Create a Unimed beneficiary',
-                security: sec,
                 body: unimedBody,
                 response: {
                     400: errorResponse,
@@ -243,7 +239,6 @@ properties: { id: { type: 'string' } } },
             schema: {
                 tags,
                 summary: 'Update a Unimed beneficiary',
-                security: sec,
                 params: { type: 'object',
 required: ['id'],
 properties: { id: { type: 'string' } } },
@@ -270,7 +265,6 @@ properties: { message: { type: 'string' } } },
             schema: {
                 tags,
                 summary: 'Delete (soft) a Unimed beneficiary',
-                security: sec,
                 params: { type: 'object',
 required: ['id'],
 properties: { id: { type: 'string' } } },

@@ -47,7 +47,6 @@ export async function instructorRouter(fastify: FastifyInstance, prisma: PrismaC
         schema: {
             tags: ['Instrutores'],
             summary: 'Promover usuário a instrutor',
-            security: [{ bearerAuth: [] }],
             params: {
                 type: 'object',
                 required: ['id'],
@@ -87,7 +86,6 @@ properties: { instructorId: { type: 'string' } } },
         schema: {
             tags: ['Instrutores'],
             summary: 'Remover status de instrutor',
-            security: [{ bearerAuth: [] }],
             params: {
                 type: 'object',
                 required: ['id'],
@@ -109,7 +107,6 @@ example: '550e8400-e29b-41d4-a716-446655440000' } },
             tags: ['Instrutores'],
             summary: 'Atualizar dados do instrutor',
             description: 'Atualiza bio e/ou redes sociais do instrutor. Todos os campos são opcionais — enviar null limpa o campo.',
-            security: [{ bearerAuth: [] }],
             params: {
                 type: 'object',
                 required: ['id'],
@@ -148,7 +145,6 @@ properties: { message: { type: 'string' } } },
         schema: {
             tags: ['Instrutores'],
             summary: 'Listar todos os instrutores',
-            security: [{ bearerAuth: [] }],
             querystring: paginationQuerystring,
             response: {
                 200: pagedResponse({
@@ -183,7 +179,6 @@ nullable: true },
         schema: {
             tags: ['Instrutores'],
             summary: 'Vincular instrutor a curso',
-            security: [{ bearerAuth: [] }],
             params: {
                 type: 'object',
                 required: ['courseId'],
@@ -219,7 +214,6 @@ properties: { assignmentId: { type: 'string' } } },
         schema: {
             tags: ['Instrutores'],
             summary: 'Desvincular instrutor de curso',
-            security: [{ bearerAuth: [] }],
             params: {
                 type: 'object',
                 required: ['courseId', 'assignmentId'],

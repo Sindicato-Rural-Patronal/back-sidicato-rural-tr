@@ -155,7 +155,6 @@ items: buttonSchema },
             schema: {
                 tags: ['Banners — Admin'],
                 summary: 'Listar todos os banners',
-                security: [{ bearerAuth: [] }],
                 querystring: paginationQuerystring,
                 response: {
                     200: pagedResponse(bannerFullSchema),
@@ -177,7 +176,6 @@ items: buttonSchema },
             schema: {
                 tags: ['Banners — Admin'],
                 summary: 'Reordenar banners',
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['order'],
@@ -209,7 +207,6 @@ properties: { message: { type: 'string' } } },
             schema: {
                 tags: ['Banners — Admin'],
                 summary: 'Criar banner',
-                security: [{ bearerAuth: [] }],
                 body: { ...bannerBodySchema,
 required: ['title'] },
                 response: {
@@ -233,7 +230,6 @@ required: ['title'] },
             schema: {
                 tags: ['Banners — Admin'],
                 summary: 'Atualizar banner',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['id'],
@@ -262,7 +258,6 @@ required: ['title'] },
             schema: {
                 tags: ['Banners — Admin'],
                 summary: 'Excluir banner',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['id'],
@@ -290,7 +285,6 @@ required: ['title'] },
                 tags: ['Banners — Admin'],
                 summary: 'Upload de imagem do banner',
                 description: 'Aceita multipart/form-data com campo "file". PNG/JPG/WebP, max 5MB. Redimensiona para 1440×600px.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['id'],

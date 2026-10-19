@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import fastify, { type FastifyInstance } from 'fastify';
 import jwt from 'jsonwebtoken';
+import swagger from '@fastify/swagger';
 import type { Permission } from '../../generated/prisma/enums.js';
 import { withRouteAuth, publicRoute, loggedIn, requires, requiresFrom } from '../lib/route-auth.js';
 
 // O hook da autorização por rota (decisão 001, SR-023) num app mínimo, com
-// permissões falsas: as respostas têm de ser as mesmas de requirePermission.
+// permissões falsas: as respostas são as mesmas da checagem antiga, no controller.
 
 const SECRET = 'x'.repeat(40);
 const ADMINS: Record<string, Permission[]> = {
@@ -40,9 +41,8 @@ beforeAll(async () => {
             },
         }, echo);
         api.get('/sem-declaracao', echo);
-        api.get('/pendente/:id', echo);
         api.post('/upload', { config: { auth: requires('UPDATE_USER') } }, async req => ({ body: req.body }));
-    }, { pending: ['GET /pendente/:id'] });
+    });
     await app.ready();
 });
 
@@ -118,15 +118,12 @@ permissions: [] })]);
         expect(seen).toEqual([]);
     });
 
-    it('rota pendente passa sem checagem (o controller ainda confere do jeito antigo)', async () => {
-        expect((await call('GET', '/pendente/1')).statusCode).toBe(200);
-    });
-
     it('HEAD usa a declaração do GET', async () => {
         expect((await app.inject({ method: 'HEAD',
 url: '/le' })).statusCode).toBe(401);
         expect((await app.inject({ method: 'HEAD',
-url: '/pendente/1' })).statusCode).toBe(200);
+url: '/le',
+headers: token('reader') })).statusCode).toBe(200);
     });
 
     it('a checagem vem antes do corpo: sem permissão, nem lê', async () => {
@@ -144,5 +141,42 @@ url: '/pendente/1' })).statusCode).toBe(200);
         execute.mockClear();
         await call('POST', '/le-e-edita', token('both'), {});
         expect(execute).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('o Swagger sai da declaração', () => {
+    it('rota não pública ganha bearerAuth e a permissão na descrição; pública fica sem', async () => {
+        const docs = fastify({ logger: false });
+        await docs.register(swagger, {
+            openapi: {
+                info: { title: 't',
+version: '1' },
+                components: { securitySchemes: { bearerAuth: { type: 'http',
+scheme: 'bearer' } } },
+            },
+        });
+        withRouteAuth(docs, { execute }, api => {
+            api.get('/aberta', { config: { auth: publicRoute() },
+schema: { description: 'Lista do site.' } }, async () => ({}));
+            api.get('/fechada', { config: { auth: requires('READ_USER', 'UPDATE_USER') },
+schema: { description: 'Lista do painel.' } }, async () => ({}));
+            api.get('/logada', { config: { auth: loggedIn() } }, async () => ({}));
+        });
+        await docs.ready();
+        const paths = (docs.swagger() as {
+ paths: Record<string, {
+ get: {
+ security?: unknown;
+description?: string 
+} 
+}> 
+}).paths;
+
+        expect(paths['/aberta'].get.security).toBeUndefined();
+        expect(paths['/aberta'].get.description).toBe('Lista do site.');
+        expect(paths['/fechada'].get.security).toEqual([{ bearerAuth: [] }]);
+        expect(paths['/fechada'].get.description).toBe('Lista do painel.\n\nExige: READ_USER e UPDATE_USER.');
+        expect(paths['/logada'].get.description).toBe('Exige login.');
+        await docs.close();
     });
 });

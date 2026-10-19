@@ -21,7 +21,6 @@ export async function addressRouter(fastify: FastifyInstance, prisma: PrismaClie
                 summary: 'Fetch address data by CEP (zip code)',
                 description:
                     'Searches locally first; falls back to ViaCEP API and caches the result. Exige login: só o painel usa (aberta, emprestava o IP do servidor para consultas ao ViaCEP).',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { cep: { type: 'string',

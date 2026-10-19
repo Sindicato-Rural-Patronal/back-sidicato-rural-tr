@@ -82,7 +82,6 @@ format: 'date-time' },
             schema: {
                 tags: ['Contatos — Admin'],
                 summary: 'Listar mensagens de contato',
-                security: [{ bearerAuth: [] }],
                 querystring: {
                     type: 'object',
                     properties: {
@@ -134,7 +133,6 @@ format: 'date-time' },
                 tags: ['Contatos — Admin'],
                 summary: 'Marcar mensagem como lida',
                 description: 'Sempre marca como lida (o corpo é ignorado). Para voltar a "não lida" use `PATCH /admin/contacts/messages/:messageId/unread` — rota própria para a auditoria registrar qual das duas foi.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['messageId'],
@@ -165,7 +163,6 @@ properties: { message: { type: 'string' } } },
             schema: {
                 tags: ['Contatos — Admin'],
                 summary: 'Marcar mensagem como não lida',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['messageId'],
@@ -192,7 +189,6 @@ properties: { message: { type: 'string' } } },
             schema: {
                 tags: ['Contatos — Admin'],
                 summary: 'Excluir mensagem de contato',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['messageId'],

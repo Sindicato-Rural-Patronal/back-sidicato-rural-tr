@@ -49,7 +49,6 @@ export async function roomRouter(fastify: FastifyInstance, prisma: PrismaClient)
 - The \`maxCapacity\` field of each room determines the maximum number of enrollments for any course held in it
 - Use this route to populate the room selector in the course creation form`,
                 querystring: paginationQuerystring,
-                security: [{ bearerAuth: [] }],
                 response: {
                     200: pagedResponse({ type: 'object',
 properties: roomProperties }),
@@ -82,7 +81,6 @@ limit?: number
 - \`maxCapacity\` sets the absolute enrollment limit for any course allocated to this room
 - The same room cannot have two courses with overlapping periods (validated in \`POST /courses\`)
 - A course cannot be created without specifying a registered room`,
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['name', 'description', 'maxCapacity'],
@@ -117,7 +115,6 @@ properties: { id: { type: 'string' } } },
                 tags: ['Rooms'],
                 summary: 'Update room',
                 description: 'Atualiza nome, descrição e capacidade da sala. Requer permissão `UPDATE_COURSE`.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['roomId'],
@@ -168,7 +165,6 @@ maxCapacity: number
                 summary: 'Delete room',
                 description:
                     'Remove a sala. Falha com 409 se houver cursos vinculados. Requer permissão `DELETE_COURSE`.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['roomId'],

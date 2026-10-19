@@ -309,7 +309,6 @@ nullable: true } } } },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'List course registrations',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -370,7 +369,6 @@ limit?: number
                 summary: 'Register a person from the admin panel',
                 description:
                     'Inscreve uma pessoa já cadastrada. Ignora prazo, status e data de término do curso; só respeita a lotação da sala. A inscrição já nasce confirmada. Pessoa já inscrita → 409; curso lotado → 409.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -409,7 +407,6 @@ properties: { registrationId: { type: 'string' } } },
                 tags: ['Admin — Registrations'],
                 summary: 'Confirm all unconfirmed registrations of a course',
                 description: 'Retorna `confirmed`: quantas inscrições foram confirmadas agora.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -435,7 +432,6 @@ properties: { confirmed: { type: 'integer' } } },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Cancel registration',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['registrationId'],
@@ -460,7 +456,6 @@ properties: { confirmed: { type: 'integer' } } },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Confirm or unconfirm a registration',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['registrationId'],
@@ -498,7 +493,6 @@ Body: { confirmed: boolean }
                 summary: 'Start the course',
                 description:
                     'Sets the course status to IN_PROGRESS. Fails (400) only if there are no registrations; unconfirmed registrations do not block.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -527,7 +521,6 @@ properties: { message: { type: 'string' } } },
                 summary: 'Mark the course as completed',
                 description:
                     'Manual. Only from IN_PROGRESS (other status → 409). Sets the status to COMPLETED: the course stays out of the public list, its page still opens by link and it never accepts registrations.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -561,7 +554,6 @@ enum: ['COMPLETED'] },
                 tags: ['Admin — Registrations'],
                 summary: 'Mark attendance of a registration',
                 description: '`attended`: true = presente, false = faltou, null = desmarcar.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['registrationId'],
@@ -607,7 +599,6 @@ nullable: true },
                 summary: 'Mark attendance of every unmarked confirmed registration',
                 description:
                     'Sets `attended` on every confirmed, active registration of the course that is still unmarked (null). Already marked and unconfirmed registrations are left as they are. Returns `updated`: how many changed.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -649,7 +640,6 @@ properties: { updated: { type: 'integer' } } },
                 summary: 'Attach the filled/scanned enrollment form (PDF)',
                 description:
                     'Envie como multipart/form-data com o PDF no campo "file". Máx 15MB. Substitui a ficha anterior, se houver.',
-                security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
                 params: {
                     type: 'object',
@@ -678,7 +668,6 @@ properties: { filename: { type: 'string' } } },
                 tags: ['Admin — Registrations'],
                 summary: 'Download the attached enrollment form (PDF)',
                 description: 'Retorna o PDF anexado (inline). Requer READ_COURSE (mesma permissão de ver as inscrições).',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['registrationId'],
@@ -701,7 +690,6 @@ properties: { filename: { type: 'string' } } },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Remove the attached enrollment form',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['registrationId'],

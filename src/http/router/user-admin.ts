@@ -55,7 +55,6 @@ export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaCl
                 tags: ['Admin — Auth'],
                 summary: 'Get current admin profile and permissions',
                 description: `Returns the authenticated admin's profile and full permissions list. Use this to conditionally render UI elements based on what the current user can do.`,
-                security: [{ bearerAuth: [] }],
                 response: {
                     200: {
                         type: 'object',
@@ -95,7 +94,6 @@ items: { type: 'string' } },
                 tags: ['Admin — Auth'],
                 summary: 'Salvar as preferências do Painel Geral deste admin',
                 description: `Self-service: qualquer admin autenticado grava as **próprias** preferências (o id vem do token). O conteúdo de \`dashboardPrefs\` é livre — o painel decide o que guarda (cartões escondidos, ordem, filtro do calendário…) —, mas precisa ser um objeto de no máximo ${MAX_PREFS_BYTES} bytes em JSON; o objeto enviado substitui o anterior inteiro. Vem de volta em \`GET /admin/me\`.`,
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['dashboardPrefs'],
@@ -139,7 +137,6 @@ timeWindow: '5 minutes' } },
 - com erro, nada do pedido é gravado (nem nome nem usuário).
 
 Nome e usuário sozinhos não pedem a senha atual. Limite de 10 pedidos por 5 minutos por IP (429).`,
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     properties: {
@@ -171,7 +168,6 @@ properties: { message: { type: 'string' } } },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'List admin users (internal)',
-                security: [{ bearerAuth: [] }],
                 querystring: {
                     type: 'object',
                     properties: {
@@ -245,7 +241,6 @@ nullable: true },
 - \`userRole\` is the ID of an existing \`Rule\` — that Rule defines what permissions the new admin will have
 - To get available Rule IDs, use \`GET /admin/rules\`
 - Passwords are stored as bcrypt hash — never in plain text`,
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['username', 'password', 'userDataId', 'userRole'],
@@ -303,7 +298,6 @@ example: '550e8400-e29b-41d4-a716-446655440000' },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'Update admin user',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -346,7 +340,6 @@ properties: { message: { type: 'string' } } },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'Delete admin user',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
