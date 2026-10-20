@@ -47,9 +47,16 @@ method?: FinancePaymentMethodModel
 
         const existing = await this.repo.findPaymentMethodByName(name);
         if (existing) {
-            // Já existia e foi desativada/excluída: reaproveita em vez de duplicar.
+            // Já existia e foi desativada/excluída: reaproveita em vez de duplicar. A
+            // excluída volta por inteiro (isDeleted/deletedAt), senão o POST
+            // devolveria a forma ainda excluída e ela não voltaria à lista.
             if (existing.isDeleted || !existing.active) {
-                const method = await this.repo.updatePaymentMethod(existing.id, { active: true });
+                const method = await this.repo.updatePaymentMethod(existing.id, {
+                    active: true,
+                    isDeleted: false,
+                    deletedAt: null,
+                    ...(parsed.data.order !== undefined ? { order: parsed.data.order } : {}),
+                });
                 return { method };
             }
             return { error: new ConflictError('Já existe uma forma de pagamento com esse nome') };

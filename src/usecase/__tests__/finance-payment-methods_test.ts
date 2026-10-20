@@ -64,7 +64,9 @@ name: 'CHEQUE' } as never);
         const uc = new CreateFinancePaymentMethodUseCase(repo);
         const r = await uc.execute({ name: 'cheque' });
         expect(r.error).toBeUndefined();
-        expect(repo.updatePaymentMethod).toHaveBeenCalledWith('pm-1', { active: true });
+        expect(repo.updatePaymentMethod).toHaveBeenCalledWith('pm-1', { active: true,
+isDeleted: false,
+deletedAt: null });
         expect(repo.createPaymentMethod).not.toHaveBeenCalled();
     });
 
