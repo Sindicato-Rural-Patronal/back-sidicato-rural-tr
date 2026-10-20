@@ -289,7 +289,15 @@ payload: { cpf: p.cpf } });
         expect((await byCpf(courseId, p.cpf)).statusCode).toBe(201);
         const res = await byCpf(courseId, p.cpf);
         expect(res.statusCode, res.body).toBe(409);
+        expect(JSON.parse(res.body).error).toBe('Esta pessoa já está inscrita neste curso.');
         expect(await listRegistrations(courseId)).toHaveLength(1);
+
+        // Mesma resposta no register-full, para quem já tem inscrição.
+        const full2 = await full(courseId, { name: 'X',
+phone: PHONE,
+cpf: p.cpf });
+        expect(full2.statusCode, full2.body).toBe(409);
+        expect(JSON.parse(full2.body).error).toBe('Esta pessoa já está inscrita neste curso.');
     });
 
     it('curso lotado → 409; curso não publicado → 409', async () => {

@@ -81,7 +81,7 @@ phoneEnd: '9999' });
     it('já inscrita → erro de duplicidade', async () => {
         succeed();
         vi.mocked(mockRegistrationRepo.findByUserDataAndCourse).mockResolvedValue({ id: 'reg-dup' } as any);
-        expect((await build().execute(input)).error?.message).toBe('User already registered for this course');
+        expect((await build().execute(input)).error?.message).toBe('Esta pessoa já está inscrita neste curso.');
     });
 
     it('curso lotado → erro, e não publica', async () => {
