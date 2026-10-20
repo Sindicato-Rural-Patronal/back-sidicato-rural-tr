@@ -417,7 +417,7 @@ properties: { id: { type: 'string' } } },
             schema: {
                 tags,
                 summary: 'List financial transactions',
-                description: 'Paginado, com filtros: from, to, type, categoryId, accountId, search. `totals` soma entradas e saídas de todos os lançamentos filtrados (sem transferências entre caixas nem "só nota").',
+                description: 'Paginado, com filtros: from, to, type, categoryId, accountId, search. `search` acha pela descrição e também pela razão social e pelo nome fantasia da Nota de Empenho, sem diferenciar maiúscula de minúscula (na descrição) e sem acento (no nome do fornecedor). `totals` soma entradas e saídas de todos os lançamentos filtrados (sem transferências entre caixas nem "só nota").',
                 querystring: {
                     type: 'object',
                     properties: {
@@ -475,7 +475,7 @@ additionalProperties: true } },
             schema: {
                 tags,
                 summary: 'Export transactions as CSV',
-                description: 'CSV (;) dos lançamentos que batem com os filtros (from, to, type, categoryId, accountId, method, search).',
+                description: 'CSV (;) dos lançamentos que batem com os filtros (from, to, type, categoryId, accountId, method, search). `search` acha pela descrição e também pela razão social e pelo nome fantasia da Nota de Empenho, sem diferenciar maiúscula de minúscula (na descrição) e sem acento (no nome do fornecedor). Depois da Descrição vêm "Nome / Razão social" (a razão social do empenho ou, sem ela, o nome fantasia) e "CNPJ / CPF".',
                 querystring: {
                     type: 'object',
                     properties: {

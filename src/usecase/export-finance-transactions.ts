@@ -5,6 +5,17 @@ import { parseQuery } from '../errors/validation.js';
 
 type Row = Awaited<ReturnType<FinanceRepository['listTransactionsForExport']>>[number];
 
+/** Campo de texto do empenho (JSON livre): vazio se faltar ou não for texto. */
+function empenhoField(empenho: unknown, key: string): string {
+    const v = (empenho as Record<string, unknown> | null | undefined)?.[key];
+    return typeof v === 'string' ? v.trim() : '';
+}
+
+/** Quem está ligado ao lançamento: a razão social e, sem ela, o nome fantasia. */
+export function empenhoName(empenho: unknown): string {
+    return empenhoField(empenho, 'razaoSocial') || empenhoField(empenho, 'nomeFantasia');
+}
+
 const columns: CsvColumn<Row>[] = [
     { header: 'Data',
 value: t => csvDate(t.date) },
@@ -16,6 +27,10 @@ value: t => t.account?.name },
 value: t => t.category?.name },
     { header: 'Descrição',
 value: t => t.description },
+    { header: 'Nome / Razão social',
+value: t => empenhoName(t.empenho) },
+    { header: 'CNPJ / CPF',
+value: t => empenhoField(t.empenho, 'cnpjCpf') },
     { header: 'Método',
 value: t => t.method },
     { header: 'Recorrente',

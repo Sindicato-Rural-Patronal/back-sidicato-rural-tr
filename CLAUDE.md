@@ -741,7 +741,7 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 | `GET` | `/admin/finance/transactions` | paginada; filtros abaixo; traz `totals` | `READ_FINANCE` |
 | `POST` | `/admin/finance/transactions` | criar lançamento → 201 (a linha) | `CREATE_FINANCE` |
 | `PATCH` · `DELETE` | `/admin/finance/transactions/:id` | editar → `{ message }` · excluir (soft) → 204 | `UPDATE_` · `DELETE_FINANCE` |
-| `GET` | `/admin/finance/transactions/export` | CSV dos lançamentos filtrados | `READ_FINANCE` |
+| `GET` | `/admin/finance/transactions/export` | CSV dos lançamentos filtrados; depois de "Descrição": "Nome / Razão social" (razão social do empenho, ou o nome fantasia se ela estiver vazia) e "CNPJ / CPF" | `READ_FINANCE` |
 | `POST` | `/admin/finance/transfers` | transferência entre caixas → 201 `{ message }` | `CREATE_FINANCE` |
 | `POST` | `/admin/finance/transactions/:id/attachments` | comprovante (multipart: PDF, JPG, PNG, WEBP até 15 MB) → 201 `{ id, filename, mimeType, size, createdAt }` | `UPDATE_FINANCE` |
 | `GET` · `DELETE` | `/admin/finance/attachments/:attachmentId` | baixar (inline) · apagar de verdade | `READ_FINANCE` · `UPDATE_FINANCE` |
@@ -767,7 +767,7 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 - Fica fora de receita e despesa, mas conta no saldo de cada caixa.
 
 **Listagem:**
-- Filtros `from`, `to` (inclui o dia inteiro), `type`, `categoryId`, `accountId`, `method` (sem diferenciar maiúsculas), `search` (descrição).
+- Filtros `from`, `to` (inclui o dia inteiro), `type`, `categoryId`, `accountId`, `method` (sem diferenciar maiúsculas), `search` (descrição **ou** razão social / nome fantasia da Nota de Empenho, sem diferenciar maiúsculas nem acento; o nome do fornecedor é achado por SQL, `immutable_unaccent_lower` sobre `empenho->>'razaoSocial'`/`'nomeFantasia'`). Vale para a lista, os totais e o CSV.
 - Ordem por data desc.
 - `totals: { incomeCents, expenseCents }` somam todos os filtrados, sem transferências nem "só nota".
 - Filtro com formato inválido → 400 "Parâmetro inválido: <campo>" (vale também para resumo, exportação e fechamentos).
