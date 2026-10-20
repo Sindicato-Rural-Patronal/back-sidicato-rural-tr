@@ -348,6 +348,68 @@ describe('Formas de pagamento', () => {
         expect(json<{ name: string }[]>(after.body).some(m => m.name === 'VALE')).toBe(false);
     });
 
+    it('excluir e criar de novo com o mesmo nome traz a forma de volta à lista (SR-052)', async () => {
+        const pm = (method: 'POST' | 'DELETE' | 'GET', url = '/admin/finance/payment-methods', payload?: object) =>
+            app.inject({ method,
+url,
+headers: bearer(token),
+payload });
+        const names = async () => json<{ name: string }[]>((await pm('GET')).body).map(m => m.name);
+
+        const first = json<{ id: string }>((await pm('POST', undefined, { name: 'Cheque Pre' })).body);
+        expect((await pm('DELETE', `/admin/finance/payment-methods/${first.id}`)).statusCode).toBe(204);
+        expect(await names()).not.toContain('CHEQUE PRE');
+
+        for (const name of ['cheque pre', 'CHEQUE PRE']) {
+            const again = await pm('POST', undefined, { name });
+            expect(again.statusCode, again.body).toBe(201);
+            const body = json<{
+ id: string;
+name: string;
+isDeleted: boolean;
+deletedAt: string | null;
+active: boolean 
+}>(again.body);
+            // Reaproveita a mesma linha, viva e ativa.
+            expect(body).toMatchObject({ id: first.id,
+name: 'CHEQUE PRE',
+isDeleted: false,
+active: true });
+            expect(await names()).toContain('CHEQUE PRE');
+            if (name === 'cheque pre') {
+                // Repetir depois de voltar é conflito, como qualquer nome repetido.
+                expect((await pm('POST', undefined, { name })).statusCode).toBe(409);
+                await pm('DELETE', `/admin/finance/payment-methods/${first.id}`);
+            }
+        }
+        const row = await prisma.financePaymentMethod.findUniqueOrThrow({ where: { id: first.id } });
+        expect(row).toMatchObject({ isDeleted: false,
+deletedAt: null,
+active: true });
+        expect(await prisma.financePaymentMethod.count({ where: { name: 'CHEQUE PRE' } })).toBe(1);
+    });
+
+    it('recriar uma forma desativada (não excluída) também a reativa', async () => {
+        const created = json<{ id: string }>((await app.inject({ method: 'POST',
+url: '/admin/finance/payment-methods',
+headers: bearer(token),
+payload: { name: 'Ticket' } })).body);
+        await app.inject({ method: 'PATCH',
+url: `/admin/finance/payment-methods/${created.id}`,
+headers: bearer(token),
+payload: { active: false } });
+        const again = await app.inject({ method: 'POST',
+url: '/admin/finance/payment-methods',
+headers: bearer(token),
+payload: { name: 'ticket' } });
+        expect(again.statusCode, again.body).toBe(201);
+        expect(json<{
+ id: string;
+active: boolean 
+}>(again.body)).toMatchObject({ id: created.id,
+active: true });
+    });
+
     it('filtra os lançamentos pela forma de pagamento (sem diferenciar maiúsculas)', async () => {
         await app.inject({
             method: 'POST',

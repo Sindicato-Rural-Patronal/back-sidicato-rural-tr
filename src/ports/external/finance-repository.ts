@@ -202,7 +202,11 @@ export type FinancePaymentMethodCreateInput = {
     order?: number;
 };
 
-export type FinancePaymentMethodUpdateInput = Partial<FinancePaymentMethodCreateInput>;
+export type FinancePaymentMethodUpdateInput = Partial<FinancePaymentMethodCreateInput> & {
+    /** Só para trazer de volta uma forma excluída (recriar com o mesmo nome). */
+    isDeleted?: boolean;
+    deletedAt?: Date | null;
+};
 
 // ── Fechamento mensal (item 52) ─────────────────────────────────────────────
 // Movimento de um caixa em um mês, com o saldo de abertura (tudo antes do mês).
