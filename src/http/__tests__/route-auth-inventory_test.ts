@@ -24,6 +24,7 @@ const ROTAS_PUBLICAS: Record<string, string> = {
     'POST /courses/:courseId/register-by-cpf': 'inscrição de quem tem cadastro: CPF + final do telefone; limite por IP e por CPF',
     'POST /courses/:courseId/register-full': 'inscrição de quem não tem cadastro; limite por IP e por CPF',
     'GET /events': 'eventos marcados "no site"; a descrição interna não sai',
+    'GET /health': 'healthcheck leve: só diz que o processo está de pé, sem banco nem storage',
     'GET /galleries': 'galerias da página Sobre',
     'GET /invites/:token': 'o token tem 256 bits e expira',
     'POST /invites/:token/accept': 'o token tem 256 bits e expira',

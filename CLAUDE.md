@@ -230,6 +230,7 @@ Autenticação na última coluna: **Pública**, **Login** (qualquer admin) ou a 
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
 | `GET` | `/` | `{ status: 'ok', uptime }` | Pública |
+| `GET` | `/health` | `{ status: 'ok' }`, leve: não consulta o banco nem o storage (healthcheck; o do Coolify ainda usa `/site-settings`) | Pública |
 | `GET` | `/address/cep/:cep` | `FetchAddressByCepUseCase`, endereço pelo CEP; CEP inexistente → 404 "CEP not found". Só o painel usa: aberta, emprestava o IP do servidor para consultas ao ViaCEP | Login |
 
 ### Login

@@ -245,3 +245,31 @@ phone: '44911118888',
 cpf: cpfFrom('731099991') } });
     expect(res.statusCode).toBe(201);
 });
+
+describe('GET /health', () => {
+    it('200 { status: "ok" } sem token', async () => {
+        const res = await app.inject({ method: 'GET',
+url: '/health' });
+        expect(res.statusCode).toBe(200);
+        expect(JSON.parse(res.body)).toEqual({ status: 'ok' });
+    });
+
+    it('não toca no banco: nenhum acesso ao Prisma durante a chamada', async () => {
+        const touched: string[] = [];
+        let armed = false;
+        const prisma = createTestPrisma();
+        const spy = new Proxy(prisma, { get(target, prop, receiver) {
+            if (armed) touched.push(String(prop));
+            return Reflect.get(target, prop, receiver);
+        } });
+        const isolated = await createTestApp(spy);
+        armed = true;
+        const res = await isolated.inject({ method: 'GET',
+url: '/health' });
+        armed = false;
+        expect(res.statusCode).toBe(200);
+        expect(touched).toEqual([]);
+        await isolated.close();
+        await prisma.$disconnect();
+    });
+});
