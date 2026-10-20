@@ -10,7 +10,7 @@ export class RoomAlreadyBookedError extends BusinessRuleError {
 
 export class RegistrationsUnavailableError extends BusinessRuleError {
     constructor() {
-        super('Registrations unavailable for this course');
+        super('Inscrições indisponíveis para este curso.');
         this.name = 'RegistrationsUnavailableError';
     }
 }

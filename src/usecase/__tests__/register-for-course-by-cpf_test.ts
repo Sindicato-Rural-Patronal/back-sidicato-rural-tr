@@ -59,7 +59,7 @@ userDataId: 'ud-001' });
 
         vi.mocked(mockCourseRepo.findById).mockResolvedValue({ ...publishedCourse,
 status: 'UNPUBLISHED' } as any);
-        expect((await build().execute(input)).error?.message).toBe('Registrations unavailable for this course');
+        expect((await build().execute(input)).error?.message).toBe('Inscrições indisponíveis para este curso.');
 
         vi.mocked(mockCourseRepo.findById).mockResolvedValue({ ...publishedCourse,
 endTime: new Date('2020-01-10T17:00:00.000Z') } as any);
