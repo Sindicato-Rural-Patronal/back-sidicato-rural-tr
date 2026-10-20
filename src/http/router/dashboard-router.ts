@@ -5,14 +5,13 @@ import { DashboardStatsUseCase } from '../../usecase/dashboard-stats.js';
 import { createCourseAdapter } from '../../adapter/database/course-adapter.js';
 import { createUserDataAdapter } from '../../adapter/database/user-data.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createRegistrationAdapter } from '../../adapter/database/registration-adapter.js';
 import { createRoomAdapter } from '../../adapter/database/room-adapter.js';
 import { createContactMessageAdapter } from '../../adapter/database/contact-message-adapter.js';
 import { createDashboardAdapter } from '../../adapter/database/dashboard-adapter.js';
 import { createPendingNotificationsAdapter } from '../../adapter/database/pending-notifications-adapter.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { loggedIn } from '../lib/route-auth.js';
 
 const int = { type: 'integer' };
 
@@ -59,10 +58,6 @@ nullable: true },
 
 export async function dashboardRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userAdminRepository = createUserAdminAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(
-        userAdminRepository,
-        createRuleAdapter(prisma),
-    );
 
     const dashboardStatsController = new DashboardStatsController(
         new DashboardStatsUseCase(
@@ -75,12 +70,12 @@ export async function dashboardRouter(fastify: FastifyInstance, prisma: PrismaCl
             createDashboardAdapter(prisma),
             createPendingNotificationsAdapter(prisma),
         ),
-        getAdminPermissions,
     );
 
     fastify.get(
         '/admin/dashboard/stats',
         {
+            config: { auth: loggedIn() },
             schema: {
                 tags: ['Admin — Dashboard'],
                 summary: 'Números do Painel Geral',
@@ -101,7 +96,6 @@ export async function dashboardRouter(fastify: FastifyInstance, prisma: PrismaCl
 **\`READ_USER_ADMIN\`**: \`totalAdmins\` (contas de acesso ao painel) · **\`READ_CONTACT\`**: \`unreadMessages\` (mensagens de contato não lidas)
 
 **\`READ_MARKET_QUOTE\`**: \`quotesToday\` — \`{ launched, period }\`: se já houve lançamento hoje (Brasília) e qual foi o último período (\`MORNING\`/\`AFTERNOON\`, null quando nada foi lançado). É o fato puro: a regra de quando cobrar (dias úteis, a partir das 11h) fica no sino.`,
-                security: [{ bearerAuth: [] }],
                 response: {
                     200: statsResponse,
                     401: errorResponse,

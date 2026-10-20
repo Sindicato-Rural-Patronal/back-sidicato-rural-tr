@@ -50,7 +50,7 @@ src/
     error-handler.ts       apiErrorHandler
     router/                um plugin Fastify por módulo (schema Swagger + handler)
     controllers/           leem a request, checam permissão, chamam o use case
-    lib/                   require-permission.ts, public-rate-limit.ts, swagger-schemas.ts
+    lib/                   route-auth.ts (acesso por rota), require-permission.ts (errorToStatus), public-rate-limit.ts, swagger-schemas.ts
   usecase/                 regras de negócio (sem Fastify; Prisma só pelos ports)
   ports/external/          interfaces dos repositórios
   adapter/database/        implementações Prisma dos ports; list-filters.ts; prisma-errors.ts
@@ -115,11 +115,20 @@ Conferência de conflito em use case enxerga só os ativos; sem uma das duas sa�
 - `POST /auth/refresh` troca um token ainda válido por outro de 8 h, enquanto o admin existir (não excluído, com regra) e o login tiver sido há no máximo 24 h (`ADMIN_SESSION_MAX_SECONDS`). Fora disso → 401.
 - O painel renova sozinho. O header é `Authorization: Bearer <token>`.
 
-**Checagem por rota**, no controller (`http/lib/require-permission.ts`), com estas respostas em todas as rotas:
-- `requirePermission(req, reply, 'X', getAdminPermissions)`: sem token ou token inválido → 401 `{ error: "Unauthorized" }`; admin excluído/sem regra → 401 `{ error: "Admin not found" }`; sem a permissão → 403 `{ error: "Forbidden" }`.
-- `requireAuth(...)`: só o login (rotas de "Minha conta" e o sino).
-- Rota com duas permissões chama `requirePermission` duas vezes (junção de cadastros, exportação `cadastros`).
-- O `security` do schema Swagger é só documentação. Rota nova sem checagem fica aberta, e nenhum teste avisa (a decisão 001 da Arquitetura propõe declarar na rota).
+**Acesso declarado na rota** (`http/lib/route-auth.ts`, decisão 001 da Arquitetura). Toda rota diz o que exige em `config.auth`:
+- `publicRoute()`: qualquer um.
+- `loggedIn()`: qualquer admin com login válido ("Minha conta", o sino, o Painel Geral, `/auth/refresh`, CEP).
+- `requires('X', 'Y')`: todas as permissões listadas (a junção de cadastros pede duas).
+- `requiresFrom(req => [...] | null)`: calculada por params/query, nunca pelo corpo; `null` = só o login. Só a exportação usa (`cadastros` pede duas).
+
+Um hook `onRequest`, num plugin que envolve todos os routers (`registerRouters`), confere antes de ler o corpo. As respostas são as mesmas em todas as rotas:
+- sem token ou token inválido → 401 `{ error: "Unauthorized" }`; admin excluído/sem regra → 401 `{ error: "Admin not found" }`; sem a permissão → 403 `{ error: "Forbidden" }`;
+- rota **sem** declaração → 500 `{ error: "Rota sem regra de acesso." }`: fica fechada, não aberta;
+- como a checagem vem antes da validação, sem token ou sem permissão o 401/403 aparece antes de qualquer 400/404.
+
+O hook preenche `request.admin` (`{ id, permissions, has(p) }`), lido uma vez por request. Os controllers pegam quem chamou com `adminOf(request)`. Fica no handler só o que depende do registro (as travas de "Anti-escalonamento") ou do corpo (criar curso copiando capa/instrutores pede também `UPDATE_COURSE`, com `request.admin.has`).
+
+O teste de inventário (`http/__tests__/route-auth-inventory_test.ts`) monta todas as rotas e reprova rota sem declaração, rota pública fora de `ROTAS_PUBLICAS` e rota pública que grava ou recebe CPF sem limite próprio. **Rota pública nova entra em `ROTAS_PUBLICAS`, com o motivo.**
 
 **Permissões.**
 - Não são hierárquicas: `READ_USER_ADMIN` não inclui `READ_USER`.
@@ -149,8 +158,9 @@ Conferência de conflito em use case enxerga só os ativos; sem uma das duas sa�
 - **Global:** 600/min. O IP real vem do proxy por `trustProxy` em `index.ts`; a decisão 002 da Arquitetura trata da topologia.
 - **Login e refresh:** 10 a cada 5 min.
 - **`PATCH /admin/me`:** 10 a cada 5 min.
-- **Rotas públicas** (`http/lib/public-rate-limit.ts`): inscrição (`register`, `register-by-cpf`, `register-full`) e `POST /contacts/message` com 10/min; `GET /users/lookup-cpf/:cpf` com 20/min.
+- **Rotas públicas** (`http/lib/public-rate-limit.ts`): inscrição (`register-by-cpf`, `register-full`) e `POST /contacts/message` com 10/min; `POST /users/lookup-cpf` com 20/min.
 - Cada rota conta separado. O excesso nas rotas públicas responde 429 `{ error: "Muitas tentativas seguidas. Aguarde um minuto e tente de novo." }`; no login, a mensagem padrão do plugin.
+- **Por CPF** (`lib/cpf-attempt-limiter.ts`, na memória do processo): 5 erros na última hora para o mesmo CPF, somando a consulta, o `register-by-cpf` e o `register-full`, → 429 "Muitas tentativas com este CPF. Aguarde uma hora ou procure o Sindicato.", até com o par certo. Conta erro também para CPF sem cadastro, para o 429 não revelar quem tem. Ver Inscrições.
 
 ## Erros
 
@@ -164,6 +174,7 @@ ConflictError      → 409
 BusinessRuleError  → 409
 ForbiddenError     → 403
 AuthError          → 401
+TooManyAttemptsError → 429
 qualquer outro     → 400   (ValidationError, Error, e também error ausente)
 ```
 
@@ -184,9 +195,10 @@ Classes (`src/errors/`; as bases aceitam mensagem opcional e são usadas direto 
 |---|---|
 | `AuthError` (`auth.ts`) | `InvalidCredentialsError` "Invalid username or password" |
 | `ForbiddenError` (`auth.ts`, estende `Error`) | mensagem por parâmetro (padrão "Sem permissão para esta ação.") |
-| `BusinessRuleError` (`business-rule.ts`) | `RoomAlreadyBookedError` (mensagem por parâmetro: "Sala ocupada: …"), `RegistrationsUnavailableError`, `RegistrationDeadlinePassedError` "Prazo de inscrição encerrado.", `CourseFullError` "Curso lotado — sem vagas disponíveis." |
-| `ConflictError` (`conflict.ts`, 18 filhas) | `CpfAlreadyInUseError` "CPF já cadastrado para outra pessoa.", `RgAlreadyInUseError`, `RuleInUseError`, `RoomNameAlreadyExistsError`, `RoomHasCoursesError`, `RoomHasBookingsError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `CourseRegistrationAlreadyExistsError`, `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError`, `UnimedBeneficiarioAlreadyExistsError`, `ConvenioSlugAlreadyExistsError`, `CompanyCnpjAlreadyExistsError`, `PublicContactAlreadyExistsError`, `CompanyMemberAlreadyExistsError`, `MergeDifferentCpfError`, `MergeBothHaveLoginError` |
-| `NotFoundError` (`not-found.ts`, 29 filhas) | `CourseNotFoundError` "Course not found", `UserNotFoundError`, `UserDataNotFoundError` "Invalid userDataId: user not found", `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError`, `UserRelationNotFoundError`, `PropertyNotFoundError`, `AddressNotFoundError` "CEP not found", `InstructorNotFoundError`, `ContactMessageNotFoundError`, `BannerNotFoundError`, `MarketQuoteNotFoundError`, `AdminInviteInvalidError` "Convite inválido, expirado ou já utilizado.", `FinanceCategoryNotFoundError`, `FinanceTransactionNotFoundError`, `UnimedBeneficiarioNotFoundError`, `GalleryAlbumNotFoundError`, `GalleryPhotoNotFoundError`, `ConvenioNotFoundError`, `CompanyNotFoundError`, `PublicContactNotFoundError`, `CompanyMemberNotFoundError`, `RoomBookingNotFoundError` |
+| `BusinessRuleError` (`business-rule.ts`) | `RoomAlreadyBookedError` (mensagem por parâmetro: "Sala ocupada: …"), `RegistrationsUnavailableError` "Inscrições indisponíveis para este curso.", `RegistrationDeadlinePassedError` "Prazo de inscrição encerrado.", `CourseFullError` "Curso lotado — sem vagas disponíveis.", `IdentityNotConfirmedError` "Não foi possível confirmar seu cadastro pelo site. Procure o Sindicato para fazer a inscrição." |
+| `ConflictError` (`conflict.ts`, 18 filhas) | `CpfAlreadyInUseError` "CPF já cadastrado para outra pessoa.", `RgAlreadyInUseError`, `RuleInUseError`, `RoomNameAlreadyExistsError`, `RoomHasCoursesError`, `RoomHasBookingsError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `CourseRegistrationAlreadyExistsError` "Esta pessoa já está inscrita neste curso." (as duas inscrições públicas), `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError`, `UnimedBeneficiarioAlreadyExistsError`, `ConvenioSlugAlreadyExistsError`, `CompanyCnpjAlreadyExistsError`, `PublicContactAlreadyExistsError`, `CompanyMemberAlreadyExistsError`, `MergeDifferentCpfError`, `MergeBothHaveLoginError` |
+| `NotFoundError` (`not-found.ts`, 30 filhas) | `CourseNotFoundError` "Course not found", `UserNotFoundError`, `UserDataNotFoundError` "Invalid userDataId: user not found", `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError`, `UserRelationNotFoundError`, `PropertyNotFoundError`, `AddressNotFoundError` "CEP not found", `InstructorNotFoundError`, `ContactMessageNotFoundError`, `BannerNotFoundError`, `MarketQuoteNotFoundError`, `AdminInviteInvalidError` "Convite inválido, expirado ou já utilizado.", `FinanceCategoryNotFoundError`, `FinanceTransactionNotFoundError`, `UnimedBeneficiarioNotFoundError`, `GalleryAlbumNotFoundError`, `GalleryPhotoNotFoundError`, `ConvenioNotFoundError`, `CompanyNotFoundError`, `PublicContactNotFoundError`, `CompanyMemberNotFoundError`, `RoomBookingNotFoundError`, `CpfPhoneNotFoundError` "Não encontramos cadastro com este CPF e telefone." |
+| `TooManyAttemptsError` (`too-many-attempts.ts`, estende `Error`, `statusCode = 429`) | "Muitas tentativas com este CPF. Aguarde uma hora ou procure o Sindicato." |
 | `ValidationError` (`validation.ts`, estende `Error`) | mensagem obrigatória → 400 |
 
 Fora de `src/errors/`:
@@ -218,7 +230,8 @@ Autenticação na última coluna: **Pública**, **Login** (qualquer admin) ou a 
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
 | `GET` | `/` | `{ status: 'ok', uptime }` | Pública |
-| `GET` | `/address/cep/:cep` | `FetchAddressByCepUseCase`, endereço pelo CEP; CEP inexistente → 404 "CEP not found" | Pública |
+| `GET` | `/health` | `{ status: 'ok' }`, leve: não consulta o banco nem o storage (healthcheck; o do Coolify ainda usa `/site-settings`) | Pública |
+| `GET` | `/address/cep/:cep` | `FetchAddressByCepUseCase`, endereço pelo CEP; CEP inexistente → 404 "CEP not found". Só o painel usa: aberta, emprestava o IP do servidor para consultas ao ViaCEP | Login |
 
 ### Login
 | Método | Path | O que faz | Auth |
@@ -458,6 +471,11 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 - Criar, e editar mudando sala ou horário, confere o conflito com cursos **e reservas** e grava numa transação só, com a sala travada (`createInRoom`/`updateInRoom`, a mesma trava `lockRoom` das reservas).
 - Sala ocupada → `POST` 400 / `PATCH` 409 "Sala ocupada: Curso "X" em 05/10 08:00–12:00".
 
+**Limpar campos na edição (`PATCH /courses/:id`, SR-019):**
+- Campo não mandado não muda. Para limpar, manda `null`.
+- `registrationDeadline`, `observations` e `eventNumber` (colunas que aceitam null) ficam **sem valor** (null). Nos dois de texto, `""` e só espaços também limpam. O prazo só aceita `null` (`""` não é data → 400).
+- `price`, `workloadHours`, `minStudents`, `preEnrolled` e `waitlist` (colunas NOT NULL com default 0) **voltam a 0** com `null`; `0` grava 0 do mesmo jeito. Negativo → 400.
+
 **Status:**
 - O painel cria com `PUBLIC`, `PRIVATE` ou `UNPUBLISHED`.
 - Iniciar e concluir têm rotas próprias (em Inscrições).
@@ -479,10 +497,9 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 ### Inscrições (`registration-router.ts`)
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
-| `GET` | `/users/lookup-cpf/:cpf` | `{ found, name }`, com o nome mascarado ("João D. S."); CPF inválido ou sem cadastro → `{ found: false, name: null }`; 20/min por IP | Pública |
-| `POST` | `/courses/:courseId/register` | `{ name, phone, cpf, email? }` → 201 `{ registrationId, userDataId }` (cria a pessoa se o CPF é novo); 10/min | Pública |
-| `POST` | `/courses/:courseId/register-by-cpf` | `{ cpf }` → 201; **CPF sem cadastro → 404** (o site segue para o `register-full`); 10/min | Pública |
-| `POST` | `/courses/:courseId/register-full` | `{ name, phone, cpf, email?, rg?, birthDate?, address? }` → 201; cria a pessoa com o endereço como propriedade principal; 10/min | Pública |
+| `POST` | `/users/lookup-cpf` | `{ cpf, phoneEnd }` → `{ found, name }`, com o nome mascarado ("João D. S.") só quando os dois batem; CPF inválido, sem cadastro ou telefone que não confere → o mesmo `{ found: false, name: null }`; `phoneEnd` sem 4 dígitos → 400; 20/min por IP; limite por CPF (429). Não vai para a auditoria | Pública |
+| `POST` | `/courses/:courseId/register-by-cpf` | `{ cpf, phoneEnd }` → 201; **CPF sem cadastro ou telefone que não confere → o mesmo 404** "Não encontramos cadastro com este CPF e telefone." (o site segue para o `register-full`); `phoneEnd` sem 4 dígitos → 400; 10/min; limite por CPF (429) | Pública |
+| `POST` | `/courses/:courseId/register-full` | `{ name, phone, cpf, email?, rg?, birthDate?, address? }` → 201; CPF novo: cria a pessoa com o endereço como propriedade principal; CPF com cadastro: só inscreve se `phone` confere (ver abaixo), senão 409 `IdentityNotConfirmedError`; 10/min; limite por CPF (429) | Pública |
 | `GET` | `/admin/courses/:courseId/registrations` | inscritos com `confirmed`, `attended`, `ficha` (metadados), selos (memberStatus, membershipValidUntil, boardPosition, contato público, empresas parceiras) | `READ_COURSE` |
 | `POST` | `/admin/courses/:courseId/registrations` | inscrição pela equipe `{ userDataId }`, já confirmada; ignora prazo, status e fim; respeita a lotação | `UPDATE_COURSE` |
 | `PATCH` | `/admin/registrations/:registrationId/confirm` | `{ confirmed: boolean }` (confirma ou desconfirma) | `UPDATE_COURSE` |
@@ -496,21 +513,24 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 | `GET` | `/admin/registrations/:registrationId/ficha` | o PDF, inline; sem ficha → 404 "Ficha não encontrada." | `READ_COURSE` |
 | `DELETE` | `/admin/registrations/:registrationId/ficha` | remove → 204 | `UPDATE_COURSE` |
 
-**Regras da inscrição pública** (`lib/course-registration-rules.ts`, as três rotas), todas → 409:
+**Regras da inscrição pública** (`lib/course-registration-rules.ts`, as duas rotas), todas → 409:
 - `UNPUBLISHED`/`IN_PROGRESS` → `RegistrationsUnavailableError`;
 - `COMPLETED` ou o dia do fim já passou (em Brasília; no último dia ainda aceita) → `CourseEndedError`;
 - prazo passado → `RegistrationDeadlinePassedError`. Prazo gravado sem hora (00:00) vale até o fim do dia; com hora, fecha quando o relógio de Brasília passa dela;
 - lotado → `CourseFullError`;
-- já inscrita → `CourseRegistrationAlreadyExistsError`.
+- já inscrita → `CourseRegistrationAlreadyExistsError` "Esta pessoa já está inscrita neste curso." (a inscrição pela equipe responde "Pessoa já inscrita neste curso").
 
 O site usa a mesma regra (`utils/course-status.ts` no front).
 
-**Pessoa na inscrição:**
-- A pessoa é achada **só pelo CPF**. E-mail e telefone iguais aos de outra pessoa criam cadastro próprio.
+**Pessoa na inscrição** (SR-025, `lib/phone-match.ts`). Filiação a sindicato é dado sensível (LGPD): só o CPF não pode dizer quem tem cadastro nem inscrever outra pessoa.
+- A pessoa é achada pelo CPF e **confirmada pelo telefone**, sempre contra os três do cadastro (`phone`, `phone2`, `phone3`), comparando só os dígitos (máscara e DDI 55 não contam).
+- **Consulta e `register-by-cpf`:** os 4 últimos dígitos (`phoneEnd`). CPF sem cadastro e telefone que não confere dão a mesma resposta, com a mesma consulta ao banco.
+- **`register-full`:** o telefone completo, pelos últimos 8 dígitos (ignora DDD e o nono dígito de cadastro antigo). Não confere, ou o cadastro não tem telefone → 409 genérico; nada é vinculado nem alterado. O cadastro existente nunca é sobrescrito pelo formulário.
+- E-mail e telefone iguais aos de outra pessoa, com CPF novo, criam cadastro próprio.
 - CPF criado ao mesmo tempo por outra inscrição → 409 "CPF já cadastrado para outra pessoa.".
 
 **Vagas** (`lockCourseSeats` em `registration-adapter.ts`):
-- Quem conta e insere trava as vagas do curso (`pg_advisory_xact_lock`) antes de contar, em READ COMMITTED: `createWithCapacity` (que atende `register`, `register-by-cpf` e a inscrição pela equipe) e o `register-full`.
+- Quem conta e insere trava as vagas do curso (`pg_advisory_xact_lock`) antes de contar, em READ COMMITTED: `createWithCapacity` (que atende o `register-by-cpf` e a inscrição pela equipe) e o `register-full`.
 - Inscrições ao mesmo tempo entram uma de cada vez: nunca passa da lotação, e quem chega depois da última vaga ouve 409.
 - O `register-full` tenta de novo (até 3 vezes) num conflito de escrita que ainda apareça. `isPrismaSerializationError` reconhece o P2034 e o `DriverAdapterError` `TransactionWriteConflict` do adapter-pg.
 - O erro inesperado vai para o `apiErrorHandler` (log + 500 genérico).
@@ -523,7 +543,7 @@ O site usa a mesma regra (`utils/course-status.ts` no front).
 ### Salas
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
-| `GET` | `/rooms` | salas ativas | Pública |
+| `GET` | `/rooms` | salas ativas (só o painel usa) | `READ_COURSE` |
 | `POST` | `/rooms` | `{ name, description, maxCapacity }`; nome da lista fixa (`lib/room-names.ts`: AUDITORIO, COZINHA, SALA DE VIDEO CONFERENCIA, SALA 1, SALA 2, SALA APL), normalizado; repetido entre as ativas → 409 | `CREATE_COURSE` |
 | `PATCH` | `/rooms/:roomId` | editar; pode manter nome antigo, trocar exige nome da lista | `UPDATE_COURSE` |
 | `DELETE` | `/rooms/:roomId` | soft; curso ou reserva que **ainda não terminou** na sala → 409 | `DELETE_COURSE` |
@@ -656,7 +676,7 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 
 **O que é gravado:**
 - O hook grava toda mutação com sucesso: método, caminho, `entity` (`deriveAuditEntity`) e `targetLabel` (nome do alvo).
-- Fica fora (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (que grava a própria linha), `/admin/notifications/read` e `/auth/login` (que tem registro próprio).
+- Fica fora (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (que grava a própria linha), `/admin/notifications/read`, `/users/lookup-cpf` (consulta, não grava) e `/auth/login` (que tem registro próprio).
 
 **Login:** 2xx → `LOGIN`; 401 → `LOGIN_FAILED`; 429 → `LOGIN_BLOCKED`; `targetLabel` = usuário digitado. A senha nunca é lida.
 
@@ -685,7 +705,7 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 | `PATCH` | `/admin/notifications/read` | `{ ids?: string[] }` (sem `ids` = todos os visíveis; `[]` = nenhum) → `{ updated }` | Login |
 
 **Eventos** (`Notification`, `lib/notification-events.ts`):
-- Só ações públicas ou self-service: `COURSE_REGISTRATION` (`READ_COURSE`; as três inscrições públicas), `CONTACT_MESSAGE` (`READ_CONTACT`) e `INVITE_ACCEPTED` (`READ_USER_ADMIN`).
+- Só ações públicas ou self-service: `COURSE_REGISTRATION` (`READ_COURSE`; as duas inscrições públicas), `CONTACT_MESSAGE` (`READ_CONTACT`) e `INVITE_ACCEPTED` (`READ_USER_ADMIN`).
 - O que a equipe faz no painel não gera evento.
 - Publicar nunca derruba a ação (`publishSafely`).
 
@@ -727,7 +747,7 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 | `GET` | `/admin/finance/transactions` | paginada; filtros abaixo; traz `totals` | `READ_FINANCE` |
 | `POST` | `/admin/finance/transactions` | criar lançamento → 201 (a linha) | `CREATE_FINANCE` |
 | `PATCH` · `DELETE` | `/admin/finance/transactions/:id` | editar → `{ message }` · excluir (soft) → 204 | `UPDATE_` · `DELETE_FINANCE` |
-| `GET` | `/admin/finance/transactions/export` | CSV dos lançamentos filtrados | `READ_FINANCE` |
+| `GET` | `/admin/finance/transactions/export` | CSV dos lançamentos filtrados; depois de "Descrição": "Nome / Razão social" (razão social do empenho, ou o nome fantasia se ela estiver vazia) e "CNPJ / CPF" | `READ_FINANCE` |
 | `POST` | `/admin/finance/transfers` | transferência entre caixas → 201 `{ message }` | `CREATE_FINANCE` |
 | `POST` | `/admin/finance/transactions/:id/attachments` | comprovante (multipart: PDF, JPG, PNG, WEBP até 15 MB) → 201 `{ id, filename, mimeType, size, createdAt }` | `UPDATE_FINANCE` |
 | `GET` · `DELETE` | `/admin/finance/attachments/:attachmentId` | baixar (inline) · apagar de verdade | `READ_FINANCE` · `UPDATE_FINANCE` |
@@ -753,7 +773,7 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 - Fica fora de receita e despesa, mas conta no saldo de cada caixa.
 
 **Listagem:**
-- Filtros `from`, `to` (inclui o dia inteiro), `type`, `categoryId`, `accountId`, `method` (sem diferenciar maiúsculas), `search` (descrição).
+- Filtros `from`, `to` (inclui o dia inteiro), `type`, `categoryId`, `accountId`, `method` (sem diferenciar maiúsculas), `search` (descrição **ou** razão social / nome fantasia da Nota de Empenho, sem diferenciar maiúsculas nem acento; o nome do fornecedor é achado por SQL, `immutable_unaccent_lower` sobre `empenho->>'razaoSocial'`/`'nomeFantasia'`). Vale para a lista, os totais e o CSV.
 - Ordem por data desc.
 - `totals: { incomeCents, expenseCents }` somam todos os filtrados, sem transferências nem "só nota".
 - Filtro com formato inválido → 400 "Parâmetro inválido: <campo>" (vale também para resumo, exportação e fechamentos).
@@ -856,8 +876,8 @@ Helpers que não são adapters:
 
 1. **Port** em `ports/external/foo-repository.ts` e **adapter** em `adapter/database/foo-adapter.ts` (`createFooAdapter(prisma)`, `semRegistro` no `catch`).
 2. **Use case** em `usecase/`: valida com Zod (`safeParse`, nunca `parse`) e devolve `{ error?, ...resultado }`.
-3. **Controller** em `http/controllers/`: checa a permissão primeiro (`requirePermission`/`requireAuth`) e responde com `errorToStatus`.
-4. **Router** em `http/router/`: schema Swagger com `tags`, `summary`, `description`, `body`/`params`/`querystring`, `response` e `security: [{ bearerAuth: [] }]` quando protegida. Registrado em `http/register-routers.ts`, o que já vale para o servidor e para os E2E.
+3. **Controller** em `http/controllers/`: não confere permissão (a rota declara); quem chamou é `adminOf(request)`. Responde com `errorToStatus`.
+4. **Router** em `http/router/`: `config: { auth: requires('X') }` (ou `publicRoute()`, `loggedIn()`, `requiresFrom`) e schema Swagger com `tags`, `summary`, `description`, `body`/`params`/`querystring` e `response`. O `security` e a permissão na descrição saem da declaração. Registrado em `http/register-routers.ts`, o que já vale para o servidor e para os E2E.
 5. **Auditoria:** rota que edita um registro → `SNAPSHOTS` (`lib/audit-snapshot.ts`); ação diferente de criar/editar/excluir → `SPECIAL` (`lib/audit-sentence.ts`); entidade nova → `AUDIT_ENTITY_NOUNS`.
 6. **Permissão nova** → enum no schema + migration que a concede (ver Autenticação).
 7. **Testes:** unitário do use case e, para rota protegida, E2E com 401 sem token e 403 sem a permissão.
@@ -869,6 +889,7 @@ Helpers que não são adapters:
 
 - `http://localhost:3000/docs`. Fora de produção sempre sobe; em produção, só com `ENABLE_DOCS=true`.
 - Rotas protegidas: login em `POST /auth/login`, depois **Authorize** com o token.
+- O `security` (`bearerAuth`) e a linha "Exige: …" no fim da descrição saem do `config.auth` da rota (`documentAuth` em `http/lib/route-auth.ts`); não escreva à mão.
 
 ## Comandos, testes e CI
 

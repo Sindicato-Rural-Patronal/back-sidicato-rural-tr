@@ -1,19 +1,17 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createMarketQuoteAdapter } from '../../adapter/database/market-quote-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { ListMarketQuotesUseCase } from '../../usecase/list-market-quotes.js';
 import { SaveDailyQuotesUseCase } from '../../usecase/save-daily-quotes.js';
 import { MarketQuoteController } from '../controllers/market-quote-controller.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
 import { ListQuoteHistoryUseCase } from '../../usecase/list-quote-history.js';
 import { UpdateQuotesSourceUseCase } from '../../usecase/update-site-settings.js';
 import { UpdateQuoteUnitUseCase } from '../../usecase/update-quote-unit.js';
 import { QUOTE_UNITS } from '../../lib/quote-products.js';
 import { createSiteSettingsAdapter } from '../../adapter/database/site-settings-adapter.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 const marketQuoteProperties = {
     morningCents: { type: ['integer', 'null'],
@@ -48,17 +46,16 @@ properties: marketQuoteProperties } };
 
 export async function marketQuoteRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const repo = createMarketQuoteAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(createUserAdminAdapter(prisma), createRuleAdapter(prisma));
 
     const controller = new MarketQuoteController(
         new ListMarketQuotesUseCase(repo),
         new SaveDailyQuotesUseCase(repo),
-        getAdminPermissions,
     );
 
     fastify.get(
         '/market-quotes',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Market Quotes'],
                 summary: 'Cotações da home (público)',
@@ -73,6 +70,7 @@ export async function marketQuoteRouter(fastify: FastifyInstance, prisma: Prisma
     fastify.get(
         '/market-quotes/history',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Market Quotes'],
                 summary: 'Histórico das cotações (público)',
@@ -121,10 +119,10 @@ nullable: true },
     fastify.get(
         '/admin/market-quotes',
         {
+            config: { auth: requires('READ_MARKET_QUOTE') },
             schema: {
                 tags: ['Market Quotes'],
                 summary: 'Produtos da cotação (admin)',
-                security: [{ bearerAuth: [] }],
                 response: {
                     200: quoteList,
                     401: errorResponse,
@@ -138,6 +136,7 @@ nullable: true },
     fastify.put(
         '/admin/market-quotes/daily',
         {
+            config: { auth: requires('UPDATE_MARKET_QUOTE') },
             schema: {
                 tags: ['Market Quotes'],
                 summary: 'Lançar as cotações do dia',
@@ -147,7 +146,6 @@ nullable: true },
 - Produto que não vier no corpo mantém o último preço.
 - Relançar o mesmo dia/período substitui o lançamento anterior.
 - A variação é calculada contra o lançamento anterior do produto.`,
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['period', 'prices'],
@@ -184,11 +182,11 @@ example: 12050 },
     fastify.patch(
         '/admin/market-quotes/:id',
         {
+            config: { auth: requires('UPDATE_MARKET_QUOTE') },
             schema: {
                 tags: ['Market Quotes'],
                 summary: 'Trocar a unidade do produto',
                 description: 'Unidade exibida no preço e no histórico (saca, tonelada, quilo, arroba). `null` = sem unidade. Os preços gravados não mudam.',
-                security: [{ bearerAuth: [] }],
                 params: { type: 'object',
 required: ['id'],
 properties: { id: { type: 'string' } } },
@@ -210,7 +208,6 @@ properties: marketQuoteProperties },
             },
         },
         async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-            if ((await requirePermission(req, reply, 'UPDATE_MARKET_QUOTE', getAdminPermissions)) === null) return;
             const r = await updateUnit.execute(req.params.id, req.body);
             if (r.error) return reply.status(errorToStatus(r.error)).send({ error: r.error.message });
             return reply.send(r.quote);
@@ -221,10 +218,10 @@ properties: marketQuoteProperties },
     fastify.put(
         '/admin/market-quotes/source',
         {
+            config: { auth: requires('UPDATE_MARKET_QUOTE') },
             schema: {
                 tags: ['Market Quotes'],
                 summary: 'Fonte exibida na faixa de cotações (ex.: Cvale)',
-                security: [{ bearerAuth: [] }],
                 body: { type: 'object',
 required: ['source'],
 properties: { source: { type: 'string' } } },
@@ -238,7 +235,6 @@ properties: { message: { type: 'string' } } },
             },
         },
         async (req: FastifyRequest, reply: FastifyReply) => {
-            if ((await requirePermission(req, reply, 'UPDATE_MARKET_QUOTE', getAdminPermissions)) === null) return;
             const r = await updateSource.execute(req.body);
             if (r.error) return reply.status(errorToStatus(r.error)).send({ error: r.error.message });
             return reply.send({ message: 'ok' });

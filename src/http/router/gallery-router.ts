@@ -1,10 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createGalleryAdapter } from '../../adapter/database/gallery-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createStorageAdapter } from '../../adapter/storage/factory.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import {
     ListGalleriesUseCase,
     CreateGalleryUseCase,
@@ -18,6 +15,7 @@ import {
 } from '../../usecase/gallery-usecases.js';
 import { GalleryController } from '../controllers/gallery-controller.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 // fast-json-stringify descarta campos não declarados: tudo que sai está listado.
 const str = { type: 'string' };
@@ -83,7 +81,6 @@ const photoParams = { type: 'object',
 required: ['id', 'photoId'],
 properties: { id: str,
 photoId: str } };
-const sec = [{ bearerAuth: [] }];
 const errs = { 400: errorResponse,
 401: errorResponse,
 403: errorResponse,
@@ -107,7 +104,6 @@ export async function galleryRouter(fastify: FastifyInstance, prisma: PrismaClie
             removePhoto: new DeleteGalleryPhotoUseCase(repo, storage),
             reorderPhotos: new ReorderGalleryPhotosUseCase(repo),
         },
-        new GetAdminPermissionsUseCase(createUserAdminAdapter(prisma), createRuleAdapter(prisma)),
     );
 
     type Id = FastifyRequest<{ Params: { id: string } }>;
@@ -119,6 +115,7 @@ photoId: string
 }>;
 
     fastify.get('/galleries', {
+        config: { auth: publicRoute() },
         schema: {
             tags,
             summary: 'Galerias da home (público)',
@@ -129,10 +126,10 @@ items: albumWithPhotos } },
     }, (req: FastifyRequest, res: FastifyReply) => controller.listPublic(req, res));
 
     fastify.get('/admin/galleries', {
+        config: { auth: requires('READ_BANNER') },
         schema: {
             tags,
 summary: 'Todas as galerias, com fotos',
-security: sec,
             response: { 200: { type: 'array',
 items: albumWithPhotos },
 401: errorResponse,
@@ -141,10 +138,10 @@ items: albumWithPhotos },
     }, (req: FastifyRequest, res: FastifyReply) => controller.listAdmin(req, res));
 
     fastify.post('/admin/galleries', {
+        config: { auth: requires('CREATE_BANNER') },
         schema: {
             tags,
 summary: 'Criar galeria',
-security: sec,
 body: { ...albumBody,
 required: ['title'] },
             response: { 201: albumObject,
@@ -154,19 +151,19 @@ required: ['title'] },
 
     // Antes de /:id para "reorder" não ser lido como id.
     fastify.patch('/admin/galleries/reorder', {
+        config: { auth: requires('UPDATE_BANNER') },
         schema: { tags,
 summary: 'Reordenar galerias',
-security: sec,
 body: orderBody,
 response: { 200: ok,
 ...errs } },
     }, (req: FastifyRequest, res: FastifyReply) => controller.reorder(req, res));
 
     fastify.patch('/admin/galleries/:id', {
+        config: { auth: requires('UPDATE_BANNER') },
         schema: {
             tags,
 summary: 'Atualizar galeria',
-security: sec,
 params: idParams,
 body: albumBody,
             response: { 200: albumObject,
@@ -175,20 +172,20 @@ body: albumBody,
     }, (req: Id, res: FastifyReply) => controller.update(req, res));
 
     fastify.delete('/admin/galleries/:id', {
+        config: { auth: requires('DELETE_BANNER') },
         schema: { tags,
 summary: 'Excluir galeria (e as fotos)',
-security: sec,
 params: idParams,
 response: { 204: { type: 'null' },
 ...errs } },
     }, (req: Id, res: FastifyReply) => controller.remove(req, res));
 
     fastify.post('/admin/galleries/:id/photos', {
+        config: { auth: requires('UPDATE_BANNER') },
         schema: {
             tags,
             summary: 'Enviar foto (multipart, campo "file")',
             description: 'JPG, PNG, WEBP ou GIF até 15MB. Reduzida para caber em 1600×1600 e salva em JPEG.',
-            security: sec,
             params: idParams,
             consumes: ['multipart/form-data'],
             response: { 201: photoObject,
@@ -197,9 +194,9 @@ response: { 204: { type: 'null' },
     }, (req: Id, res: FastifyReply) => controller.uploadPhoto(req, res));
 
     fastify.patch('/admin/galleries/:id/photos/reorder', {
+        config: { auth: requires('UPDATE_BANNER') },
         schema: { tags,
 summary: 'Reordenar fotos da galeria',
-security: sec,
 params: idParams,
 body: orderBody,
 response: { 200: ok,
@@ -207,10 +204,10 @@ response: { 200: ok,
     }, (req: Id, res: FastifyReply) => controller.reorderPhotos(req, res));
 
     fastify.patch('/admin/galleries/:id/photos/:photoId', {
+        config: { auth: requires('UPDATE_BANNER') },
         schema: {
             tags,
             summary: 'Editar legenda da foto',
-            security: sec,
             params: photoParams,
             body: { type: 'object',
 properties: { caption: nstr } },
@@ -220,9 +217,9 @@ properties: { caption: nstr } },
     }, (req: Photo, res: FastifyReply) => controller.updatePhoto(req, res));
 
     fastify.delete('/admin/galleries/:id/photos/:photoId', {
+        config: { auth: requires('UPDATE_BANNER') },
         schema: { tags,
 summary: 'Excluir foto',
-security: sec,
 params: photoParams,
 response: { 204: { type: 'null' },
 ...errs } },

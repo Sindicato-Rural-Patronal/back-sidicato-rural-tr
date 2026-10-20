@@ -4,6 +4,7 @@ import { createAddressAdapter } from '../../adapter/database/address-adapter.js'
 import { FetchAddressByCepUseCase } from '../../usecase/fetch-address-by-cep.js';
 import { FetchAddressByCepController } from '../controllers/fetch-address-by-cep.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { loggedIn } from '../lib/route-auth.js';
 
 export async function addressRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const addressRepo = createAddressAdapter(prisma);
@@ -14,11 +15,12 @@ export async function addressRouter(fastify: FastifyInstance, prisma: PrismaClie
     fastify.get(
         '/address/cep/:cep',
         {
+            config: { auth: loggedIn() },
             schema: {
                 tags: ['Address'],
                 summary: 'Fetch address data by CEP (zip code)',
                 description:
-                    'Searches locally first; falls back to ViaCEP API and caches the result.',
+                    'Searches locally first; falls back to ViaCEP API and caches the result. Exige login: só o painel usa (aberta, emprestava o IP do servidor para consultas ao ViaCEP).',
                 params: {
                     type: 'object',
                     properties: { cep: { type: 'string',
@@ -43,6 +45,7 @@ nullable: true },
 nullable: true },
                         },
                     },
+                    401: errorResponse,
                     404: errorResponse,
                 },
             },

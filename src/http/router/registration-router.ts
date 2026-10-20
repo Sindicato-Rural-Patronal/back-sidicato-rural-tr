@@ -2,11 +2,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createRegistrationAdapter } from '../../adapter/database/registration-adapter.js';
 import { createUserDataAdapter } from '../../adapter/database/user-data.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createCourseAdapter } from '../../adapter/database/course-adapter.js';
 import { createNotificationPublisher } from '../../adapter/database/notification-adapter.js';
-import { RegisterForCourseUseCase } from '../../usecase/register-for-course.js';
 import { RegisterForCourseByCpfUseCase } from '../../usecase/register-for-course-by-cpf.js';
 import { RegisterForCourseFullUseCase } from '../../usecase/register-for-course-full.js';
 import { LookupUserByCpfUseCase } from '../../usecase/lookup-user-by-cpf.js';
@@ -17,7 +14,6 @@ import { StartCourseUseCase } from '../../usecase/start-course.js';
 import { UploadRegistrationFichaUseCase } from '../../usecase/upload-registration-ficha.js';
 import { GetRegistrationFichaUseCase } from '../../usecase/get-registration-ficha.js';
 import { DeleteRegistrationFichaUseCase } from '../../usecase/delete-registration-ficha.js';
-import { RegisterForCourseController } from '../controllers/register-for-course.js';
 import { RegisterForCourseByCpfController } from '../controllers/register-for-course-by-cpf.js';
 import { RegisterForCourseFullController } from '../controllers/register-for-course-full.js';
 import { LookupUserByCpfController } from '../controllers/lookup-user-by-cpf.js';
@@ -46,147 +42,76 @@ import {
     SetRegistrationAttendanceController,
     SetUnmarkedAttendanceController,
 } from '../controllers/course-attendance.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
 import { publicFormRateLimit, publicLookupRateLimit } from '../lib/public-rate-limit.js';
+import { CpfAttemptLimiter } from '../../lib/cpf-attempt-limiter.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 export async function registrationRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const courseRepository = createCourseAdapter(prisma);
     const userDataRepository = createUserDataAdapter(prisma);
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
     const registrationRepository = createRegistrationAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
     const notifications = createNotificationPublisher(prisma);
+    // Um contador só para a consulta e as duas inscrições por CPF: errar numa
+    // gasta as tentativas das outras.
+    const cpfAttempts = new CpfAttemptLimiter();
 
-    const registerController = new RegisterForCourseController(
-        new RegisterForCourseUseCase(courseRepository, userDataRepository, registrationRepository, notifications),
-    );
     const registerByCpfController = new RegisterForCourseByCpfController(
-        new RegisterForCourseByCpfUseCase(courseRepository, userDataRepository, registrationRepository, notifications),
+        new RegisterForCourseByCpfUseCase(courseRepository, userDataRepository, registrationRepository, notifications, cpfAttempts),
     );
     const registerFullController = new RegisterForCourseFullController(
-        new RegisterForCourseFullUseCase(prisma, notifications),
+        new RegisterForCourseFullUseCase(prisma, notifications, cpfAttempts),
     );
     const lookupByCpfController = new LookupUserByCpfController(
-        new LookupUserByCpfUseCase(userDataRepository),
+        new LookupUserByCpfUseCase(userDataRepository, cpfAttempts),
     );
     const listController = new ListCourseRegistrationsController(
         new ListCourseRegistrationsUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const cancelController = new CancelRegistrationController(
         new CancelRegistrationUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const setConfirmedController = new SetRegistrationConfirmedController(
         new SetRegistrationConfirmedUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const startCourseController = new StartCourseController(
         new StartCourseUseCase(courseRepository, registrationRepository),
-        getAdminPermissions,
     );
     const uploadFichaController = new UploadRegistrationFichaController(
         new UploadRegistrationFichaUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const downloadFichaController = new DownloadRegistrationFichaController(
         new GetRegistrationFichaUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const deleteFichaController = new DeleteRegistrationFichaController(
         new DeleteRegistrationFichaUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const adminRegisterController = new AdminRegisterPersonController(
         new AdminRegisterPersonUseCase(courseRepository, userDataRepository, registrationRepository),
-        getAdminPermissions,
     );
     const confirmAllController = new ConfirmAllRegistrationsController(
         new ConfirmAllRegistrationsUseCase(courseRepository, registrationRepository),
-        getAdminPermissions,
     );
     const completeCourseController = new CompleteCourseController(
         new CompleteCourseUseCase(courseRepository),
-        getAdminPermissions,
     );
     const setAttendanceController = new SetRegistrationAttendanceController(
         new SetRegistrationAttendanceUseCase(registrationRepository),
-        getAdminPermissions,
     );
     const setUnmarkedAttendanceController = new SetUnmarkedAttendanceController(
         new SetUnmarkedAttendanceUseCase(courseRepository, registrationRepository),
-        getAdminPermissions,
-    );
-
-    fastify.post(
-        '/courses/:courseId/register',
-        {
-            config: publicFormRateLimit,
-            schema: {
-                tags: ['Registrations'],
-                summary: 'Register for a course',
-                description:
-                    'Public. Looks up existing UserData by CPF — if found, associates the registration; otherwise creates a new record. E-mail is optional and may repeat between people.',
-                params: {
-                    type: 'object',
-                    required: ['courseId'],
-                    properties: { courseId: { type: 'string' } },
-                },
-                body: {
-                    type: 'object',
-                    required: ['name', 'phone', 'cpf'],
-                    properties: {
-                        name: { type: 'string',
-example: 'João da Silva' },
-                        phone: { type: 'string',
-example: '44999990001' },
-                        // Opcional; sem format para aceitar vazio (formato conferido no use case).
-                        email: { type: 'string',
-nullable: true,
-example: 'joao@example.com' },
-                        cpf: { type: 'string',
-example: '52998224725' },
-                    },
-                },
-                response: {
-                    201: {
-                        type: 'object',
-                        properties: {
-                            registrationId: { type: 'string' },
-                            userDataId: { type: 'string' },
-                        },
-                    },
-                    400: errorResponse,
-                    404: errorResponse,
-                    409: errorResponse,
-                },
-            },
-        },
-        (
-            req: FastifyRequest<{
-                Params: { courseId: string };
-                Body: {
-                    name: string;
-                    phone: string;
-                    email?: string | null;
-                    cpf: string;
-                };
-            }>,
-            res: FastifyReply,
-        ) => registerController.handle(req, res),
     );
 
     fastify.post(
         '/courses/:courseId/register-by-cpf',
         {
-            config: publicFormRateLimit,
+            config: { ...publicFormRateLimit,
+auth: publicRoute() },
             schema: {
                 tags: ['Registrations'],
-                summary: 'Register for a course by CPF only',
+                summary: 'Register for a course with CPF and the last 4 phone digits',
                 description:
-                    'Public. Looks up existing UserData by CPF — if found, registers for the course; if not found, returns 404 so the client can redirect to the full registration flow.',
+                    'Pública. Inscreve quem já tem cadastro: o CPF e os 4 últimos dígitos de um dos telefones do cadastro (só dígitos; máscara e DDI 55 não contam). CPF sem cadastro **e** telefone que não confere dão o mesmo 404 "Não encontramos cadastro com este CPF e telefone." (o site segue para o `register-full`). 5 erros na hora para o mesmo CPF (somando consulta e inscrições) → 429. `phoneEnd` sem 4 dígitos → 400.',
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -194,10 +119,13 @@ example: '52998224725' },
                 },
                 body: {
                     type: 'object',
-                    required: ['cpf'],
+                    required: ['cpf', 'phoneEnd'],
                     properties: {
                         cpf: { type: 'string',
 example: '52998224725' },
+                        phoneEnd: { type: 'string',
+description: 'Os 4 últimos dígitos do telefone',
+example: '0001' },
                     },
                 },
                 response: {
@@ -211,31 +139,42 @@ example: '52998224725' },
                     400: errorResponse,
                     404: errorResponse,
                     409: errorResponse,
+                    429: errorResponse,
                 },
             },
         },
         (
             req: FastifyRequest<{
  Params: { courseId: string };
-Body: { cpf: string } 
+Body: {
+ cpf: string;
+phoneEnd: string 
+}
 }>,
             res: FastifyReply,
         ) => registerByCpfController.handle(req, res),
     );
 
-    fastify.get(
-        '/users/lookup-cpf/:cpf',
+    fastify.post(
+        '/users/lookup-cpf',
         {
-            config: publicLookupRateLimit,
+            config: { ...publicLookupRateLimit,
+auth: publicRoute() },
             schema: {
                 tags: ['Registrations'],
-                summary: 'Look up a participant by CPF',
+                summary: 'Look up a participant by CPF and the last 4 phone digits',
                 description:
-                    'Public. Returns whether a UserData exists for the CPF and a masked name to confirm identity. Does not register.',
-                params: {
+                    'Pública. POST para o CPF não ir na URL (nem nos logs). Com o CPF e os 4 últimos dígitos de um dos telefones do cadastro, devolve `{ found: true, name }` com o nome mascarado ("João D. S."). CPF inválido, sem cadastro ou telefone que não confere: o mesmo `{ found: false, name: null }`. 5 erros na hora para o mesmo CPF (somando consulta e inscrições) → 429. `phoneEnd` sem 4 dígitos → 400. Não inscreve.',
+                body: {
                     type: 'object',
-                    required: ['cpf'],
-                    properties: { cpf: { type: 'string' } },
+                    required: ['cpf', 'phoneEnd'],
+                    properties: {
+                        cpf: { type: 'string',
+example: '52998224725' },
+                        phoneEnd: { type: 'string',
+description: 'Os 4 últimos dígitos do telefone',
+example: '0001' },
+                    },
                 },
                 response: {
                     200: {
@@ -246,22 +185,30 @@ Body: { cpf: string }
 nullable: true },
                         },
                     },
+                    400: errorResponse,
+                    429: errorResponse,
                 },
             },
         },
-        (req: FastifyRequest<{ Params: { cpf: string } }>, res: FastifyReply) =>
+        (req: FastifyRequest<{
+ Body: {
+ cpf: string;
+phoneEnd: string 
+} 
+}>, res: FastifyReply) =>
             lookupByCpfController.handle(req, res),
     );
 
     fastify.post(
         '/courses/:courseId/register-full',
         {
-            config: publicFormRateLimit,
+            config: { ...publicFormRateLimit,
+auth: publicRoute() },
             schema: {
                 tags: ['Registrations'],
                 summary: 'Register a new participant with full data',
                 description:
-                    'Public. Creates the participant (with rg/birthDate and address as their primary property) and registers for the course. If a UserData already exists for the CPF, only registers. E-mail is optional.',
+                    'Pública. CPF sem cadastro: cria a pessoa (com rg, nascimento e o endereço como propriedade principal) e inscreve. CPF que já tem cadastro: só inscreve se `phone` for um dos três telefones do cadastro (últimos 8 dígitos; máscara e DDI 55 não contam); senão, ou se o cadastro não tem telefone, nada é vinculado nem alterado → 409 "Não foi possível confirmar seu cadastro pelo site. Procure o Sindicato para fazer a inscrição.". O cadastro existente nunca é sobrescrito. E-mail é opcional. 5 erros na hora para o mesmo CPF → 429.',
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -306,6 +253,7 @@ enum: ['URBAN', 'RURAL'] },
                     400: errorResponse,
                     404: errorResponse,
                     409: errorResponse,
+                    429: errorResponse,
                 },
             },
         },
@@ -357,10 +305,10 @@ nullable: true } } } },
     fastify.get(
         '/admin/courses/:courseId/registrations',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'List course registrations',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -415,12 +363,12 @@ limit?: number
     fastify.post(
         '/admin/courses/:courseId/registrations',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Register a person from the admin panel',
                 description:
                     'Inscreve uma pessoa já cadastrada. Ignora prazo, status e data de término do curso; só respeita a lotação da sala. A inscrição já nasce confirmada. Pessoa já inscrita → 409; curso lotado → 409.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -454,11 +402,11 @@ properties: { registrationId: { type: 'string' } } },
     fastify.patch(
         '/admin/courses/:courseId/registrations/confirm-all',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Confirm all unconfirmed registrations of a course',
                 description: 'Retorna `confirmed`: quantas inscrições foram confirmadas agora.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -480,10 +428,10 @@ properties: { confirmed: { type: 'integer' } } },
     fastify.delete(
         '/admin/registrations/:registrationId',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Cancel registration',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['registrationId'],
@@ -504,10 +452,10 @@ properties: { confirmed: { type: 'integer' } } },
     fastify.patch(
         '/admin/registrations/:registrationId/confirm',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Confirm or unconfirm a registration',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['registrationId'],
@@ -539,12 +487,12 @@ Body: { confirmed: boolean }
     fastify.post(
         '/admin/courses/:courseId/start',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Start the course',
                 description:
                     'Sets the course status to IN_PROGRESS. Fails (400) only if there are no registrations; unconfirmed registrations do not block.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -567,12 +515,12 @@ properties: { message: { type: 'string' } } },
     fastify.patch(
         '/admin/courses/:courseId/complete',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Courses'],
                 summary: 'Mark the course as completed',
                 description:
                     'Manual. Only from IN_PROGRESS (other status → 409). Sets the status to COMPLETED: the course stays out of the public list, its page still opens by link and it never accepts registrations.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -601,11 +549,11 @@ enum: ['COMPLETED'] },
     fastify.patch(
         '/admin/registrations/:registrationId/attendance',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Mark attendance of a registration',
                 description: '`attended`: true = presente, false = faltou, null = desmarcar.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['registrationId'],
@@ -645,12 +593,12 @@ nullable: true },
     fastify.patch(
         '/admin/courses/:courseId/registrations/attendance',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Mark attendance of every unmarked confirmed registration',
                 description:
                     'Sets `attended` on every confirmed, active registration of the course that is still unmarked (null). Already marked and unconfirmed registrations are left as they are. Returns `updated`: how many changed.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -686,12 +634,12 @@ properties: { updated: { type: 'integer' } } },
     fastify.post(
         '/admin/registrations/:registrationId/ficha',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Attach the filled/scanned enrollment form (PDF)',
                 description:
                     'Envie como multipart/form-data com o PDF no campo "file". Máx 15MB. Substitui a ficha anterior, se houver.',
-                security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
                 params: {
                     type: 'object',
@@ -715,11 +663,11 @@ properties: { filename: { type: 'string' } } },
     fastify.get(
         '/admin/registrations/:registrationId/ficha',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Download the attached enrollment form (PDF)',
                 description: 'Retorna o PDF anexado (inline). Requer READ_COURSE (mesma permissão de ver as inscrições).',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['registrationId'],
@@ -738,10 +686,10 @@ properties: { filename: { type: 'string' } } },
     fastify.delete(
         '/admin/registrations/:registrationId/ficha',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Admin — Registrations'],
                 summary: 'Remove the attached enrollment form',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['registrationId'],

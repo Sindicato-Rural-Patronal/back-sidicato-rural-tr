@@ -1,10 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createBannerAdapter } from '../../adapter/database/banner-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createStorageAdapter } from '../../adapter/storage/factory.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { CreateBannerUseCase } from '../../usecase/create-banner.js';
 import { ListBannersUseCase } from '../../usecase/list-banners.js';
 import { ListAllBannersUseCase } from '../../usecase/list-all-banners.js';
@@ -19,8 +16,8 @@ import { UpdateBannerController } from '../controllers/update-banner.js';
 import { DeleteBannerController } from '../controllers/delete-banner.js';
 import { UploadBannerImageController } from '../controllers/upload-banner-image.js';
 import { ReorderBannersController } from '../controllers/reorder-banners.js';
-import { requirePermission } from '../lib/require-permission.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 const buttonSchema = {
     type: 'object',
@@ -111,9 +108,6 @@ example: '2026-08-31T23:59:00-03:00' },
 export async function bannerRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const repo = createBannerAdapter(prisma);
     const storage = createStorageAdapter();
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const listCtrl = new ListBannersController(new ListBannersUseCase(repo));
     const listAllCtrl = new ListAllBannersController(new ListAllBannersUseCase(repo));
@@ -127,6 +121,7 @@ export async function bannerRouter(fastify: FastifyInstance, prisma: PrismaClien
     fastify.get(
         '/banners',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Banners'],
                 summary: 'Listar banners ativos (home)',
@@ -156,10 +151,10 @@ items: buttonSchema },
     fastify.get(
         '/admin/banners',
         {
+            config: { auth: requires('READ_BANNER') },
             schema: {
                 tags: ['Banners — Admin'],
                 summary: 'Listar todos os banners',
-                security: [{ bearerAuth: [] }],
                 querystring: paginationQuerystring,
                 response: {
                     200: pagedResponse(bannerFullSchema),
@@ -169,7 +164,6 @@ items: buttonSchema },
             },
         },
         async (req: FastifyRequest, res: FastifyReply) => {
-            if (!(await requirePermission(req, res, 'READ_BANNER', getAdminPermissions))) return;
             return listAllCtrl.handle(req as Parameters<typeof listAllCtrl.handle>[0], res);
         },
     );
@@ -178,10 +172,10 @@ items: buttonSchema },
     fastify.patch(
         '/admin/banners/reorder',
         {
+            config: { auth: requires('UPDATE_BANNER') },
             schema: {
                 tags: ['Banners — Admin'],
                 summary: 'Reordenar banners',
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['order'],
@@ -201,7 +195,6 @@ properties: { message: { type: 'string' } } },
             },
         },
         async (req: FastifyRequest, res: FastifyReply) => {
-            if (!(await requirePermission(req, res, 'UPDATE_BANNER', getAdminPermissions))) return;
             return reorderCtrl.handle(req, res);
         },
     );
@@ -210,10 +203,10 @@ properties: { message: { type: 'string' } } },
     fastify.post(
         '/admin/banners',
         {
+            config: { auth: requires('CREATE_BANNER') },
             schema: {
                 tags: ['Banners — Admin'],
                 summary: 'Criar banner',
-                security: [{ bearerAuth: [] }],
                 body: { ...bannerBodySchema,
 required: ['title'] },
                 response: {
@@ -225,7 +218,6 @@ required: ['title'] },
             },
         },
         async (req: FastifyRequest, res: FastifyReply) => {
-            if (!(await requirePermission(req, res, 'CREATE_BANNER', getAdminPermissions))) return;
             return createCtrl.handle(req, res);
         },
     );
@@ -234,10 +226,10 @@ required: ['title'] },
     fastify.patch(
         '/admin/banners/:id',
         {
+            config: { auth: requires('UPDATE_BANNER') },
             schema: {
                 tags: ['Banners — Admin'],
                 summary: 'Atualizar banner',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['id'],
@@ -254,7 +246,6 @@ required: ['title'] },
             },
         },
         async (req: FastifyRequest, res: FastifyReply) => {
-            if (!(await requirePermission(req, res, 'UPDATE_BANNER', getAdminPermissions))) return;
             return updateCtrl.handle(req as Parameters<typeof updateCtrl.handle>[0], res);
         },
     );
@@ -263,10 +254,10 @@ required: ['title'] },
     fastify.delete(
         '/admin/banners/:id',
         {
+            config: { auth: requires('DELETE_BANNER') },
             schema: {
                 tags: ['Banners — Admin'],
                 summary: 'Excluir banner',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['id'],
@@ -281,7 +272,6 @@ required: ['title'] },
             },
         },
         async (req: FastifyRequest, res: FastifyReply) => {
-            if (!(await requirePermission(req, res, 'DELETE_BANNER', getAdminPermissions))) return;
             return deleteCtrl.handle(req as Parameters<typeof deleteCtrl.handle>[0], res);
         },
     );
@@ -290,11 +280,11 @@ required: ['title'] },
     fastify.post(
         '/admin/banners/:id/image',
         {
+            config: { auth: requires('UPDATE_BANNER') },
             schema: {
                 tags: ['Banners — Admin'],
                 summary: 'Upload de imagem do banner',
                 description: 'Aceita multipart/form-data com campo "file". PNG/JPG/WebP, max 5MB. Redimensiona para 1440×600px.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['id'],
@@ -311,7 +301,6 @@ properties: { imageUrl: { type: 'string' } } },
             },
         },
         async (req: FastifyRequest, res: FastifyReply) => {
-            if (!(await requirePermission(req, res, 'UPDATE_BANNER', getAdminPermissions))) return;
             return uploadCtrl.handle(req as Parameters<typeof uploadCtrl.handle>[0], res);
         },
     );

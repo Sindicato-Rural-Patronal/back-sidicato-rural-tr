@@ -10,9 +10,7 @@ import type {
     DeleteGalleryPhotoUseCase,
     ReorderGalleryPhotosUseCase,
 } from '../../usecase/gallery-usecases.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import type { Permission } from '../../generated/prisma/enums.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
 
 type IdParams = { id: string };
 type PhotoParams = {
@@ -36,12 +34,7 @@ export type GalleryUseCases = {
 export class GalleryController {
     constructor(
         private readonly uc: GalleryUseCases,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
-
-    private can(req: FastifyRequest, reply: FastifyReply, perm: Permission) {
-        return requirePermission(req, reply, perm, this.getAdminPermissions);
-    }
 
     private fail(reply: FastifyReply, error: Error) {
         return reply.status(errorToStatus(error)).send({ error: error.message });
@@ -52,40 +45,34 @@ export class GalleryController {
     }
 
     async listAdmin(req: FastifyRequest, reply: FastifyReply) {
-        if ((await this.can(req, reply, 'READ_BANNER')) === null) return;
         return reply.send(await this.uc.list.execute(false));
     }
 
     async create(req: FastifyRequest, reply: FastifyReply) {
-        if ((await this.can(req, reply, 'CREATE_BANNER')) === null) return;
         const r = await this.uc.create.execute(req.body);
         if (r.error) return this.fail(reply, r.error);
         return reply.status(201).send(r.album);
     }
 
     async update(req: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await this.can(req, reply, 'UPDATE_BANNER')) === null) return;
         const r = await this.uc.update.execute(req.params.id, req.body);
         if (r.error) return this.fail(reply, r.error);
         return reply.send(r.album);
     }
 
     async remove(req: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await this.can(req, reply, 'DELETE_BANNER')) === null) return;
         const r = await this.uc.remove.execute(req.params.id);
         if (r.error) return this.fail(reply, r.error);
         return reply.status(204).send();
     }
 
     async reorder(req: FastifyRequest, reply: FastifyReply) {
-        if ((await this.can(req, reply, 'UPDATE_BANNER')) === null) return;
         const r = await this.uc.reorder.execute(req.body);
         if (r.error) return this.fail(reply, r.error);
         return reply.send({ message: 'ok' });
     }
 
     async uploadPhoto(req: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await this.can(req, reply, 'UPDATE_BANNER')) === null) return;
         const data = await req.file();
         if (!data) return reply.status(400).send({ error: 'Nenhum arquivo enviado.' });
 
@@ -99,21 +86,18 @@ export class GalleryController {
     }
 
     async updatePhoto(req: FastifyRequest<{ Params: PhotoParams }>, reply: FastifyReply) {
-        if ((await this.can(req, reply, 'UPDATE_BANNER')) === null) return;
         const r = await this.uc.updatePhoto.execute(req.params.id, req.params.photoId, req.body);
         if (r.error) return this.fail(reply, r.error);
         return reply.send(r.photo);
     }
 
     async removePhoto(req: FastifyRequest<{ Params: PhotoParams }>, reply: FastifyReply) {
-        if ((await this.can(req, reply, 'UPDATE_BANNER')) === null) return;
         const r = await this.uc.removePhoto.execute(req.params.id, req.params.photoId);
         if (r.error) return this.fail(reply, r.error);
         return reply.status(204).send();
     }
 
     async reorderPhotos(req: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await this.can(req, reply, 'UPDATE_BANNER')) === null) return;
         const r = await this.uc.reorderPhotos.execute(req.params.id, req.body);
         if (r.error) return this.fail(reply, r.error);
         return reply.send({ message: 'ok' });

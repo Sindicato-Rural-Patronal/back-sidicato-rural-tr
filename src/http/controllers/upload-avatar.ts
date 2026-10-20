@@ -1,13 +1,12 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { UploadAvatarUseCase } from '../../usecase/upload-avatar.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import type { UserAdminRepository } from '../../ports/external/user-admin-repository.js';
-import { requirePermission, requireAuth, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
+import { adminOf } from '../lib/route-auth.js';
 
 export class UploadAvatarController {
     constructor(
         private readonly uploadAvatarUseCase: UploadAvatarUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
         private readonly userAdminRepository: UserAdminRepository,
     ) {}
 
@@ -30,7 +29,6 @@ originalName: data.filename };
     }
 
     async handle(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'UPDATE_USER', this.getAdminPermissions)) === null) return;
         const parsed = await this.readFile(request, reply);
         if (!parsed) return;
 
@@ -42,11 +40,9 @@ originalName: data.filename };
         return reply.status(200).send({ avatarUrl: response.avatarUrl });
     }
 
-    // Self-service: o admin logado troca a PRÓPRIA foto (auth-only).
+    // Self-service: o admin logado troca a PRÓPRIA foto (`loggedIn()` na rota).
     async handleMe(request: FastifyRequest, reply: FastifyReply) {
-        const adminId = await requireAuth(request, reply, this.getAdminPermissions);
-        if (adminId === null) return;
-        const admin = await this.userAdminRepository.findById(adminId);
+        const admin = await this.userAdminRepository.findById(adminOf(request).id);
         if (!admin) return reply.status(404).send({ error: 'Admin não encontrado' });
         const parsed = await this.readFile(request, reply);
         if (!parsed) return;

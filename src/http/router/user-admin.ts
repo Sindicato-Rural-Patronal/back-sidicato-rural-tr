@@ -17,52 +17,44 @@ import { UpdateMeController } from '../controllers/update-me.js';
 import { CURRENT_PASSWORD_REQUIRED, CURRENT_PASSWORD_WRONG, UpdateMeUseCase } from '../../usecase/update-me.js';
 import { AdminPreferencesController } from '../controllers/admin-preferences.js';
 import { MAX_PREFS_BYTES, UpdateAdminPreferencesUseCase } from '../../usecase/admin-preferences.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
+import { loggedIn, requires } from '../lib/route-auth.js';
 
 export async function userAdminRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userAdminRepository = createUserAdminAdapter(prisma);
     const userDataRepository = createUserDataAdapter(prisma);
     const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const createUserAdminController = new CreateUserAdminController(
         new CreateUserAdminUseCase(userAdminRepository, userDataRepository, ruleRepository),
-        getAdminPermissions,
     );
     const listUserAdminsController = new ListUserAdminsController(
         new ListUserAdminsUseCase(userAdminRepository),
-        getAdminPermissions,
     );
     const updateUserAdminController = new UpdateUserAdminController(
         new UpdateUserAdminUseCase(userAdminRepository, ruleRepository),
-        getAdminPermissions,
     );
     const deleteUserAdminController = new DeleteUserAdminController(
         new DeleteUserAdminUseCase(userAdminRepository, ruleRepository),
-        getAdminPermissions,
     );
     const getCurrentAdminController = new GetCurrentAdminController(
         new GetCurrentAdminUseCase(userAdminRepository, ruleRepository, userDataRepository),
-        getAdminPermissions,
     );
     const updateMeController = new UpdateMeController(
         new UpdateMeUseCase(userAdminRepository, userDataRepository),
-        getAdminPermissions,
     );
     const adminPreferencesController = new AdminPreferencesController(
         new UpdateAdminPreferencesUseCase(userAdminRepository),
-        getAdminPermissions,
     );
 
     fastify.get(
         '/admin/me',
         {
+            config: { auth: loggedIn() },
             schema: {
                 tags: ['Admin — Auth'],
                 summary: 'Get current admin profile and permissions',
                 description: `Returns the authenticated admin's profile and full permissions list. Use this to conditionally render UI elements based on what the current user can do.`,
-                security: [{ bearerAuth: [] }],
                 response: {
                     200: {
                         type: 'object',
@@ -97,11 +89,11 @@ items: { type: 'string' } },
     fastify.patch(
         '/admin/me/preferences',
         {
+            config: { auth: loggedIn() },
             schema: {
                 tags: ['Admin — Auth'],
                 summary: 'Salvar as preferências do Painel Geral deste admin',
                 description: `Self-service: qualquer admin autenticado grava as **próprias** preferências (o id vem do token). O conteúdo de \`dashboardPrefs\` é livre — o painel decide o que guarda (cartões escondidos, ordem, filtro do calendário…) —, mas precisa ser um objeto de no máximo ${MAX_PREFS_BYTES} bytes em JSON; o objeto enviado substitui o anterior inteiro. Vem de volta em \`GET /admin/me\`.`,
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['dashboardPrefs'],
@@ -131,7 +123,8 @@ additionalProperties: true },
         {
             // Cada pedido com senha confere a senha atual: limite como o do login,
             // para um token vazado não servir de força bruta da senha.
-            config: { rateLimit: { max: 10,
+            config: { auth: loggedIn(),
+rateLimit: { max: 10,
 timeWindow: '5 minutes' } },
             schema: {
                 tags: ['Admin — Auth'],
@@ -144,7 +137,6 @@ timeWindow: '5 minutes' } },
 - com erro, nada do pedido é gravado (nem nome nem usuário).
 
 Nome e usuário sozinhos não pedem a senha atual. Limite de 10 pedidos por 5 minutos por IP (429).`,
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     properties: {
@@ -172,10 +164,10 @@ properties: { message: { type: 'string' } } },
     fastify.get(
         '/admin/users/admins',
         {
+            config: { auth: requires('READ_USER_ADMIN') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'List admin users (internal)',
-                security: [{ bearerAuth: [] }],
                 querystring: {
                     type: 'object',
                     properties: {
@@ -236,6 +228,7 @@ nullable: true },
     fastify.post(
         '/admin/users',
         {
+            config: { auth: requires('CREATE_USER_ADMIN') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'Create admin user',
@@ -248,7 +241,6 @@ nullable: true },
 - \`userRole\` is the ID of an existing \`Rule\` — that Rule defines what permissions the new admin will have
 - To get available Rule IDs, use \`GET /admin/rules\`
 - Passwords are stored as bcrypt hash — never in plain text`,
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['username', 'password', 'userDataId', 'userRole'],
@@ -302,10 +294,10 @@ example: '550e8400-e29b-41d4-a716-446655440000' },
     fastify.patch(
         '/admin/users/:id',
         {
+            config: { auth: requires('UPDATE_USER_ADMIN') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'Update admin user',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -344,10 +336,10 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/admin/users/:id',
         {
+            config: { auth: requires('DELETE_USER_ADMIN') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'Delete admin user',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },

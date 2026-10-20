@@ -21,7 +21,6 @@ type AuditStash = {
 
 const stash = (request: FastifyRequest) => request as unknown as AuditStash;
 const cleanPath = (request: FastifyRequest) => (request.url ?? '').split('?')[0];
-const bearer = (request: FastifyRequest) => request.headers['authorization']?.replace('Bearer ', '') ?? '';
 const MUTATIONS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 
 /**
@@ -71,15 +70,16 @@ export function registerAuditHooks(app: FastifyInstance, prisma: PrismaClient) {
         const wantsLabel = shouldLookupTargetLabel(method, path);
         const wantsSnapshot = shouldSnapshot(method, path);
         if (!wantsLabel && !wantsSnapshot) return;
-        // Sem token válido a rota vai recusar: não consulta o banco à toa.
-        const decoded = decodeToken(bearer(request));
-        if (!decoded) return;
+        // Quem chamou já foi conferido pela autorização da rota (onRequest,
+        // http/lib/route-auth.ts). Sem admin (rota pública) não há o que ler.
+        const admin = request.admin;
+        if (!admin) return;
         const s = stash(request);
-        s._auditActorId = decoded.userId;
+        s._auditActorId = admin.id;
         try {
             const [label, before] = await Promise.all([
                 wantsLabel ? lookupTargetLabel(prisma, path) : null,
-                wantsSnapshot ? snapshotTarget(prisma, method, path, decoded.userId) : null,
+                wantsSnapshot ? snapshotTarget(prisma, method, path, admin.id) : null,
             ]);
             s._auditLabel = label;
             s._auditBefore = before;
@@ -142,7 +142,7 @@ data: { location } });
             }
 
             if (!MUTATIONS.has(method) || reply.statusCode >= 400 || skipAudit(path)) return;
-            const actorId = s._auditActorId ?? decodeToken(bearer(request))?.userId ?? null;
+            const actorId = s._auditActorId ?? request.admin?.id ?? null;
             const targetLabel = s._auditLabel ?? bodyLabel(request.body);
             const ctx = requestContext(request);
             const [location, changes] = await Promise.all([

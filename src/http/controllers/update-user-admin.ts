@@ -1,12 +1,11 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { UpdateUserAdminUseCase } from '../../usecase/update-user-admin.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
+import { adminOf } from '../lib/route-auth.js';
 
 export class UpdateUserAdminController {
     constructor(
         private readonly useCase: UpdateUserAdminUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(
@@ -20,14 +19,7 @@ export class UpdateUserAdminController {
         }>,
         reply: FastifyReply,
     ) {
-        const actorId = await requirePermission(
-            request,
-            reply,
-            'UPDATE_USER_ADMIN',
-            this.getAdminPermissions,
-        );
-        if (actorId === null) return;
-        const actorPerms = (await this.getAdminPermissions.execute(actorId)) ?? [];
+        const actorPerms = [...adminOf(request).permissions];
         const { id } = request.params;
         const body = request.body;
         const result = await this.useCase.execute({ ...body,

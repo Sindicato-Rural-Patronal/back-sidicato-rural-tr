@@ -2,44 +2,36 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createUserDataAdapter } from '../../adapter/database/user-data.js';
 import { createUserRelationAdapter } from '../../adapter/database/user-relation-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { AddUserRelationUseCase } from '../../usecase/add-user-relation.js';
 import { DeleteUserRelationUseCase } from '../../usecase/delete-user-relation.js';
 import { ListUserRelationsUseCase } from '../../usecase/list-user-relations.js';
 import { AddUserRelationController } from '../controllers/add-user-relation.js';
 import { DeleteUserRelationController } from '../controllers/delete-user-relation.js';
 import { ListUserRelationsController } from '../controllers/list-user-relations.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
+import { requires } from '../lib/route-auth.js';
 
 export async function userRelationRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userDataRepository = createUserDataAdapter(prisma);
     const userRelationRepository = createUserRelationAdapter(prisma);
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const listUserRelationsController = new ListUserRelationsController(
         new ListUserRelationsUseCase(userRelationRepository),
-        getAdminPermissions,
     );
     const addUserRelationController = new AddUserRelationController(
         new AddUserRelationUseCase(userDataRepository, userRelationRepository),
-        getAdminPermissions,
     );
     const deleteUserRelationController = new DeleteUserRelationController(
         new DeleteUserRelationUseCase(userRelationRepository),
-        getAdminPermissions,
     );
 
     fastify.get(
         '/admin/users/:id/relations',
         {
+            config: { auth: requires('READ_USER') },
             schema: {
                 tags: ['Admin — Relations'],
                 summary: 'List relations of a worker',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -81,11 +73,11 @@ nullable: true },
     fastify.post(
         '/admin/users/:id/relations',
         {
+            config: { auth: requires('UPDATE_USER') },
             schema: {
                 tags: ['Admin — Relations'],
                 summary: 'Link two worker records as related',
                 description: 'Creates a bidirectional relation between two workers. The inverse relation (B→A) is created automatically with no label.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -121,11 +113,11 @@ properties: { id: { type: 'string' } } },
     fastify.delete(
         '/admin/users/:id/relations/:relationId',
         {
+            config: { auth: requires('UPDATE_USER') },
             schema: {
                 tags: ['Admin — Relations'],
                 summary: 'Remove a relation between two workers',
                 description: 'Deletes the relation and its inverse automatically.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: {

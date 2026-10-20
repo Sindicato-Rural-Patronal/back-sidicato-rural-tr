@@ -114,7 +114,6 @@ const SPECIAL: Record<string, Sentence> = {
     'POST /courses/:id/banner': fixed('Trocou a imagem do curso'),
     'POST /courses/:id/gallery': fixed('Adicionou foto ao curso'),
     'DELETE /courses/:id/gallery/:id': fixed('Excluiu foto do curso'),
-    'POST /courses/:id/register': l => (l ? `Inscreveu ${q(l)} em um curso` : 'Fez uma inscrição em curso'),
     'POST /courses/:id/register-by-cpf': l => (l ? `Inscreveu ${q(l)} em um curso` : 'Fez uma inscrição em curso'),
     'POST /courses/:id/register-full': l => (l ? `Inscreveu ${q(l)} em um curso` : 'Fez uma inscrição em curso'),
     'DELETE /admin/registrations/:id': fixed('Cancelou uma inscrição', 'Cancelou a inscrição de'),

@@ -68,6 +68,7 @@ describe('auditoria: rotas fora da trilha', () => {
         expect(skipAudit('/invites/abc/accept')).toBe(true);
         expect(skipAudit('/admin/export/people')).toBe(true);
         expect(skipAudit('/admin/notifications/read')).toBe(true);
+        expect(skipAudit('/users/lookup-cpf')).toBe(true);
         expect(skipAudit('/admin/banners')).toBe(false);
     });
 
@@ -76,7 +77,7 @@ describe('auditoria: rotas fora da trilha', () => {
         expect(shouldLookupTargetLabel('PATCH', '/admin/site-settings')).toBe(true);
         expect(shouldLookupTargetLabel('POST', '/admin/courses/' + ID + '/start')).toBe(true);
         expect(shouldLookupTargetLabel('POST', '/admin/banners')).toBe(false);
-        expect(shouldLookupTargetLabel('POST', '/courses/' + ID + '/register')).toBe(false);
+        expect(shouldLookupTargetLabel('POST', '/courses/' + ID + '/register-full')).toBe(false);
     });
 });
 

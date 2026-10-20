@@ -1,19 +1,16 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CreateRuleUseCase } from '../../usecase/create-rule.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import type { Permission } from '../../generated/prisma/enums.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
+import { adminOf } from '../lib/route-auth.js';
 
 export class CreateRuleController {
     constructor(
         private readonly createRuleUseCase: CreateRuleUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(request: FastifyRequest, reply: FastifyReply) {
-        const actorId = await requirePermission(request, reply, 'CREATE_RULE', this.getAdminPermissions);
-        if (actorId === null) return;
-        const actorPerms = (await this.getAdminPermissions.execute(actorId)) ?? [];
+        const actorPerms = [...adminOf(request).permissions];
         const {
             name,
             permissions: perms,

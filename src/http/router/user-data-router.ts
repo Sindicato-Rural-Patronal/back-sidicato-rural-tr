@@ -11,7 +11,6 @@ import { UpdateUserController } from '../controllers/update-user.js';
 import { UpdateUserDataUseCase } from '../../usecase/update-user-data.js';
 import { DeleteUserController } from '../controllers/delete-user.js';
 import { DeleteUserDataUseCase } from '../../usecase/delete-user-data.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { GetUserDetailController } from '../controllers/get-user-detail.js';
 import { GetUserDetailUseCase } from '../../usecase/get-user-detail.js';
 import { UploadAvatarController } from '../controllers/upload-avatar.js';
@@ -20,48 +19,42 @@ import { createStorageAdapter } from '../../adapter/storage/factory.js';
 import { createInstructorAdapter } from '../../adapter/database/instructor-adapter.js';
 import { UpdateInstructorUseCase } from '../../usecase/update-instructor.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
+import { loggedIn, requires } from '../lib/route-auth.js';
 
 export async function userDataRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const userRepository = createUserDataAdapter(prisma);
     const userAdminRepository = createUserAdminAdapter(prisma);
     const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
     const instructorRepository = createInstructorAdapter(prisma);
 
     const createUserController = new CreateUserController(
         new CreateUserUseCase(userRepository),
-        getAdminPermissions,
     );
     const listUsersController = new ListUsersController(
         new ListUsersUseCase(userRepository),
-        getAdminPermissions,
     );
     const updateUserController = new UpdateUserController(
         new UpdateUserDataUseCase(userRepository),
-        getAdminPermissions,
         new UpdateInstructorUseCase(instructorRepository),
     );
     const deleteUserController = new DeleteUserController(
         new DeleteUserDataUseCase(userRepository, userAdminRepository, ruleRepository),
-        getAdminPermissions,
     );
     const getUserDetailController = new GetUserDetailController(
         new GetUserDetailUseCase(userRepository),
-        getAdminPermissions,
     );
     const uploadAvatarController = new UploadAvatarController(
         new UploadAvatarUseCase(createStorageAdapter(), userRepository),
-        getAdminPermissions,
         userAdminRepository,
     );
 
     fastify.get(
         '/admin/users',
         {
+            config: { auth: requires('READ_USER') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'List workers (internal)',
-                security: [{ bearerAuth: [] }],
                 querystring: {
                     type: 'object',
                     properties: {
@@ -132,10 +125,10 @@ nullable: true },
     fastify.get(
         '/admin/users/:id',
         {
+            config: { auth: requires('READ_USER') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'Get worker detail with relations and properties',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -335,10 +328,10 @@ nullable: true },
     fastify.post(
         '/users',
         {
+            config: { auth: requires('CREATE_USER') },
             schema: {
                 tags: ['Users'],
                 summary: 'Create worker user',
-                security: [{ bearerAuth: [] }],
                 description: `Creates a new UserData (rural worker). Requires \`CREATE_USER\` — it is the admin panel's form; public course registration has its own routes.
 
 **Business rules:**
@@ -399,10 +392,10 @@ format: 'date-time' },
     fastify.patch(
         '/users/:id',
         {
+            config: { auth: requires('UPDATE_USER') },
             schema: {
                 tags: ['Users'],
                 summary: 'Update worker user',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -510,13 +503,13 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/users/:id',
         {
+            config: { auth: requires('DELETE_USER') },
             schema: {
                 tags: ['Users'],
                 summary: 'Delete worker user',
                 description: `Exclusão lógica. Leva junto login, convite não usado, inscrições ativas, escala de instrutor, Unimed, propriedades, relações, contato público e vínculos com empresas. Requer \`DELETE_USER\`.
 
 Se a pessoa tem login no painel, valem também as travas de excluir administrador: exige \`DELETE_USER_ADMIN\` (403), não a si mesmo (400), não quem tem permissões além das suas (403) e nunca o último administrador ativo (400).`,
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     properties: { id: { type: 'string' } },
@@ -541,6 +534,7 @@ Se a pessoa tem login no painel, valem também as travas de excluir administrado
     fastify.post(
         '/admin/users/:id/avatar',
         {
+            config: { auth: requires('UPDATE_USER') },
             schema: {
                 tags: ['Admin — Users'],
                 summary: 'Upload avatar for a worker',
@@ -550,7 +544,6 @@ Se a pessoa tem login no painel, valem também as travas de excluir administrado
 - Send as \`multipart/form-data\` with the file in the \`file\` field
 - The URL is saved to \`UserData.avatar\` and returned in \`avatarUrl\`
 - Uploading a new avatar overwrites the previous URL (old file remains in storage)`,
-                security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
                 params: {
                     type: 'object',
@@ -577,11 +570,11 @@ properties: { avatarUrl: { type: 'string' } } },
     fastify.post(
         '/admin/me/avatar',
         {
+            config: { auth: loggedIn() },
             schema: {
                 tags: ['Admin — Auth'],
                 summary: 'Upload own avatar (self-service)',
                 description: 'O admin logado troca a própria foto. Auth-only, sem permissão de gestão. multipart/form-data no campo `file`.',
-                security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
                 response: {
                     200: { type: 'object',

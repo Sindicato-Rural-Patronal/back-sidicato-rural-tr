@@ -9,8 +9,7 @@ import type {
     DeleteConvenioUseCase,
 } from '../../usecase/convenio-usecases.js';
 import type { UploadConvenioLogoUseCase } from '../../usecase/upload-convenio-logo.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
 
 type IdParams = { id: string };
 type SlugParams = { slug: string };
@@ -29,7 +28,6 @@ export type ConvenioUseCases = {
 export class ConvenioController {
     constructor(
         private readonly uc: ConvenioUseCases,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     private fail(reply: FastifyReply, error: Error) {
@@ -49,40 +47,34 @@ export class ConvenioController {
 
     // ── Admin ────────────────────────────────────────────────────────────────
     async list(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_CONVENIO', this.getAdminPermissions)) === null) return;
         return reply.send(await this.uc.list.execute());
     }
 
     async get(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'READ_CONVENIO', this.getAdminPermissions)) === null) return;
         const r = await this.uc.get.execute(request.params.id);
         if (r.error) return this.fail(reply, r.error);
         return reply.send(r.convenio);
     }
 
     async create(request: FastifyRequest, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'CREATE_CONVENIO', this.getAdminPermissions)) === null) return;
         const r = await this.uc.create.execute(request.body);
         if (r.error) return this.fail(reply, r.error);
         return reply.status(201).send(r.convenio);
     }
 
     async update(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'UPDATE_CONVENIO', this.getAdminPermissions)) === null) return;
         const r = await this.uc.update.execute(request.params.id, request.body);
         if (r.error) return this.fail(reply, r.error);
         return reply.send(r.convenio);
     }
 
     async remove(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'DELETE_CONVENIO', this.getAdminPermissions)) === null) return;
         const r = await this.uc.remove.execute(request.params.id);
         if (r.error) return this.fail(reply, r.error);
         return reply.status(204).send();
     }
 
     async uploadLogo(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
-        if ((await requirePermission(request, reply, 'UPDATE_CONVENIO', this.getAdminPermissions)) === null) return;
         const data = await request.file();
         if (!data) return reply.status(400).send({ error: 'Nenhum arquivo enviado.' });
 

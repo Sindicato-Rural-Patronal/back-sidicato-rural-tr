@@ -1,7 +1,5 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CreateNewsUseCase } from '../../usecase/create-news.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission } from '../lib/require-permission.js';
 
 type CreateNewsBody = {
     title: string;
@@ -14,15 +12,9 @@ type CreateNewsBody = {
 export class CreateNewsController {
     constructor(
         private readonly createNewsUseCase: CreateNewsUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(request: FastifyRequest, reply: FastifyReply) {
-        if (
-            (await requirePermission(request, reply, 'CREATE_NEWS', this.getAdminPermissions)) ===
-            null
-        )
-            return;
         const body = request.body as CreateNewsBody;
         const response = await this.createNewsUseCase.execute({
             ...body,

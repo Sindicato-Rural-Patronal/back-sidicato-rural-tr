@@ -239,11 +239,11 @@ description: 'NOTA SEM CAIXA' });
         expect(depois.byMonth).toEqual(antes.byMonth);
     });
 
-    // BUG (SR-017): o saldo por caixa agrupa por (caixa, tipo) e soma
-    // `total * (tipo === 'IN' ? 1 : -1)`, então o grupo de tipo null SUBTRAI.
-    // Uma nota de empenho de R$ 99,99 na CAIXA A tira R$ 99,99 do saldo dela,
-    // e a soma das caixas deixa de bater com o saldo histórico (que só soma
-    // IN e OUT). Quando a correção entrar, troque `it.fails` por `it`.
+    // Corrigido (SR-017). O saldo por caixa agrupava por (caixa, tipo) e somava
+    // `total * (tipo === 'IN' ? 1 : -1)`, então o grupo de tipo null SUBTRAÍA:
+    // uma nota de empenho de R$ 99,99 na CAIXA A tirava R$ 99,99 do saldo dela,
+    // e a soma das caixas deixava de bater com o saldo histórico (que só soma
+    // IN e OUT). Este teste guarda contra a volta.
     it('não mexe no saldo de nenhuma caixa', async () => {
         const depois = await summary();
         expect(saldos(depois)).toEqual(saldos(antes));
@@ -252,9 +252,9 @@ description: 'NOTA SEM CAIXA' });
 });
 
 describe('parâmetros', () => {
-    // BUG (SR-017): o use case faz `querySchema.parse(query)` sem tratar o erro;
-    // data que não é data estoura ZodError e a rota responde 500 em vez de 400.
-    // Quando a correção entrar, troque `it.fails` por `it`.
+    // Corrigido (SR-017). O use case fazia `querySchema.parse(query)` sem tratar o
+    // erro; data que não era data estourava ZodError e a rota respondia 500 em
+    // vez de 400. Este teste guarda contra a volta.
     it('data inválida → 400', async () => {
         const res = await app.inject({ method: 'GET',
 url: '/admin/finance/summary?from=ontem',

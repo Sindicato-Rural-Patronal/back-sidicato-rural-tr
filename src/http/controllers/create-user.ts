@@ -1,18 +1,15 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CreateUserUseCase } from '../../usecase/create-user-data.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { errorToStatus, requirePermission } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
 
 export class CreateUserController {
     constructor(
         private createUserUseCase: CreateUserUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(request: FastifyRequest, reply: FastifyReply) {
         // Só o painel cadastra pessoa por aqui (a inscrição pública tem rotas
         // próprias). Aberta, deixava qualquer um "ocupar" o CPF de outra pessoa.
-        if ((await requirePermission(request, reply, 'CREATE_USER', this.getAdminPermissions)) === null) return;
         const { name, email, phone, cpf } = request.body as {
             name: string;
             email?: string | null;

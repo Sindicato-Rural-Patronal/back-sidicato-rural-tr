@@ -321,8 +321,6 @@ url: '/courses' },
         { method: 'GET' as const,
 url: '/news' },
         { method: 'GET' as const,
-url: '/rooms' },
-        { method: 'GET' as const,
 url: '/partners' },
         { method: 'GET' as const,
 url: '/banners' },
@@ -335,4 +333,31 @@ url });
             expect(res.statusCode).toBe(200);
         });
     }
+});
+
+// Fechadas pela decisão 001 (SR-023): só o painel as usa.
+describe('Rotas que deixaram de ser públicas', () => {
+    it('GET /rooms: sem token → 401; sem READ_COURSE → 403', async () => {
+        expect((await app.inject({ method: 'GET',
+url: '/rooms' })).statusCode).toBe(401);
+        const res = await app.inject({ method: 'GET',
+url: '/rooms',
+headers: bearer(limitedToken) });
+        expect(res.statusCode).toBe(403);
+    });
+
+    it('GET /address/cep/:cep: sem token → 401', async () => {
+        const res = await app.inject({ method: 'GET',
+url: '/address/cep/85990000' });
+        expect(res.statusCode).toBe(401);
+    });
+
+    it('POST /courses/:id/register não existe mais', async () => {
+        const res = await app.inject({ method: 'POST',
+url: '/courses/00000000-0000-0000-0000-000000000000/register',
+payload: { name: 'X',
+phone: '44999990000',
+cpf: '52998224725' } });
+        expect(res.statusCode).toBe(404);
+    });
 });

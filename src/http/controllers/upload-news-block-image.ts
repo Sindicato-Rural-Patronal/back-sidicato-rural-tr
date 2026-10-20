@@ -1,20 +1,13 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { UploadNewsBlockImageUseCase } from '../../usecase/upload-news-block-image.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { errorToStatus, requirePermission } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
 
 export class UploadNewsBlockImageController {
     constructor(
         private readonly useCase: UploadNewsBlockImageUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(request: FastifyRequest<{ Params: { newsId: string } }>, reply: FastifyReply) {
-        if (
-            (await requirePermission(request, reply, 'UPDATE_NEWS', this.getAdminPermissions)) ===
-            null
-        )
-            return;
         const { newsId } = request.params;
         const data = await request.file();
         if (!data) return reply.status(400).send({ error: 'Nenhum arquivo enviado.' });

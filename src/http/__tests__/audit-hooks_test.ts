@@ -48,6 +48,17 @@ update: vi.fn().mockResolvedValue({}) },
     };
     app = fastify();
     await app.register(rateLimit, { global: false });
+    // Faz o papel da autorização da rota (http/lib/route-auth.ts): quem tem
+    // token válido chega aos hooks da auditoria com request.admin preenchido.
+    app.decorateRequest('admin', null);
+    app.addHook('onRequest', async req => {
+        const raw = req.headers.authorization?.replace('Bearer ', '');
+        if (!raw) return;
+        const { userId } = jwt.verify(raw, process.env.JWT_SECRET!) as { userId: string };
+        req.admin = { id: userId,
+permissions: [],
+has: () => false };
+    });
     // O dublê só tem as tabelas que os hooks tocam.
     registerAuditHooks(app, prisma as unknown as PrismaClient);
 

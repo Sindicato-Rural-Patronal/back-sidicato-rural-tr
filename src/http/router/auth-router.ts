@@ -6,6 +6,7 @@ import { LoginUserAdminUseCase } from '../../usecase/login-user-admin.js';
 import { RefreshAdminTokenUseCase } from '../../usecase/refresh-admin-token.js';
 import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
 import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
+import { loggedIn, publicRoute } from '../lib/route-auth.js';
 
 // Limite estrito contra brute-force de senha (bem abaixo do global). A renovação
 // usa o mesmo: o painel renova no máximo algumas vezes por turno.
@@ -47,7 +48,8 @@ export async function authRouter(fastify: FastifyInstance, prisma: PrismaClient)
         {
             // Conta a tentativa depois de ler o corpo (preValidation, não onRequest):
             // o bloqueio (429) entra na auditoria com o usuário digitado.
-            config: { rateLimit: { ...authRateLimit.rateLimit,
+            config: { auth: publicRoute(),
+rateLimit: { ...authRateLimit.rateLimit,
 hook: 'preValidation' as const } },
             bodyLimit: 2048,
             schema: {
@@ -80,7 +82,8 @@ hook: 'preValidation' as const } },
     fastify.post(
         '/auth/refresh',
         {
-            config: authRateLimit,
+            config: { ...authRateLimit,
+auth: loggedIn() },
             schema: {
                 tags: ['Auth'],
                 summary: 'Renew admin token',
@@ -90,7 +93,6 @@ hook: 'preValidation' as const } },
 - Send the current token in the \`Authorization: Bearer <token>\` header (no body)
 - An expired or invalid token, or an admin that was removed (or has no rule), gets \`401\` — a new login is required
 - The admin panel calls this automatically while in use, so an active session does not expire`,
-                security: [{ bearerAuth: [] }],
                 response: {
                     200: tokenResponse('Token renewed'),
                     401: errorBody('Invalid or expired token, or admin not found'),

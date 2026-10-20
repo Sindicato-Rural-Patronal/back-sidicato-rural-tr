@@ -50,6 +50,7 @@ export function skipAudit(path: string): boolean {
     if (path.startsWith('/invites/')) return true; // não persistir o token de convite
     if (path.startsWith('/admin/export/')) return true; // a exportação registra a própria linha ("Exportou")
     if (path === '/admin/notifications/read') return true; // marcar o sino como lido não é ação sobre dados
+    if (path === '/users/lookup-cpf') return true; // consulta pública, não grava nada (é POST só para o CPF sair da URL)
     return false;
 }
 

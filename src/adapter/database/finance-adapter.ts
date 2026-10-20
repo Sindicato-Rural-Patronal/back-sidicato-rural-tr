@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { semRegistro } from './prisma-errors.js';
+import { searchKey } from './list-filters.js';
 import type { FinancialCategoryModel } from '../../generated/prisma/models/FinancialCategory.js';
 import type { FinancialTransactionModel } from '../../generated/prisma/models/FinancialTransaction.js';
 import type {
@@ -126,7 +127,7 @@ deletedAt: new Date() },
  items: FinanceTransactionWithCategory[];
 total: number 
 }> {
-        const where = this.buildWhere(filters);
+        const where = await this.buildWhere(filters);
         const [items, total] = await Promise.all([
             this.prisma.financialTransaction.findMany({
                 where,
@@ -146,11 +147,11 @@ orderBy: { createdAt: 'asc' } },
 total };
     }
 
-    listTransactionsForExport(
+    async listTransactionsForExport(
         filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>,
     ): Promise<FinanceTransactionWithCategory[]> {
         return this.prisma.financialTransaction.findMany({
-            where: this.buildWhere(filters),
+            where: await this.buildWhere(filters),
             include: {
                 category: true,
                 account: true,
@@ -164,7 +165,7 @@ orderBy: { createdAt: 'asc' } },
     async sumTransactions(
         filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>,
     ): Promise<FinanceTransactionSum[]> {
-        const where = this.buildWhere(filters);
+        const where = await this.buildWhere(filters);
         // Soma por tipo só dos lançamentos comuns: transferência entre caixas não
         // entra em receita/despesa (mesma regra do dashboard).
         const plain = await this.prisma.financialTransaction.groupBy({
@@ -422,7 +423,7 @@ outCents: 0 };
         };
     }
 
-    private buildWhere(filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>) {
+    private async buildWhere(filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>) {
         const where: Record<string, unknown> = { isDeleted: false };
         if (filters.type) where.type = filters.type;
         if (filters.categoryId) where.categoryId = filters.categoryId;
@@ -439,10 +440,29 @@ outCents: 0 };
 mode: 'insensitive' };
         }
         if (filters.search) {
-            where.description = { contains: filters.search,
-mode: 'insensitive' };
+            // Descrição, ou o nome do fornecedor da Nota de Empenho (razão social e
+            // nome fantasia). O nome fica num JSON, que o Prisma só filtra
+            // diferenciando maiúscula; por isso os ids vêm de SQL, comparando sem
+            // caixa e sem acento (a mesma função da busca de pessoas).
+            const byName = await this.idsByEmpenhoName(filters.search);
+            where.OR = [
+                { description: { contains: filters.search,
+mode: 'insensitive' } },
+                ...(byName.length ? [{ id: { in: byName } }] : []),
+            ];
         }
         return where;
+    }
+
+    private async idsByEmpenhoName(term: string): Promise<string[]> {
+        // % e _ digitados valem como texto; o escape padrão do LIKE no Postgres é a barra.
+        const like = `%${searchKey(term).replace(/[\\%_]/g, c => `\\${c}`)}%`;
+        const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+            SELECT "id" FROM "FinancialTransaction"
+            WHERE "isDeleted" = false
+              AND (immutable_unaccent_lower("empenho"->>'razaoSocial') LIKE ${like}
+                OR immutable_unaccent_lower("empenho"->>'nomeFantasia') LIKE ${like})`;
+        return rows.map(r => r.id);
     }
 
     // ── Recorrentes ─────────────────────────────────────────────────────────

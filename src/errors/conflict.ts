@@ -60,7 +60,7 @@ export class AdminAccountAlreadyExistsError extends ConflictError {
 
 export class CourseRegistrationAlreadyExistsError extends ConflictError {
     constructor() {
-        super('User already registered for this course');
+        super('Esta pessoa já está inscrita neste curso.');
         this.name = 'CourseRegistrationAlreadyExistsError';
     }
 }

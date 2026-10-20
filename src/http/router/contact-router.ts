@@ -1,10 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createContactMessageAdapter } from '../../adapter/database/contact-message-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { createNotificationPublisher } from '../../adapter/database/notification-adapter.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { CreateContactMessageUseCase } from '../../usecase/create-contact-message.js';
 import { ListContactMessagesUseCase } from '../../usecase/list-contact-messages.js';
 import { MarkContactMessageReadUseCase } from '../../usecase/mark-contact-message-read.js';
@@ -13,15 +10,12 @@ import { ListContactMessagesController } from '../controllers/list-contact-messa
 import { MarkContactMessageReadController } from '../controllers/mark-contact-message-read.js';
 import { DeleteContactMessageController } from '../controllers/delete-contact-message.js';
 import { DeleteContactMessageUseCase } from '../../usecase/delete-contact-message.js';
-import { requirePermission } from '../lib/require-permission.js';
 import { errorResponse, pagedResponse } from '../lib/swagger-schemas.js';
 import { publicFormRateLimit } from '../lib/public-rate-limit.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 export async function contactRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const repo = createContactMessageAdapter(prisma);
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const createController = new CreateContactMessageController(
         new CreateContactMessageUseCase(repo, createNotificationPublisher(prisma)),
@@ -33,7 +27,8 @@ export async function contactRouter(fastify: FastifyInstance, prisma: PrismaClie
     fastify.post(
         '/contacts/message',
         {
-            config: publicFormRateLimit,
+            config: { ...publicFormRateLimit,
+auth: publicRoute() },
             schema: {
                 tags: ['Contatos — Formulário'],
                 summary: 'Enviar mensagem de contato',
@@ -83,10 +78,10 @@ format: 'date-time' },
     fastify.get(
         '/admin/contacts/messages',
         {
+            config: { auth: requires('READ_CONTACT') },
             schema: {
                 tags: ['Contatos — Admin'],
                 summary: 'Listar mensagens de contato',
-                security: [{ bearerAuth: [] }],
                 querystring: {
                     type: 'object',
                     properties: {
@@ -126,8 +121,6 @@ format: 'date-time' },
             },
         },
         async (req: FastifyRequest, res: FastifyReply) => {
-            const userId = await requirePermission(req, res, 'READ_CONTACT', getAdminPermissions);
-            if (!userId) return;
             return listController.handle(req as Parameters<typeof listController.handle>[0], res);
         },
     );
@@ -135,11 +128,11 @@ format: 'date-time' },
     fastify.patch(
         '/admin/contacts/messages/:messageId',
         {
+            config: { auth: requires('UPDATE_CONTACT') },
             schema: {
                 tags: ['Contatos — Admin'],
                 summary: 'Marcar mensagem como lida',
                 description: 'Sempre marca como lida (o corpo é ignorado). Para voltar a "não lida" use `PATCH /admin/contacts/messages/:messageId/unread` — rota própria para a auditoria registrar qual das duas foi.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['messageId'],
@@ -159,8 +152,6 @@ properties: { message: { type: 'string' } } },
             },
         },
         async (req: FastifyRequest, res: FastifyReply) => {
-            const userId = await requirePermission(req, res, 'UPDATE_CONTACT', getAdminPermissions);
-            if (!userId) return;
             return markReadController.handle(req as Parameters<typeof markReadController.handle>[0], res);
         },
     );
@@ -168,10 +159,10 @@ properties: { message: { type: 'string' } } },
     fastify.patch(
         '/admin/contacts/messages/:messageId/unread',
         {
+            config: { auth: requires('UPDATE_CONTACT') },
             schema: {
                 tags: ['Contatos — Admin'],
                 summary: 'Marcar mensagem como não lida',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['messageId'],
@@ -187,8 +178,6 @@ properties: { message: { type: 'string' } } },
             },
         },
         async (req: FastifyRequest, res: FastifyReply) => {
-            const userId = await requirePermission(req, res, 'UPDATE_CONTACT', getAdminPermissions);
-            if (!userId) return;
             return markReadController.handle(req as Parameters<typeof markReadController.handle>[0], res, false);
         },
     );
@@ -196,10 +185,10 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/admin/contacts/messages/:messageId',
         {
+            config: { auth: requires('UPDATE_CONTACT') },
             schema: {
                 tags: ['Contatos — Admin'],
                 summary: 'Excluir mensagem de contato',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['messageId'],
@@ -214,8 +203,6 @@ properties: { message: { type: 'string' } } },
             },
         },
         async (req: FastifyRequest, res: FastifyReply) => {
-            const userId = await requirePermission(req, res, 'UPDATE_CONTACT', getAdminPermissions);
-            if (!userId) return;
             return deleteController.handle(req as Parameters<typeof deleteController.handle>[0], res);
         },
     );

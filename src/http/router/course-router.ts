@@ -13,8 +13,6 @@ import { ListCoursesController } from '../controllers/list-courses.js';
 import { ListCoursesUseCase } from '../../usecase/list-courses.js';
 import { ListAllCoursesController } from '../controllers/list-all-courses.js';
 import { ListAllCoursesUseCase } from '../../usecase/list-all-courses.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { UpdateCourseController } from '../controllers/update-course.js';
 import { UpdateCourseUseCase } from '../../usecase/update-course.js';
 import { DeleteCourseController } from '../controllers/delete-course.js';
@@ -25,12 +23,11 @@ import { DeleteCoursePhotoController } from '../controllers/delete-course-photo.
 import { DeleteCoursePhotoUseCase } from '../../usecase/delete-course-photo.js';
 import { GetAdminCourseDetailController } from '../controllers/get-admin-course-detail.js';
 import { GetAdminCourseDetailUseCase } from '../../usecase/get-admin-course-detail.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { CopyCourseExtrasUseCase } from '../../usecase/copy-course-extras.js';
 import { createInstructorAdapter } from '../../adapter/database/instructor-adapter.js';
 import { downloadImage } from '../../lib/download-image.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
-import { requirePermission } from '../lib/require-permission.js';
+import { publicRoute, requires } from '../lib/route-auth.js';
 
 const courseDetailProperties = {
     id: { type: 'string',
@@ -138,14 +135,10 @@ export async function courseRouter(fastify: FastifyInstance, prisma: PrismaClien
     const courseRepository = createCourseAdapter(prisma);
     const roomRepository = createRoomAdapter(prisma);
     const storage = createStorageAdapter();
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const uploadBannerUseCase = new UploadCourseBannerUseCase(storage, courseRepository);
     const createCourseController = new CreateCourseController(
         new CreateCourseUseCase(courseRepository, roomRepository),
-        getAdminPermissions,
         new CopyCourseExtrasUseCase(
             courseRepository,
             createInstructorAdapter(prisma),
@@ -155,7 +148,6 @@ export async function courseRouter(fastify: FastifyInstance, prisma: PrismaClien
     );
     const uploadBannerController = new UploadBannerCourseController(
         uploadBannerUseCase,
-        getAdminPermissions,
     );
     const getCourseDetailController = new GetCourseDetailController(
         new GetCourseDetailUseCase(courseRepository),
@@ -165,37 +157,31 @@ export async function courseRouter(fastify: FastifyInstance, prisma: PrismaClien
     );
     const listAllCoursesController = new ListAllCoursesController(
         new ListAllCoursesUseCase(courseRepository),
-        getAdminPermissions,
     );
     const updateCourseController = new UpdateCourseController(
         new UpdateCourseUseCase(courseRepository, roomRepository),
-        getAdminPermissions,
     );
     const deleteCourseController = new DeleteCourseController(
         new DeleteCourseUseCase(courseRepository),
-        getAdminPermissions,
     );
     const addCoursePhotoController = new AddCoursePhotoController(
         new AddCoursePhotoUseCase(courseRepository, storage),
-        getAdminPermissions,
     );
     const deleteCoursePhotoController = new DeleteCoursePhotoController(
         new DeleteCoursePhotoUseCase(courseRepository),
-        getAdminPermissions,
     );
     const getAdminCourseDetailController = new GetAdminCourseDetailController(
         new GetAdminCourseDetailUseCase(courseRepository),
-        getAdminPermissions,
     );
 
     fastify.get(
         '/admin/courses',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags: ['Admin — Courses'],
                 summary: 'List all courses (card listing)',
                 description: `Returns **all** courses with minimal card data. Requires JWT token with \`READ_COURSE\` permission. Use \`GET /admin/courses/:courseId\` for full detail.`,
-                security: [{ bearerAuth: [] }],
                 querystring: {
                     type: 'object',
                     properties: {
@@ -253,11 +239,11 @@ nullable: true },
     fastify.get(
         '/admin/courses/years',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags: ['Admin — Courses'],
                 summary: 'Anos com curso cadastrado (admin)',
                 description: 'Anos de inicio dos cursos, do mais recente para o mais antigo. Requer `READ_COURSE`.',
-                security: [{ bearerAuth: [] }],
                 response: {
                     200: { type: 'array',
 items: { type: 'integer' } },
@@ -267,7 +253,6 @@ items: { type: 'integer' } },
             },
         },
         async (req: FastifyRequest, res: FastifyReply) => {
-            if ((await requirePermission(req, res, 'READ_COURSE', getAdminPermissions)) === null) return;
             return res.status(200).send(await courseRepository.years());
         },
     );
@@ -275,11 +260,11 @@ items: { type: 'integer' } },
     fastify.get(
         '/admin/courses/:courseId',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags: ['Admin — Courses'],
                 summary: 'Get course full detail (admin)',
                 description: `Returns all fields of a course. Requires JWT token with \`READ_COURSE\` permission. Use this when opening the edit/view dialog.`,
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -301,6 +286,7 @@ properties: courseDetailProperties },
     fastify.get(
         '/courses',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Courses'],
                 summary: 'List courses',
@@ -333,6 +319,7 @@ description: 'Cursos que já terminaram: no fim da lista (include) ou fora dela 
     fastify.get(
         '/courses/:courseId',
         {
+            config: { auth: publicRoute() },
             schema: {
                 tags: ['Courses'],
                 summary: 'Course detail',
@@ -362,6 +349,7 @@ properties: courseDetailProperties },
     fastify.post(
         '/courses',
         {
+            config: { auth: requires('CREATE_COURSE') },
             schema: {
                 tags: ['Courses'],
                 summary: 'Create course',
@@ -383,7 +371,6 @@ properties: courseDetailProperties },
 - \`copyCoverFromCourseId\` — copia a capa desse curso para um arquivo próprio do curso novo (não reaproveita a URL: trocar a capa de um mudaria a do outro). Resposta traz \`coverCopied\` (false = enviar a capa pela edição)
 - \`copyInstructorsFromCourseId\` — copia os instrutores (título e categoria); \`instructorAssignmentIds\` limita a esses vínculos. Resposta traz \`instructorsCopied\`
 - A galeria não é copiada; se a cópia falhar o curso continua criado`,
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['name', 'description', 'roomId', 'startTime', 'endTime'],
@@ -447,6 +434,7 @@ items: { type: 'string' } },
     fastify.post(
         '/courses/:courseId/banner',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Courses'],
                 summary: 'Upload course banner',
@@ -459,7 +447,6 @@ items: { type: 'string' } },
 - A ~640px WebP thumbnail is generated too (\`thumbUrl\`, saved as \`coverImageThumb\`, used by the cards); \`null\` if it could not be generated
 - Uploading a new banner overwrites the previous one (and its thumbnail)
 - \`courseId\` must be an existing course ID`,
-                security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
                 params: {
                     type: 'object',
@@ -485,6 +472,7 @@ nullable: true } } },
     fastify.patch(
         '/courses/:courseId',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Courses'],
                 summary: 'Edit course',
@@ -492,10 +480,10 @@ nullable: true } } },
 
 **Business rules:**
 - All fields are optional — only the fields sent are updated
+- Para limpar um campo, mande \`null\` (texto vazio também vale nos de texto): \`registrationDeadline\`, \`observations\` e \`eventNumber\` ficam sem valor; \`price\`, \`workloadHours\`, \`minStudents\`, \`preEnrolled\` e \`waitlist\` voltam a 0 (colunas sem null)
 - If \`roomId\` is changed, the room must exist and be available for the period
 - If \`startTime\` or \`endTime\` is changed, room availability is re-validated
 - The \`status\` field controls course visibility`,
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -521,10 +509,14 @@ example: '2026-08-10T09:00:00-03:00' },
 format: 'date-time',
 example: '2026-08-12T17:00:00-03:00' },
                         price: { type: 'number',
+nullable: true,
 minimum: 0,
+description: 'null = 0 (a coluna não aceita vazio)',
 example: 150.00 },
                         workloadHours: { type: 'integer',
+nullable: true,
 minimum: 0,
+description: 'null = 0',
 example: 16 },
                         registrationDeadline: {
                             type: 'string',
@@ -533,16 +525,24 @@ example: 16 },
                             example: '2026-08-05T23:59:00-03:00',
                         },
                         observations: { type: 'string',
+nullable: true,
+description: 'null ou vazio limpa',
 example: 'Trazer botas e protetor solar.' },
                         eventNumber: { type: 'string',
+nullable: true,
+description: 'null ou vazio limpa',
 example: 'EVT-2026-042' },
                         minStudents: { type: 'integer',
+nullable: true,
 minimum: 0,
+description: 'null = 0',
 example: 5 },
                         preEnrolled: { type: 'integer',
+nullable: true,
 minimum: 0,
 example: 0 },
                         waitlist: { type: 'integer',
+nullable: true,
 minimum: 0,
 example: 0 },
                     },
@@ -564,6 +564,7 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/courses/:courseId',
         {
+            config: { auth: requires('DELETE_COURSE') },
             schema: {
                 tags: ['Courses'],
                 summary: 'Delete course',
@@ -573,7 +574,6 @@ properties: { message: { type: 'string' } } },
 - This operation is irreversible
 - Also removes registrations (\`courseUserRegistration\`) and gallery photos (\`CoursePhoto\`) linked to the course
 - The banner in storage is **not** removed automatically`,
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId'],
@@ -595,6 +595,7 @@ description: 'Course deleted successfully' },
     fastify.post(
         '/courses/:courseId/gallery',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Courses'],
                 summary: 'Upload photo to course gallery',
@@ -604,7 +605,6 @@ description: 'Course deleted successfully' },
 - Send as \`multipart/form-data\` with the file in the \`file\` field
 - Optional \`caption\` field for the photo caption
 - Returns the \`photoId\` needed to remove the photo via \`DELETE /courses/:courseId/gallery/:photoId\``,
-                security: [{ bearerAuth: [] }],
                 consumes: ['multipart/form-data'],
                 params: {
                     type: 'object',
@@ -632,6 +632,7 @@ description: 'Course deleted successfully' },
     fastify.delete(
         '/courses/:courseId/gallery/:photoId',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Courses'],
                 summary: 'Remove photo from course gallery',
@@ -640,7 +641,6 @@ description: 'Course deleted successfully' },
 **Business rules:**
 - Use the \`photoId\` returned by \`POST /courses/:courseId/gallery\`
 - The file in storage is **not** removed, only the database record`,
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['courseId', 'photoId'],

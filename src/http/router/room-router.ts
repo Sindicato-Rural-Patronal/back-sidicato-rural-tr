@@ -1,8 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createRoomAdapter } from '../../adapter/database/room-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { CreateRoomController } from '../controllers/create-room.js';
 import { CreateRoomUseCase } from '../../usecase/create-room.js';
 import { ListRoomsController } from '../controllers/list-rooms.js';
@@ -11,8 +9,8 @@ import { UpdateRoomController } from '../controllers/update-room.js';
 import { UpdateRoomUseCase } from '../../usecase/update-room.js';
 import { DeleteRoomController } from '../controllers/delete-room.js';
 import { DeleteRoomUseCase } from '../../usecase/delete-room.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse, paginationQuerystring, pagedResponse } from '../lib/swagger-schemas.js';
+import { requires } from '../lib/route-auth.js';
 
 const roomProperties = {
     id: { type: 'string' },
@@ -25,40 +23,37 @@ const roomProperties = {
 
 export async function roomRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const roomRepository = createRoomAdapter(prisma);
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const createRoomController = new CreateRoomController(
         new CreateRoomUseCase(roomRepository),
-        getAdminPermissions,
     );
     const listRoomsController = new ListRoomsController(new ListRoomsUseCase(roomRepository));
     const updateRoomController = new UpdateRoomController(
         new UpdateRoomUseCase(roomRepository),
-        getAdminPermissions,
     );
     const deleteRoomController = new DeleteRoomController(
         new DeleteRoomUseCase(roomRepository),
-        getAdminPermissions,
     );
 
     fastify.get(
         '/rooms',
         {
+            config: { auth: requires('READ_COURSE') },
             schema: {
                 tags: ['Rooms'],
                 summary: 'List rooms',
                 description: `Returns all registered rooms, ordered by name.
 
 **Business rules:**
-- Public route — no authentication required
+- Exige \`READ_COURSE\`: só o painel usa (agenda, curso e configurações)
 - The \`maxCapacity\` field of each room determines the maximum number of enrollments for any course held in it
 - Use this route to populate the room selector in the course creation form`,
                 querystring: paginationQuerystring,
                 response: {
                     200: pagedResponse({ type: 'object',
 properties: roomProperties }),
+                    401: errorResponse,
+                    403: errorResponse,
                 },
             },
         },
@@ -76,6 +71,7 @@ limit?: number
     fastify.post(
         '/rooms',
         {
+            config: { auth: requires('CREATE_COURSE') },
             schema: {
                 tags: ['Rooms'],
                 summary: 'Create room',
@@ -85,7 +81,6 @@ limit?: number
 - \`maxCapacity\` sets the absolute enrollment limit for any course allocated to this room
 - The same room cannot have two courses with overlapping periods (validated in \`POST /courses\`)
 - A course cannot be created without specifying a registered room`,
-                security: [{ bearerAuth: [] }],
                 body: {
                     type: 'object',
                     required: ['name', 'description', 'maxCapacity'],
@@ -115,11 +110,11 @@ properties: { id: { type: 'string' } } },
     fastify.patch(
         '/rooms/:roomId',
         {
+            config: { auth: requires('UPDATE_COURSE') },
             schema: {
                 tags: ['Rooms'],
                 summary: 'Update room',
                 description: 'Atualiza nome, descrição e capacidade da sala. Requer permissão `UPDATE_COURSE`.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['roomId'],
@@ -164,12 +159,12 @@ maxCapacity: number
     fastify.delete(
         '/rooms/:roomId',
         {
+            config: { auth: requires('DELETE_COURSE') },
             schema: {
                 tags: ['Rooms'],
                 summary: 'Delete room',
                 description:
                     'Remove a sala. Falha com 409 se houver cursos vinculados. Requer permissão `DELETE_COURSE`.',
-                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['roomId'],

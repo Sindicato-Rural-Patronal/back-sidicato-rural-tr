@@ -1,16 +1,14 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { createUnimedAdapter } from '../../adapter/database/unimed-adapter.js';
-import { createUserAdminAdapter } from '../../adapter/database/user-admin-adapter.js';
-import { createRuleAdapter } from '../../adapter/database/rule-adapter.js';
 import { ListUnimedUseCase } from '../../usecase/list-unimed.js';
 import { GetUnimedUseCase } from '../../usecase/get-unimed.js';
 import { CreateUnimedUseCase } from '../../usecase/create-unimed.js';
 import { UpdateUnimedUseCase } from '../../usecase/update-unimed.js';
 import { DeleteUnimedUseCase } from '../../usecase/delete-unimed.js';
 import { UnimedController } from '../controllers/unimed-controller.js';
-import { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { requires } from '../lib/route-auth.js';
 
 // UserData básico embutido — cpf pode ser nulo.
 const userDataBasic = {
@@ -149,9 +147,6 @@ nullable: true },
 
 export async function unimedRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const repo = createUnimedAdapter(prisma);
-    const userAdminRepository = createUserAdminAdapter(prisma);
-    const ruleRepository = createRuleAdapter(prisma);
-    const getAdminPermissions = new GetAdminPermissionsUseCase(userAdminRepository, ruleRepository);
 
     const controller = new UnimedController(
         new ListUnimedUseCase(repo),
@@ -159,21 +154,19 @@ export async function unimedRouter(fastify: FastifyInstance, prisma: PrismaClien
         new CreateUnimedUseCase(repo),
         new UpdateUnimedUseCase(repo),
         new DeleteUnimedUseCase(repo),
-        getAdminPermissions,
     );
 
     const tags = ['Unimed'];
-    const sec = [{ bearerAuth: [] }];
 
     fastify.get(
         '/admin/unimed',
         {
+            config: { auth: requires('READ_USER') },
             schema: {
                 tags,
                 summary: 'List Unimed beneficiaries (admin)',
                 description: 'Paginado. ?search filtra pelo nome ou CPF do usuário vinculado; '
                     + '?userDataId traz os cadastros da pessoa (o dela e os em que ela é o titular).',
-                security: sec,
                 querystring: {
                     type: 'object',
                     properties: {
@@ -201,10 +194,10 @@ default: 20 },
     fastify.get(
         '/admin/unimed/:id',
         {
+            config: { auth: requires('READ_USER') },
             schema: {
                 tags,
                 summary: 'Get a Unimed beneficiary (admin)',
-                security: sec,
                 params: { type: 'object',
 required: ['id'],
 properties: { id: { type: 'string' } } },
@@ -223,10 +216,10 @@ properties: { id: { type: 'string' } } },
     fastify.post(
         '/admin/unimed',
         {
+            config: { auth: requires('CREATE_USER') },
             schema: {
                 tags,
                 summary: 'Create a Unimed beneficiary',
-                security: sec,
                 body: unimedBody,
                 response: {
                     400: errorResponse,
@@ -242,10 +235,10 @@ properties: { id: { type: 'string' } } },
     fastify.patch(
         '/admin/unimed/:id',
         {
+            config: { auth: requires('UPDATE_USER') },
             schema: {
                 tags,
                 summary: 'Update a Unimed beneficiary',
-                security: sec,
                 params: { type: 'object',
 required: ['id'],
 properties: { id: { type: 'string' } } },
@@ -268,10 +261,10 @@ properties: { message: { type: 'string' } } },
     fastify.delete(
         '/admin/unimed/:id',
         {
+            config: { auth: requires('DELETE_USER') },
             schema: {
                 tags,
                 summary: 'Delete (soft) a Unimed beneficiary',
-                security: sec,
                 params: { type: 'object',
 required: ['id'],
 properties: { id: { type: 'string' } } },

@@ -151,7 +151,7 @@ afterAll(async () => {
 const registerOther = () =>
     app.inject({
         method: 'POST',
-        url: `/courses/${ids.course}/register`,
+        url: `/courses/${ids.course}/register-full`,
         payload: { name: 'QUEM ESPERAVA A VAGA',
 phone: '44981110009',
 cpf: cpfFrom('222555888') },

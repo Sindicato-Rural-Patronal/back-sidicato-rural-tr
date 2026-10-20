@@ -10,7 +10,7 @@ export class RoomAlreadyBookedError extends BusinessRuleError {
 
 export class RegistrationsUnavailableError extends BusinessRuleError {
     constructor() {
-        super('Registrations unavailable for this course');
+        super('Inscrições indisponíveis para este curso.');
         this.name = 'RegistrationsUnavailableError';
     }
 }
@@ -26,5 +26,14 @@ export class CourseFullError extends BusinessRuleError {
     constructor() {
         super('Curso lotado — sem vagas disponíveis.');
         this.name = 'CourseFullError';
+    }
+}
+
+// Inscrição completa com CPF que já tem cadastro e telefone que não confere:
+// nada é vinculado nem alterado (SR-025).
+export class IdentityNotConfirmedError extends BusinessRuleError {
+    constructor() {
+        super('Não foi possível confirmar seu cadastro pelo site. Procure o Sindicato para fazer a inscrição.');
+        this.name = 'IdentityNotConfirmedError';
     }
 }

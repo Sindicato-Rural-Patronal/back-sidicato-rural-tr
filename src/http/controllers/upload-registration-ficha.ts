@@ -1,22 +1,16 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { UploadRegistrationFichaUseCase } from '../../usecase/upload-registration-ficha.js';
-import type { GetAdminPermissionsUseCase } from '../../usecase/get-admin-permissions.js';
-import { requirePermission, errorToStatus } from '../lib/require-permission.js';
+import { errorToStatus } from '../lib/require-permission.js';
 
 export class UploadRegistrationFichaController {
     constructor(
         private readonly useCase: UploadRegistrationFichaUseCase,
-        private readonly getAdminPermissions: GetAdminPermissionsUseCase,
     ) {}
 
     async handle(
         request: FastifyRequest<{ Params: { registrationId: string } }>,
         reply: FastifyReply,
     ) {
-        if (
-            (await requirePermission(request, reply, 'UPDATE_COURSE', this.getAdminPermissions)) === null
-        )
-            return;
         const { registrationId } = request.params;
 
         const data = await request.file();

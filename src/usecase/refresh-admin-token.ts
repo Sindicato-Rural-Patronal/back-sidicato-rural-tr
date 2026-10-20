@@ -10,7 +10,7 @@ type RefreshAdminTokenResponse = {
 };
 
 // Renova o token de um admin logado: exige um token ainda válido e que o admin
-// continue existindo (não excluído, com regra) — mesmo critério do requireAuth.
+// continue existindo (não excluído, com regra) — o mesmo critério do loggedIn() da rota.
 // Devolve um token novo com o mesmo payload e validade cheia, até o teto de
 // ADMIN_SESSION_MAX_SECONDS desde o login (tokens antigos, sem authTime, contam do iat).
 export class RefreshAdminTokenUseCase {

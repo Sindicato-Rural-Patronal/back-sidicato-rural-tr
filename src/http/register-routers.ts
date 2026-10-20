@@ -29,37 +29,48 @@ import { galleryRouter } from './router/gallery-router.js';
 import { publicContactRouter } from './router/public-contact-router.js';
 import { exportRouter } from './router/export-router.js';
 import { notificationRouter } from './router/notification-router.js';
+import { healthRouter } from './router/health-router.js';
+import { createUserAdminAdapter } from '../adapter/database/user-admin-adapter.js';
+import { createRuleAdapter } from '../adapter/database/rule-adapter.js';
+import { GetAdminPermissionsUseCase } from '../usecase/get-admin-permissions.js';
+import { withRouteAuth, type RouteAuthEntry } from './lib/route-auth.js';
 
 // Todas as rotas da API. Usado pelo servidor e pelos testes E2E, para os dois
-// não ficarem com conjuntos diferentes de rotas.
-export function registerRouters(app: FastifyInstance, prisma: PrismaClient) {
-    app.register(userDataRouter, prisma);
-    app.register(authRouter, prisma);
-    app.register(userAdminRouter, prisma);
-    app.register(userMergeRouter, prisma);
-    app.register(courseRouter, prisma);
-    app.register(roomRouter, prisma);
-    app.register(roomBookingRouter, prisma);
-    app.register(ruleRouter, prisma);
-    app.register(dashboardRouter, prisma);
-    app.register(registrationRouter, prisma);
-    app.register(newsRouter, prisma);
-    app.register(addressRouter, prisma);
-    app.register(instructorRouter, prisma);
-    app.register(contactRouter, prisma);
-    app.register(bannerRouter, prisma);
-    app.register(userRelationRouter, prisma);
-    app.register(userPropertyRouter, prisma);
-    app.register(marketQuoteRouter, prisma);
-    app.register(auditRouter, prisma);
-    app.register(adminInviteRouter, prisma);
-    app.register(financeRouter, prisma);
-    app.register(unimedRouter, prisma);
-    app.register(siteSettingsRouter, prisma);
-    app.register(convenioRouter, prisma);
-    app.register(companyRouter, prisma);
-    app.register(galleryRouter, prisma);
-    app.register(publicContactRouter, prisma);
-    app.register(exportRouter, prisma);
-    app.register(notificationRouter, prisma);
+// não ficarem com conjuntos diferentes de rotas. Ficam dentro do plugin da
+// autorização por rota (`lib/route-auth.ts`); `inventory` recebe a declaração
+// de cada rota, para os testes.
+export function registerRouters(app: FastifyInstance, prisma: PrismaClient, inventory?: RouteAuthEntry[]) {
+    const getAdminPermissions = new GetAdminPermissionsUseCase(createUserAdminAdapter(prisma), createRuleAdapter(prisma));
+    withRouteAuth(app, getAdminPermissions, api => {
+        api.register(userDataRouter, prisma);
+        api.register(authRouter, prisma);
+        api.register(userAdminRouter, prisma);
+        api.register(userMergeRouter, prisma);
+        api.register(courseRouter, prisma);
+        api.register(roomRouter, prisma);
+        api.register(roomBookingRouter, prisma);
+        api.register(ruleRouter, prisma);
+        api.register(dashboardRouter, prisma);
+        api.register(registrationRouter, prisma);
+        api.register(newsRouter, prisma);
+        api.register(addressRouter, prisma);
+        api.register(instructorRouter, prisma);
+        api.register(contactRouter, prisma);
+        api.register(bannerRouter, prisma);
+        api.register(userRelationRouter, prisma);
+        api.register(userPropertyRouter, prisma);
+        api.register(marketQuoteRouter, prisma);
+        api.register(auditRouter, prisma);
+        api.register(adminInviteRouter, prisma);
+        api.register(financeRouter, prisma);
+        api.register(unimedRouter, prisma);
+        api.register(siteSettingsRouter, prisma);
+        api.register(convenioRouter, prisma);
+        api.register(companyRouter, prisma);
+        api.register(galleryRouter, prisma);
+        api.register(publicContactRouter, prisma);
+        api.register(exportRouter, prisma);
+        api.register(notificationRouter, prisma);
+        api.register(healthRouter);
+    }, { inventory });
 }

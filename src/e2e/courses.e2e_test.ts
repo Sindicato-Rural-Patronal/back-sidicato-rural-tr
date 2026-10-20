@@ -92,9 +92,13 @@ maxCapacity: 10 },
 // GET /rooms
 // ---------------------------------------------------------------------------
 describe('GET /rooms', () => {
-    it('returns array of rooms (public route)', async () => {
-        const res = await app.inject({ method: 'GET',
+    it('exige READ_COURSE: sem token → 401; com token → lista', async () => {
+        const anon = await app.inject({ method: 'GET',
 url: '/rooms' });
+        expect(anon.statusCode).toBe(401);
+        const res = await app.inject({ method: 'GET',
+url: '/rooms',
+headers: bearer(token) });
         expect(res.statusCode).toBe(200);
         expect(Array.isArray((JSON.parse(res.body) as { data: unknown }).data)).toBe(true);
     });
@@ -364,7 +368,7 @@ roomId },
 // ---------------------------------------------------------------------------
 // POST /courses/:courseId/register (course registration)
 // ---------------------------------------------------------------------------
-describe('POST /courses/:courseId/register', () => {
+describe('POST /courses/:courseId/register-full', () => {
     let publicCourseId: string;
     let unpublishedCourseId: string;
 
@@ -397,7 +401,7 @@ roomId },
     it('registers user for PUBLIC course', async () => {
         const res = await app.inject({
             method: 'POST',
-            url: `/courses/${publicCourseId}/register`,
+            url: `/courses/${publicCourseId}/register-full`,
             payload: {
                 name: 'Inscrito Silva',
                 email: 'inscrito@test.com',
@@ -411,7 +415,7 @@ roomId },
     it('returns 409 when registering same user twice', async () => {
         await app.inject({
             method: 'POST',
-            url: `/courses/${publicCourseId}/register`,
+            url: `/courses/${publicCourseId}/register-full`,
             payload: {
                 name: 'Double Reg',
                 email: 'doublereg@test.com',
@@ -421,7 +425,7 @@ roomId },
         });
         const res = await app.inject({
             method: 'POST',
-            url: `/courses/${publicCourseId}/register`,
+            url: `/courses/${publicCourseId}/register-full`,
             payload: {
                 name: 'Double Reg',
                 email: 'doublereg@test.com',
@@ -435,7 +439,7 @@ roomId },
     it('returns 409 for UNPUBLISHED course registrations', async () => {
         const res = await app.inject({
             method: 'POST',
-            url: `/courses/${unpublishedCourseId}/register`,
+            url: `/courses/${unpublishedCourseId}/register-full`,
             payload: {
                 name: 'Blocked User',
                 email: 'blocked@test.com',
@@ -450,7 +454,7 @@ roomId },
     it('returns 404 for non-existent course', async () => {
         const res = await app.inject({
             method: 'POST',
-            url: '/courses/00000000-0000-0000-0000-000000000000/register',
+            url: '/courses/00000000-0000-0000-0000-000000000000/register-full',
             payload: {
                 name: 'Ghost Reg',
                 email: 'ghost@test.com',
@@ -483,7 +487,7 @@ roomId },
 
         await app.inject({
             method: 'POST',
-            url: `/courses/${courseId}/register`,
+            url: `/courses/${courseId}/register-full`,
             payload: { name: 'Reg 1',
 email: 'reg1@test.com',
 phone: '44911110070',
@@ -491,7 +495,7 @@ cpf: '52223337015' },
         });
         await app.inject({
             method: 'POST',
-            url: `/courses/${courseId}/register`,
+            url: `/courses/${courseId}/register-full`,
             payload: { name: 'Reg 2',
 email: 'reg2@test.com',
 phone: '44911110071',

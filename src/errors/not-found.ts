@@ -202,3 +202,12 @@ export class RoomBookingNotFoundError extends NotFoundError {
         this.name = 'RoomBookingNotFoundError';
     }
 }
+
+// Inscrição por CPF: a mesma resposta para CPF sem cadastro e telefone que não
+// confere, para não dizer se o CPF tem cadastro (SR-025).
+export class CpfPhoneNotFoundError extends NotFoundError {
+    constructor() {
+        super('Não encontramos cadastro com este CPF e telefone.');
+        this.name = 'CpfPhoneNotFoundError';
+    }
+}

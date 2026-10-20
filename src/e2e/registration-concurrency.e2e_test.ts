@@ -5,9 +5,9 @@ import { createTestApp } from './helpers/create-test-app.js';
 import { createTestPrisma, cleanDatabase } from './helpers/db.js';
 
 // Vagas com inscrições chegando ao mesmo tempo, contra o Postgres de verdade:
-// `register` e `register-by-cpf` contam e inserem numa transação Serializable
-// (`RegistrationAdapter.createWithCapacity`). O `register-full` tem caminho
-// próprio e fica para quando a SR-016 terminar.
+// `register-by-cpf` conta e insere com as vagas travadas
+// (`RegistrationAdapter.createWithCapacity`), e o `register-full` faz o mesmo
+// na própria transação (`lockCourseSeats`).
 
 let app: FastifyInstance;
 let prisma: PrismaClient;
@@ -42,7 +42,7 @@ maxCapacity: seats } });
     });
 }
 
-type Rota = 'register' | 'register-by-cpf';
+type Rota = 'register-full' | 'register-by-cpf';
 
 /** Dispara `requests` inscrições ao mesmo tempo num curso de `seats` vagas. */
 async function burst(rota: Rota, seats: number, requests: number) {
@@ -58,9 +58,10 @@ cpf })) });
             app.inject({
                 method: 'POST',
                 url: `/courses/${course.id}/${rota}`,
-                payload: rota === 'register' ? { name: `INSCRITO ${i}`,
+                payload: rota === 'register-full' ? { name: `INSCRITO ${i}`,
 phone: '44990000001',
-cpf } : { cpf },
+cpf } : { cpf,
+phoneEnd: '0001' },
             }),
         ),
     );
@@ -83,20 +84,20 @@ afterAll(async () => {
     await prisma.$disconnect();
 });
 
-describe.each<Rota>(['register', 'register-by-cpf'])('POST /courses/:id/%s ao mesmo tempo', rota => {
+describe.each<Rota>(['register-full', 'register-by-cpf'])('POST /courses/:id/%s ao mesmo tempo', rota => {
     it('nunca passa da lotação: 8 pedidos para 3 vagas', async () => {
         const { responses, active } = await burst(rota, 3, 8);
         expect(active).toBeLessThanOrEqual(3);
         expect(responses.filter(r => r.statusCode === 201)).toHaveLength(active);
     });
 
-    // BUG (SR-017): com o driver adapter do Prisma 7 o conflito de serialização
-    // chega como DriverAdapterError, sem `code`, com cause.kind
+    // Corrigido (SR-017). Com o driver adapter do Prisma 7 o conflito de
+    // serialização chega como DriverAdapterError, sem `code`, com cause.kind
     // 'TransactionWriteConflict' (originalCode 40001). O
-    // `isPrismaSerializationError` só reconhece `code === 'P2034'`, então o retry
-    // do `createWithCapacity` nunca roda e quem perde a corrida leva 500, com vaga
-    // sobrando. Medido: 6 pedidos para 5 vagas → só 1 a 4 entram, o resto 500.
-    // Quando a correção entrar, este teste quebra: troque `it.fails` por `it`.
+    // `isPrismaSerializationError` só reconhecia `code === 'P2034'`, então o retry
+    // do `createWithCapacity` nunca rodava e quem perdia a corrida levava 500, com
+    // vaga sobrando (6 pedidos para 5 vagas: só 1 a 4 entravam, o resto 500).
+    // Este teste guarda contra a volta.
     it('N+1 pedidos para N vagas: N entram, 1 ouve "lotado", ninguém leva 500', async () => {
         const { statuses, active } = await burst(rota, 5, 6);
         expect(statuses).toEqual([201, 201, 201, 201, 201, 409]);
