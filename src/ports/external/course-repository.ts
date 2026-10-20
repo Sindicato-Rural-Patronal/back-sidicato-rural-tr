@@ -32,8 +32,8 @@ export type CourseUpdateData = {
     price?: number;
     workloadHours?: number;
     registrationDeadline?: Date | null;
-    observations?: string;
-    eventNumber?: string;
+    observations?: string | null;
+    eventNumber?: string | null;
     minStudents?: number;
     preEnrolled?: number;
     waitlist?: number;

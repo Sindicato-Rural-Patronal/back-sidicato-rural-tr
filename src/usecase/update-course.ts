@@ -8,6 +8,15 @@ import { conflictMessage } from './room-availability.js';
 import { nomeDoCurso } from '../lib/course-name.js';
 import { COURSE_END_BEFORE_START } from './create-course.js';
 
+// Campos de texto opcionais: vazio ou só espaços limpa (grava null).
+const clearableText = z.preprocess(
+    v => (v === null || (typeof v === 'string' && v.trim() === '') ? null : v),
+    z.string().nullable().optional(),
+);
+
+// Colunas numéricas NOT NULL (default 0): limpar é gravar 0, então null vale 0.
+const zeroIfNull = (v: unknown) => (v === null ? 0 : v);
+
 const updateCourseBodySchema = z.object({
     // Apagar o titulo na edicao devolve o nome generico, em vez de recusar.
     name: z.preprocess(
@@ -20,14 +29,15 @@ const updateCourseBodySchema = z.object({
     endTime: z.iso.datetime().optional(),
     // COMPLETED também: pela edição dá para concluir ou desfazer a conclusão.
     status: z.enum(['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS', 'COMPLETED'] as const).optional(),
-    price: z.number().min(0).optional(),
-    workloadHours: z.number().int().min(0).optional(),
-    registrationDeadline: z.iso.datetime().nullable().optional(),
-    observations: z.string().optional(),
-    eventNumber: z.string().optional(),
-    minStudents: z.number().int().min(0).optional(),
-    preEnrolled: z.number().int().min(0).optional(),
-    waitlist: z.number().int().min(0).optional(),
+    price: z.preprocess(zeroIfNull, z.number().min(0).optional()),
+    workloadHours: z.preprocess(zeroIfNull, z.number().int().min(0).optional()),
+    // null ou vazio: sem prazo.
+    registrationDeadline: z.preprocess(v => (v === '' ? null : v), z.iso.datetime().nullable().optional()),
+    observations: clearableText,
+    eventNumber: clearableText,
+    minStudents: z.preprocess(zeroIfNull, z.number().int().min(0).optional()),
+    preEnrolled: z.preprocess(zeroIfNull, z.number().int().min(0).optional()),
+    waitlist: z.preprocess(zeroIfNull, z.number().int().min(0).optional()),
 });
 
 export type UpdateCourseRequest = z.infer<typeof updateCourseBodySchema> & { courseId: string };

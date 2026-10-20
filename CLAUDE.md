@@ -470,6 +470,11 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 - Criar, e editar mudando sala ou horário, confere o conflito com cursos **e reservas** e grava numa transação só, com a sala travada (`createInRoom`/`updateInRoom`, a mesma trava `lockRoom` das reservas).
 - Sala ocupada → `POST` 400 / `PATCH` 409 "Sala ocupada: Curso "X" em 05/10 08:00–12:00".
 
+**Limpar campos na edição (`PATCH /courses/:id`, SR-019):**
+- Campo não mandado não muda. Para limpar, manda `null`.
+- `registrationDeadline`, `observations` e `eventNumber` (colunas que aceitam null) ficam **sem valor** (null). Nos dois de texto, `""` e só espaços também limpam. O prazo só aceita `null` (`""` não é data → 400).
+- `price`, `workloadHours`, `minStudents`, `preEnrolled` e `waitlist` (colunas NOT NULL com default 0) **voltam a 0** com `null`; `0` grava 0 do mesmo jeito. Negativo → 400.
+
 **Status:**
 - O painel cria com `PUBLIC`, `PRIVATE` ou `UNPUBLISHED`.
 - Iniciar e concluir têm rotas próprias (em Inscrições).
