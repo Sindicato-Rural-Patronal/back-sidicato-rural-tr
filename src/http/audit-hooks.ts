@@ -78,7 +78,7 @@ export function registerAuditHooks(app: FastifyInstance, prisma: PrismaClient) {
         s._auditActorId = admin.id;
         try {
             const [label, before] = await Promise.all([
-                wantsLabel ? lookupTargetLabel(prisma, path) : null,
+                wantsLabel ? lookupTargetLabel(prisma, path, request.body) : null,
                 wantsSnapshot ? snapshotTarget(prisma, method, path, admin.id) : null,
             ]);
             s._auditLabel = label;

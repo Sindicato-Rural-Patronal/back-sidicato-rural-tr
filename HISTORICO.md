@@ -2,6 +2,17 @@
 
 O que mudou e por quê. As regras que valem hoje estão no `CLAUDE.md`. Este arquivo serve para entender de onde veio uma regra ou um dado estranho no banco. As entradas mais novas ficam no topo.
 
+## 30/10/2026: SR-054
+
+- **Mês fechado passou a travar lançamentos (SR-054, fecha a SR-020).**
+  - O fechamento mensal existia desde setembro, mas não travava nada: dava para lançar, editar e excluir no mês fechado, e o saldo conferido deixava de bater sem ninguém perceber.
+  - A regra foi decidida pelo usuário em 30/10: com o mês fechado, nada com data nele é criado, editado ou excluído, nem a recorrência lança nele; reabrir libera tudo. Como o fechamento é por caixa e mês, a trava também é.
+  - Recusa com 409, como as outras regras de negócio, e a mensagem diz o mês e o caixa.
+  - A recorrência não lança no mês fechado e volta a tentar o mês nas rodadas seguintes, para que reabrir libere também a geração, sem o lançamento do mês se perder de vez.
+  - Fechar e reabrir já entravam na trilha, mas como "Criou um registro"/"Excluiu um registro" (entidade "Outro"). Passaram a ter frase própria, e reabrir guarda os valores do fechamento apagado. Reabrir continua apagando a linha do fechamento: a tabela não tem soft-delete, e a trilha guarda o que havia.
+  - Comprovantes ficaram fora da trava: não mexem no saldo, e anexar o comprovante depois do fechamento é o uso normal.
+- **Reativar recorrência pausada lançava a pausa inteira de uma vez (B1).** O marcador `lastGeneratedMonth` ficava no mês da pausa, e a geração preenchia todos os meses até o atual. Decidido em 30/10: os meses da pausa são pulados. Nada do que já foi gerado é apagado ou alterado.
+
 ## 19/10/2026: SR-023 e SR-025
 
 - **Acesso declarado na rota (SR-023, decisão 001).**

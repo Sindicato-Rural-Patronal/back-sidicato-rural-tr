@@ -26,19 +26,53 @@ export function loginUsername(body: unknown): string | null {
 // Inscrição pública (/courses/:id/register*): o nome vem do corpo, não do curso.
 const PUBLIC_REGISTER_RE = /^\/courses\/[^/]+\/register/i;
 
+// Fechar o mês: o corpo traz o caixa (id) e o mês, e o rótulo é "mês · caixa".
+const CLOSING_CREATE_PATH = '/admin/finance/closings';
+
+/** Rótulo do fechamento na auditoria: "2026-10" + "BANCO" → "10/2026 · BANCO". */
+export function closingAuditLabel(month: string, accountName: string | null | undefined): string {
+    const [year, mm] = month.split('-');
+    const when = mm ? `${mm}/${year}` : month;
+    return accountName ? `${when} · ${accountName}` : when;
+}
+
 /**
  * Quais requisições buscam o nome do alvo antes de executar: edições e exclusões
  * (o alvo some numa exclusão) e as ações POST sobre um item existente
- * (iniciar curso, foto da galeria, vínculo de empresa...). Criar algo novo usa o corpo.
+ * (iniciar curso, foto da galeria, vínculo de empresa...). Criar algo novo usa o
+ * corpo; fechar o mês também, mas o nome do caixa vem do banco.
  */
 export function shouldLookupTargetLabel(method: string, path: string): boolean {
     if (method === 'PATCH' || method === 'PUT' || method === 'DELETE') return true;
+    if (method === 'POST' && path === CLOSING_CREATE_PATH) return true;
     return method === 'POST' && !!firstId(path) && !PUBLIC_REGISTER_RE.test(path);
+}
+
+/** Fechar o mês: rótulo pelo corpo (ainda não validado; o caixa vem do banco). */
+async function closingCreateLabel(prisma: PrismaClient, body: unknown): Promise<string | null> {
+    if (!body || typeof body !== 'object') return null;
+    const { accountId, month } = body as {
+        accountId?: unknown;
+        month?: unknown;
+    };
+    if (typeof accountId !== 'string' || typeof month !== 'string') return null;
+    const account = await prisma.financialAccount.findUnique({
+        where: { id: accountId },
+        select: { name: true },
+    });
+    return closingAuditLabel(month, account?.name);
 }
 
 // Busca o nome/rótulo do alvo pelo id no caminho — chamado ANTES da mutação
 // (num preHandler) para capturar o nome mesmo em exclusões.
-export async function lookupTargetLabel(prisma: PrismaClient, path: string): Promise<string | null> {
+export async function lookupTargetLabel(prisma: PrismaClient, path: string, body?: unknown): Promise<string | null> {
+    if (path === CLOSING_CREATE_PATH) {
+        try {
+            return await closingCreateLabel(prisma, body);
+        } catch {
+            return null;
+        }
+    }
     const id = firstId(path);
     if (!id) return null;
     const entity = deriveAuditEntity(path);
@@ -133,6 +167,17 @@ select: { description: true } }))?.description ?? null;
                 }
                 return (await prisma.financialAttachment.findUnique({ where: { id },
 select: { filename: true } }))?.filename ?? null;
+            case 'Fechamento de caixa': {
+                // Reabrir: DELETE /admin/finance/closings/:id (o fechamento some depois).
+                const closing = await prisma.financeMonthlyClosing.findUnique({
+                    where: { id },
+                    select: {
+                        month: true,
+                        account: { select: { name: true } },
+                    },
+                });
+                return closing ? closingAuditLabel(closing.month, closing.account.name) : null;
+            }
             default:
                 return null;
         }

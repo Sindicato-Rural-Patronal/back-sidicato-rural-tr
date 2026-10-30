@@ -5,8 +5,10 @@ import {
     lastDayOfMonth,
     monthOf,
     monthsToGenerate,
+    skipPausedMonths,
     MAX_MONTHS_PER_RUN,
     CreateFinanceRecurrenceUseCase,
+    UpdateFinanceRecurrenceUseCase,
     DeleteFinanceRecurrenceUseCase,
     GenerateFinanceRecurrencesUseCase,
 } from '../finance-recurrences.js';
@@ -20,6 +22,9 @@ const repo = {
     listRecurrencesToGenerate: vi.fn(),
     createRecurrenceTransaction: vi.fn(),
     setRecurrenceLastGeneratedMonth: vi.fn(),
+    findRecurrenceById: vi.fn(),
+    updateRecurrence: vi.fn(),
+    findClosedMonths: vi.fn().mockResolvedValue([]),
 } as unknown as FinanceRepository;
 
 const rec = (over: Record<string, unknown> = {}) => ({
@@ -231,6 +236,170 @@ accountId: 'acc-1' }),
             categoryId: 'cat-1',
             accountId: 'acc-1',
         });
+    });
+});
+
+describe('GenerateFinanceRecurrencesUseCase — mês fechado (SR-054)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(repo.createRecurrenceTransaction).mockResolvedValue(true);
+    });
+
+    const closed = (...months: string[]) => months.map(month => ({
+        accountId: 'acc-1',
+        month,
+        accountName: 'BANCO',
+    }));
+
+    it('não lança no mês fechado do caixa e o marcador para antes dele', async () => {
+        vi.mocked(repo.listRecurrencesToGenerate).mockResolvedValue([
+            rec({
+                startMonth: '2026-01',
+                accountId: 'acc-1',
+            }),
+        ] as never);
+        vi.mocked(repo.findClosedMonths).mockResolvedValueOnce(closed('2026-02'));
+        const uc = new GenerateFinanceRecurrencesUseCase(repo);
+        const r = await uc.execute(new Date(2026, 2, 15)); // março/2026
+        expect(r.created).toBe(2);
+        const meses = vi.mocked(repo.createRecurrenceTransaction).mock.calls.map(c => c[0].recurringMonth);
+        expect(meses).toEqual(['2026-01', '2026-03']);
+        // Fevereiro volta a ser tentado na próxima rodada (lança quando for reaberto).
+        expect(repo.setRecurrenceLastGeneratedMonth).toHaveBeenCalledWith('rec-1', '2026-01');
+        // Uma consulta só, com todos os meses da rodada no caixa da recorrência.
+        expect(repo.findClosedMonths).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(repo.findClosedMonths).mock.calls[0][0]).toEqual([
+            {
+                accountId: 'acc-1',
+                month: '2026-01',
+            },
+            {
+                accountId: 'acc-1',
+                month: '2026-02',
+            },
+            {
+                accountId: 'acc-1',
+                month: '2026-03',
+            },
+        ]);
+    });
+
+    it('primeiro mês fechado: não mexe no marcador', async () => {
+        vi.mocked(repo.listRecurrencesToGenerate).mockResolvedValue([
+            rec({
+                startMonth: '2026-02',
+                accountId: 'acc-1',
+            }),
+        ] as never);
+        vi.mocked(repo.findClosedMonths).mockResolvedValueOnce(closed('2026-02'));
+        const uc = new GenerateFinanceRecurrencesUseCase(repo);
+        const r = await uc.execute(new Date(2026, 2, 15));
+        expect(r.created).toBe(1);
+        expect(repo.setRecurrenceLastGeneratedMonth).not.toHaveBeenCalled();
+    });
+
+    it('depois de reaberto, o mês que ficou para trás é lançado', async () => {
+        vi.mocked(repo.listRecurrencesToGenerate).mockResolvedValue([
+            rec({
+                startMonth: '2026-01',
+                lastGeneratedMonth: '2026-01',
+                accountId: 'acc-1',
+            }),
+        ] as never);
+        vi.mocked(repo.findClosedMonths).mockResolvedValueOnce([]);
+        // Março já existia (gerado na rodada em que fevereiro estava fechado).
+        vi.mocked(repo.createRecurrenceTransaction)
+            .mockResolvedValueOnce(true)
+            .mockResolvedValueOnce(false);
+        const uc = new GenerateFinanceRecurrencesUseCase(repo);
+        const r = await uc.execute(new Date(2026, 2, 15));
+        expect(r.created).toBe(1);
+        expect(vi.mocked(repo.createRecurrenceTransaction).mock.calls[0][0].recurringMonth).toBe('2026-02');
+        expect(repo.setRecurrenceLastGeneratedMonth).toHaveBeenCalledWith('rec-1', '2026-03');
+    });
+
+    it('recorrência sem caixa não consulta fechamento', async () => {
+        vi.mocked(repo.listRecurrencesToGenerate).mockResolvedValue([rec({ startMonth: '2026-03' })] as never);
+        const uc = new GenerateFinanceRecurrencesUseCase(repo);
+        await uc.execute(new Date(2026, 2, 15));
+        expect(repo.findClosedMonths).not.toHaveBeenCalled();
+    });
+});
+
+describe('skipPausedMonths (B1)', () => {
+    it('pula até o mês anterior ao atual', () => {
+        expect(skipPausedMonths('2026-03', '2026-10')).toBe('2026-09');
+        expect(skipPausedMonths(null, '2026-10')).toBe('2026-09');
+        // Virando o ano.
+        expect(skipPausedMonths('2026-10', '2027-01')).toBe('2026-12');
+    });
+
+    it('não volta o marcador (pausa e volta no mesmo mês, ou já gerou o atual)', () => {
+        expect(skipPausedMonths('2026-09', '2026-10')).toBeNull();
+        expect(skipPausedMonths('2026-10', '2026-10')).toBeNull();
+    });
+});
+
+describe('UpdateFinanceRecurrenceUseCase — reativar (B1)', () => {
+    const OCT = new Date(2026, 9, 30); // outubro/2026, no relógio local como a geração
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(repo.updateRecurrence).mockResolvedValue({ id: 'rec-1' } as never);
+    });
+
+    it('pausada → ativa: os meses da pausa são pulados', async () => {
+        vi.mocked(repo.findRecurrenceById).mockResolvedValue(rec({
+            active: false,
+            lastGeneratedMonth: '2026-05',
+        }) as never);
+        const uc = new UpdateFinanceRecurrenceUseCase(repo);
+        const r = await uc.execute('rec-1', { active: true }, OCT);
+        expect(r.error).toBeUndefined();
+        expect(repo.updateRecurrence).toHaveBeenCalledWith('rec-1', {
+            active: true,
+            lastGeneratedMonth: '2026-09',
+        });
+        // Depois disso, a geração começa no mês atual.
+        expect(monthsToGenerate(rec({ lastGeneratedMonth: '2026-09' }), '2026-10')).toEqual(['2026-10']);
+    });
+
+    it('criada pausada e nunca gerada: começa no mês atual, não no início', async () => {
+        vi.mocked(repo.findRecurrenceById).mockResolvedValue(rec({
+            active: false,
+            startMonth: '2026-01',
+            lastGeneratedMonth: null,
+        }) as never);
+        const uc = new UpdateFinanceRecurrenceUseCase(repo);
+        await uc.execute('rec-1', { active: true }, OCT);
+        expect(vi.mocked(repo.updateRecurrence).mock.calls[0][1].lastGeneratedMonth).toBe('2026-09');
+    });
+
+    it('editar sem reativar não mexe no marcador', async () => {
+        vi.mocked(repo.findRecurrenceById).mockResolvedValue(rec({
+            active: false,
+            lastGeneratedMonth: '2026-05',
+        }) as never);
+        const uc = new UpdateFinanceRecurrenceUseCase(repo);
+        await uc.execute('rec-1', { description: 'NOVA' }, OCT);
+        expect(vi.mocked(repo.updateRecurrence).mock.calls[0][1]).toEqual({ description: 'NOVA' });
+    });
+
+    it('já ativa: active true não pula nada', async () => {
+        vi.mocked(repo.findRecurrenceById).mockResolvedValue(rec({
+            active: true,
+            lastGeneratedMonth: '2026-05',
+        }) as never);
+        const uc = new UpdateFinanceRecurrenceUseCase(repo);
+        await uc.execute('rec-1', { active: true }, OCT);
+        expect(vi.mocked(repo.updateRecurrence).mock.calls[0][1]).toEqual({ active: true });
+    });
+
+    it('o corpo não consegue escrever o marcador', async () => {
+        vi.mocked(repo.findRecurrenceById).mockResolvedValue(rec({ active: true }) as never);
+        const uc = new UpdateFinanceRecurrenceUseCase(repo);
+        await uc.execute('rec-1', { lastGeneratedMonth: '2030-01' }, OCT);
+        expect(vi.mocked(repo.updateRecurrence).mock.calls[0][1]).toEqual({});
     });
 });
 

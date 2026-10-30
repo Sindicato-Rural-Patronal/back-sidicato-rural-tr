@@ -195,7 +195,7 @@ Classes (`src/errors/`; as bases aceitam mensagem opcional e são usadas direto 
 |---|---|
 | `AuthError` (`auth.ts`) | `InvalidCredentialsError` "Invalid username or password" |
 | `ForbiddenError` (`auth.ts`, estende `Error`) | mensagem por parâmetro (padrão "Sem permissão para esta ação.") |
-| `BusinessRuleError` (`business-rule.ts`) | `RoomAlreadyBookedError` (mensagem por parâmetro: "Sala ocupada: …"), `RegistrationsUnavailableError` "Inscrições indisponíveis para este curso.", `RegistrationDeadlinePassedError` "Prazo de inscrição encerrado.", `CourseFullError` "Curso lotado — sem vagas disponíveis.", `IdentityNotConfirmedError` "Não foi possível confirmar seu cadastro pelo site. Procure o Sindicato para fazer a inscrição." |
+| `BusinessRuleError` (`business-rule.ts`) | `RoomAlreadyBookedError` (mensagem por parâmetro: "Sala ocupada: …"), `RegistrationsUnavailableError` "Inscrições indisponíveis para este curso.", `RegistrationDeadlinePassedError` "Prazo de inscrição encerrado.", `CourseFullError` "Curso lotado — sem vagas disponíveis.", `IdentityNotConfirmedError` "Não foi possível confirmar seu cadastro pelo site. Procure o Sindicato para fazer a inscrição.", `ClosedMonthError` "O mês MM/AAAA está fechado no caixa "X". Reabra o mês para mudar lançamentos dele." (ver Financeiro) |
 | `ConflictError` (`conflict.ts`, 18 filhas) | `CpfAlreadyInUseError` "CPF já cadastrado para outra pessoa.", `RgAlreadyInUseError`, `RuleInUseError`, `RoomNameAlreadyExistsError`, `RoomHasCoursesError`, `RoomHasBookingsError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `CourseRegistrationAlreadyExistsError` "Esta pessoa já está inscrita neste curso." (as duas inscrições públicas), `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError`, `UnimedBeneficiarioAlreadyExistsError`, `ConvenioSlugAlreadyExistsError`, `CompanyCnpjAlreadyExistsError`, `PublicContactAlreadyExistsError`, `CompanyMemberAlreadyExistsError`, `MergeDifferentCpfError`, `MergeBothHaveLoginError` |
 | `NotFoundError` (`not-found.ts`, 30 filhas) | `CourseNotFoundError` "Course not found", `UserNotFoundError`, `UserDataNotFoundError` "Invalid userDataId: user not found", `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError`, `UserRelationNotFoundError`, `PropertyNotFoundError`, `AddressNotFoundError` "CEP not found", `InstructorNotFoundError`, `ContactMessageNotFoundError`, `BannerNotFoundError`, `MarketQuoteNotFoundError`, `AdminInviteInvalidError` "Convite inválido, expirado ou já utilizado.", `FinanceCategoryNotFoundError`, `FinanceTransactionNotFoundError`, `UnimedBeneficiarioNotFoundError`, `GalleryAlbumNotFoundError`, `GalleryPhotoNotFoundError`, `ConvenioNotFoundError`, `CompanyNotFoundError`, `PublicContactNotFoundError`, `CompanyMemberNotFoundError`, `RoomBookingNotFoundError`, `CpfPhoneNotFoundError` "Não encontramos cadastro com este CPF e telefone." |
 | `TooManyAttemptsError` (`too-many-attempts.ts`, estende `Error`, `statusCode = 429`) | "Muitas tentativas com este CPF. Aguarde uma hora ou procure o Sindicato." |
@@ -752,18 +752,19 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 | `POST` · `PATCH` · `DELETE` | `/admin/finance/categories[/:id]` | `{ name, type: IN\|OUT, color?, active?, order? }` → 201 · `{ message }` · 204 (soft) | `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
 | `GET` · `POST` · `PATCH` · `DELETE` | `/admin/finance/accounts[/:id]` | caixas `{ name, color?, active?, order? }` (mesmo padrão) | `READ_` · `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
 | `GET` | `/admin/finance/transactions` | paginada; filtros abaixo; traz `totals` | `READ_FINANCE` |
-| `POST` | `/admin/finance/transactions` | criar lançamento → 201 (a linha) | `CREATE_FINANCE` |
-| `PATCH` · `DELETE` | `/admin/finance/transactions/:id` | editar → `{ message }` · excluir (soft) → 204 | `UPDATE_` · `DELETE_FINANCE` |
+| `POST` | `/admin/finance/transactions` | criar lançamento → 201 (a linha); mês fechado → 409 | `CREATE_FINANCE` |
+| `PATCH` · `DELETE` | `/admin/finance/transactions/:id` | editar → `{ message }` · excluir (soft) → 204; mês fechado → 409 | `UPDATE_` · `DELETE_FINANCE` |
 | `GET` | `/admin/finance/transactions/export` | CSV dos lançamentos filtrados; depois de "Descrição": "Nome / Razão social" (razão social do empenho, ou o nome fantasia se ela estiver vazia) e "CNPJ / CPF" | `READ_FINANCE` |
-| `POST` | `/admin/finance/transfers` | transferência entre caixas → 201 `{ message }` | `CREATE_FINANCE` |
+| `POST` | `/admin/finance/transfers` | transferência entre caixas → 201 `{ message }`; mês fechado na origem ou no destino → 409 | `CREATE_FINANCE` |
 | `POST` | `/admin/finance/transactions/:id/attachments` | comprovante (multipart: PDF, JPG, PNG, WEBP até 15 MB) → 201 `{ id, filename, mimeType, size, createdAt }` | `UPDATE_FINANCE` |
 | `GET` · `DELETE` | `/admin/finance/attachments/:attachmentId` | baixar (inline) · apagar de verdade | `READ_FINANCE` · `UPDATE_FINANCE` |
 | `GET` | `/admin/finance/summary?from&to` | resumo (abaixo) | `READ_FINANCE` |
 | `GET` · `POST` · `PATCH` · `DELETE` | `/admin/finance/recurrences[/:id]` | molde do lançamento mensal | `READ_` · `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
-| `POST` | `/admin/finance/recurrences/generate` | gera o que falta até o mês atual → `{ created }` | `CREATE_FINANCE` |
+| `POST` | `/admin/finance/recurrences/generate` | gera o que falta até o mês atual, pulando mês fechado → `{ created }` | `CREATE_FINANCE` |
 | `GET` · `POST` · `PATCH` · `DELETE` | `/admin/finance/payment-methods[/:id]` | formas de pagamento | `READ_` · `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
-| `GET` | `/admin/finance/closings` · `/admin/finance/closings/preview?accountId&month` | fechamentos · prévia do mês | `READ_FINANCE` |
-| `POST` · `DELETE` | `/admin/finance/closings[/:id]` | fechar o mês · reabrir | `CREATE_` · `DELETE_FINANCE` |
+| `GET` | `/admin/finance/closings[?accountId&year]` · `/admin/finance/closings/preview?accountId&month` | fechamentos `[{ id, accountId, month, expectedBalanceCents, countedBalanceCents, differenceCents, notes, closedAt, closedByAdminId }]` · prévia do mês | `READ_FINANCE` |
+| `POST` | `/admin/finance/closings` | fechar o mês `{ accountId, month, countedBalanceCents, notes? }` → 201 (o fechamento); já fechado → 409 | `CREATE_FINANCE` |
+| `DELETE` | `/admin/finance/closings/:id` | **reabrir o mês** → 204; inexistente → 404 | `DELETE_FINANCE` |
 
 **Lançamento:** `{ type?: IN|OUT|null, amountCents, date, description, method?, notes?, categoryId?, accountId?, empenho? }`.
 - `empenho` é a Nota de Empenho, JSON ou null: `numero, notaFiscal, nomeFantasia, razaoSocial, cnpjCpf, inscricaoEstadual, endereco, bairro, cep, cidade, uf, telefone, banco, conta, agencia, cheque, descontoCents, usuarioId, empresaId`.
@@ -771,6 +772,7 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
   - categoria sem tipo no lançamento;
   - categoria de outro tipo, inexistente ou excluída ("Categoria inválida");
   - caixa inexistente ou excluído ("Caixa inválido").
+- Mês fechado no caixa → 409 (ver "Mês fechado trava").
 - Perna de transferência não se edita → 400 "Transferências não podem ser editadas — exclua e refaça."; excluir uma perna apaga as duas.
 - `method` é texto livre; `payment-methods` é só a lista que o painel oferece.
 
@@ -793,14 +795,24 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 **Recorrência** (`FinanceRecurringTransaction`):
 - Meses são `"AAAA-MM"` (`startMonth`, `endMonth?`, `lastGeneratedMonth?`). `dayOfMonth` vai de 1 a 31; no mês mais curto, vale o último dia.
 - A geração roda quando a tela abre e é idempotente (unique `(recurringId, recurringMonth)`), com teto de 120 meses por rodada.
+- Pausar é `PATCH { active: false }`. **Reativar** (`active: true` numa pausada) pula os meses da pausa: o use case põe `lastGeneratedMonth` no mês anterior ao atual, e ela volta a lançar a partir do mês atual. Pausar e reativar no mesmo mês não pula nada. Os lançamentos já gerados não mudam. `lastGeneratedMonth` nunca vem do corpo.
+- **Mês fechado** no caixa da recorrência não recebe lançamento. A geração segue para os meses seguintes, mas o marcador para antes do mês fechado: as próximas rodadas voltam a tentar esse mês e lançam quando ele for reaberto.
 - Excluir é soft-delete do molde.
 
 **Formas de pagamento:** nome em caixa alta e único.
 
 **Fechamento** (`FinanceMonthlyClosing`, único por caixa e mês):
 - Esperado = abertura + entradas − saídas, recalculado no servidor; `differenceCents` = contado − esperado.
-- `DELETE` reabre sem tocar nos lançamentos.
-- Hoje o mês fechado **não** trava lançamentos (SR-020, aguardando decisão).
+- **Reabrir** é `DELETE /admin/finance/closings/:id` (`DELETE_FINANCE`): apaga a linha do fechamento, sem tocar nos lançamentos, e libera de novo o mês.
+- **Auditoria:** entidade "Fechamento de caixa", com o rótulo "MM/AAAA · CAIXA". Fechar → "Fechou o mês "10/2026 · BANCO""; reabrir → "Reabriu o mês "10/2026 · BANCO"", com os valores que estavam fechados em `changes` (mês, caixa, esperado, contado, diferença, observação, quem fechou e quando).
+
+**Mês fechado trava** (SR-054, decidido em 30/10; `usecase/finance-closed-month.ts`). A trava é por **caixa e mês**, como o fechamento:
+- Com o mês M fechado no caixa C, os lançamentos de C com data em M não podem ser criados, editados (nenhum campo) nem excluídos. Também não dá para mover um lançamento para dentro ou para fora de (C, M), pela data ou pelo caixa.
+- Transferência: criar com data em M é recusado se M está fechado na origem **ou** no destino. Excluir uma perna é recusado se qualquer uma das duas está num mês fechado; nenhuma sai.
+- Recusa → **409** `{ error: "O mês 10/2026 está fechado no caixa \"BANCO\". Reabra o mês para mudar lançamentos dele." }` (`ClosedMonthError`, um `BusinessRuleError`), e nada é gravado. Vale para `POST`/`PATCH`/`DELETE /admin/finance/transactions[/:id]` e `POST /admin/finance/transfers`. Quando mais de um mês está fechado, a mensagem cita o mais antigo.
+- O mês do lançamento é o da data em UTC (`date.toISOString().slice(0, 7)`), o mesmo relógio do cálculo do fechamento (`monthRange`). O painel manda `"AAAA-MM-DD"`.
+- Fica de fora: lançamento sem caixa (não entra em fechamento nenhum), o mesmo mês em outro caixa e os comprovantes (anexar e remover continuam livres).
+- As respostas não ganharam campo novo: o painel sabe o que está fechado por `GET /admin/finance/closings` (pares `accountId` + `month`).
 
 ## Modelos
 

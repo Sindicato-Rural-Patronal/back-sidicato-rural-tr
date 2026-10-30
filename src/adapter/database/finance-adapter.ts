@@ -21,6 +21,8 @@ import type {
     FinancePaymentMethodCreateInput,
     FinancePaymentMethodUpdateInput,
     FinanceAccountMonthMovement,
+    FinanceAccountMonth,
+    FinanceClosedMonth,
     FinanceClosingCreateInput,
     FinancialType,
     FinanceCategoryCreateInput,
@@ -249,6 +251,15 @@ isDeleted: false },
 deletedAt: new Date() },
         });
         return r.count > 0;
+    }
+
+    listTransferLegs(transferId: string): Promise<FinancialTransactionModel[]> {
+        return this.prisma.financialTransaction.findMany({
+            where: {
+                transferId,
+                isDeleted: false,
+            },
+        });
     }
 
     // ── Comprovantes ──────────────────────────────────────────────────────────
@@ -598,6 +609,25 @@ year?: string
     findClosing(accountId: string, month: string): Promise<FinanceMonthlyClosingModel | null> {
         return this.prisma.financeMonthlyClosing.findFirst({ where: { accountId,
 month } });
+    }
+
+    async findClosedMonths(pairs: FinanceAccountMonth[]): Promise<FinanceClosedMonth[]> {
+        if (pairs.length === 0) return [];
+        const rows = await this.prisma.financeMonthlyClosing.findMany({
+            where: {
+                OR: pairs.map(p => ({
+                    accountId: p.accountId,
+                    month: p.month,
+                })),
+            },
+            include: { account: { select: { name: true } } },
+            orderBy: { month: 'asc' },
+        });
+        return rows.map(r => ({
+            accountId: r.accountId,
+            month: r.month,
+            accountName: r.account.name,
+        }));
     }
 
     async accountMonthMovement(

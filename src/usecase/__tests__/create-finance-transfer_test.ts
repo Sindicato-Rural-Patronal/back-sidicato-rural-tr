@@ -5,6 +5,7 @@ import type { FinanceRepository } from '../../ports/external/finance-repository.
 const repo = {
     findAccountById: vi.fn(),
     createTransfer: vi.fn(),
+    findClosedMonths: vi.fn().mockResolvedValue([]),
 } as unknown as FinanceRepository;
 
 const A = '11111111-1111-4111-8111-111111111111';
@@ -66,5 +67,34 @@ name: 'Banco' }) as any);
         expect(arg.description).toContain('Dinheiro');
         expect(arg.description).toContain('Banco');
         expect(arg.createdBy).toBe('admin-1');
+    });
+
+    it('recusa quando o mês está fechado no caixa de destino (SR-054)', async () => {
+        vi.mocked(repo.findAccountById).mockImplementation(async (id: string) =>
+            (id === A ? { id: A,
+name: 'Dinheiro' } : { id: B,
+name: 'Banco' }) as any);
+        vi.mocked(repo.findClosedMonths).mockResolvedValueOnce([
+            {
+                accountId: B,
+                month: '2026-09',
+                accountName: 'Banco',
+            },
+        ]);
+        const uc = new CreateFinanceTransferUseCase(repo);
+        const r = await uc.execute(base, null);
+        expect(r.error?.message).toContain('O mês 09/2026 está fechado no caixa "Banco"');
+        // Confere os dois caixas no mês da data.
+        expect(repo.findClosedMonths).toHaveBeenCalledWith([
+            {
+                accountId: A,
+                month: '2026-09',
+            },
+            {
+                accountId: B,
+                month: '2026-09',
+            },
+        ]);
+        expect(repo.createTransfer).not.toHaveBeenCalled();
     });
 });

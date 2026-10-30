@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { deriveAuditEntity, loginAuditMethod, skipAudit } from '../../lib/audit-entity.js';
 import { AUDIT_ENTITY_NOUNS, auditRouteKey, describeAuditAction } from '../../lib/audit-sentence.js';
-import { loginUsername, shouldLookupTargetLabel } from '../../lib/audit-label.js';
+import { closingAuditLabel, loginUsername, shouldLookupTargetLabel } from '../../lib/audit-label.js';
 import { addressText, shouldSnapshot } from '../../lib/audit-snapshot.js';
 
 const ID = '3f2b8c1e-4a5d-4e6f-8a9b-0c1d2e3f4a5b';
@@ -33,6 +33,8 @@ describe('auditoria: entidade pelo caminho', () => {
         ['/news/' + ID + '/banner', 'Notícia'],
         ['/admin/finance/transactions/' + ID + '/attachments', 'Comprovante'],
         ['/admin/finance/transactions/' + ID, 'Lançamento'],
+        ['/admin/finance/closings', 'Fechamento de caixa'],
+        ['/admin/finance/closings/' + ID, 'Fechamento de caixa'],
         ['/admin/users', 'Administrador'],
         ['/admin/users/' + ID, 'Administrador'],
         ['/admin/me', 'Administrador'],
@@ -49,7 +51,7 @@ describe('auditoria: entidade pelo caminho', () => {
     it('toda entidade derivada tem substantivo e gênero para a frase', () => {
         const paths = [
             '/admin/finance/categories', '/admin/finance/accounts', '/admin/finance/transfers',
-            '/admin/finance/attachments/x', '/admin/finance/transactions', '/admin/companies', '/admin/market-quotes/daily',
+            '/admin/finance/attachments/x', '/admin/finance/transactions', '/admin/finance/closings', '/admin/companies', '/admin/market-quotes/daily',
             '/admin/convenios', '/admin/galleries', '/admin/public-contacts', '/admin/site-settings', '/admin/invites',
             '/admin/unimed', '/rooms', '/rules', '/admin/users/x/instructor', '/news', '/admin/banners',
             '/admin/contacts/messages/x', '/admin/registrations/x', '/admin/users/x/properties',
@@ -125,6 +127,26 @@ targetLabel: 'Pessoas: 3 registros' }))
 path: '/x',
 entity: 'Coisa',
 targetLabel: null })).toBe('Excluiu um coisa');
+    });
+});
+
+describe('auditoria: fechamento do mês (SR-054)', () => {
+    it('rótulo "mês · caixa"', () => {
+        expect(closingAuditLabel('2026-10', 'BANCO')).toBe('10/2026 · BANCO');
+        expect(closingAuditLabel('2026-10', null)).toBe('10/2026');
+    });
+
+    it('fechar e reabrir têm frase própria', () => {
+        expect(sentence('POST', '/admin/finance/closings', '10/2026 · BANCO')).toBe('Fechou o mês "10/2026 · BANCO"');
+        expect(sentence('POST', '/admin/finance/closings')).toBe('Fechou o mês de um caixa');
+        expect(sentence('DELETE', `/admin/finance/closings/${ID}`, '10/2026 · BANCO')).toBe('Reabriu o mês "10/2026 · BANCO"');
+        expect(sentence('DELETE', `/admin/finance/closings/${ID}`)).toBe('Reabriu o mês de um caixa');
+    });
+
+    it('fechar busca o rótulo (caixa do corpo); reabrir guarda o que estava fechado', () => {
+        expect(shouldLookupTargetLabel('POST', '/admin/finance/closings')).toBe(true);
+        expect(shouldLookupTargetLabel('DELETE', `/admin/finance/closings/${ID}`)).toBe(true);
+        expect(shouldSnapshot('DELETE', `/admin/finance/closings/${ID}`)).toBe(true);
     });
 });
 
