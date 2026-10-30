@@ -2,12 +2,13 @@ import { z } from 'zod';
 import type { FinanceRepository } from '../ports/external/finance-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { closedMonthError } from './finance-closed-month.js';
+import { financeDate } from './finance-dates.js';
 
 export const financeTransferSchema = z.object({
     fromAccountId: z.string().uuid('Caixa de origem inválido'),
     toAccountId: z.string().uuid('Caixa de destino inválido'),
     amountCents: z.number().int().positive('O valor deve ser maior que zero'),
-    date: z.coerce.date(),
+    date: financeDate,
     description: z.preprocess(v => (v === '' ? undefined : v), z.string().optional()),
     method: z.preprocess(v => (v === '' ? null : v), z.string().nullable().optional()),
 });

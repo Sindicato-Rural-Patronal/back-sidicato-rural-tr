@@ -5,12 +5,13 @@ import type {
 } from '../ports/external/finance-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { closedMonthError } from './finance-closed-month.js';
+import { financeDate } from './finance-dates.js';
 
 export const financeTransactionSchema = z.object({
     // null/ausente = "só nota" (sem lançamento no caixa): não entra em saldo/KPIs.
     type: z.preprocess(v => (v === '' ? null : v), z.enum(['IN', 'OUT']).nullable().optional()),
     amountCents: z.number().int().positive('O valor deve ser maior que zero'),
-    date: z.coerce.date(),
+    date: financeDate,
     description: z.string().min(1, 'Informe a descrição'),
     method: z.preprocess(v => (v === '' ? null : v), z.string().nullable().optional()),
     notes: z.preprocess(v => (v === '' ? null : v), z.string().nullable().optional()),

@@ -10,6 +10,7 @@ import { registerAuditHooks } from './http/audit-hooks.js';
 
 import { loadEnv } from './config/env.js';
 import { apiErrorHandler } from './http/error-handler.js';
+import { AJV_CUSTOM_OPTIONS, parseJsonBody } from './http/lib/request-parsing.js';
 
 // Não expor o token de convite em logs (ele vai no caminho da URL).
 function safeUrl(url: string): string {
@@ -25,11 +26,8 @@ const server = fastify({
     trustProxy: (_address: string, hop: number) => hop === 0,
     logger: true,
     disableRequestLogging: true,
-    ajv: {
-        customOptions: {
-            keywords: ['example'],
-        },
-    },
+    // As mesmas opções do app dos E2E (http/lib/request-parsing.ts).
+    ajv: { customOptions: AJV_CUSTOM_OPTIONS },
 });
 
 server.addHook('onRequest', (request, _reply, done) => {
@@ -88,17 +86,8 @@ if (process.env.NODE_ENV !== 'production' || process.env.ENABLE_DOCS === 'true')
     });
 }
 
-server.addContentTypeParser('application/json', { parseAs: 'string' }, function (_req, body, done) {
-    if (body === '' || body === null || body === undefined) {
-        done(null, {});
-        return;
-    }
-    try {
-        done(null, JSON.parse(body as string));
-    } catch (err) {
-        done(err as Error, undefined);
-    }
-});
+// JSON malformado → 400 (antes saía 500); corpo vazio vale {}.
+server.addContentTypeParser('application/json', { parseAs: 'string' }, parseJsonBody);
 
 // Sem `limits`, o @fastify/multipart usa o bodyLimit padrão do Fastify (1MB),
 // que rejeita (413) avatares/banners/fichas reais. 15MB cobre a ficha escaneada

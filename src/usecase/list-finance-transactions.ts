@@ -5,11 +5,12 @@ import type {
     FinanceTransactionWithCategory,
 } from '../ports/external/finance-repository.js';
 import { parseQuery } from '../errors/validation.js';
+import { financeDate } from './finance-dates.js';
 
 /** Filtros dos lançamentos (lista e exportação usam os mesmos). */
 export const financeFiltersSchema = z.object({
-    from: z.preprocess(v => (v === '' || v == null ? undefined : v), z.coerce.date().optional()),
-    to: z.preprocess(v => (v === '' || v == null ? undefined : v), z.coerce.date().optional()),
+    from: z.preprocess(v => (v === '' || v == null ? undefined : v), financeDate.optional()),
+    to: z.preprocess(v => (v === '' || v == null ? undefined : v), financeDate.optional()),
     type: z.enum(['IN', 'OUT']).optional(),
     categoryId: z.preprocess(v => (v === '' ? undefined : v), z.string().uuid().optional()),
     accountId: z.preprocess(v => (v === '' ? undefined : v), z.string().uuid().optional()),

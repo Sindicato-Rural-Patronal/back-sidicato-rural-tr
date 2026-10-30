@@ -50,7 +50,8 @@ src/
     error-handler.ts       apiErrorHandler
     router/                um plugin Fastify por módulo (schema Swagger + handler)
     controllers/           leem a request, checam permissão, chamam o use case
-    lib/                   route-auth.ts (acesso por rota), require-permission.ts (errorToStatus), public-rate-limit.ts, swagger-schemas.ts
+    lib/                   route-auth.ts (acesso por rota), require-permission.ts (errorToStatus), public-rate-limit.ts, swagger-schemas.ts,
+                           request-parsing.ts (parser de JSON, opções do Ajv, limites dos números)
   usecase/                 regras de negócio (sem Fastify; Prisma só pelos ports)
   ports/external/          interfaces dos repositórios
   adapter/database/        implementações Prisma dos ports; list-filters.ts; prisma-errors.ts
@@ -179,13 +180,19 @@ qualquer outro     → 400   (ValidationError, Error, e também error ausente)
 ```
 
 O que o use case **lança** (em vez de devolver) cai no `apiErrorHandler` (`http/error-handler.ts`):
-- validação do JSON schema (Ajv) → 400 com a mensagem do Ajv;
+- validação do JSON schema (Ajv) → 400 com a mensagem do Ajv em português (`http/validation-message.ts`), ex.: `Valor maior que o máximo em "amountCents": 2147483647.`;
+- `ZodError` de um `.parse` → 400 com a mensagem do primeiro problema e o campo (`Campo "amountCents": …`). A regra continua sendo `safeParse` ou `parseQuery`; isto é a rede;
 - P2002 → 409 "Registro já existe (dados únicos em conflito).";
 - P2003 → 409 "Registro em uso e não pode ser removido.";
+- valor que o banco recusa → **400**: P2020 ou SQLSTATE 22003 "Número fora do limite permitido."; P2000 ou 22001 "Texto longo demais para o campo."; SQLSTATE 22007/22008/22009 "Data fora do intervalo aceito." (ano 0 ou antes de 4713 a.C., que o JavaScript aceita); P2007 e o resto da classe 22 do Postgres (ex.: caractere nulo `\u0000` no texto) "Valor inválido.". O SQLSTATE vem de `postgresSqlState` (`lib/prisma-errors.ts`), porque o driver adapter entrega esses erros como P2039 com o código em `meta.driverAdapterError.cause`;
 - erro com `statusCode` < 500 (ex.: 429 do rate limit) → esse status com a mensagem;
 - o resto → 500 "Erro interno do servidor." e `request.log.error`.
 - `ValidationError` lançado tem `statusCode = 400` → 400 com a mensagem. Filtro de consulta validado com `parseQuery` (`errors/validation.ts`) sai assim: "Parâmetro inválido: <campo>".
-- Atenção: JSON malformado no corpo hoje cai aqui como 500 (o parser de `index.ts` não põe `statusCode`).
+
+**Entrada que não chega a ser 500** (SR-055, `http/lib/request-parsing.ts`, o mesmo no servidor e no app dos E2E):
+- **JSON malformado** no corpo → 400 "O corpo da requisição não é um JSON válido." (`parseJsonBody`). Corpo vazio com `content-type: application/json` continua valendo `{}`.
+- **Números com limite:** um hook `onRoute` (`limitNumberInputs`, registrado em `registerRouters`) põe em toda propriedade `integer` do corpo, da query e dos parâmetros os limites do int4 do Postgres (−2.147.483.648 a 2.147.483.647) e em toda `number` os do número finito, sem afrouxar o que a rota já declarou. Fora disso, 400 do Ajv citando o campo. Rota nova ganha isso sozinha.
+- **`strictNumbers: false`** no Ajv (`AJV_CUSTOM_OPTIONS`): com o padrão do Ajv 8, `?page=1e400` (Infinity depois da coerção) passava sem conferir nem o `maximum`.
 
 **Regra das listagens:** sempre 200, com lista vazia ou página zerada. 404 só em detalhe ou ação sobre id inexistente.
 
@@ -767,6 +774,7 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 | `DELETE` | `/admin/finance/closings/:id` | **reabrir o mês** → 204; inexistente → 404 | `DELETE_FINANCE` |
 
 **Lançamento:** `{ type?: IN|OUT|null, amountCents, date, description, method?, notes?, categoryId?, accountId?, empenho? }`.
+- **Datas e meses do Financeiro** (`usecase/finance-dates.ts`, SR-055): `date` do lançamento e da transferência e os filtros `from`/`to` (lista, CSV, resumo) só aceitam ano de 1900 a 2999. Fora disso, ou texto que não é data → 400 "Data inválida: use um ano entre 1900 e 2999." (nos filtros, "Parâmetro inválido: from"). Os meses `AAAA-MM` (recorrência e fechamento) também: "Mês inválido (use AAAA-MM, com ano entre 1900 e 2999)". Antes, ano 0 dava 500, e "0026-01" no início de uma recorrência fazia a geração falhar toda vez que a tela abria.
 - `empenho` é a Nota de Empenho, JSON ou null: `numero, notaFiscal, nomeFantasia, razaoSocial, cnpjCpf, inscricaoEstadual, endereco, bairro, cep, cidade, uf, telefone, banco, conta, agencia, cheque, descontoCents, usuarioId, empresaId`.
 - Recusas → 400:
   - categoria sem tipo no lançamento;
@@ -898,7 +906,7 @@ Helpers que não são adapters:
 1. **Port** em `ports/external/foo-repository.ts` e **adapter** em `adapter/database/foo-adapter.ts` (`createFooAdapter(prisma)`, `semRegistro` no `catch`).
 2. **Use case** em `usecase/`: valida com Zod (`safeParse`, nunca `parse`) e devolve `{ error?, ...resultado }`.
 3. **Controller** em `http/controllers/`: não confere permissão (a rota declara); quem chamou é `adminOf(request)`. Responde com `errorToStatus`.
-4. **Router** em `http/router/`: `config: { auth: requires('X') }` (ou `publicRoute()`, `loggedIn()`, `requiresFrom`) e schema Swagger com `tags`, `summary`, `description`, `body`/`params`/`querystring` e `response`. O `security` e a permissão na descrição saem da declaração. Registrado em `http/register-routers.ts`, o que já vale para o servidor e para os E2E.
+4. **Router** em `http/router/`: `config: { auth: requires('X') }` (ou `publicRoute()`, `loggedIn()`, `requiresFrom`) e schema Swagger com `tags`, `summary`, `description`, `body`/`params`/`querystring` e `response`. O `security` e a permissão na descrição saem da declaração, e os inteiros de entrada ganham o limite do int4 sozinhos. Registrado em `http/register-routers.ts`, o que já vale para o servidor e para os E2E.
 5. **Auditoria:** rota que edita um registro → `SNAPSHOTS` (`lib/audit-snapshot.ts`); ação diferente de criar/editar/excluir → `SPECIAL` (`lib/audit-sentence.ts`); entidade nova → `AUDIT_ENTITY_NOUNS`.
 6. **Permissão nova** → enum no schema + migration que a concede (ver Autenticação).
 7. **Testes:** unitário do use case e, para rota protegida, E2E com 401 sem token e 403 sem a permissão.

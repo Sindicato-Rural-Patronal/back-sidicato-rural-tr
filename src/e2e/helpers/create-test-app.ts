@@ -6,6 +6,7 @@ import rateLimit from '@fastify/rate-limit';
 import { registerRouters } from '../../http/register-routers.js';
 import { apiErrorHandler } from '../../http/error-handler.js';
 import { registerAuditHooks } from '../../http/audit-hooks.js';
+import { AJV_CUSTOM_OPTIONS, parseJsonBody } from '../../http/lib/request-parsing.js';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import type { FastifyInstance } from 'fastify';
 
@@ -16,25 +17,11 @@ export async function createTestApp(
     prisma: PrismaClient,
     options: { rateLimit?: boolean } = {},
 ): Promise<FastifyInstance> {
-    // Mesmas opções de AJV do servidor real (as rotas documentam `example`).
+    // Mesmas opções de AJV e o mesmo parser de JSON do servidor real.
     const app = fastify({ logger: false,
-ajv: { customOptions: { keywords: ['example'] } } });
+ajv: { customOptions: AJV_CUSTOM_OPTIONS } });
 
-    app.addContentTypeParser(
-        'application/json',
-        { parseAs: 'string' },
-        function (_req, body, done) {
-            if (body === '' || body === null || body === undefined) {
-                done(null, {});
-                return;
-            }
-            try {
-                done(null, JSON.parse(body as string));
-            } catch (err) {
-                done(err as Error, undefined);
-            }
-        },
-    );
+    app.addContentTypeParser('application/json', { parseAs: 'string' }, parseJsonBody);
 
     app.register(cors, {
         origin: true,

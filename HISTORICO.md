@@ -2,7 +2,7 @@
 
 O que mudou e por quê. As regras que valem hoje estão no `CLAUDE.md`. Este arquivo serve para entender de onde veio uma regra ou um dado estranho no banco. As entradas mais novas ficam no topo.
 
-## 30/10/2026: SR-054 e SR-056
+## 30/10/2026: SR-054, SR-055 e SR-056
 
 - **Mês fechado passou a travar lançamentos (SR-054, fecha a SR-020).**
   - O fechamento mensal existia desde setembro, mas não travava nada: dava para lançar, editar e excluir no mês fechado, e o saldo conferido deixava de bater sem ninguém perceber.
@@ -11,6 +11,12 @@ O que mudou e por quê. As regras que valem hoje estão no `CLAUDE.md`. Este arq
   - A recorrência não lança no mês fechado e volta a tentar o mês nas rodadas seguintes, para que reabrir libere também a geração, sem o lançamento do mês se perder de vez.
   - Fechar e reabrir já entravam na trilha, mas como "Criou um registro"/"Excluiu um registro" (entidade "Outro"). Passaram a ter frase própria, e reabrir guarda os valores do fechamento apagado. Reabrir continua apagando a linha do fechamento: a tabela não tem soft-delete, e a trilha guarda o que havia.
   - Comprovantes ficaram fora da trava: não mexem no saldo, e anexar o comprovante depois do fechamento é o uso normal.
+- **Entrada errada dava 500 em vez de 400 (SR-055, B2).** Os `.parse` do Zod citados na SR-002 já tinham virado `parseQuery`; o que sobrava apareceu numa sonda que passou por todas as 191 rotas com entradas erradas:
+  - JSON malformado no corpo: o parser de `index.ts` repassava o erro de sintaxe sem `statusCode` (todas as rotas com corpo).
+  - Inteiro maior que o int4 do Postgres (`order` de categoria, caixa e forma de pagamento; valores em centavos; lotação): passava pelo JSON schema e estourava no banco.
+  - `?page=1e400`: a coerção do Ajv dava Infinity, que com o `strictNumbers` padrão do Ajv 8 passava até pelo `maximum`, e o Prisma recusava o `skip` ou o `take` (16 listagens).
+  - Datas com ano 0 ou antes de 4713 a.C.: válidas no JavaScript, recusadas pelo Postgres (lista, CSV e resumo do Financeiro, lançamento e auditoria).
+  - A correção ficou em pontos centrais (parser e opções do Ajv compartilhados com o app dos E2E, limites dos números num hook `onRoute`, e o error handler tratando `ZodError` e a classe 22 do Postgres), mais a validação das datas e meses do Financeiro, onde o erro tem nome de campo. Depois disso a sonda não achou nenhum 500.
 - **Busca de lançamentos pelo CNPJ/CPF do fornecedor (SR-056, A1).** A SR-039 pôs na busca a razão social e o nome fantasia da Nota de Empenho, mas não o documento. O empenho guarda o CNPJ/CPF como foi digitado (com ou sem pontuação), então a comparação é pelos dígitos, só quando o termo parece documento e tem 3 ou mais dígitos, a mesma regra da busca de pessoas. Sem migration: a consulta usa `regexp_replace` sobre o JSON.
 - **Reativar recorrência pausada lançava a pausa inteira de uma vez (B1).** O marcador `lastGeneratedMonth` ficava no mês da pausa, e a geração preenchia todos os meses até o atual. Decidido em 30/10: os meses da pausa são pulados. Nada do que já foi gerado é apagado ou alterado.
 

@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import type { FinanceRepository, FinanceSummary } from '../ports/external/finance-repository.js';
 import { parseQuery } from '../errors/validation.js';
+import { financeDate } from './finance-dates.js';
 
 const querySchema = z.object({
-    from: z.preprocess(v => (v === '' || v == null ? undefined : v), z.coerce.date().optional()),
-    to: z.preprocess(v => (v === '' || v == null ? undefined : v), z.coerce.date().optional()),
+    from: z.preprocess(v => (v === '' || v == null ? undefined : v), financeDate.optional()),
+    to: z.preprocess(v => (v === '' || v == null ? undefined : v), financeDate.optional()),
 });
 
 export class FinanceSummaryUseCase {

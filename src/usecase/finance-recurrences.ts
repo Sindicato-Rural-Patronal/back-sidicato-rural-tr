@@ -7,13 +7,17 @@ import type {
 } from '../ports/external/finance-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { NotFoundError } from '../errors/not-found.js';
+import { FINANCE_MAX_YEAR, FINANCE_MIN_YEAR, isFinanceYear } from './finance-dates.js';
 
 // ── Meses ("YYYY-MM") ───────────────────────────────────────────────────────
 // Mês é texto: comparável e ordenável como string, e sem surpresa de fuso.
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
+export const MONTH_MESSAGE = `Mês inválido (use AAAA-MM, com ano entre ${FINANCE_MIN_YEAR} e ${FINANCE_MAX_YEAR})`;
+
+/** "AAAA-MM" com ano entre 1900 e 2999 (SR-055: "0026-01" quebrava a geração). */
 export function isMonth(value: string): boolean {
-    return MONTH_RE.test(value);
+    return MONTH_RE.test(value) && isFinanceYear(Number(value.slice(0, 4)));
 }
 
 /** Mês (no fuso local do servidor) de uma data — "hoje" da geração. */
@@ -95,7 +99,7 @@ function minMonth(a: string, b: string): string {
 }
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
-const monthField = z.string().regex(MONTH_RE, 'Mês inválido (use AAAA-MM)');
+const monthField = z.string().refine(isMonth, MONTH_MESSAGE);
 
 export const financeRecurrenceSchema = z.object({
     type: z.enum(['IN', 'OUT']),
