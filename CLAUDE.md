@@ -182,7 +182,7 @@ qualquer outro     → 400   (ValidationError, Error, e também error ausente)
 O que o use case **lança** (em vez de devolver) cai no `apiErrorHandler` (`http/error-handler.ts`):
 - validação do JSON schema (Ajv) → 400 com a mensagem do Ajv em português (`http/validation-message.ts`), ex.: `Valor maior que o máximo em "amountCents": 2147483647.`;
 - `ZodError` de um `.parse` → 400 com a mensagem do primeiro problema e o campo (`Campo "amountCents": …`). A regra continua sendo `safeParse` ou `parseQuery`; isto é a rede;
-- P2002 → 409 "Registro já existe (dados únicos em conflito).". Para saber **qual** índice foi, use `uniqueViolationTarget` (`lib/prisma-errors.ts`): com o `@prisma/adapter-pg` o `meta.target` não vem, e o nome do índice está em `meta.driverAdapterError.cause.constraint.index`;
+- P2002 → 409 "Registro já existe (dados únicos em conflito).". Para saber **qual** índice foi, use `uniqueViolationTarget` (`lib/prisma-errors.ts`), a única leitura que existe: com o `@prisma/adapter-pg` o `meta.target` não vem, e o nome do índice está em `meta.driverAdapterError.cause.constraint.index` (ela lê os dois, `meta.target` primeiro). Quem depende do índice: o `register-full` (CPF × inscrição), o cadastro de administrador (usuário × pessoa) e a recorrência/Nº do Financeiro. `register-by-cpf` e a inscrição pela equipe só gravam uma linha de `courseUserRegistration`, então qualquer P2002 neles já é a inscrição repetida;
 - P2003 → 409 "Registro em uso e não pode ser removido.";
 - valor que o banco recusa → **400**: P2020 ou SQLSTATE 22003 "Número fora do limite permitido."; P2000 ou 22001 "Texto longo demais para o campo."; SQLSTATE 22007/22008/22009 "Data fora do intervalo aceito." (ano 0 ou antes de 4713 a.C., que o JavaScript aceita); P2007 e o resto da classe 22 do Postgres (ex.: caractere nulo `\u0000` no texto) "Valor inválido.". O SQLSTATE vem de `postgresSqlState` (`lib/prisma-errors.ts`), porque o driver adapter entrega esses erros como P2039 com o código em `meta.driverAdapterError.cause`;
 - erro com `statusCode` < 500 (ex.: 429 do rate limit) → esse status com a mensagem;
@@ -352,7 +352,7 @@ CNPJ é gravado só com dígitos e é único entre as empresas ativas → 409 "J
 **Cadastro de admin:**
 - Senha com 8+ caracteres → 400 "A senha deve ter ao menos 8 caracteres.".
 - Usuário não vazio, gravado sem os espaços das pontas → 400 "Informe o usuário.".
-- Usuário de outro admin ativo → 409. A pessoa já ser admin ativa → 409.
+- Usuário de outro admin ativo → 409 "Username already exists". A pessoa já ser admin ativa → 409 "This user already has an admin account", inclusive quando a conta dela é criada ao mesmo tempo por outra requisição (o P2002 do índice `UserAdmin_userDataId_key` não é mais confundido com o do usuário).
 - Admin excluído da mesma pessoa é **reativado** na mesma linha.
 - Regra mais forte que a de quem pede → 403.
 
@@ -541,7 +541,7 @@ O site usa a mesma regra (`utils/course-status.ts` no front).
 - **Consulta e `register-by-cpf`:** os 4 últimos dígitos (`phoneEnd`). CPF sem cadastro e telefone que não confere dão a mesma resposta, com a mesma consulta ao banco.
 - **`register-full`:** o telefone completo, pelos últimos 8 dígitos (ignora DDD e o nono dígito de cadastro antigo). Não confere, ou o cadastro não tem telefone → 409 genérico; nada é vinculado nem alterado. O cadastro existente nunca é sobrescrito pelo formulário.
 - E-mail e telefone iguais aos de outra pessoa, com CPF novo, criam cadastro próprio.
-- CPF criado ao mesmo tempo por outra inscrição → 409 "CPF já cadastrado para outra pessoa.".
+- CPF criado ao mesmo tempo por outro cadastro → 409 "CPF já cadastrado para outra pessoa."; inscrição da mesma pessoa no mesmo curso gravada ao mesmo tempo por um caminho que não passou pela trava de vagas → 409 "Esta pessoa já está inscrita neste curso.". Quem diz qual foi é o índice do P2002 (`UserData_cpf_active_unique` × `courseUserRegistration_courseId_userDataId_active_key`). Dentro da trava, a conferência da inscrição repetida já pega antes do índice.
 
 **Vagas** (`lockCourseSeats` em `registration-adapter.ts`):
 - Quem conta e insere trava as vagas do curso (`pg_advisory_xact_lock`) antes de contar, em READ COMMITTED: `createWithCapacity` (que atende o `register-by-cpf` e a inscrição pela equipe) e o `register-full`.

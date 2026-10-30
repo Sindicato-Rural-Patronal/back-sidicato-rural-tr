@@ -79,7 +79,11 @@ interface UniqueViolationMeta {
  * erro traz. O Prisma sem driver adapter põe em `meta.target` (array de colunas
  * ou o nome do índice). Com o `@prisma/adapter-pg`, o nosso, `meta.target` não
  * vem: vem `meta.driverAdapterError.cause.constraint`, com `index` (o nome do
- * índice, medido no E2E em 30/10) ou `fields`. Lê os dois.
+ * índice, medido no E2E em 30/10) ou `fields`. Lê os dois, `meta.target` primeiro.
+ *
+ * É a única leitura do índice violado. Havia outra, `uniqueViolationFields`, que
+ * só olhava `meta.target` e devolvia sempre `[]` com o adapter-pg (SR-069): quem
+ * a usava caía no "senão" e respondia como se todo P2002 fosse o do CPF.
  */
 export function uniqueViolationTarget(error: unknown): string[] {
     if (!isPrismaUniqueViolation(error)) return [];
@@ -92,18 +96,4 @@ export function uniqueViolationTarget(error: unknown): string[] {
     if (typeof constraint?.index === 'string') out.push(constraint.index);
     if (Array.isArray(constraint?.fields)) out.push(...constraint.fields.map(String));
     return out;
-}
-
-/**
- * Campos/índice envolvidos numa violação de unicidade (P2002). Prisma expõe
- * `meta.target` como array de colunas ou, para índices nomeados, uma string.
- * Atenção: com o `@prisma/adapter-pg` o `meta.target` não vem e isto devolve
- * `[]`; o índice está em `uniqueViolationTarget`.
- */
-export function uniqueViolationFields(error: unknown): string[] {
-    if (!isPrismaUniqueViolation(error)) return [];
-    const target = (error as { meta?: { target?: unknown } }).meta?.target;
-    if (Array.isArray(target)) return target.map(String);
-    if (typeof target === 'string') return [target];
-    return [];
 }

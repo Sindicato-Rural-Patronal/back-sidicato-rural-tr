@@ -8,7 +8,7 @@ import { UserDataNotFoundError, RoleNotFoundError } from '../errors/not-found.js
 import { ForbiddenError } from '../errors/auth.js';
 import { ValidationError } from '../errors/validation.js';
 import { exceedsActor } from './admin-guards.js';
-import { isPrismaUniqueViolation } from '../lib/prisma-errors.js';
+import { isPrismaUniqueViolation, uniqueViolationTarget } from '../lib/prisma-errors.js';
 
 type CreateUserAdminRequest = {
     username: string;
@@ -100,6 +100,13 @@ password: request.password });
             return { userAdminId: newAdmin.id };
         } catch (err: unknown) {
             if (isPrismaUniqueViolation(err)) {
+                // Dois índices podem estourar aqui: o do usuário
+                // ("UserAdmin_username_active_key") e o da pessoa, que só tem uma
+                // conta ("UserAdmin_userDataId_key"), de quem criou a dela ao
+                // mesmo tempo. Sem saber o índice, o padrão é o do usuário.
+                if (uniqueViolationTarget(err).some(f => f.includes('userDataId'))) {
+                    return { error: new AdminAccountAlreadyExistsError() };
+                }
                 return { error: new UsernameAlreadyExistsError() };
             }
             const msg = err instanceof Error ? err.message : String(err);

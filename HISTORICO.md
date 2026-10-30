@@ -2,6 +2,13 @@
 
 O que mudou e por quê. As regras que valem hoje estão no `CLAUDE.md`. Este arquivo serve para entender de onde veio uma regra ou um dado estranho no banco. As entradas mais novas ficam no topo.
 
+## 30/10/2026: SR-069, o P2002 do adapter-pg e o índice violado
+
+- **O problema.** Com o `@prisma/adapter-pg` o P2002 vem sem `meta.target`; o nome do índice está em `meta.driverAdapterError.cause.constraint.index`. O `uniqueViolationFields` (usado no `register-full`) só lia o `meta.target`, então devolvia sempre `[]` e o código caía no "senão": todo P2002 virava "CPF já cadastrado".
+- **O que isso causava na prática.** Nada visível hoje. Dentro da trava de vagas, o `register-full` confere a inscrição repetida antes de gravar (a repetição em sequência sempre respondeu "Esta pessoa já está inscrita neste curso."), e o único outro P2002 alcançável é o do CPF, que estava certo por acaso. O erro só apareceria para uma inscrição gravada por fora da trava no mesmo instante. O caso que estava errado de verdade era o cadastro de administrador: duas requisições criando a conta da mesma pessoa ao mesmo tempo davam "Username already exists" em vez de "This user already has an admin account".
+- **A correção.** O `uniqueViolationFields` foi apagado; o `uniqueViolationTarget` (da SR-064) é a única leitura do índice. O `register-full` e o `CreateUserAdminUseCase` passaram a usá-lo. Os outros usos de `isPrismaUniqueViolation` (`register-by-cpf`, inscrição pela equipe) só gravam uma tabela com um índice único, então não dependem do nome.
+- **Como o teste provoca o P2002 de verdade.** Uma transação do teste grava a linha e fica aberta; a requisição não a enxerga, passa pelas conferências e espera no índice; o teste confirma e o Postgres devolve o P2002. Sem mock do erro (`unique-violations.e2e_test.ts`).
+
 ## 30/10/2026: SR-064, Nº dos lançamentos (decisão 005)
 
 - **Ida A: a coluna `number` e a numeração dos lançamentos que já existiam.**
