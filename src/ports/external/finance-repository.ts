@@ -5,6 +5,7 @@ import type { FinanceRecurringTransactionModel } from '../../generated/prisma/mo
 import type { FinancePaymentMethodModel } from '../../generated/prisma/models/FinancePaymentMethod.js';
 import type { FinanceMonthlyClosingModel } from '../../generated/prisma/models/FinanceMonthlyClosing.js';
 import type { FinancialType } from '../../generated/prisma/enums.js';
+import type { FinanceNumberConflict } from '../../lib/finance-number.js';
 
 export type {
     FinancialCategoryModel,
@@ -58,6 +59,8 @@ export type FinanceEmpenho = {
 };
 
 export type FinanceTransactionCreateInput = {
+    /** Nº digitado (decisão 005). Ausente = automático: o maior + 1. */
+    number?: number;
     // null = "só nota" (sem lançamento no caixa; fora de saldo/KPIs).
     type: FinancialType | null;
     amountCents: number;
@@ -74,6 +77,14 @@ export type FinanceTransactionCreateInput = {
 export type FinanceTransactionUpdateInput = Partial<
     Omit<FinanceTransactionCreateInput, 'createdBy'>
 >;
+
+export type { FinanceNumberConflict };
+
+/**
+ * Gravação que escolhe ou confere o Nº dentro da trava: `conflict` quando o
+ * número pedido já é de outro lançamento (nada é gravado).
+ */
+export type FinanceNumberedWrite<T> = { conflict: FinanceNumberConflict } | { result: T };
 
 export type FinanceTransferInput = {
     fromAccountId: string;
@@ -117,6 +128,8 @@ export type FinanceTransactionFilters = {
     /** Forma de pagamento (texto do lançamento; comparado sem diferenciar maiúsculas). */
     method?: string;
     search?: string;
+    /** Ordem: `date` (padrão) ou `number`, os dois do mais novo para o mais antigo. */
+    orderBy?: 'date' | 'number';
     skip: number;
     take: number;
 };
@@ -272,11 +285,19 @@ total: number
         filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>,
     ): Promise<FinanceTransactionSum[]>;
     findTransactionById(id: string): Promise<FinancialTransactionModel | null>;
-    createTransaction(data: FinanceTransactionCreateInput): Promise<FinancialTransactionModel>;
-    updateTransaction(id: string, data: FinanceTransactionUpdateInput): Promise<FinancialTransactionModel>;
+    // Criar e editar o Nº passam pela trava do número (decisão 005, item 3):
+    // sem `number`, o automático; com ele, conferido contra todos, até os excluídos.
+    createTransaction(data: FinanceTransactionCreateInput): Promise<FinanceNumberedWrite<FinancialTransactionModel>>;
+    updateTransaction(
+        id: string,
+        data: FinanceTransactionUpdateInput,
+    ): Promise<FinanceNumberedWrite<FinancialTransactionModel>>;
+    // O próximo Nº automático (o maior + 1), só informativo: não reserva.
+    nextTransactionNumber(): Promise<number>;
     softDeleteTransaction(id: string): Promise<boolean>;
 
-    // Transferência entre caixas: cria os 2 lançamentos ligados e devolve [saída, entrada].
+    // Transferência entre caixas: cria os 2 lançamentos ligados e devolve
+    // [saída, entrada], com dois números seguidos (a saída com o menor).
     createTransfer(input: FinanceTransferInput): Promise<FinancialTransactionModel[]>;
     // Soft-delete dos 2 lançamentos de uma transferência.
     softDeleteTransfer(transferId: string): Promise<boolean>;
@@ -303,7 +324,8 @@ total: number
     updateRecurrence(id: string, data: FinanceRecurrenceUpdateInput): Promise<FinanceRecurringTransactionModel>;
     // Soft-delete: os lançamentos já gerados continuam no caixa.
     softDeleteRecurrence(id: string): Promise<boolean>;
-    // Cria o lançamento do mês; `false` quando ele já existia (unique) — idempotente.
+    // Cria o lançamento do mês, com o Nº automático; `false` quando o mês já
+    // existia (unique de recurringId + recurringMonth) — idempotente.
     createRecurrenceTransaction(run: FinanceRecurrenceRun): Promise<boolean>;
     setRecurrenceLastGeneratedMonth(id: string, month: string): Promise<void>;
 

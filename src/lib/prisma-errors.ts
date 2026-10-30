@@ -64,9 +64,41 @@ export function postgresSqlState(error: unknown): string | null {
     return null;
 }
 
+interface UniqueConstraint {
+    index?: unknown;
+    fields?: unknown;
+}
+
+interface UniqueViolationMeta {
+    target?: unknown;
+    driverAdapterError?: { cause?: { constraint?: UniqueConstraint } };
+}
+
+/**
+ * Qual índice único foi violado (P2002): os nomes de colunas e do índice que o
+ * erro traz. O Prisma sem driver adapter põe em `meta.target` (array de colunas
+ * ou o nome do índice). Com o `@prisma/adapter-pg`, o nosso, `meta.target` não
+ * vem: vem `meta.driverAdapterError.cause.constraint`, com `index` (o nome do
+ * índice, medido no E2E em 30/10) ou `fields`. Lê os dois.
+ */
+export function uniqueViolationTarget(error: unknown): string[] {
+    if (!isPrismaUniqueViolation(error)) return [];
+    const meta = (error as { meta?: UniqueViolationMeta }).meta;
+    const out: string[] = [];
+    const target = meta?.target;
+    if (Array.isArray(target)) out.push(...target.map(String));
+    else if (typeof target === 'string') out.push(target);
+    const constraint = meta?.driverAdapterError?.cause?.constraint;
+    if (typeof constraint?.index === 'string') out.push(constraint.index);
+    if (Array.isArray(constraint?.fields)) out.push(...constraint.fields.map(String));
+    return out;
+}
+
 /**
  * Campos/índice envolvidos numa violação de unicidade (P2002). Prisma expõe
  * `meta.target` como array de colunas ou, para índices nomeados, uma string.
+ * Atenção: com o `@prisma/adapter-pg` o `meta.target` não vem e isto devolve
+ * `[]`; o índice está em `uniqueViolationTarget`.
  */
 export function uniqueViolationFields(error: unknown): string[] {
     if (!isPrismaUniqueViolation(error)) return [];

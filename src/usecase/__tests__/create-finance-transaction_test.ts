@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CreateFinanceTransactionUseCase } from '../create-finance-transaction.js';
 import { BusinessRuleError } from '../../errors/business-rule.js';
+import { ConflictError } from '../../errors/conflict.js';
 import type { FinanceRepository } from '../../ports/external/finance-repository.js';
 
 const repo = {
@@ -36,7 +37,7 @@ description: '' }, null);
     });
 
     it('cria lançamento válido sem categoria/caixa', async () => {
-        vi.mocked(repo.createTransaction).mockResolvedValue({ id: 'tx-1' } as any);
+        vi.mocked(repo.createTransaction).mockResolvedValue({ result: { id: 'tx-1' } } as any);
         const uc = new CreateFinanceTransactionUseCase(repo);
         const r = await uc.execute(base, 'admin-1');
         expect(r.error).toBeUndefined();
@@ -47,7 +48,7 @@ description: '' }, null);
     });
 
     it('cria "só nota" sem tipo (não vira entrada/saída)', async () => {
-        vi.mocked(repo.createTransaction).mockResolvedValue({ id: 'tx-nota' } as any);
+        vi.mocked(repo.createTransaction).mockResolvedValue({ result: { id: 'tx-nota' } } as any);
         const uc = new CreateFinanceTransactionUseCase(repo);
         const r = await uc.execute({ ...base,
 type: null }, 'admin-1');
@@ -97,7 +98,7 @@ accountId: '22222222-2222-4222-8222-222222222222' }, null);
         vi.mocked(repo.findCategoryById).mockResolvedValue({ id: 'c1',
 type: 'OUT' } as any);
         vi.mocked(repo.findAccountById).mockResolvedValue({ id: 'a1' } as any);
-        vi.mocked(repo.createTransaction).mockResolvedValue({ id: 'tx-2' } as any);
+        vi.mocked(repo.createTransaction).mockResolvedValue({ result: { id: 'tx-2' } } as any);
         const uc = new CreateFinanceTransactionUseCase(repo);
         const r = await uc.execute({
             ...base,
@@ -132,8 +133,44 @@ type: 'OUT' } as any);
         expect(repo.createTransaction).not.toHaveBeenCalled();
     });
 
+    describe('Nº do lançamento (SR-064)', () => {
+        it('sem número, pede o automático (não manda number)', async () => {
+            vi.mocked(repo.createTransaction).mockResolvedValue({ result: { id: 'tx-4',
+number: 128 } } as any);
+            const r = await new CreateFinanceTransactionUseCase(repo).execute(base, null);
+            expect(r.transaction?.number).toBe(128);
+            expect(vi.mocked(repo.createTransaction).mock.calls[0][0].number).toBeUndefined();
+        });
+
+        it('passa o número digitado', async () => {
+            vi.mocked(repo.createTransaction).mockResolvedValue({ result: { id: 'tx-5',
+number: 5000 } } as any);
+            await new CreateFinanceTransactionUseCase(repo).execute({ ...base,
+number: 5000 }, null);
+            expect(vi.mocked(repo.createTransaction).mock.calls[0][0].number).toBe(5000);
+        });
+
+        it('número em uso → 409 "O número 123 já é de outro lançamento."', async () => {
+            vi.mocked(repo.createTransaction).mockResolvedValue({ conflict: { number: 123,
+deleted: false } } as any);
+            const r = await new CreateFinanceTransactionUseCase(repo).execute({ ...base,
+number: 123 }, null);
+            expect(r.error).toBeInstanceOf(ConflictError);
+            expect(r.error?.message).toBe('O número 123 já é de outro lançamento.');
+            expect(r.transaction).toBeUndefined();
+        });
+
+        it.each([null, 0, -5, 2.5])('recusa %s (400) e não grava', async value => {
+            const r = await new CreateFinanceTransactionUseCase(repo).execute({ ...base,
+number: value }, null);
+            expect(r.error).toBeDefined();
+            expect(r.error).not.toBeInstanceOf(ConflictError);
+            expect(repo.createTransaction).not.toHaveBeenCalled();
+        });
+    });
+
     it('lançamento sem caixa não consulta fechamento (não há trava)', async () => {
-        vi.mocked(repo.createTransaction).mockResolvedValue({ id: 'tx-3' } as any);
+        vi.mocked(repo.createTransaction).mockResolvedValue({ result: { id: 'tx-3' } } as any);
         const uc = new CreateFinanceTransactionUseCase(repo);
         const r = await uc.execute(base, null);
         expect(r.error).toBeUndefined();

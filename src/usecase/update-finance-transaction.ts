@@ -5,6 +5,7 @@ import type {
 } from '../ports/external/finance-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { FinanceTransactionNotFoundError } from '../errors/not-found.js';
+import { FinanceNumberInUseError } from '../errors/conflict.js';
 import { financeTransactionSchema } from './create-finance-transaction.js';
 import { closedMonthError } from './finance-closed-month.js';
 
@@ -80,7 +81,11 @@ export class UpdateFinanceTransactionUseCase {
             if (!acc) return { error: new ValidationError('Caixa inválido') };
         }
 
-        const transaction = await this.repo.updateTransaction(id, data);
-        return { transaction };
+        // Trocar o Nº confere, dentro da trava, que ninguém mais o usa (nem excluído).
+        const written = await this.repo.updateTransaction(id, data);
+        if ('conflict' in written) {
+            return { error: new FinanceNumberInUseError(written.conflict.number, written.conflict.deleted) };
+        }
+        return { transaction: written.result };
     }
 }

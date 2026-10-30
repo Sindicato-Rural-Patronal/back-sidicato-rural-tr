@@ -132,3 +132,16 @@ export class MergeBothHaveLoginError extends ConflictError {
         this.name = 'MergeBothHaveLoginError';
     }
 }
+
+// Nº do lançamento do Financeiro (decisão 005, item 2): único para sempre,
+// inclusive entre os excluídos.
+export class FinanceNumberInUseError extends ConflictError {
+    constructor(number: number, deleted: boolean) {
+        super(
+            deleted
+                ? `O número ${number} já é de um lançamento excluído.`
+                : `O número ${number} já é de outro lançamento.`,
+        );
+        this.name = 'FinanceNumberInUseError';
+    }
+}

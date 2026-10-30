@@ -36,6 +36,7 @@ import type {
     CreateFinanceClosingUseCase,
     DeleteFinanceClosingUseCase,
 } from '../../usecase/finance-closings.js';
+import type { NextFinanceNumberUseCase } from '../../usecase/next-finance-number.js';
 import { errorToStatus } from '../lib/require-permission.js';
 import { adminOf } from '../lib/route-auth.js';
 
@@ -74,6 +75,7 @@ export class FinanceController {
         private readonly previewClosing: PreviewFinanceClosingUseCase,
         private readonly createClosing: CreateFinanceClosingUseCase,
         private readonly deleteClosing: DeleteFinanceClosingUseCase,
+        private readonly nextNumber: NextFinanceNumberUseCase,
     ) {}
 
     // ── Categorias ──────────────────────────────────────────────────────────
@@ -127,6 +129,11 @@ export class FinanceController {
     // ── Lançamentos ─────────────────────────────────────────────────────────
     async getTransactions(request: FastifyRequest, reply: FastifyReply) {
         return reply.send(await this.listTransactions.execute(request.query));
+    }
+
+    // Só informativo: o próximo Nº automático, sem reservar.
+    async getNextNumber(_request: FastifyRequest, reply: FastifyReply) {
+        return reply.send(await this.nextNumber.execute());
     }
 
     async exportTransactions(request: FastifyRequest, reply: FastifyReply) {

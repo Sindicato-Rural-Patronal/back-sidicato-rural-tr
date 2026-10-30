@@ -182,7 +182,7 @@ qualquer outro     → 400   (ValidationError, Error, e também error ausente)
 O que o use case **lança** (em vez de devolver) cai no `apiErrorHandler` (`http/error-handler.ts`):
 - validação do JSON schema (Ajv) → 400 com a mensagem do Ajv em português (`http/validation-message.ts`), ex.: `Valor maior que o máximo em "amountCents": 2147483647.`;
 - `ZodError` de um `.parse` → 400 com a mensagem do primeiro problema e o campo (`Campo "amountCents": …`). A regra continua sendo `safeParse` ou `parseQuery`; isto é a rede;
-- P2002 → 409 "Registro já existe (dados únicos em conflito).";
+- P2002 → 409 "Registro já existe (dados únicos em conflito).". Para saber **qual** índice foi, use `uniqueViolationTarget` (`lib/prisma-errors.ts`): com o `@prisma/adapter-pg` o `meta.target` não vem, e o nome do índice está em `meta.driverAdapterError.cause.constraint.index`;
 - P2003 → 409 "Registro em uso e não pode ser removido.";
 - valor que o banco recusa → **400**: P2020 ou SQLSTATE 22003 "Número fora do limite permitido."; P2000 ou 22001 "Texto longo demais para o campo."; SQLSTATE 22007/22008/22009 "Data fora do intervalo aceito." (ano 0 ou antes de 4713 a.C., que o JavaScript aceita); P2007 e o resto da classe 22 do Postgres (ex.: caractere nulo `\u0000` no texto) "Valor inválido.". O SQLSTATE vem de `postgresSqlState` (`lib/prisma-errors.ts`), porque o driver adapter entrega esses erros como P2039 com o código em `meta.driverAdapterError.cause`;
 - erro com `statusCode` < 500 (ex.: 429 do rate limit) → esse status com a mensagem;
@@ -203,7 +203,7 @@ Classes (`src/errors/`; as bases aceitam mensagem opcional e são usadas direto 
 | `AuthError` (`auth.ts`) | `InvalidCredentialsError` "Invalid username or password" |
 | `ForbiddenError` (`auth.ts`, estende `Error`) | mensagem por parâmetro (padrão "Sem permissão para esta ação.") |
 | `BusinessRuleError` (`business-rule.ts`) | `RoomAlreadyBookedError` (mensagem por parâmetro: "Sala ocupada: …"), `RegistrationsUnavailableError` "Inscrições indisponíveis para este curso.", `RegistrationDeadlinePassedError` "Prazo de inscrição encerrado.", `CourseFullError` "Curso lotado — sem vagas disponíveis.", `IdentityNotConfirmedError` "Não foi possível confirmar seu cadastro pelo site. Procure o Sindicato para fazer a inscrição.", `ClosedMonthError` "O mês MM/AAAA está fechado no caixa "X". Reabra o mês para mudar lançamentos dele." (ver Financeiro) |
-| `ConflictError` (`conflict.ts`, 18 filhas) | `CpfAlreadyInUseError` "CPF já cadastrado para outra pessoa.", `RgAlreadyInUseError`, `RuleInUseError`, `RoomNameAlreadyExistsError`, `RoomHasCoursesError`, `RoomHasBookingsError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `CourseRegistrationAlreadyExistsError` "Esta pessoa já está inscrita neste curso." (as duas inscrições públicas), `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError`, `UnimedBeneficiarioAlreadyExistsError`, `ConvenioSlugAlreadyExistsError`, `CompanyCnpjAlreadyExistsError`, `PublicContactAlreadyExistsError`, `CompanyMemberAlreadyExistsError`, `MergeDifferentCpfError`, `MergeBothHaveLoginError` |
+| `ConflictError` (`conflict.ts`, 19 filhas) | `CpfAlreadyInUseError` "CPF já cadastrado para outra pessoa.", `RgAlreadyInUseError`, `RuleInUseError`, `RoomNameAlreadyExistsError`, `RoomHasCoursesError`, `RoomHasBookingsError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `CourseRegistrationAlreadyExistsError` "Esta pessoa já está inscrita neste curso." (as duas inscrições públicas), `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError`, `UnimedBeneficiarioAlreadyExistsError`, `ConvenioSlugAlreadyExistsError`, `CompanyCnpjAlreadyExistsError`, `PublicContactAlreadyExistsError`, `CompanyMemberAlreadyExistsError`, `MergeDifferentCpfError`, `MergeBothHaveLoginError`, `FinanceNumberInUseError` "O número 123 já é de outro lançamento." / "… de um lançamento excluído." |
 | `NotFoundError` (`not-found.ts`, 30 filhas) | `CourseNotFoundError` "Course not found", `UserNotFoundError`, `UserDataNotFoundError` "Invalid userDataId: user not found", `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError`, `UserRelationNotFoundError`, `PropertyNotFoundError`, `AddressNotFoundError` "CEP not found", `InstructorNotFoundError`, `ContactMessageNotFoundError`, `BannerNotFoundError`, `MarketQuoteNotFoundError`, `AdminInviteInvalidError` "Convite inválido, expirado ou já utilizado.", `FinanceCategoryNotFoundError`, `FinanceTransactionNotFoundError`, `UnimedBeneficiarioNotFoundError`, `GalleryAlbumNotFoundError`, `GalleryPhotoNotFoundError`, `ConvenioNotFoundError`, `CompanyNotFoundError`, `PublicContactNotFoundError`, `CompanyMemberNotFoundError`, `RoomBookingNotFoundError`, `CpfPhoneNotFoundError` "Não encontramos cadastro com este CPF e telefone." |
 | `TooManyAttemptsError` (`too-many-attempts.ts`, estende `Error`, `statusCode = 429`) | "Muitas tentativas com este CPF. Aguarde uma hora ou procure o Sindicato." |
 | `ValidationError` (`validation.ts`, estende `Error`) | mensagem obrigatória → 400 |
@@ -758,11 +758,12 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 | `GET` | `/admin/finance/categories[?all=true]` | categorias (sem `all`, só as ativas) | `READ_FINANCE` |
 | `POST` · `PATCH` · `DELETE` | `/admin/finance/categories[/:id]` | `{ name, type: IN\|OUT, color?, active?, order? }` → 201 · `{ message }` · 204 (soft) | `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
 | `GET` · `POST` · `PATCH` · `DELETE` | `/admin/finance/accounts[/:id]` | caixas `{ name, color?, active?, order? }` (mesmo padrão) | `READ_` · `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
-| `GET` | `/admin/finance/transactions` | paginada; filtros abaixo; traz `totals` | `READ_FINANCE` |
-| `POST` | `/admin/finance/transactions` | criar lançamento → 201 (a linha, com o `number`); mês fechado → 409 | `CREATE_FINANCE` |
-| `PATCH` · `DELETE` | `/admin/finance/transactions/:id` | editar → `{ message, transaction }` (a linha como ficou) · excluir (soft) → 204; mês fechado → 409 | `UPDATE_` · `DELETE_FINANCE` |
-| `GET` | `/admin/finance/transactions/export` | CSV dos lançamentos filtrados; depois de "Descrição": "Nome / Razão social" (razão social do empenho, ou o nome fantasia se ela estiver vazia) e "CNPJ / CPF" | `READ_FINANCE` |
-| `POST` | `/admin/finance/transfers` | transferência entre caixas → 201 `{ message, transactions: [saída, entrada] }`; mês fechado na origem ou no destino → 409 | `CREATE_FINANCE` |
+| `GET` | `/admin/finance/transactions` | paginada; filtros e `orderBy` abaixo; traz `totals` | `READ_FINANCE` |
+| `GET` | `/admin/finance/transactions/next-number` | `{ next }`: o próximo Nº automático (o maior + 1, contando excluídos). Só informativo, não reserva | `READ_FINANCE` |
+| `POST` | `/admin/finance/transactions` | criar lançamento, com `number?` → 201 (a linha, com o `number`); número em uso → 409; mês fechado → 409 | `CREATE_FINANCE` |
+| `PATCH` · `DELETE` | `/admin/finance/transactions/:id` | editar (aceita `number`) → `{ message, transaction }` (a linha como ficou) · excluir (soft) → 204; número em uso → 409; mês fechado → 409 | `UPDATE_` · `DELETE_FINANCE` |
+| `GET` | `/admin/finance/transactions/export` | CSV dos lançamentos filtrados, na ordem de `orderBy`. "Nº" é a primeira coluna (vazia sem número); depois de "Descrição": "Nome / Razão social" (razão social do empenho, ou o nome fantasia se ela estiver vazia), "CNPJ / CPF" e "Nº anterior" (`empenho.numero`) | `READ_FINANCE` |
+| `POST` | `/admin/finance/transfers` | transferência entre caixas → 201 `{ message, transactions: [saída, entrada] }`, com dois números seguidos; mês fechado na origem ou no destino → 409 | `CREATE_FINANCE` |
 | `POST` | `/admin/finance/transactions/:id/attachments` | comprovante (multipart: PDF, JPG, PNG, WEBP até 15 MB) → 201 `{ id, filename, mimeType, size, createdAt }` | `UPDATE_FINANCE` |
 | `GET` · `DELETE` | `/admin/finance/attachments/:attachmentId` | baixar (inline) · apagar de verdade | `READ_FINANCE` · `UPDATE_FINANCE` |
 | `GET` | `/admin/finance/summary?from&to` | resumo (abaixo) | `READ_FINANCE` |
@@ -773,11 +774,22 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 | `POST` | `/admin/finance/closings` | fechar o mês `{ accountId, month, countedBalanceCents, notes? }` → 201 (o fechamento); já fechado → 409 | `CREATE_FINANCE` |
 | `DELETE` | `/admin/finance/closings/:id` | **reabrir o mês** → 204; inexistente → 404 | `DELETE_FINANCE` |
 
-**Lançamento:** `{ type?: IN|OUT|null, amountCents, date, description, method?, notes?, categoryId?, accountId?, empenho? }`.
-- **Nº do lançamento** (`number`, decisão 005, SR-064). **Ida A:** a coluna existe e a migration `…_finance_transaction_number_fill` numerou os lançamentos ativos em ordem de data. Os excluídos ficaram com null. O código ainda **não** dá número a lançamento novo, que nasce com `number: null`.
-  - Vem em toda resposta que traz o lançamento: a lista (`data[]`), a criação, a edição (`transaction`) e a transferência (`transactions`). null sai como null (o front mostra "—").
-  - Ordem da numeração: `date`, depois `createdAt`; no empate, saída e "só nota" antes da entrada; por fim o `id`. As duas pernas de uma transferência ficam juntas, saída e depois entrada, na posição do `createdAt` da saída (o Prisma grava a entrada alguns milissegundos depois).
-  - A migration pode rodar de novo: só numera quem está sem número, continuando do maior (excluídos contam).
+**Lançamento:** `{ number?, type?: IN|OUT|null, amountCents, date, description, method?, notes?, categoryId?, accountId?, empenho? }`.
+
+**Nº do lançamento** (`number`, decisão 005, SR-064; regra em `lib/finance-number.ts`, trava em `finance-adapter.ts`):
+- Uma sequência só, para entrada, saída e "só nota", que nunca recomeça. Único para sempre: o índice `FinancialTransaction_number_key` é **cheio**, conta os excluídos, de propósito (uma nota impressa não pode passar a ter o número de outra). É o contrário do padrão de soft-delete do projeto.
+- **Automático** (sem `number` no `POST`): o maior que existe + 1, contando os excluídos; começa em 1. Não é "o próximo livre": nunca preenche buraco.
+- **Digitado** (`number`, inteiro ≥ 1): aceito se nenhum lançamento usa, nem excluído. Abaixo do próximo (um buraco), a sequência não muda; acima, ela continua dele (digitar 5000 faz o próximo automático ser 5001). A confirmação do salto é da tela.
+- **Número em uso** → **409** `{ error: "O número 123 já é de outro lançamento." }` ou `"O número 123 já é de um lançamento excluído."` (`FinanceNumberInUseError`), e nada é gravado.
+- **Edição:** `PATCH` aceita `number` com as mesmas regras; manter o próprio número não é conflito. `null`, 0, negativo, fracionado ou texto → 400 (o número não se apaga). Perna de transferência continua sem edição.
+- **Transferência:** sempre automática, dois números seguidos, a saída com o menor. `number` no corpo é ignorado.
+- **Recorrência:** sempre automática, um número por mês gerado.
+- **"Repetir"** do painel é um `POST` comum: ganha o próximo automático.
+- **Trava** (`lockFinanceNumbers`): os quatro caminhos que dão número (`createTransaction`, `updateTransaction` com `number`, `createTransfer` e `createRecurrenceTransaction`) rodam numa transação que começa por `pg_advisory_xact_lock(hashtext('finance-transaction-number'))`, leem o maior e gravam. Lançamentos gravados ao mesmo tempo nunca repetem número (E2E com dez em paralelo). Se mesmo assim o índice recusar (gravação fora da trava), a resposta é o mesmo 409.
+- Vem em toda resposta que traz o lançamento: a lista (`data[]`), a criação, a edição (`transaction`) e a transferência (`transactions`). `null` só sobra nos excluídos antes da numeração, que não aparecem em lugar nenhum.
+- **Numeração dos que já existiam** (migrations `…_number_fill`, ida A, e `…_number_fill_again`, ida B, a mesma consulta): só os ativos, por `date`, depois `createdAt`; no empate, saída e "só nota" antes da entrada; por fim o `id`. As duas pernas de uma transferência ficam juntas, saída e depois entrada, na posição do `createdAt` da saída (o Prisma grava a entrada alguns milissegundos depois). Só escreve na coluna `number`, só onde ela está vazia, e continua do maior.
+- **Auditoria:** o rótulo do lançamento (edição, exclusão, comprovante) é "nº 123 — descrição" (`financeTransactionLabel`); a frase fica `Editou o lançamento "nº 123 — Compra de adubo"`. A correção do Nº aparece em `changes` como `{ field: "number", before: 12, after: 15 }` (o painel mostra o rótulo "Nº"). Criar continua "Criou um lançamento", sem o número.
+- O `empenho.numero` não muda de lugar: é o "Nº anterior" (sistema antigo ou nota em papel), entra na busca e no CSV.
 - **Datas e meses do Financeiro** (`usecase/finance-dates.ts`, SR-055): `date` do lançamento e da transferência e os filtros `from`/`to` (lista, CSV, resumo) só aceitam ano de 1900 a 2999. Fora disso, ou texto que não é data → 400 "Data inválida: use um ano entre 1900 e 2999." (nos filtros, "Parâmetro inválido: from"). Os meses `AAAA-MM` (recorrência e fechamento) também: "Mês inválido (use AAAA-MM, com ano entre 1900 e 2999)". Antes, ano 0 dava 500, e "0026-01" no início de uma recorrência fazia a geração falhar toda vez que a tela abria.
 - `empenho` é a Nota de Empenho, JSON ou null: `numero, notaFiscal, nomeFantasia, razaoSocial, cnpjCpf, inscricaoEstadual, endereco, bairro, cep, cidade, uf, telefone, banco, conta, agencia, cheque, descontoCents, usuarioId, empresaId`.
 - Recusas → 400:
@@ -790,14 +802,17 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 
 **Transferência:** `{ fromAccountId, toAccountId, amountCents, date, description?, method? }`.
 - Origem igual ao destino → 400.
-- Cria OUT e IN com o mesmo `transferId`, numa transação.
+- Cria OUT e IN com o mesmo `transferId`, numa transação, com dois números seguidos (a saída com o menor).
 - Fica fora de receita e despesa, mas conta no saldo de cada caixa.
 
 **Listagem:**
-- Filtros `from`, `to` (inclui o dia inteiro), `type`, `categoryId`, `accountId`, `method` (sem diferenciar maiúsculas), `search` (descrição **ou** razão social / nome fantasia da Nota de Empenho, sem diferenciar maiúsculas nem acento; **ou** o CNPJ/CPF da Nota de Empenho, com ou sem pontuação). Vale para a lista, os totais e o CSV.
-- O fornecedor é achado por SQL (`idsByEmpenho` em `finance-adapter.ts`): `immutable_unaccent_lower` sobre `empenho->>'razaoSocial'`/`'nomeFantasia'`, e os dígitos de `empenho->>'cnpjCpf'` (`regexp_replace`).
+- Filtros `from`, `to` (inclui o dia inteiro), `type`, `categoryId`, `accountId`, `method` (sem diferenciar maiúsculas), `search` (descrição **ou** razão social / nome fantasia da Nota de Empenho, sem diferenciar maiúsculas nem acento; **ou** o CNPJ/CPF da Nota de Empenho, com ou sem pontuação; **ou** o Nº e o "Nº anterior", abaixo). Vale para a lista, os totais e o CSV.
+- **Nº na busca** (decisão 005):
+  - termo só de dígitos (aparado): acha também o `number` **igual** ("0045" acha o nº 45) e o "Nº anterior" (`empenho.numero`) igual **sem contar os zeros à esquerda** ("45" acha "0045", mas não "1450" nem "045/2024"). A descrição continua por "contém";
+  - outro termo: acha também o "Nº anterior" que **contém** o termo, sem diferenciar maiúsculas nem acento ("ne-2024" acha "NE-2024/7").
+- O fornecedor e o "Nº anterior" são achados por SQL (`idsByEmpenho` em `finance-adapter.ts`): `immutable_unaccent_lower` sobre `empenho->>'razaoSocial'`/`'nomeFantasia'`/`'numero'`, os dígitos de `empenho->>'cnpjCpf'` (`regexp_replace`) e `ltrim(btrim(empenho->>'numero'), '0')` para o igual.
 - CNPJ/CPF (SR-056) só entra quando o termo parece documento (números e `.-/()+`, a mesma regra da busca de pessoas, `docDigitsOf` em `list-filters.ts`) e tem 3 ou mais dígitos. Compara só os dígitos dos dois lados: "12.345.678/0001-90", "12345678000190" e "0001-90" acham o mesmo empenho, gravado com ou sem pontuação.
-- Ordem por data desc.
+- **Ordem** (`orderBy`, lista e CSV): `date` (padrão, data desc e o mais novo primeiro) ou `number` (Nº desc, sem número por último). Outro valor → 400.
 - `totals: { incomeCents, expenseCents }` somam todos os filtrados, sem transferências nem "só nota".
 - Filtro com formato inválido → 400 "Parâmetro inválido: <campo>" (vale também para resumo, exportação e fechamentos).
 
@@ -809,6 +824,7 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 **Recorrência** (`FinanceRecurringTransaction`):
 - Meses são `"AAAA-MM"` (`startMonth`, `endMonth?`, `lastGeneratedMonth?`). `dayOfMonth` vai de 1 a 31; no mês mais curto, vale o último dia.
 - A geração roda quando a tela abre e é idempotente (unique `(recurringId, recurringMonth)`), com teto de 120 meses por rodada.
+- Só o P2002 desse índice quer dizer "mês já gerado" (`isRecurrenceMonthTaken`, pelo índice em `uniqueViolationTarget`). Colisão de Nº, ou outro erro, sobe como erro (409 genérico do `apiErrorHandler`). A tentativa que falha não gasta número.
 - Pausar é `PATCH { active: false }`. **Reativar** (`active: true` numa pausada) pula os meses da pausa: o use case põe `lastGeneratedMonth` no mês anterior ao atual, e ela volta a lançar a partir do mês atual. Pausar e reativar no mesmo mês não pula nada. Os lançamentos já gerados não mudam. `lastGeneratedMonth` nunca vem do corpo.
 - **Mês fechado** no caixa da recorrência não recebe lançamento. A geração segue para os meses seguintes, mas o marcador para antes do mês fechado: as próximas rodadas voltam a tentar esse mês e lançam quando ele for reaberto.
 - Excluir é soft-delete do molde.
@@ -865,7 +881,7 @@ Nomes como estão no `prisma/schema.prisma` (alguns em minúsculas). Detalhe de 
 | `Notification` / `NotificationRead` | evento: id, type, title, body, link, permission, entityId · leitura: notificationId (cascade), adminId, readAt — única por (evento, admin) |
 | `FinancialCategory` | id, name, type, color, active, order, isDeleted |
 | `FinancialAccount` | id, name, color, active, order, isDeleted |
-| `FinancialTransaction` | id, number? (Nº do lançamento; sem índice único na ida A), type? (null = só nota), amountCents, date, description, method, notes, categoryId?, accountId?, transferId, createdBy, recurringId (SetNull), recurringMonth, empenho (Json?), isDeleted — único por (recurringId, recurringMonth) |
+| `FinancialTransaction` | id, number? (Nº do lançamento; único, inclusive entre os excluídos), type? (null = só nota), amountCents, date, description, method, notes, categoryId?, accountId?, transferId, createdBy, recurringId (SetNull), recurringMonth, empenho (Json?), isDeleted — único por (recurringId, recurringMonth) |
 | `FinancialAttachment` | id, transactionId (cascade), data (Bytes), filename, mimeType, size |
 | `FinanceRecurringTransaction` | id, type, description, amountCents, dayOfMonth, startMonth, endMonth, lastGeneratedMonth, paymentMethod, notes, active, categoryId?, accountId?, isDeleted |
 | `FinancePaymentMethod` | id, name (único), active, order, isDeleted |

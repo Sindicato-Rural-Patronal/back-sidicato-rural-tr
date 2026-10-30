@@ -38,6 +38,7 @@ import {
     CreateFinanceClosingUseCase,
     DeleteFinanceClosingUseCase,
 } from '../../usecase/finance-closings.js';
+import { NextFinanceNumberUseCase } from '../../usecase/next-finance-number.js';
 import { FinanceController } from '../controllers/finance-controller.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
 import { requires } from '../lib/route-auth.js';
@@ -99,6 +100,12 @@ const transactionBody = {
     type: 'object',
     required: ['amountCents', 'date', 'description'],
     properties: {
+        number: {
+            type: 'integer',
+            minimum: 1,
+            example: 128,
+            description: 'Nº do lançamento. Ausente = automático (o maior + 1). Número de outro lançamento, mesmo excluído → 409. null → 400.',
+        },
         // null/ausente = "só nota" (gera a Nota de Empenho sem lançar no caixa).
         type: { type: ['string', 'null'],
 enum: ['IN', 'OUT', null],
@@ -125,6 +132,13 @@ additionalProperties: true,
 nullable: true },
     },
 };
+
+// Busca e ordem da lista e do CSV (decisão 005, item 8).
+const SEARCH_DOC = '`search` acha pela descrição (contém, sem diferenciar maiúscula de minúscula), pela razão social e pelo nome fantasia da Nota de Empenho (contém, sem acento) e pelo CNPJ/CPF da Nota de Empenho com ou sem pontuação (termo só com números e pontuação, com 3 ou mais dígitos; compara os dígitos). Termo só de dígitos acha também o `number` igual e o "Nº anterior" (`empenho.numero`) igual sem contar os zeros à esquerda ("45" acha "0045", não "1450"). Outro termo acha também o "Nº anterior" que contém o termo.';
+const ORDER_DOC = '`orderBy`: `date` (padrão) ou `number`, os dois do mais novo para o mais antigo.';
+const orderByQuery = { type: 'string',
+enum: ['date', 'number'],
+default: 'date' };
 
 // O lançamento como está no banco. O Fastify serializa a resposta pelo schema:
 // campo que não está aqui some, e null em campo sem `null` no tipo vira "" ou 0.
@@ -257,6 +271,7 @@ export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClie
         new PreviewFinanceClosingUseCase(repo),
         new CreateFinanceClosingUseCase(repo),
         new DeleteFinanceClosingUseCase(repo),
+        new NextFinanceNumberUseCase(repo),
     );
 
     const tags = ['Finance'];
@@ -455,7 +470,7 @@ properties: { id: { type: 'string' } } },
             schema: {
                 tags,
                 summary: 'List financial transactions',
-                description: 'Paginado, com filtros: from, to, type, categoryId, accountId, search. `search` acha pela descrição e também pela razão social e pelo nome fantasia da Nota de Empenho, sem diferenciar maiúscula de minúscula (na descrição) e sem acento (no nome do fornecedor), e pelo CNPJ/CPF da Nota de Empenho com ou sem pontuação (termo só com números e pontuação, com 3 ou mais dígitos; compara os dígitos). `totals` soma entradas e saídas de todos os lançamentos filtrados (sem transferências entre caixas nem "só nota").',
+                description: `Paginado, com filtros: from, to, type, categoryId, accountId, method, search e orderBy. ${SEARCH_DOC} ${ORDER_DOC} \`totals\` soma entradas e saídas de todos os lançamentos filtrados (sem transferências entre caixas nem "só nota").`,
                 querystring: {
                     type: 'object',
                     properties: {
@@ -475,6 +490,7 @@ enum: ['IN', 'OUT'] },
                         method: { type: 'string',
 example: 'PIX' },
                         search: { type: 'string' },
+                        orderBy: orderByQuery,
                     },
                 },
                 response: {
@@ -506,13 +522,33 @@ items: transactionResponse },
     );
 
     fastify.get(
+        '/admin/finance/transactions/next-number',
+        {
+            config: { auth: requires('READ_FINANCE') },
+            schema: {
+                tags,
+                summary: 'Next automatic transaction number',
+                description: 'O próximo Nº automático: o maior que existe + 1, contando os lançamentos excluídos (1 sem nenhum). Só informativo, para o formulário mostrar "Automático (próximo: 128)" e avisar quando o digitado pula a sequência: não reserva o número.',
+                response: {
+                    200: { type: 'object',
+properties: { next: { type: 'integer',
+example: 128 } } },
+                    401: errorResponse,
+                    403: errorResponse,
+                },
+            },
+        },
+        (req: FastifyRequest, res: FastifyReply) => controller.getNextNumber(req, res),
+    );
+
+    fastify.get(
         '/admin/finance/transactions/export',
         {
             config: { auth: requires('READ_FINANCE') },
             schema: {
                 tags,
                 summary: 'Export transactions as CSV',
-                description: 'CSV (;) dos lançamentos que batem com os filtros (from, to, type, categoryId, accountId, method, search). `search` acha pela descrição e também pela razão social e pelo nome fantasia da Nota de Empenho, sem diferenciar maiúscula de minúscula (na descrição) e sem acento (no nome do fornecedor), e pelo CNPJ/CPF da Nota de Empenho com ou sem pontuação (termo só com números e pontuação, com 3 ou mais dígitos; compara os dígitos). Depois da Descrição vêm "Nome / Razão social" (a razão social do empenho ou, sem ela, o nome fantasia) e "CNPJ / CPF".',
+                description: `CSV (;) dos lançamentos que batem com os filtros (from, to, type, categoryId, accountId, method, search), na ordem de orderBy. ${SEARCH_DOC} ${ORDER_DOC} A primeira coluna é "Nº" (vazia sem número). Depois da Descrição vêm "Nome / Razão social" (a razão social do empenho ou, sem ela, o nome fantasia), "CNPJ / CPF" e "Nº anterior" (o empenho.numero).`,
                 querystring: {
                     type: 'object',
                     properties: {
@@ -524,6 +560,7 @@ enum: ['IN', 'OUT'] },
                         accountId: { type: 'string' },
                         method: { type: 'string' },
                         search: { type: 'string' },
+                        orderBy: orderByQuery,
                     },
                 },
                 response: { 401: errorResponse,
@@ -540,7 +577,7 @@ enum: ['IN', 'OUT'] },
             schema: {
                 tags,
                 summary: 'Create financial transaction',
-                description: 'Responde com o lançamento criado, com o `number`. Mês fechado no caixa do lançamento → 409 "O mês MM/AAAA está fechado no caixa \"X\". Reabra o mês para mudar lançamentos dele." Sem caixa, não há trava.',
+                description: 'Responde com o lançamento criado, com o `number`. Sem `number`, o automático (o maior + 1, contando os excluídos); com ele, o digitado, se nenhum lançamento usa. Número em uso → 409 "O número 123 já é de outro lançamento." ou "O número 123 já é de um lançamento excluído.", e nada é gravado. Mês fechado no caixa do lançamento → 409 "O mês MM/AAAA está fechado no caixa \"X\". Reabra o mês para mudar lançamentos dele." Sem caixa, não há trava.',
                 body: transactionBody,
                 response: {
                     201: transactionResponse,
@@ -561,7 +598,7 @@ enum: ['IN', 'OUT'] },
             schema: {
                 tags,
                 summary: 'Transfer between cash accounts',
-                description: 'Cria 2 lançamentos ligados (saída na origem, entrada no destino) e responde com os dois em `transactions`, a saída primeiro, cada um com o `number`. Não conta como receita/despesa. Mês fechado na origem ou no destino → 409 (mesma mensagem do lançamento).',
+                description: 'Cria 2 lançamentos ligados (saída na origem, entrada no destino) e responde com os dois em `transactions`, a saída primeiro. O Nº é sempre automático: dois números seguidos, a saída com o menor. Não conta como receita/despesa. Mês fechado na origem ou no destino → 409 (mesma mensagem do lançamento).',
                 body: {
                     type: 'object',
                     required: ['fromAccountId', 'toAccountId', 'amountCents', 'date'],
@@ -605,7 +642,7 @@ items: transactionResponse },
             schema: {
                 tags,
                 summary: 'Update financial transaction',
-                description: 'Responde com o lançamento como ficou, em `transaction`. Lançamento num mês fechado do caixa não se edita, e nenhum lançamento é movido para dentro de um mês fechado (pela data ou pelo caixa) → 409 "O mês MM/AAAA está fechado no caixa \"X\". Reabra o mês para mudar lançamentos dele."',
+                description: 'Responde com o lançamento como ficou, em `transaction`. `number` corrige o Nº (inteiro ≥ 1; null → 400); número de outro lançamento, mesmo excluído → 409 com a mesma mensagem da criação. Lançamento num mês fechado do caixa não se edita, e nenhum lançamento é movido para dentro de um mês fechado (pela data ou pelo caixa) → 409 "O mês MM/AAAA está fechado no caixa \"X\". Reabra o mês para mudar lançamentos dele."',
                 params: { type: 'object',
 required: ['id'],
 properties: { id: { type: 'string' } } },

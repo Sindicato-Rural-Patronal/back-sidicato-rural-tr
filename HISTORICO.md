@@ -9,6 +9,11 @@ O que mudou e por quê. As regras que valem hoje estão no `CLAUDE.md`. Este arq
   - Foi em duas migrations que só acrescentam: a coluna vazia, e depois um `UPDATE` que escreve só nela. Os excluídos ficaram sem número, para a lista não começar com buracos.
   - A ordem da decisão supunha as duas pernas da transferência com o mesmo `createdAt`. Na prática o Prisma gera o horário a cada gravação, e a entrada sai de 1 a 6 ms depois da saída. Por isso a migration põe as duas pernas juntas, na posição do `createdAt` da saída. Sem isso, um lançamento do mesmo dia gravado no meio, ou empatado com a saída, cairia entre elas.
   - Nesta ida o código só devolve o número. Ele ainda não dá número a lançamento novo, e não há índice único: a numeração é conferida pelo usuário antes da ida B.
+- **Ida B: o número automático, o digitado e o índice único.**
+  - A mesma numeração roda de novo, para os lançamentos criados entre as idas, e depois vem o índice único. O índice é cheio, contando os excluídos: o número de uma nota impressa não pode ir para outro lançamento.
+  - "Maior + 1" dentro de uma trava (`pg_advisory_xact_lock`), e não uma `SEQUENCE`. A sequence gasta número em toda gravação que falha (e a geração de recorrências falha de propósito no mês já gerado) e não enxerga o número digitado.
+  - A geração de recorrências tratava todo P2002 como "mês já gerado". Com o índice novo, uma colisão de número seria engolida calada. Passou a olhar qual índice foi. Com o `@prisma/adapter-pg`, o `meta.target` não vem no P2002 (medido em 30/10): o nome do índice está em `meta.driverAdapterError.cause.constraint.index`, lido por `uniqueViolationTarget`. O `uniqueViolationFields`, usado no `register-full`, continua lendo só o `meta.target`.
+  - Busca: o "Nº anterior" é achado ignorando os zeros à esquerda ("45" acha "0045"), decidido pelo Orquestrador em 30/10. O `number` continua por igualdade e a descrição por "contém".
 
 ## 30/10/2026: SR-054, SR-055 e SR-056
 

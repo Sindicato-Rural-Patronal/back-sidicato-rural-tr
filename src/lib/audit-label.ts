@@ -1,5 +1,6 @@
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { deriveAuditEntity } from './audit-entity.js';
+import { financeTransactionLabel } from './finance-number.js';
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
@@ -61,6 +62,16 @@ async function closingCreateLabel(prisma: PrismaClient, body: unknown): Promise<
         select: { name: true },
     });
     return closingAuditLabel(month, account?.name);
+}
+
+/** Lançamento do Financeiro: "nº 123 — descrição" (decisão 005); sem número, só a descrição. */
+async function transactionLabel(prisma: PrismaClient, id: string): Promise<string | null> {
+    const t = await prisma.financialTransaction.findUnique({
+        where: { id },
+        select: { number: true,
+description: true },
+    });
+    return t ? financeTransactionLabel(t.number, t.description) : null;
 }
 
 // Busca o nome/rótulo do alvo pelo id no caminho — chamado ANTES da mutação
@@ -157,14 +168,10 @@ select: { name: true } }))?.name ?? null;
                 return (await prisma.financialAccount.findUnique({ where: { id },
 select: { name: true } }))?.name ?? null;
             case 'Lançamento':
-                return (await prisma.financialTransaction.findUnique({ where: { id },
-select: { description: true } }))?.description ?? null;
+                return transactionLabel(prisma, id);
             case 'Comprovante':
                 // POST /transactions/:id/attachments → lançamento; DELETE /attachments/:id → arquivo
-                if (p.includes('/transactions/')) {
-                    return (await prisma.financialTransaction.findUnique({ where: { id },
-select: { description: true } }))?.description ?? null;
-                }
+                if (p.includes('/transactions/')) return transactionLabel(prisma, id);
                 return (await prisma.financialAttachment.findUnique({ where: { id },
 select: { filename: true } }))?.filename ?? null;
             case 'Fechamento de caixa': {

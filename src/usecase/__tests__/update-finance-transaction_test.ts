@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UpdateFinanceTransactionUseCase } from '../update-finance-transaction.js';
 import type { FinanceRepository } from '../../ports/external/finance-repository.js';
+import { ConflictError } from '../../errors/conflict.js';
 
 const repo = {
     findTransactionById: vi.fn(),
@@ -56,7 +57,7 @@ type: 'IN' } as any);
 type: null,
 transferId: null,
 categoryId: null } as any);
-        vi.mocked(repo.updateTransaction).mockResolvedValue({ id: 'tx-1' } as any);
+        vi.mocked(repo.updateTransaction).mockResolvedValue({ result: { id: 'tx-1' } } as any);
         const uc = new UpdateFinanceTransactionUseCase(repo);
         const r = await uc.execute('tx-1', { type: 'IN' });
         expect(r.error).toBeUndefined();
@@ -67,8 +68,8 @@ categoryId: null } as any);
         vi.mocked(repo.findTransactionById).mockResolvedValue({ id: 'tx-1',
 type: 'OUT',
 transferId: null } as any);
-        vi.mocked(repo.updateTransaction).mockResolvedValue({ id: 'tx-1',
-number: 12 } as any);
+        vi.mocked(repo.updateTransaction).mockResolvedValue({ result: { id: 'tx-1',
+number: 12 } } as any);
         const uc = new UpdateFinanceTransactionUseCase(repo);
         const r = await uc.execute('tx-1', { description: 'atualizado',
 amountCents: 15000 });
@@ -77,6 +78,48 @@ amountCents: 15000 });
         // Devolve o lançamento como ficou (com o número).
         expect(r.transaction).toEqual({ id: 'tx-1',
 number: 12 });
+    });
+
+    describe('Nº do lançamento (SR-064)', () => {
+        const tx = { id: 'tx-1',
+type: 'OUT',
+transferId: null,
+number: 12 };
+
+        it('passa o número corrigido ao repositório e devolve o lançamento', async () => {
+            vi.mocked(repo.findTransactionById).mockResolvedValue(tx as any);
+            vi.mocked(repo.updateTransaction).mockResolvedValue({ result: { ...tx,
+number: 15 } } as any);
+            const r = await new UpdateFinanceTransactionUseCase(repo).execute('tx-1', { number: 15 });
+            expect(r.error).toBeUndefined();
+            expect(vi.mocked(repo.updateTransaction).mock.calls[0][1].number).toBe(15);
+            expect(r.transaction?.number).toBe(15);
+        });
+
+        it('número de outro lançamento → 409 com a mensagem da decisão', async () => {
+            vi.mocked(repo.findTransactionById).mockResolvedValue(tx as any);
+            vi.mocked(repo.updateTransaction).mockResolvedValue({ conflict: { number: 15,
+deleted: false } } as any);
+            const r = await new UpdateFinanceTransactionUseCase(repo).execute('tx-1', { number: 15 });
+            expect(r.error).toBeInstanceOf(ConflictError);
+            expect(r.error?.message).toBe('O número 15 já é de outro lançamento.');
+        });
+
+        it('número de um lançamento excluído → 409 que diz isso', async () => {
+            vi.mocked(repo.findTransactionById).mockResolvedValue(tx as any);
+            vi.mocked(repo.updateTransaction).mockResolvedValue({ conflict: { number: 3,
+deleted: true } } as any);
+            const r = await new UpdateFinanceTransactionUseCase(repo).execute('tx-1', { number: 3 });
+            expect(r.error?.message).toBe('O número 3 já é de um lançamento excluído.');
+        });
+
+        it.each([null, 0, -1, 1.5, '12'])('recusa %s (400) e não grava', async value => {
+            vi.mocked(repo.findTransactionById).mockResolvedValue(tx as any);
+            const r = await new UpdateFinanceTransactionUseCase(repo).execute('tx-1', { number: value });
+            expect(r.error).toBeDefined();
+            expect(r.error).not.toBeInstanceOf(ConflictError);
+            expect(repo.updateTransaction).not.toHaveBeenCalled();
+        });
     });
 
     describe('mês fechado (SR-054)', () => {
@@ -100,7 +143,7 @@ number: 12 });
         it('confere o mês de antes e o de depois (mover para fora e para dentro)', async () => {
             vi.mocked(repo.findTransactionById).mockResolvedValue(septTx as any);
             vi.mocked(repo.findAccountById).mockResolvedValue({ id: OTHER } as any);
-            vi.mocked(repo.updateTransaction).mockResolvedValue({ id: 'tx-1' } as any);
+            vi.mocked(repo.updateTransaction).mockResolvedValue({ result: { id: 'tx-1' } } as any);
             const uc = new UpdateFinanceTransactionUseCase(repo);
             const r = await uc.execute('tx-1', {
                 date: '2026-10-02',
@@ -133,7 +176,7 @@ number: 12 });
 
         it('tirar o caixa (accountId null) só confere o caixa de antes', async () => {
             vi.mocked(repo.findTransactionById).mockResolvedValue(septTx as any);
-            vi.mocked(repo.updateTransaction).mockResolvedValue({ id: 'tx-1' } as any);
+            vi.mocked(repo.updateTransaction).mockResolvedValue({ result: { id: 'tx-1' } } as any);
             const uc = new UpdateFinanceTransactionUseCase(repo);
             const r = await uc.execute('tx-1', { accountId: null });
             expect(r.error).toBeUndefined();
