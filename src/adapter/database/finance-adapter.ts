@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { semRegistro } from './prisma-errors.js';
-import { searchKey } from './list-filters.js';
+import { docDigitsOf, searchKey } from './list-filters.js';
 import type { FinancialCategoryModel } from '../../generated/prisma/models/FinancialCategory.js';
 import type { FinancialTransactionModel } from '../../generated/prisma/models/FinancialTransaction.js';
 import type {
@@ -451,28 +451,36 @@ outCents: 0 };
 mode: 'insensitive' };
         }
         if (filters.search) {
-            // Descrição, ou o nome do fornecedor da Nota de Empenho (razão social e
-            // nome fantasia). O nome fica num JSON, que o Prisma só filtra
-            // diferenciando maiúscula; por isso os ids vêm de SQL, comparando sem
-            // caixa e sem acento (a mesma função da busca de pessoas).
-            const byName = await this.idsByEmpenhoName(filters.search);
+            // Descrição, ou o fornecedor da Nota de Empenho: razão social, nome
+            // fantasia e CNPJ/CPF. Esses dados ficam num JSON, que o Prisma só
+            // filtra diferenciando maiúscula e sem tirar pontuação; por isso os
+            // ids vêm de SQL.
+            const bySupplier = await this.idsByEmpenho(filters.search);
             where.OR = [
                 { description: { contains: filters.search,
 mode: 'insensitive' } },
-                ...(byName.length ? [{ id: { in: byName } }] : []),
+                ...(bySupplier.length ? [{ id: { in: bySupplier } }] : []),
             ];
         }
         return where;
     }
 
-    private async idsByEmpenhoName(term: string): Promise<string[]> {
+    private async idsByEmpenho(term: string): Promise<string[]> {
+        // Nome: sem caixa e sem acento (a mesma função da busca de pessoas).
         // % e _ digitados valem como texto; o escape padrão do LIKE no Postgres é a barra.
         const like = `%${searchKey(term).replace(/[\\%_]/g, c => `\\${c}`)}%`;
+        // CNPJ/CPF (SR-056): quando o termo parece documento e tem 3 ou mais
+        // dígitos, compara só os dígitos dos dois lados. O empenho guarda o
+        // documento como foi digitado, com ou sem pontuação.
+        const digits = docDigitsOf(term.trim());
+        const docLike = digits.length >= 3 ? `%${digits}%` : null;
         const rows = await this.prisma.$queryRaw<{ id: string }[]>`
             SELECT "id" FROM "FinancialTransaction"
             WHERE "isDeleted" = false
               AND (immutable_unaccent_lower("empenho"->>'razaoSocial') LIKE ${like}
-                OR immutable_unaccent_lower("empenho"->>'nomeFantasia') LIKE ${like})`;
+                OR immutable_unaccent_lower("empenho"->>'nomeFantasia') LIKE ${like}
+                OR (${docLike}::text IS NOT NULL
+                    AND regexp_replace("empenho"->>'cnpjCpf', '[^0-9]', '', 'g') LIKE ${docLike}::text))`;
         return rows.map(r => r.id);
     }
 

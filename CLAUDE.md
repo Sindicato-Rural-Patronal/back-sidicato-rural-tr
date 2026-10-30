@@ -782,7 +782,9 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 - Fica fora de receita e despesa, mas conta no saldo de cada caixa.
 
 **Listagem:**
-- Filtros `from`, `to` (inclui o dia inteiro), `type`, `categoryId`, `accountId`, `method` (sem diferenciar maiúsculas), `search` (descrição **ou** razão social / nome fantasia da Nota de Empenho, sem diferenciar maiúsculas nem acento; o nome do fornecedor é achado por SQL, `immutable_unaccent_lower` sobre `empenho->>'razaoSocial'`/`'nomeFantasia'`). Vale para a lista, os totais e o CSV.
+- Filtros `from`, `to` (inclui o dia inteiro), `type`, `categoryId`, `accountId`, `method` (sem diferenciar maiúsculas), `search` (descrição **ou** razão social / nome fantasia da Nota de Empenho, sem diferenciar maiúsculas nem acento; **ou** o CNPJ/CPF da Nota de Empenho, com ou sem pontuação). Vale para a lista, os totais e o CSV.
+- O fornecedor é achado por SQL (`idsByEmpenho` em `finance-adapter.ts`): `immutable_unaccent_lower` sobre `empenho->>'razaoSocial'`/`'nomeFantasia'`, e os dígitos de `empenho->>'cnpjCpf'` (`regexp_replace`).
+- CNPJ/CPF (SR-056) só entra quando o termo parece documento (números e `.-/()+`, a mesma regra da busca de pessoas, `docDigitsOf` em `list-filters.ts`) e tem 3 ou mais dígitos. Compara só os dígitos dos dois lados: "12.345.678/0001-90", "12345678000190" e "0001-90" acham o mesmo empenho, gravado com ou sem pontuação.
 - Ordem por data desc.
 - `totals: { incomeCents, expenseCents }` somam todos os filtrados, sem transferências nem "só nota".
 - Filtro com formato inválido → 400 "Parâmetro inválido: <campo>" (vale também para resumo, exportação e fechamentos).
