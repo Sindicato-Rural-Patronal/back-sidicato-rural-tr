@@ -216,7 +216,7 @@ Listas paginadas aceitam `?page=1&limit=20` e respondem `{ data, total, page, li
 | `GET /admin/users/admins` | `search` (usuário), `rulesId` |
 | `GET /admin/companies` | `search`, `type`, `isPartner` |
 | `GET /admin/unimed` | `search` (nome/CPF/telefone da pessoa), `userDataId` |
-| `GET /admin/courses` | `status` (os 5), `search` (nome ou nº do evento), `year` (ano do início) |
+| `GET /admin/courses` | `status` (os 5), `search` (nome ou nº do evento), `year` (ano do início), `view` (`upcoming` \| `stored`, ver Cursos) |
 | `GET /admin/news` | `status` = PUBLISHED (no ar) / SCHEDULED (agendada) / UNPUBLISHED (rascunho), `search` (título) |
 | `GET /admin/contacts/messages` | `read`, `search` |
 | `GET /admin/audit-logs` | ver Auditoria |
@@ -260,13 +260,13 @@ Autenticação na última coluna: **Pública**, **Login** (qualquer admin) ou a 
 - Tem de ser objeto simples (null, array ou outro tipo → 400) de no máximo 4 KB em JSON (`MAX_PREFS_BYTES`).
 - `null` em `GET /admin/me` enquanto nunca salvou.
 
-**Avatar:** imagem até 15 MB, gravada como veio no bucket `avatars`.
+**Avatar:** imagem até 15 MB, gravada **como veio** no bucket `avatars` (o back não reduz; a foto antiga e a nova têm o tamanho que foi enviado).
 
 ### Pessoas (UserData)
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
 | `POST` | `/users` | `CreateUserUseCase` — formulário do painel; `{ name, phone, cpf, email? }` → 201 | `CREATE_USER` |
-| `GET` | `/admin/users` | `ListUsersUseCase` (paginada, filtros acima) | `READ_USER` |
+| `GET` | `/admin/users` | `ListUsersUseCase` (paginada, filtros acima). Cada pessoa traz `memberStatus` e `membershipValidUntil`: é a lista e também a busca de pessoa dos formulários. Selo "Sócio" = `memberStatus ACTIVE` com validade vazia ou de hoje em diante | `READ_USER` |
 | `GET` | `/admin/users/:id` | `GetUserDetailUseCase` (ficha completa) | `READ_USER` |
 | `PATCH` | `/users/:id` | `UpdateUserDataUseCase` | `UPDATE_USER` |
 | `DELETE` | `/users/:id` | `DeleteUserDataUseCase` → 204 (soft, leva junto o que depende da pessoa) | `DELETE_USER` (+ `DELETE_USER_ADMIN` se a pessoa tem login) |
@@ -454,7 +454,7 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 | `DELETE` | `/courses/:courseId` | soft (leva fotos e inscrições) | `DELETE_COURSE` |
 | `POST` | `/courses/:courseId/banner` | capa (multipart) → `{ url, thumbUrl }` | `UPDATE_COURSE` |
 | `POST` · `DELETE` | `/courses/:courseId/gallery[/:photoId]` | foto da galeria do curso | `UPDATE_COURSE` |
-| `GET` | `/admin/courses` | paginada (status, search, year), formato de card | `READ_COURSE` |
+| `GET` | `/admin/courses` | paginada (status, search, year, `view`), formato de card | `READ_COURSE` |
 | `GET` | `/admin/courses/years` | `number[]`: anos de início com curso, do mais recente | `READ_COURSE` |
 | `GET` | `/admin/courses/:courseId` | detalhe do painel | `READ_COURSE` |
 
@@ -470,6 +470,13 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 - Sem CHECK no banco, de propósito: um curso antigo com datas trocadas continua editável no resto.
 - Criar, e editar mudando sala ou horário, confere o conflito com cursos **e reservas** e grava numa transação só, com a sala travada (`createInRoom`/`updateInRoom`, a mesma trava `lockRoom` das reservas).
 - Sala ocupada → `POST` 400 / `PATCH` 409 "Sala ocupada: Curso "X" em 05/10 08:00–12:00".
+
+**Abas da lista do painel (`GET /admin/courses?view=`, SR-057):**
+- Sem `view`, a lista é a de sempre (todos, do início mais cedo ao mais tarde).
+- `upcoming` ("Próximos"): o dia do início ainda **não chegou**, o mais próximo primeiro.
+- `stored` ("Armazenados"): o dia do início é **hoje ou já passou**, no relógio de Brasília (`startTime < amanhã 00:00` com `todayInBrazil`), o mais recente primeiro. Vale para qualquer status; o concluído vem com `status: COMPLETED`.
+- O curso passa de uma aba para a outra sozinho, no dia do início: é só filtro por data na consulta (`viewFilters` em `usecase/list-all-courses.ts`), sem job. Combina com `status`, `search` e `year`; `total` e `totalPages` contam só a visão. Valor desconhecido → 400.
+- Nada na gestão do curso olha a data: inscritos, presença, ficha, iniciar e concluir funcionam com o curso armazenado.
 
 **Limpar campos na edição (`PATCH /courses/:id`, SR-019):**
 - Campo não mandado não muda. Para limpar, manda `null`.
@@ -500,7 +507,7 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 | `POST` | `/users/lookup-cpf` | `{ cpf, phoneEnd }` → `{ found, name }`, com o nome mascarado ("João D. S.") só quando os dois batem; CPF inválido, sem cadastro ou telefone que não confere → o mesmo `{ found: false, name: null }`; `phoneEnd` sem 4 dígitos → 400; 20/min por IP; limite por CPF (429). Não vai para a auditoria | Pública |
 | `POST` | `/courses/:courseId/register-by-cpf` | `{ cpf, phoneEnd }` → 201; **CPF sem cadastro ou telefone que não confere → o mesmo 404** "Não encontramos cadastro com este CPF e telefone." (o site segue para o `register-full`); `phoneEnd` sem 4 dígitos → 400; 10/min; limite por CPF (429) | Pública |
 | `POST` | `/courses/:courseId/register-full` | `{ name, phone, cpf, email?, rg?, birthDate?, address? }` → 201; CPF novo: cria a pessoa com o endereço como propriedade principal; CPF com cadastro: só inscreve se `phone` confere (ver abaixo), senão 409 `IdentityNotConfirmedError`; 10/min; limite por CPF (429) | Pública |
-| `GET` | `/admin/courses/:courseId/registrations` | inscritos com `confirmed`, `attended`, `ficha` (metadados), selos (memberStatus, membershipValidUntil, boardPosition, contato público, empresas parceiras) | `READ_COURSE` |
+| `GET` | `/admin/courses/:courseId/registrations` | inscritos **da mais antiga para a mais nova** (ordem de chegada, `createdAt` com data e hora, desempate por `id`) com `confirmed`, `attended`, `ficha` (metadados), selos (memberStatus, membershipValidUntil, boardPosition, contato público, empresas parceiras) | `READ_COURSE` |
 | `POST` | `/admin/courses/:courseId/registrations` | inscrição pela equipe `{ userDataId }`, já confirmada; ignora prazo, status e fim; respeita a lotação | `UPDATE_COURSE` |
 | `PATCH` | `/admin/registrations/:registrationId/confirm` | `{ confirmed: boolean }` (confirma ou desconfirma) | `UPDATE_COURSE` |
 | `PATCH` | `/admin/courses/:courseId/registrations/confirm-all` | confirma as pendentes → `{ confirmed }` | `UPDATE_COURSE` |

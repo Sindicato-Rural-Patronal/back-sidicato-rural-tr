@@ -177,6 +177,14 @@ export function buildCourseListWhere(filters?: CourseListFilters) {
             startTime: { gte: new Date(Date.UTC(year, 0, 1)),
 lt: new Date(Date.UTC(year + 1, 0, 1)) },
         }),
+        // Visões "próximos" e "armazenados" do painel: separadas do ano, e as duas
+        // valem juntas (AND), então ficam fora da chave `startTime` do ano.
+        ...((filters?.startsFrom || filters?.startsBefore) && {
+            AND: [
+                ...(filters.startsFrom ? [{ startTime: { gte: filters.startsFrom } }] : []),
+                ...(filters.startsBefore ? [{ startTime: { lt: filters.startsBefore } }] : []),
+            ],
+        }),
         ...((filters?.endsFrom || filters?.endedBefore) && {
             endTime: {
                 ...(filters.endsFrom && { gte: filters.endsFrom }),

@@ -22,7 +22,7 @@ describe('ListAllCoursesUseCase', () => {
             vi.mocked(mockCourseRepo.findAll).mockResolvedValue([]);
             const uc = new ListAllCoursesUseCase(mockCourseRepo);
             await uc.execute();
-            expect(mockCourseRepo.findAll).toHaveBeenCalledWith(undefined, 0, 20);
+            expect(mockCourseRepo.findAll).toHaveBeenCalledWith(undefined, 0, 20, 'asc');
         });
 
         it('retorna lista vazia quando não há cursos', async () => {
