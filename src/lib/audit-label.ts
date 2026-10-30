@@ -49,6 +49,36 @@ export function shouldLookupTargetLabel(method: string, path: string): boolean {
     return method === 'POST' && !!firstId(path) && !PUBLIC_REGISTER_RE.test(path);
 }
 
+// Criar lançamento: o Nº só existe depois de gravar, então o rótulo não vem do
+// corpo (que traz a descrição, mas não o número automático) e sim da resposta.
+const TRANSACTION_CREATE_PATH = '/admin/finance/transactions';
+
+/** É a criação de um lançamento (e não a de transferência, comprovante...)? */
+export function isTransactionCreate(method: string, path: string): boolean {
+    return method === 'POST' && path.replace(/\/+$/, '') === TRANSACTION_CREATE_PATH;
+}
+
+/**
+ * Rótulo do lançamento recém-criado a partir da resposta (201 com a linha):
+ * "nº 123 — descrição". Resposta que não dá para ler → null (a trilha fica
+ * "Criou um lançamento", como antes).
+ */
+export function createdTransactionLabel(payload: unknown): string | null {
+    const text = typeof payload === 'string' ? payload : Buffer.isBuffer(payload) ? payload.toString('utf8') : null;
+    if (!text) return null;
+    try {
+        const row = JSON.parse(text) as {
+ number?: unknown;
+description?: unknown 
+} | null;
+        if (!row || typeof row.description !== 'string' || !row.description.trim()) return null;
+        const number = typeof row.number === 'number' ? row.number : null;
+        return financeTransactionLabel(number, row.description.trim()).slice(0, 140);
+    } catch {
+        return null;
+    }
+}
+
 /** Fechar o mês: rótulo pelo corpo (ainda não validado; o caixa vem do banco). */
 async function closingCreateLabel(prisma: PrismaClient, body: unknown): Promise<string | null> {
     if (!body || typeof body !== 'object') return null;

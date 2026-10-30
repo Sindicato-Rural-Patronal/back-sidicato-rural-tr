@@ -813,6 +813,47 @@ describe('edição do Nº na auditoria (ida B)', () => {
         expect(summaries).toContain('Editou o lançamento "nº 1 — COMPRA DE ADUBO"');
     });
 
+    it('criar cita o número, o automático e o digitado (SR-069)', async () => {
+        const auto = await create({ description: 'COMPRA DE ADUBO' });
+        const typed = await create({ number: 5000,
+description: 'LUZ' });
+        expect([auto.number, typed.number]).toEqual([1, 5000]);
+
+        const log = await waitForAudit({
+            method: 'POST',
+            entity: 'Lançamento',
+            targetLabel: 'nº 5000 — LUZ',
+        });
+        expect(log.statusCode).toBe(201);
+        await waitForAudit({
+            method: 'POST',
+            entity: 'Lançamento',
+            targetLabel: 'nº 1 — COMPRA DE ADUBO',
+        });
+
+        const list = await call('GET', `/admin/audit-logs?entity=${encodeURIComponent('Lançamento')}`);
+        const summaries = json<{ data: { summary: string }[] }>(list.body).data.map(r => r.summary);
+        expect(summaries).toContain('Criou o lançamento "nº 1 — COMPRA DE ADUBO"');
+        expect(summaries).toContain('Criou o lançamento "nº 5000 — LUZ"');
+    });
+
+    it('criar que a regra recusa não deixa linha na trilha', async () => {
+        await create({ number: 7,
+description: 'PRIMEIRO' });
+        await waitForAudit({ method: 'POST',
+entity: 'Lançamento',
+targetLabel: 'nº 7 — PRIMEIRO' });
+        const again = await call('POST', '/admin/finance/transactions', { type: 'OUT',
+amountCents: 1000,
+date: '2026-05-10',
+description: 'REPETIDO',
+number: 7 });
+        expect(again.statusCode, again.body).toBe(409);
+        await new Promise(r => setTimeout(r, 300));
+        expect(await prisma.auditLog.count({ where: { entity: 'Lançamento',
+targetLabel: { contains: 'REPETIDO' } } })).toBe(0);
+    });
+
     it('excluir não mexe no número, e a trilha cita o número', async () => {
         const t = await create({ description: 'LUZ' });
         expect((await call('DELETE', `/admin/finance/transactions/${t.id}`)).statusCode).toBe(204);

@@ -2,7 +2,14 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { decodeToken } from '../lib/auth.js';
 import { deriveAuditEntity, loginAuditMethod, LOGIN_PATH, skipAudit } from '../lib/audit-entity.js';
-import { lookupTargetLabel, bodyLabel, shouldLookupTargetLabel, loginUsername } from '../lib/audit-label.js';
+import {
+    lookupTargetLabel,
+    bodyLabel,
+    shouldLookupTargetLabel,
+    loginUsername,
+    isTransactionCreate,
+    createdTransactionLabel,
+} from '../lib/audit-label.js';
 import { diffSnapshots, removedSnapshot, type AuditChange } from '../lib/audit-diff.js';
 import { shouldSnapshot, snapshotTarget } from '../lib/audit-snapshot.js';
 import { lookupLocation } from '../lib/geoip.js';
@@ -88,12 +95,18 @@ export function registerAuditHooks(app: FastifyInstance, prisma: PrismaClient) {
         }
     });
 
-    // Login com sucesso: o id do admin só existe no token que está saindo.
+    // O que só existe na resposta: o id do admin no token que está saindo (login)
+    // e o Nº do lançamento que acabou de ser criado.
     app.addHook('onSend', async (request, reply, payload) => {
-        if (request.method !== 'POST' || cleanPath(request) !== LOGIN_PATH || reply.statusCode !== 200) return payload;
+        const method = request.method;
+        const path = cleanPath(request);
         try {
-            const token = typeof payload === 'string' ? (JSON.parse(payload) as { token?: unknown }).token : null;
-            if (typeof token === 'string') stash(request)._auditActorId = decodeToken(token)?.userId ?? null;
+            if (method === 'POST' && path === LOGIN_PATH && reply.statusCode === 200) {
+                const token = typeof payload === 'string' ? (JSON.parse(payload) as { token?: unknown }).token : null;
+                if (typeof token === 'string') stash(request)._auditActorId = decodeToken(token)?.userId ?? null;
+            } else if (isTransactionCreate(method, path) && reply.statusCode === 201) {
+                stash(request)._auditLabel = createdTransactionLabel(payload);
+            }
         } catch {
             /* auditoria nunca deve derrubar a request */
         }

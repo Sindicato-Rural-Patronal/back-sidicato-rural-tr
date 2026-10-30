@@ -8,6 +8,7 @@ O que mudou e por quê. As regras que valem hoje estão no `CLAUDE.md`. Este arq
 - **O que isso causava na prática.** Nada visível hoje. Dentro da trava de vagas, o `register-full` confere a inscrição repetida antes de gravar (a repetição em sequência sempre respondeu "Esta pessoa já está inscrita neste curso."), e o único outro P2002 alcançável é o do CPF, que estava certo por acaso. O erro só apareceria para uma inscrição gravada por fora da trava no mesmo instante. O caso que estava errado de verdade era o cadastro de administrador: duas requisições criando a conta da mesma pessoa ao mesmo tempo davam "Username already exists" em vez de "This user already has an admin account".
 - **A correção.** O `uniqueViolationFields` foi apagado; o `uniqueViolationTarget` (da SR-064) é a única leitura do índice. O `register-full` e o `CreateUserAdminUseCase` passaram a usá-lo. Os outros usos de `isPrismaUniqueViolation` (`register-by-cpf`, inscrição pela equipe) só gravam uma tabela com um índice único, então não dependem do nome.
 - **Como o teste provoca o P2002 de verdade.** Uma transação do teste grava a linha e fica aberta; a requisição não a enxerga, passa pelas conferências e espera no índice; o teste confirma e o Postgres devolve o P2002. Sem mock do erro (`unique-violations.e2e_test.ts`).
+- **Auditoria.** Criar lançamento passou a citar o número ("Criou o lançamento "nº 123 — descrição""). O número automático só existe depois de gravar; o rótulo sai da resposta 201.
 
 ## 30/10/2026: SR-064, Nº dos lançamentos (decisão 005)
 
