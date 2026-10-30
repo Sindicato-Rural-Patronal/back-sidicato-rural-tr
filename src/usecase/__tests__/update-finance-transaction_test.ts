@@ -67,12 +67,16 @@ categoryId: null } as any);
         vi.mocked(repo.findTransactionById).mockResolvedValue({ id: 'tx-1',
 type: 'OUT',
 transferId: null } as any);
-        vi.mocked(repo.updateTransaction).mockResolvedValue({ id: 'tx-1' } as any);
+        vi.mocked(repo.updateTransaction).mockResolvedValue({ id: 'tx-1',
+number: 12 } as any);
         const uc = new UpdateFinanceTransactionUseCase(repo);
         const r = await uc.execute('tx-1', { description: 'atualizado',
 amountCents: 15000 });
         expect(r.error).toBeUndefined();
         expect(repo.updateTransaction).toHaveBeenCalled();
+        // Devolve o lançamento como ficou (com o número).
+        expect(r.transaction).toEqual({ id: 'tx-1',
+number: 12 });
     });
 
     describe('mês fechado (SR-054)', () => {

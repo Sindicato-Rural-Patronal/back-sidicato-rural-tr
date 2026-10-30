@@ -451,6 +451,10 @@ model FinancialCategory {
 // Financeiro: lançamento de caixa. Valor em CENTAVOS (Int) — nunca float.
 model FinancialTransaction {
   id          String        @id @default(uuid())
+  // Nº do lançamento (decisão 005): uma sequência só, que nunca recomeça. Na
+  // ida A a coluna só existe e é preenchida pela migration, nos ativos, em
+  // ordem de data; null = lançamento criado depois dela ou já excluído antes.
+  number      Int?
   // null = "só nota" (gera a Nota de Empenho sem lançar no caixa; fora de
   // saldo/KPIs). Editável depois para IN/OUT.
   type        FinancialType?

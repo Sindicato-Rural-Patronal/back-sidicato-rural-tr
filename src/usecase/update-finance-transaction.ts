@@ -1,6 +1,7 @@
 import type {
     FinanceRepository,
     FinanceTransactionUpdateInput,
+    FinancialTransactionModel,
 } from '../ports/external/finance-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { FinanceTransactionNotFoundError } from '../errors/not-found.js';
@@ -12,7 +13,14 @@ const updateSchema = financeTransactionSchema.partial();
 export class UpdateFinanceTransactionUseCase {
     constructor(private readonly repo: FinanceRepository) {}
 
-    async execute(id: string, input: unknown): Promise<{ error?: Error }> {
+    async execute(
+        id: string,
+        input: unknown,
+    ): Promise<{
+        error?: Error;
+        /** O lançamento como ficou (com o `number`). */
+        transaction?: FinancialTransactionModel;
+    }> {
         const parsed = updateSchema.safeParse(input);
         if (!parsed.success) {
             return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Dados inválidos') };
@@ -72,7 +80,7 @@ export class UpdateFinanceTransactionUseCase {
             if (!acc) return { error: new ValidationError('Caixa inválido') };
         }
 
-        await this.repo.updateTransaction(id, data);
-        return {};
+        const transaction = await this.repo.updateTransaction(id, data);
+        return { transaction };
     }
 }

@@ -276,8 +276,8 @@ total: number
     updateTransaction(id: string, data: FinanceTransactionUpdateInput): Promise<FinancialTransactionModel>;
     softDeleteTransaction(id: string): Promise<boolean>;
 
-    // Transferência entre caixas: cria os 2 lançamentos ligados (OUT + IN).
-    createTransfer(input: FinanceTransferInput): Promise<void>;
+    // Transferência entre caixas: cria os 2 lançamentos ligados e devolve [saída, entrada].
+    createTransfer(input: FinanceTransferInput): Promise<FinancialTransactionModel[]>;
     // Soft-delete dos 2 lançamentos de uma transferência.
     softDeleteTransfer(transferId: string): Promise<boolean>;
     // Os lançamentos (não excluídos) de uma transferência: as duas pernas.

@@ -126,6 +126,44 @@ nullable: true },
     },
 };
 
+// O lançamento como está no banco. O Fastify serializa a resposta pelo schema:
+// campo que não está aqui some, e null em campo sem `null` no tipo vira "" ou 0.
+// `additionalProperties` deixa passar o que a lista acrescenta (categoria,
+// caixa e comprovantes).
+const transactionProperties = {
+    id: { type: 'string' },
+    number: {
+        type: ['integer', 'null'],
+        description: 'Nº do lançamento (decisão 005). null = ainda sem número.',
+        example: 128,
+    },
+    type: { type: ['string', 'null'],
+enum: ['IN', 'OUT', null] },
+    amountCents: { type: 'integer' },
+    date: { type: 'string' },
+    description: { type: 'string' },
+    method: { type: ['string', 'null'] },
+    notes: { type: ['string', 'null'] },
+    categoryId: { type: ['string', 'null'] },
+    accountId: { type: ['string', 'null'] },
+    transferId: { type: ['string', 'null'] },
+    createdBy: { type: ['string', 'null'] },
+    recurringId: { type: ['string', 'null'] },
+    recurringMonth: { type: ['string', 'null'] },
+    empenho: { type: ['object', 'null'],
+additionalProperties: true },
+    isDeleted: { type: 'boolean' },
+    deletedAt: { type: ['string', 'null'] },
+    createdAt: { type: 'string' },
+    updatedAt: { type: 'string' },
+};
+
+const transactionResponse = {
+    type: 'object',
+    properties: transactionProperties,
+    additionalProperties: true,
+};
+
 // Recorrência: molde do lançamento que se repete todo mês. Meses em "AAAA-MM".
 const recurrenceBody = {
     type: 'object',
@@ -445,8 +483,7 @@ example: 'PIX' },
                         properties: {
                             // Lançamento com categoria, caixa, empenho e comprovantes: vai inteiro.
                             data: { type: 'array',
-items: { type: 'object',
-additionalProperties: true } },
+items: transactionResponse },
                             total: { type: 'integer' },
                             page: { type: 'integer' },
                             limit: { type: 'integer' },
@@ -503,9 +540,10 @@ enum: ['IN', 'OUT'] },
             schema: {
                 tags,
                 summary: 'Create financial transaction',
-                description: 'Mês fechado no caixa do lançamento → 409 "O mês MM/AAAA está fechado no caixa \"X\". Reabra o mês para mudar lançamentos dele." Sem caixa, não há trava.',
+                description: 'Responde com o lançamento criado, com o `number`. Mês fechado no caixa do lançamento → 409 "O mês MM/AAAA está fechado no caixa \"X\". Reabra o mês para mudar lançamentos dele." Sem caixa, não há trava.',
                 body: transactionBody,
                 response: {
+                    201: transactionResponse,
                     400: errorResponse,
                     401: errorResponse,
                     403: errorResponse,
@@ -523,7 +561,7 @@ enum: ['IN', 'OUT'] },
             schema: {
                 tags,
                 summary: 'Transfer between cash accounts',
-                description: 'Cria 2 lançamentos ligados (saída na origem, entrada no destino). Não conta como receita/despesa. Mês fechado na origem ou no destino → 409 (mesma mensagem do lançamento).',
+                description: 'Cria 2 lançamentos ligados (saída na origem, entrada no destino) e responde com os dois em `transactions`, a saída primeiro, cada um com o `number`. Não conta como receita/despesa. Mês fechado na origem ou no destino → 409 (mesma mensagem do lançamento).',
                 body: {
                     type: 'object',
                     required: ['fromAccountId', 'toAccountId', 'amountCents', 'date'],
@@ -541,8 +579,15 @@ nullable: true },
                     },
                 },
                 response: {
-                    201: { type: 'object',
-properties: { message: { type: 'string' } } },
+                    201: {
+                        type: 'object',
+                        properties: {
+                            message: { type: 'string' },
+                            // [saída, entrada]
+                            transactions: { type: 'array',
+items: transactionResponse },
+                        },
+                    },
                     400: errorResponse,
                     401: errorResponse,
                     403: errorResponse,
@@ -560,15 +605,20 @@ properties: { message: { type: 'string' } } },
             schema: {
                 tags,
                 summary: 'Update financial transaction',
-                description: 'Lançamento num mês fechado do caixa não se edita, e nenhum lançamento é movido para dentro de um mês fechado (pela data ou pelo caixa) → 409 "O mês MM/AAAA está fechado no caixa \"X\". Reabra o mês para mudar lançamentos dele."',
+                description: 'Responde com o lançamento como ficou, em `transaction`. Lançamento num mês fechado do caixa não se edita, e nenhum lançamento é movido para dentro de um mês fechado (pela data ou pelo caixa) → 409 "O mês MM/AAAA está fechado no caixa \"X\". Reabra o mês para mudar lançamentos dele."',
                 params: { type: 'object',
 required: ['id'],
 properties: { id: { type: 'string' } } },
                 body: { type: 'object',
 properties: transactionBody.properties },
                 response: {
-                    200: { type: 'object',
-properties: { message: { type: 'string' } } },
+                    200: {
+                        type: 'object',
+                        properties: {
+                            message: { type: 'string' },
+                            transaction: transactionResponse,
+                        },
+                    },
                     400: errorResponse,
                     401: errorResponse,
                     403: errorResponse,

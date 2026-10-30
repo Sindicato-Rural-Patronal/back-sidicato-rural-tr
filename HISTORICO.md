@@ -2,6 +2,14 @@
 
 O que mudou e por quê. As regras que valem hoje estão no `CLAUDE.md`. Este arquivo serve para entender de onde veio uma regra ou um dado estranho no banco. As entradas mais novas ficam no topo.
 
+## 30/10/2026: SR-064, Nº dos lançamentos (decisão 005)
+
+- **Ida A: a coluna `number` e a numeração dos lançamentos que já existiam.**
+  - O lançamento só tinha o UUID. O único número era o "Nº empenho" (`empenho.numero`), texto livre e opcional. O usuário pediu um número automático, numa sequência só, com os lançamentos de hoje numerados por data (decisão 005).
+  - Foi em duas migrations que só acrescentam: a coluna vazia, e depois um `UPDATE` que escreve só nela. Os excluídos ficaram sem número, para a lista não começar com buracos.
+  - A ordem da decisão supunha as duas pernas da transferência com o mesmo `createdAt`. Na prática o Prisma gera o horário a cada gravação, e a entrada sai de 1 a 6 ms depois da saída. Por isso a migration põe as duas pernas juntas, na posição do `createdAt` da saída. Sem isso, um lançamento do mesmo dia gravado no meio, ou empatado com a saída, cairia entre elas.
+  - Nesta ida o código só devolve o número. Ele ainda não dá número a lançamento novo, e não há índice único: a numeração é conferida pelo usuário antes da ida B.
+
 ## 30/10/2026: SR-054, SR-055 e SR-056
 
 - **Mês fechado passou a travar lançamentos (SR-054, fecha a SR-020).**

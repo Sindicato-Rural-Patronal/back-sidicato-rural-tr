@@ -148,13 +148,16 @@ export class FinanceController {
         const actorId = adminOf(request).id;
         const res = await this.createTransfer.execute(request.body, actorId);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
-        return reply.status(201).send({ message: 'ok' });
+        // [saída, entrada], cada uma com o seu número.
+        return reply.status(201).send({ message: 'ok',
+transactions: res.transactions });
     }
 
     async patchTransaction(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
         const res = await this.updateTransaction.execute(request.params.id, request.body);
         if (res.error) return reply.status(errorToStatus(res.error)).send({ error: res.error.message });
-        return reply.status(200).send({ message: 'ok' });
+        return reply.status(200).send({ message: 'ok',
+transaction: res.transaction });
     }
 
     async removeTransaction(request: FastifyRequest<{ Params: IdParams }>, reply: FastifyReply) {
