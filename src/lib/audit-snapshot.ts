@@ -249,6 +249,14 @@ account: t?.account?.name ?? null }, ['categoryId', 'accountId']);
     '/admin/finance/attachments/:id': byFirstId('financialAttachment', { select: { filename: true,
 mimeType: true,
 size: true } }),
+    // Reabrir o mês apaga o fechamento: a trilha guarda o que estava fechado.
+    '/admin/finance/closings/:id': async (prisma, ids) => {
+        const c = await prisma.financeMonthlyClosing.findUnique({
+            where: { id: ids[0] },
+            include: { account: nameOnly },
+        });
+        return named(c, { account: c?.account?.name ?? null }, ['accountId']);
+    },
 };
 
 function snapshotFor(method: string, path: string): Snapshot | null {

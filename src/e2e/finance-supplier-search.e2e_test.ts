@@ -155,3 +155,62 @@ headers: bearer(token) });
         expect(rows.map(r => r[4])).toEqual(['Compra de adubo']);
     });
 });
+
+// SR-056: a busca acha também pelo CNPJ/CPF guardado na Nota de Empenho, com ou
+// sem pontuação dos dois lados, comparando só os dígitos (termo com 3 ou mais).
+describe('busca por CNPJ / CPF do fornecedor', () => {
+    beforeAll(async () => {
+        // Documento gravado só com dígitos (o empenho guarda como foi digitado).
+        await lancamento({
+            ...base,
+            description: 'Frete',
+            amountCents: 3000,
+            empenho: {
+                nomeFantasia: 'TRANSPORTES RAPIDO',
+                cnpjCpf: '98765432000155',
+            },
+        });
+    });
+
+    it('CNPJ com ou sem pontuação, inteiro ou em parte', async () => {
+        expect(descricoes(await buscar('12.345.678/0001-90'))).toEqual(['Compra de adubo']);
+        expect(descricoes(await buscar('12345678000190'))).toEqual(['Compra de adubo']);
+        expect(descricoes(await buscar('0001-90'))).toEqual(['Compra de adubo']);
+    });
+
+    it('CPF com ou sem pontuação', async () => {
+        expect(descricoes(await buscar('123.456.789-09'))).toEqual(['Conserto da bomba']);
+        expect(descricoes(await buscar('12345678909'))).toEqual(['Conserto da bomba']);
+    });
+
+    it('documento gravado sem pontuação é achado pelo termo com pontuação', async () => {
+        expect(descricoes(await buscar('98.765.432/0001-55'))).toEqual(['Frete']);
+        expect(descricoes(await buscar(' 98765432 '))).toEqual(['Frete']);
+    });
+
+    it('os dígitos em comum acham os dois documentos', async () => {
+        // "12345678" está no começo do CNPJ e do CPF.
+        expect(descricoes(await buscar('12.345.678'))).toEqual(['Compra de adubo', 'Conserto da bomba']);
+    });
+
+    it('menos de 3 dígitos, ou texto com letras, não vira busca por documento', async () => {
+        expect((await buscar('12')).data).toEqual([]);
+        expect((await buscar('nf 000190')).data).toEqual([]);
+    });
+
+    it('totais e CSV seguem o mesmo filtro', async () => {
+        const page = await buscar('12345678000190');
+        expect(page.totals).toEqual({
+            incomeCents: 0,
+            expenseCents: 25000,
+        });
+        const res = await app.inject({
+            method: 'GET',
+            url: '/admin/finance/transactions/export?search=98765432000155',
+            headers: bearer(token),
+        });
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.body).toContain('Frete');
+        expect(res.body).not.toContain('Compra de adubo');
+    });
+});

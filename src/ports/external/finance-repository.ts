@@ -173,7 +173,13 @@ export type FinanceRecurrenceCreateInput = {
     active?: boolean;
 };
 
-export type FinanceRecurrenceUpdateInput = Partial<FinanceRecurrenceCreateInput>;
+export type FinanceRecurrenceUpdateInput = Partial<FinanceRecurrenceCreateInput> & {
+    /**
+     * Só o use case grava (nunca vem do corpo): ao reativar uma recorrência
+     * pausada, os meses da pausa são pulados (SR-054).
+     */
+    lastGeneratedMonth?: string | null;
+};
 
 // Recorrência com categoria e caixa embutidos (listagem do painel).
 export type FinanceRecurrenceWithRefs = FinanceRecurringTransactionModel & {
@@ -226,6 +232,15 @@ export type FinanceClosingCreateInput = {
     closedByAdminId?: string | null;
 };
 
+// Par (caixa, mês "AAAA-MM") que o fechamento trava.
+export type FinanceAccountMonth = {
+    accountId: string;
+    month: string;
+};
+
+// Fechamento achado para um par, com o nome do caixa (vai na mensagem de erro).
+export type FinanceClosedMonth = FinanceAccountMonth & { accountName: string };
+
 export interface FinanceRepository {
     // Categorias
     listCategories(includeInactive: boolean): Promise<FinancialCategoryModel[]>;
@@ -265,6 +280,8 @@ total: number
     createTransfer(input: FinanceTransferInput): Promise<void>;
     // Soft-delete dos 2 lançamentos de uma transferência.
     softDeleteTransfer(transferId: string): Promise<boolean>;
+    // Os lançamentos (não excluídos) de uma transferência: as duas pernas.
+    listTransferLegs(transferId: string): Promise<FinancialTransactionModel[]>;
 
     // Comprovantes (anexos)
     addAttachment(
@@ -303,6 +320,8 @@ total: number
 year?: string 
 }): Promise<FinanceMonthlyClosingModel[]>;
     findClosing(accountId: string, month: string): Promise<FinanceMonthlyClosingModel | null>;
+    // Quais destes pares (caixa, mês) estão fechados, do mês mais antigo ao mais novo.
+    findClosedMonths(pairs: FinanceAccountMonth[]): Promise<FinanceClosedMonth[]>;
     // Saldo de abertura + entradas/saídas do caixa no mês [from, to].
     accountMonthMovement(accountId: string, from: Date, to: Date): Promise<FinanceAccountMonthMovement>;
     createClosing(data: FinanceClosingCreateInput): Promise<FinanceMonthlyClosingModel>;

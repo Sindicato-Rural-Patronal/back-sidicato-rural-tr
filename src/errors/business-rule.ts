@@ -29,6 +29,15 @@ export class CourseFullError extends BusinessRuleError {
     }
 }
 
+// Lançamento ou transferência num mês fechado do caixa (SR-054). `month` é "AAAA-MM".
+export class ClosedMonthError extends BusinessRuleError {
+    constructor(month: string, accountName: string) {
+        const [year, mm] = month.split('-');
+        super(`O mês ${mm}/${year} está fechado no caixa "${accountName}". Reabra o mês para mudar lançamentos dele.`);
+        this.name = 'ClosedMonthError';
+    }
+}
+
 // Inscrição completa com CPF que já tem cadastro e telefone que não confere:
 // nada é vinculado nem alterado (SR-025).
 export class IdentityNotConfirmedError extends BusinessRuleError {

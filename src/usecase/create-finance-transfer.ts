@@ -1,12 +1,14 @@
 import { z } from 'zod';
 import type { FinanceRepository } from '../ports/external/finance-repository.js';
 import { ValidationError } from '../errors/validation.js';
+import { closedMonthError } from './finance-closed-month.js';
+import { financeDate } from './finance-dates.js';
 
 export const financeTransferSchema = z.object({
     fromAccountId: z.string().uuid('Caixa de origem inválido'),
     toAccountId: z.string().uuid('Caixa de destino inválido'),
     amountCents: z.number().int().positive('O valor deve ser maior que zero'),
-    date: z.coerce.date(),
+    date: financeDate,
     description: z.preprocess(v => (v === '' ? undefined : v), z.string().optional()),
     method: z.preprocess(v => (v === '' ? null : v), z.string().nullable().optional()),
 });
@@ -30,6 +32,19 @@ export class CreateFinanceTransferUseCase {
         ]);
         if (!from) return { error: new ValidationError('Caixa de origem inválido') };
         if (!to) return { error: new ValidationError('Caixa de destino inválido') };
+
+        // Mês fechado em qualquer um dos dois caixas barra a transferência (SR-054).
+        const locked = await closedMonthError(this.repo, [
+            {
+                accountId: data.fromAccountId,
+                date: data.date,
+            },
+            {
+                accountId: data.toAccountId,
+                date: data.date,
+            },
+        ]);
+        if (locked) return { error: locked };
 
         const description = data.description?.trim() || `Transferência: ${from.name} → ${to.name}`;
 

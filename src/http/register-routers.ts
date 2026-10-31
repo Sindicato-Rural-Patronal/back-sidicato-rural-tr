@@ -34,12 +34,16 @@ import { createUserAdminAdapter } from '../adapter/database/user-admin-adapter.j
 import { createRuleAdapter } from '../adapter/database/rule-adapter.js';
 import { GetAdminPermissionsUseCase } from '../usecase/get-admin-permissions.js';
 import { withRouteAuth, type RouteAuthEntry } from './lib/route-auth.js';
+import { limitNumberInputs } from './lib/request-parsing.js';
 
 // Todas as rotas da API. Usado pelo servidor e pelos testes E2E, para os dois
 // não ficarem com conjuntos diferentes de rotas. Ficam dentro do plugin da
 // autorização por rota (`lib/route-auth.ts`); `inventory` recebe a declaração
 // de cada rota, para os testes.
 export function registerRouters(app: FastifyInstance, prisma: PrismaClient, inventory?: RouteAuthEntry[]) {
+    // Número de entrada tem limite (SR-055): inteiro cabe no int4 do Postgres e
+    // nada é Infinity. Fora disso, 400 do Ajv com o nome do campo, e não 500.
+    app.addHook('onRoute', limitNumberInputs);
     const getAdminPermissions = new GetAdminPermissionsUseCase(createUserAdminAdapter(prisma), createRuleAdapter(prisma));
     withRouteAuth(app, getAdminPermissions, api => {
         api.register(userDataRouter, prisma);

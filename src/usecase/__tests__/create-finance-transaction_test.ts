@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CreateFinanceTransactionUseCase } from '../create-finance-transaction.js';
+import { BusinessRuleError } from '../../errors/business-rule.js';
 import type { FinanceRepository } from '../../ports/external/finance-repository.js';
 
 const repo = {
     findCategoryById: vi.fn(),
     findAccountById: vi.fn(),
     createTransaction: vi.fn(),
+    findClosedMonths: vi.fn().mockResolvedValue([]),
 } as unknown as FinanceRepository;
 
 const base = {
@@ -104,5 +106,37 @@ type: 'OUT' } as any);
         }, null);
         expect(r.error).toBeUndefined();
         expect(r.transaction).toBeDefined();
+    });
+
+    it('recusa lançamento no mês fechado do caixa (409) e não grava (SR-054)', async () => {
+        vi.mocked(repo.findAccountById).mockResolvedValue({ id: 'a1' } as any);
+        vi.mocked(repo.findClosedMonths).mockResolvedValueOnce([
+            {
+                accountId: '22222222-2222-4222-8222-222222222222',
+                month: '2026-09',
+                accountName: 'BANCO',
+            },
+        ]);
+        const uc = new CreateFinanceTransactionUseCase(repo);
+        const r = await uc.execute({
+            ...base,
+            accountId: '22222222-2222-4222-8222-222222222222',
+        }, null);
+        expect(r.error).toBeInstanceOf(BusinessRuleError);
+        expect(r.error?.message).toBe('O mês 09/2026 está fechado no caixa "BANCO". Reabra o mês para mudar lançamentos dele.');
+        // Consulta o par (caixa, mês da data).
+        expect(repo.findClosedMonths).toHaveBeenCalledWith([{
+            accountId: '22222222-2222-4222-8222-222222222222',
+            month: '2026-09',
+        }]);
+        expect(repo.createTransaction).not.toHaveBeenCalled();
+    });
+
+    it('lançamento sem caixa não consulta fechamento (não há trava)', async () => {
+        vi.mocked(repo.createTransaction).mockResolvedValue({ id: 'tx-3' } as any);
+        const uc = new CreateFinanceTransactionUseCase(repo);
+        const r = await uc.execute(base, null);
+        expect(r.error).toBeUndefined();
+        expect(repo.findClosedMonths).not.toHaveBeenCalled();
     });
 });

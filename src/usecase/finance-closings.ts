@@ -6,7 +6,7 @@ import type {
 import { ValidationError, parseQuery } from '../errors/validation.js';
 import { NotFoundError } from '../errors/not-found.js';
 import { ConflictError } from '../errors/conflict.js';
-import { isMonth } from './finance-recurrences.js';
+import { isMonth, MONTH_MESSAGE } from './finance-recurrences.js';
 
 /** Primeiro instante do mês "YYYY-MM" e o último (23:59:59.999 do último dia). */
 export function monthRange(month: string): {
@@ -58,7 +58,7 @@ const listSchema = z.object({
 
 const createSchema = z.object({
     accountId: z.string().uuid('Escolha o caixa'),
-    month: z.string().refine(isMonth, 'Mês inválido (use AAAA-MM)'),
+    month: z.string().refine(isMonth, MONTH_MESSAGE),
     countedBalanceCents: z.number().int(),
     notes: z.preprocess(v => (v === '' ? null : v), z.string().nullable().optional()),
 });
@@ -88,7 +88,7 @@ preview?: FinanceClosingCalc & { closing: FinanceMonthlyClosingModel | null }
 }> {
         const parsed = z
             .object({ accountId: z.string().uuid('Escolha o caixa'),
-month: z.string().refine(isMonth, 'Mês inválido (use AAAA-MM)') })
+month: z.string().refine(isMonth, MONTH_MESSAGE) })
             .safeParse(query ?? {});
         if (!parsed.success) {
             return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Dados inválidos') };

@@ -45,6 +45,26 @@ cause?: unknown
 }
 
 /**
+ * SQLSTATE do Postgres que o driver adapter devolveu, quando há (ex.: "22008").
+ * Erros que o Prisma não traduz chegam como P2039 (ou P2010 em SQL cru), com o
+ * código em `meta.driverAdapterError.cause`; os traduzidos (P2020…) podem trazer
+ * só `cause` no próprio erro.
+ */
+export function postgresSqlState(error: unknown): string | null {
+    let current: unknown = error;
+    for (let depth = 0; depth < 4 && typeof current === 'object' && current !== null; depth++) {
+        const e = current as {
+            originalCode?: unknown;
+            meta?: { driverAdapterError?: unknown };
+            cause?: unknown;
+        };
+        if (typeof e.originalCode === 'string') return e.originalCode;
+        current = e.meta?.driverAdapterError ?? e.cause;
+    }
+    return null;
+}
+
+/**
  * Campos/índice envolvidos numa violação de unicidade (P2002). Prisma expõe
  * `meta.target` como array de colunas ou, para índices nomeados, uma string.
  */

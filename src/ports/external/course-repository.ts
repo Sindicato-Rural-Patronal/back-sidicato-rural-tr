@@ -71,6 +71,10 @@ export type CourseListFilters = {
     search?: string;
     /** Ano de inicio do curso. Filtro proprio, separado da busca por texto. */
     year?: number;
+    /** So os que comecam neste instante (hora de parede) ou depois: `startTime >= startsFrom`. */
+    startsFrom?: Date;
+    /** So os que comecam antes deste instante: `startTime < startsBefore`. */
+    startsBefore?: Date;
     /** So os que ainda nao terminaram neste instante (hora de parede): `endTime >= endsFrom`. */
     endsFrom?: Date;
     /** So os que ja terminaram: `endTime < endedBefore`. */

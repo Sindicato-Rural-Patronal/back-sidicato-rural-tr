@@ -7,6 +7,7 @@ export function deriveAuditEntity(path: string): string {
     if (p.includes('/finance/categories')) return 'Categoria financeira';
     if (p.includes('/finance/accounts')) return 'Caixa';
     if (p.includes('/finance/transfers')) return 'Transferência';
+    if (p.includes('/finance/closings')) return 'Fechamento de caixa';
     // Antes de /transactions: anexar comprovante é POST /transactions/:id/attachments.
     if (p.includes('/attachments')) return 'Comprovante';
     if (p.includes('/finance/transactions')) return 'Lançamento';

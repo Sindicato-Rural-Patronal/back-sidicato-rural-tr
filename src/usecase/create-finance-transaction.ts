@@ -4,12 +4,14 @@ import type {
     FinancialTransactionModel,
 } from '../ports/external/finance-repository.js';
 import { ValidationError } from '../errors/validation.js';
+import { closedMonthError } from './finance-closed-month.js';
+import { financeDate } from './finance-dates.js';
 
 export const financeTransactionSchema = z.object({
     // null/ausente = "só nota" (sem lançamento no caixa): não entra em saldo/KPIs.
     type: z.preprocess(v => (v === '' ? null : v), z.enum(['IN', 'OUT']).nullable().optional()),
     amountCents: z.number().int().positive('O valor deve ser maior que zero'),
-    date: z.coerce.date(),
+    date: financeDate,
     description: z.string().min(1, 'Informe a descrição'),
     method: z.preprocess(v => (v === '' ? null : v), z.string().nullable().optional()),
     notes: z.preprocess(v => (v === '' ? null : v), z.string().nullable().optional()),
@@ -80,6 +82,13 @@ transaction?: FinancialTransactionModel
             const acc = await this.repo.findAccountById(data.accountId);
             if (!acc) return { error: new ValidationError('Caixa inválido') };
         }
+
+        // Mês fechado no caixa não aceita lançamento novo (SR-054).
+        const locked = await closedMonthError(this.repo, [{
+            accountId: data.accountId,
+            date: data.date,
+        }]);
+        if (locked) return { error: locked };
 
         const transaction = await this.repo.createTransaction({ ...data,
 type: data.type ?? null,

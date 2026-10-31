@@ -1,18 +1,23 @@
 import { z } from 'zod';
 import type {
     FinanceRepository,
+    FinanceRecurrenceUpdateInput,
     FinanceRecurrenceWithRefs,
     FinanceRecurringTransactionModel,
 } from '../ports/external/finance-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { NotFoundError } from '../errors/not-found.js';
+import { FINANCE_MAX_YEAR, FINANCE_MIN_YEAR, isFinanceYear } from './finance-dates.js';
 
 // ── Meses ("YYYY-MM") ───────────────────────────────────────────────────────
 // Mês é texto: comparável e ordenável como string, e sem surpresa de fuso.
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
+export const MONTH_MESSAGE = `Mês inválido (use AAAA-MM, com ano entre ${FINANCE_MIN_YEAR} e ${FINANCE_MAX_YEAR})`;
+
+/** "AAAA-MM" com ano entre 1900 e 2999 (SR-055: "0026-01" quebrava a geração). */
 export function isMonth(value: string): boolean {
-    return MONTH_RE.test(value);
+    return MONTH_RE.test(value) && isFinanceYear(Number(value.slice(0, 4)));
 }
 
 /** Mês (no fuso local do servidor) de uma data — "hoje" da geração. */
@@ -72,6 +77,19 @@ export function monthsToGenerate(
     return months;
 }
 
+/**
+ * Reativar uma recorrência pausada pula os meses da pausa (B1 da SR-054,
+ * decidido em 30/10): ela volta a lançar a partir do mês atual. Devolve o novo
+ * `lastGeneratedMonth` (o mês anterior ao atual), ou null quando o marcador já
+ * está nele ou depois (pausa e volta no mesmo mês não pula nada).
+ * Os lançamentos já gerados não são tocados.
+ */
+export function skipPausedMonths(lastGeneratedMonth: string | null, currentMonth: string): string | null {
+    const previous = addMonths(currentMonth, -1);
+    if (lastGeneratedMonth && lastGeneratedMonth >= previous) return null;
+    return previous;
+}
+
 function maxMonth(a: string, b: string): string {
     return a >= b ? a : b;
 }
@@ -81,7 +99,7 @@ function minMonth(a: string, b: string): string {
 }
 
 // ── Schemas ─────────────────────────────────────────────────────────────────
-const monthField = z.string().regex(MONTH_RE, 'Mês inválido (use AAAA-MM)');
+const monthField = z.string().refine(isMonth, MONTH_MESSAGE);
 
 export const financeRecurrenceSchema = z.object({
     type: z.enum(['IN', 'OUT']),
@@ -159,7 +177,7 @@ recurrence?: FinanceRecurringTransactionModel
 export class UpdateFinanceRecurrenceUseCase {
     constructor(private readonly repo: FinanceRepository) {}
 
-    async execute(id: string, input: unknown): Promise<{ error?: Error }> {
+    async execute(id: string, input: unknown, now: Date = new Date()): Promise<{ error?: Error }> {
         const parsed = updateSchema.safeParse(input);
         if (!parsed.success) {
             return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Dados inválidos') };
@@ -176,7 +194,14 @@ export class UpdateFinanceRecurrenceUseCase {
         const refError = await validateRefs(this.repo, data, current.type);
         if (refError) return { error: refError };
 
-        await this.repo.updateRecurrence(id, data);
+        const update: FinanceRecurrenceUpdateInput = { ...data };
+        // Pausada → ativa: os meses da pausa não são lançados (B1).
+        if (data.active === true && !current.active) {
+            const skipTo = skipPausedMonths(current.lastGeneratedMonth, monthOf(now));
+            if (skipTo) update.lastGeneratedMonth = skipTo;
+        }
+
+        await this.repo.updateRecurrence(id, update);
         return {};
     }
 }
@@ -196,6 +221,11 @@ export class DeleteFinanceRecurrenceUseCase {
  * Gera os lançamentos que faltam de todas as recorrências ativas, até o mês
  * atual. Idempotente: além do `lastGeneratedMonth`, o unique
  * (recurringId, recurringMonth) no banco impede o mesmo mês duas vezes.
+ *
+ * Mês fechado no caixa da recorrência não recebe lançamento (SR-054). O
+ * marcador para antes dele, então as próximas rodadas voltam a tentar esse mês
+ * e lançam quando ele for reaberto; os meses seguintes, já criados, o unique
+ * não repete.
  */
 export class GenerateFinanceRecurrencesUseCase {
     constructor(private readonly repo: FinanceRepository) {}
@@ -209,7 +239,16 @@ export class GenerateFinanceRecurrencesUseCase {
             const months = monthsToGenerate(rec, currentMonth);
             if (months.length === 0) continue;
 
+            const closed = await this.closedMonthsOf(rec.accountId, months);
+            // Último mês até onde tudo foi resolvido (criado ou já existia).
+            let mark: string | null = null;
+            let skipped = false;
+
             for (const month of months) {
+                if (closed.has(month)) {
+                    skipped = true;
+                    continue;
+                }
                 const didCreate = await this.repo.createRecurrenceTransaction({
                     recurringId: rec.id,
                     recurringMonth: month,
@@ -223,12 +262,22 @@ export class GenerateFinanceRecurrencesUseCase {
                     accountId: rec.accountId,
                 });
                 if (didCreate) created += 1;
+                if (!skipped) mark = month;
             }
             // Marca o último mês percorrido mesmo quando nada foi criado (já existia):
             // a próxima passada não refaz o caminho todo.
-            await this.repo.setRecurrenceLastGeneratedMonth(rec.id, months[months.length - 1]);
+            if (mark) await this.repo.setRecurrenceLastGeneratedMonth(rec.id, mark);
         }
 
         return { created };
+    }
+
+    private async closedMonthsOf(accountId: string | null, months: string[]): Promise<Set<string>> {
+        if (!accountId) return new Set();
+        const closed = await this.repo.findClosedMonths(months.map(month => ({
+            accountId,
+            month,
+        })));
+        return new Set(closed.map(c => c.month));
     }
 }

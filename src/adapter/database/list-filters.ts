@@ -28,13 +28,20 @@ type TextSearch = {
     docDigits: string;
 };
 
+/**
+ * Dígitos do termo quando ele parece documento ou telefone (só números e
+ * pontuação); senão ''. "joao 1" não vira busca por CPF/CNPJ/telefone contendo
+ * "1". Parênteses e "+" entram por causa do telefone: "(44) 99999-0001".
+ */
+export function docDigitsOf(term: string): string {
+    return /^[\d.\-/\s()+]+$/.test(term) ? term.replace(/\D/g, '') : '';
+}
+
 /** Termo aparado + chave sem acento + dígitos de documento; null se a busca está vazia. */
 function textSearch(search: string | undefined): TextSearch | null {
     const term = search?.trim();
     if (!term) return null;
-    // "joao 1" não vira busca por CPF/CNPJ/telefone contendo "1".
-    // Parênteses e "+" entram por causa do telefone: "(44) 99999-0001".
-    const docDigits = /^[\d.\-/\s()+]+$/.test(term) ? term.replace(/\D/g, '') : '';
+    const docDigits = docDigitsOf(term);
     return { term,
 key: searchKey(term),
 docDigits };
@@ -176,6 +183,14 @@ export function buildCourseListWhere(filters?: CourseListFilters) {
         ...(year !== undefined && {
             startTime: { gte: new Date(Date.UTC(year, 0, 1)),
 lt: new Date(Date.UTC(year + 1, 0, 1)) },
+        }),
+        // Visões "próximos" e "armazenados" do painel: separadas do ano, e as duas
+        // valem juntas (AND), então ficam fora da chave `startTime` do ano.
+        ...((filters?.startsFrom || filters?.startsBefore) && {
+            AND: [
+                ...(filters.startsFrom ? [{ startTime: { gte: filters.startsFrom } }] : []),
+                ...(filters.startsBefore ? [{ startTime: { lt: filters.startsBefore } }] : []),
+            ],
         }),
         ...((filters?.endsFrom || filters?.endedBefore) && {
             endTime: {

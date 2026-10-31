@@ -17,7 +17,8 @@ export class ListAllCoursesController {
             search: q.search || undefined,
             year: Number.isInteger(ano) && ano >= 1990 && ano <= 2100 ? ano : undefined,
         };
-        const response = await this.useCase.execute(page, limit, filters);
+        const view = q.view === 'upcoming' || q.view === 'stored' ? q.view : undefined;
+        const response = await this.useCase.execute(page, limit, filters, view);
         if (response.error) return reply.status(400).send({ error: response.error?.message });
         return reply.status(200).send(response.result);
     }

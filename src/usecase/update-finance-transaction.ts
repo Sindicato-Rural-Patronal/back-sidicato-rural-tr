@@ -5,6 +5,7 @@ import type {
 import { ValidationError } from '../errors/validation.js';
 import { FinanceTransactionNotFoundError } from '../errors/not-found.js';
 import { financeTransactionSchema } from './create-finance-transaction.js';
+import { closedMonthError } from './finance-closed-month.js';
 
 const updateSchema = financeTransactionSchema.partial();
 
@@ -23,6 +24,21 @@ export class UpdateFinanceTransactionUseCase {
         }
 
         const data = parsed.data as FinanceTransactionUpdateInput;
+
+        // Mês fechado (SR-054): nem editar o lançamento que está nele, nem mover
+        // um lançamento para dentro dele (pela data ou pelo caixa).
+        const locked = await closedMonthError(this.repo, [
+            {
+                accountId: existing.accountId,
+                date: existing.date,
+            },
+            {
+                accountId: data.accountId !== undefined ? data.accountId : existing.accountId,
+                date: data.date ?? existing.date,
+            },
+        ]);
+        if (locked) return { error: locked };
+
         // Tipo efetivo após a edição. `undefined` = não mexeu; `null` = virou "só
         // nota" (sem lançamento). Por isso não uso `??` (trataria null como ausente).
         const typeProvided = data.type !== undefined;

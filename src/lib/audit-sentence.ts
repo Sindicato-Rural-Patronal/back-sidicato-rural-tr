@@ -41,6 +41,8 @@ g: 'f' },
 g: 'm' },
     'Exportação': { noun: 'planilha',
 g: 'f' },
+    'Fechamento de caixa': { noun: 'fechamento de caixa',
+g: 'm' },
     'Galeria': { noun: 'galeria',
 g: 'f' },
     'Inscrição': { noun: 'inscrição',
@@ -172,6 +174,9 @@ const SPECIAL: Record<string, Sentence> = {
     'POST /news/:id/image': fixed('Enviou imagem para a notícia'),
     'POST /admin/convenios/:id/logo': fixed('Trocou o logo do convênio'),
     'POST /admin/finance/transactions/:id/attachments': fixed('Anexou comprovante ao lançamento'),
+    // Rótulo do fechamento: "10/2026 · BANCO" (closingAuditLabel).
+    'POST /admin/finance/closings': fixed('Fechou o mês de um caixa', 'Fechou o mês'),
+    'DELETE /admin/finance/closings/:id': fixed('Reabriu o mês de um caixa', 'Reabriu o mês'),
     'POST /admin/invites': () => 'Gerou um convite de acesso ao painel',
     'DELETE /admin/invites/:id': fixed('Cancelou um convite de acesso ao painel', 'Cancelou o convite de acesso de'),
 };

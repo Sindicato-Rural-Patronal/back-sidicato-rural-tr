@@ -50,7 +50,8 @@ src/
     error-handler.ts       apiErrorHandler
     router/                um plugin Fastify por módulo (schema Swagger + handler)
     controllers/           leem a request, checam permissão, chamam o use case
-    lib/                   route-auth.ts (acesso por rota), require-permission.ts (errorToStatus), public-rate-limit.ts, swagger-schemas.ts
+    lib/                   route-auth.ts (acesso por rota), require-permission.ts (errorToStatus), public-rate-limit.ts, swagger-schemas.ts,
+                           request-parsing.ts (parser de JSON, opções do Ajv, limites dos números)
   usecase/                 regras de negócio (sem Fastify; Prisma só pelos ports)
   ports/external/          interfaces dos repositórios
   adapter/database/        implementações Prisma dos ports; list-filters.ts; prisma-errors.ts
@@ -179,13 +180,19 @@ qualquer outro     → 400   (ValidationError, Error, e também error ausente)
 ```
 
 O que o use case **lança** (em vez de devolver) cai no `apiErrorHandler` (`http/error-handler.ts`):
-- validação do JSON schema (Ajv) → 400 com a mensagem do Ajv;
+- validação do JSON schema (Ajv) → 400 com a mensagem do Ajv em português (`http/validation-message.ts`), ex.: `Valor maior que o máximo em "amountCents": 2147483647.`;
+- `ZodError` de um `.parse` → 400 com a mensagem do primeiro problema e o campo (`Campo "amountCents": …`). A regra continua sendo `safeParse` ou `parseQuery`; isto é a rede;
 - P2002 → 409 "Registro já existe (dados únicos em conflito).";
 - P2003 → 409 "Registro em uso e não pode ser removido.";
+- valor que o banco recusa → **400**: P2020 ou SQLSTATE 22003 "Número fora do limite permitido."; P2000 ou 22001 "Texto longo demais para o campo."; SQLSTATE 22007/22008/22009 "Data fora do intervalo aceito." (ano 0 ou antes de 4713 a.C., que o JavaScript aceita); P2007 e o resto da classe 22 do Postgres (ex.: caractere nulo `\u0000` no texto) "Valor inválido.". O SQLSTATE vem de `postgresSqlState` (`lib/prisma-errors.ts`), porque o driver adapter entrega esses erros como P2039 com o código em `meta.driverAdapterError.cause`;
 - erro com `statusCode` < 500 (ex.: 429 do rate limit) → esse status com a mensagem;
 - o resto → 500 "Erro interno do servidor." e `request.log.error`.
 - `ValidationError` lançado tem `statusCode = 400` → 400 com a mensagem. Filtro de consulta validado com `parseQuery` (`errors/validation.ts`) sai assim: "Parâmetro inválido: <campo>".
-- Atenção: JSON malformado no corpo hoje cai aqui como 500 (o parser de `index.ts` não põe `statusCode`).
+
+**Entrada que não chega a ser 500** (SR-055, `http/lib/request-parsing.ts`, o mesmo no servidor e no app dos E2E):
+- **JSON malformado** no corpo → 400 "O corpo da requisição não é um JSON válido." (`parseJsonBody`). Corpo vazio com `content-type: application/json` continua valendo `{}`.
+- **Números com limite:** um hook `onRoute` (`limitNumberInputs`, registrado em `registerRouters`) põe em toda propriedade `integer` do corpo, da query e dos parâmetros os limites do int4 do Postgres (−2.147.483.648 a 2.147.483.647) e em toda `number` os do número finito, sem afrouxar o que a rota já declarou. Fora disso, 400 do Ajv citando o campo. Rota nova ganha isso sozinha.
+- **`strictNumbers: false`** no Ajv (`AJV_CUSTOM_OPTIONS`): com o padrão do Ajv 8, `?page=1e400` (Infinity depois da coerção) passava sem conferir nem o `maximum`.
 
 **Regra das listagens:** sempre 200, com lista vazia ou página zerada. 404 só em detalhe ou ação sobre id inexistente.
 
@@ -195,7 +202,7 @@ Classes (`src/errors/`; as bases aceitam mensagem opcional e são usadas direto 
 |---|---|
 | `AuthError` (`auth.ts`) | `InvalidCredentialsError` "Invalid username or password" |
 | `ForbiddenError` (`auth.ts`, estende `Error`) | mensagem por parâmetro (padrão "Sem permissão para esta ação.") |
-| `BusinessRuleError` (`business-rule.ts`) | `RoomAlreadyBookedError` (mensagem por parâmetro: "Sala ocupada: …"), `RegistrationsUnavailableError` "Inscrições indisponíveis para este curso.", `RegistrationDeadlinePassedError` "Prazo de inscrição encerrado.", `CourseFullError` "Curso lotado — sem vagas disponíveis.", `IdentityNotConfirmedError` "Não foi possível confirmar seu cadastro pelo site. Procure o Sindicato para fazer a inscrição." |
+| `BusinessRuleError` (`business-rule.ts`) | `RoomAlreadyBookedError` (mensagem por parâmetro: "Sala ocupada: …"), `RegistrationsUnavailableError` "Inscrições indisponíveis para este curso.", `RegistrationDeadlinePassedError` "Prazo de inscrição encerrado.", `CourseFullError` "Curso lotado — sem vagas disponíveis.", `IdentityNotConfirmedError` "Não foi possível confirmar seu cadastro pelo site. Procure o Sindicato para fazer a inscrição.", `ClosedMonthError` "O mês MM/AAAA está fechado no caixa "X". Reabra o mês para mudar lançamentos dele." (ver Financeiro) |
 | `ConflictError` (`conflict.ts`, 18 filhas) | `CpfAlreadyInUseError` "CPF já cadastrado para outra pessoa.", `RgAlreadyInUseError`, `RuleInUseError`, `RoomNameAlreadyExistsError`, `RoomHasCoursesError`, `RoomHasBookingsError`, `UsernameAlreadyExistsError`, `AdminAccountAlreadyExistsError`, `CourseRegistrationAlreadyExistsError` "Esta pessoa já está inscrita neste curso." (as duas inscrições públicas), `InstructorAlreadyExistsError`, `InstructorAlreadyAssignedError`, `UnimedBeneficiarioAlreadyExistsError`, `ConvenioSlugAlreadyExistsError`, `CompanyCnpjAlreadyExistsError`, `PublicContactAlreadyExistsError`, `CompanyMemberAlreadyExistsError`, `MergeDifferentCpfError`, `MergeBothHaveLoginError` |
 | `NotFoundError` (`not-found.ts`, 30 filhas) | `CourseNotFoundError` "Course not found", `UserNotFoundError`, `UserDataNotFoundError` "Invalid userDataId: user not found", `AdminNotFoundError`, `NewsNotFoundError`, `RoomNotFoundError`, `RuleNotFoundError`, `RoleNotFoundError`, `PermissionRuleNotFoundError`, `RegistrationNotFoundError`, `PhotoNotFoundError`, `UserRelationNotFoundError`, `PropertyNotFoundError`, `AddressNotFoundError` "CEP not found", `InstructorNotFoundError`, `ContactMessageNotFoundError`, `BannerNotFoundError`, `MarketQuoteNotFoundError`, `AdminInviteInvalidError` "Convite inválido, expirado ou já utilizado.", `FinanceCategoryNotFoundError`, `FinanceTransactionNotFoundError`, `UnimedBeneficiarioNotFoundError`, `GalleryAlbumNotFoundError`, `GalleryPhotoNotFoundError`, `ConvenioNotFoundError`, `CompanyNotFoundError`, `PublicContactNotFoundError`, `CompanyMemberNotFoundError`, `RoomBookingNotFoundError`, `CpfPhoneNotFoundError` "Não encontramos cadastro com este CPF e telefone." |
 | `TooManyAttemptsError` (`too-many-attempts.ts`, estende `Error`, `statusCode = 429`) | "Muitas tentativas com este CPF. Aguarde uma hora ou procure o Sindicato." |
@@ -216,7 +223,7 @@ Listas paginadas aceitam `?page=1&limit=20` e respondem `{ data, total, page, li
 | `GET /admin/users/admins` | `search` (usuário), `rulesId` |
 | `GET /admin/companies` | `search`, `type`, `isPartner` |
 | `GET /admin/unimed` | `search` (nome/CPF/telefone da pessoa), `userDataId` |
-| `GET /admin/courses` | `status` (os 5), `search` (nome ou nº do evento), `year` (ano do início) |
+| `GET /admin/courses` | `status` (os 5), `search` (nome ou nº do evento), `year` (ano do início), `view` (`upcoming` \| `stored`, ver Cursos) |
 | `GET /admin/news` | `status` = PUBLISHED (no ar) / SCHEDULED (agendada) / UNPUBLISHED (rascunho), `search` (título) |
 | `GET /admin/contacts/messages` | `read`, `search` |
 | `GET /admin/audit-logs` | ver Auditoria |
@@ -260,13 +267,13 @@ Autenticação na última coluna: **Pública**, **Login** (qualquer admin) ou a 
 - Tem de ser objeto simples (null, array ou outro tipo → 400) de no máximo 4 KB em JSON (`MAX_PREFS_BYTES`).
 - `null` em `GET /admin/me` enquanto nunca salvou.
 
-**Avatar:** imagem até 15 MB, gravada como veio no bucket `avatars`.
+**Avatar:** imagem até 15 MB, gravada **como veio** no bucket `avatars` (o back não reduz; a foto antiga e a nova têm o tamanho que foi enviado).
 
 ### Pessoas (UserData)
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
 | `POST` | `/users` | `CreateUserUseCase` — formulário do painel; `{ name, phone, cpf, email? }` → 201 | `CREATE_USER` |
-| `GET` | `/admin/users` | `ListUsersUseCase` (paginada, filtros acima) | `READ_USER` |
+| `GET` | `/admin/users` | `ListUsersUseCase` (paginada, filtros acima). Cada pessoa traz `memberStatus` e `membershipValidUntil`: é a lista e também a busca de pessoa dos formulários. Selo "Sócio" = `memberStatus ACTIVE` com validade vazia ou de hoje em diante | `READ_USER` |
 | `GET` | `/admin/users/:id` | `GetUserDetailUseCase` (ficha completa) | `READ_USER` |
 | `PATCH` | `/users/:id` | `UpdateUserDataUseCase` | `UPDATE_USER` |
 | `DELETE` | `/users/:id` | `DeleteUserDataUseCase` → 204 (soft, leva junto o que depende da pessoa) | `DELETE_USER` (+ `DELETE_USER_ADMIN` se a pessoa tem login) |
@@ -454,7 +461,7 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 | `DELETE` | `/courses/:courseId` | soft (leva fotos e inscrições) | `DELETE_COURSE` |
 | `POST` | `/courses/:courseId/banner` | capa (multipart) → `{ url, thumbUrl }` | `UPDATE_COURSE` |
 | `POST` · `DELETE` | `/courses/:courseId/gallery[/:photoId]` | foto da galeria do curso | `UPDATE_COURSE` |
-| `GET` | `/admin/courses` | paginada (status, search, year), formato de card | `READ_COURSE` |
+| `GET` | `/admin/courses` | paginada (status, search, year, `view`), formato de card | `READ_COURSE` |
 | `GET` | `/admin/courses/years` | `number[]`: anos de início com curso, do mais recente | `READ_COURSE` |
 | `GET` | `/admin/courses/:courseId` | detalhe do painel | `READ_COURSE` |
 
@@ -470,6 +477,13 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 - Sem CHECK no banco, de propósito: um curso antigo com datas trocadas continua editável no resto.
 - Criar, e editar mudando sala ou horário, confere o conflito com cursos **e reservas** e grava numa transação só, com a sala travada (`createInRoom`/`updateInRoom`, a mesma trava `lockRoom` das reservas).
 - Sala ocupada → `POST` 400 / `PATCH` 409 "Sala ocupada: Curso "X" em 05/10 08:00–12:00".
+
+**Abas da lista do painel (`GET /admin/courses?view=`, SR-057):**
+- Sem `view`, a lista é a de sempre (todos, do início mais cedo ao mais tarde).
+- `upcoming` ("Próximos"): o dia do início ainda **não chegou**, o mais próximo primeiro.
+- `stored` ("Armazenados"): o dia do início é **hoje ou já passou**, no relógio de Brasília (`startTime < amanhã 00:00` com `todayInBrazil`), o mais recente primeiro. Vale para qualquer status; o concluído vem com `status: COMPLETED`.
+- O curso passa de uma aba para a outra sozinho, no dia do início: é só filtro por data na consulta (`viewFilters` em `usecase/list-all-courses.ts`), sem job. Combina com `status`, `search` e `year`; `total` e `totalPages` contam só a visão. Valor desconhecido → 400.
+- Nada na gestão do curso olha a data: inscritos, presença, ficha, iniciar e concluir funcionam com o curso armazenado.
 
 **Limpar campos na edição (`PATCH /courses/:id`, SR-019):**
 - Campo não mandado não muda. Para limpar, manda `null`.
@@ -500,7 +514,7 @@ Páginas públicas de convênio (ex.: Unimed: tabela de preços, documentos, des
 | `POST` | `/users/lookup-cpf` | `{ cpf, phoneEnd }` → `{ found, name }`, com o nome mascarado ("João D. S.") só quando os dois batem; CPF inválido, sem cadastro ou telefone que não confere → o mesmo `{ found: false, name: null }`; `phoneEnd` sem 4 dígitos → 400; 20/min por IP; limite por CPF (429). Não vai para a auditoria | Pública |
 | `POST` | `/courses/:courseId/register-by-cpf` | `{ cpf, phoneEnd }` → 201; **CPF sem cadastro ou telefone que não confere → o mesmo 404** "Não encontramos cadastro com este CPF e telefone." (o site segue para o `register-full`); `phoneEnd` sem 4 dígitos → 400; 10/min; limite por CPF (429) | Pública |
 | `POST` | `/courses/:courseId/register-full` | `{ name, phone, cpf, email?, rg?, birthDate?, address? }` → 201; CPF novo: cria a pessoa com o endereço como propriedade principal; CPF com cadastro: só inscreve se `phone` confere (ver abaixo), senão 409 `IdentityNotConfirmedError`; 10/min; limite por CPF (429) | Pública |
-| `GET` | `/admin/courses/:courseId/registrations` | inscritos com `confirmed`, `attended`, `ficha` (metadados), selos (memberStatus, membershipValidUntil, boardPosition, contato público, empresas parceiras) | `READ_COURSE` |
+| `GET` | `/admin/courses/:courseId/registrations` | inscritos **da mais antiga para a mais nova** (ordem de chegada, `createdAt` com data e hora, desempate por `id`) com `confirmed`, `attended`, `ficha` (metadados), selos (memberStatus, membershipValidUntil, boardPosition, contato público, empresas parceiras) | `READ_COURSE` |
 | `POST` | `/admin/courses/:courseId/registrations` | inscrição pela equipe `{ userDataId }`, já confirmada; ignora prazo, status e fim; respeita a lotação | `UPDATE_COURSE` |
 | `PATCH` | `/admin/registrations/:registrationId/confirm` | `{ confirmed: boolean }` (confirma ou desconfirma) | `UPDATE_COURSE` |
 | `PATCH` | `/admin/courses/:courseId/registrations/confirm-all` | confirma as pendentes → `{ confirmed }` | `UPDATE_COURSE` |
@@ -745,25 +759,28 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 | `POST` · `PATCH` · `DELETE` | `/admin/finance/categories[/:id]` | `{ name, type: IN\|OUT, color?, active?, order? }` → 201 · `{ message }` · 204 (soft) | `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
 | `GET` · `POST` · `PATCH` · `DELETE` | `/admin/finance/accounts[/:id]` | caixas `{ name, color?, active?, order? }` (mesmo padrão) | `READ_` · `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
 | `GET` | `/admin/finance/transactions` | paginada; filtros abaixo; traz `totals` | `READ_FINANCE` |
-| `POST` | `/admin/finance/transactions` | criar lançamento → 201 (a linha) | `CREATE_FINANCE` |
-| `PATCH` · `DELETE` | `/admin/finance/transactions/:id` | editar → `{ message }` · excluir (soft) → 204 | `UPDATE_` · `DELETE_FINANCE` |
+| `POST` | `/admin/finance/transactions` | criar lançamento → 201 (a linha); mês fechado → 409 | `CREATE_FINANCE` |
+| `PATCH` · `DELETE` | `/admin/finance/transactions/:id` | editar → `{ message }` · excluir (soft) → 204; mês fechado → 409 | `UPDATE_` · `DELETE_FINANCE` |
 | `GET` | `/admin/finance/transactions/export` | CSV dos lançamentos filtrados; depois de "Descrição": "Nome / Razão social" (razão social do empenho, ou o nome fantasia se ela estiver vazia) e "CNPJ / CPF" | `READ_FINANCE` |
-| `POST` | `/admin/finance/transfers` | transferência entre caixas → 201 `{ message }` | `CREATE_FINANCE` |
+| `POST` | `/admin/finance/transfers` | transferência entre caixas → 201 `{ message }`; mês fechado na origem ou no destino → 409 | `CREATE_FINANCE` |
 | `POST` | `/admin/finance/transactions/:id/attachments` | comprovante (multipart: PDF, JPG, PNG, WEBP até 15 MB) → 201 `{ id, filename, mimeType, size, createdAt }` | `UPDATE_FINANCE` |
 | `GET` · `DELETE` | `/admin/finance/attachments/:attachmentId` | baixar (inline) · apagar de verdade | `READ_FINANCE` · `UPDATE_FINANCE` |
 | `GET` | `/admin/finance/summary?from&to` | resumo (abaixo) | `READ_FINANCE` |
 | `GET` · `POST` · `PATCH` · `DELETE` | `/admin/finance/recurrences[/:id]` | molde do lançamento mensal | `READ_` · `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
-| `POST` | `/admin/finance/recurrences/generate` | gera o que falta até o mês atual → `{ created }` | `CREATE_FINANCE` |
+| `POST` | `/admin/finance/recurrences/generate` | gera o que falta até o mês atual, pulando mês fechado → `{ created }` | `CREATE_FINANCE` |
 | `GET` · `POST` · `PATCH` · `DELETE` | `/admin/finance/payment-methods[/:id]` | formas de pagamento | `READ_` · `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
-| `GET` | `/admin/finance/closings` · `/admin/finance/closings/preview?accountId&month` | fechamentos · prévia do mês | `READ_FINANCE` |
-| `POST` · `DELETE` | `/admin/finance/closings[/:id]` | fechar o mês · reabrir | `CREATE_` · `DELETE_FINANCE` |
+| `GET` | `/admin/finance/closings[?accountId&year]` · `/admin/finance/closings/preview?accountId&month` | fechamentos `[{ id, accountId, month, expectedBalanceCents, countedBalanceCents, differenceCents, notes, closedAt, closedByAdminId }]` · prévia do mês | `READ_FINANCE` |
+| `POST` | `/admin/finance/closings` | fechar o mês `{ accountId, month, countedBalanceCents, notes? }` → 201 (o fechamento); já fechado → 409 | `CREATE_FINANCE` |
+| `DELETE` | `/admin/finance/closings/:id` | **reabrir o mês** → 204; inexistente → 404 | `DELETE_FINANCE` |
 
 **Lançamento:** `{ type?: IN|OUT|null, amountCents, date, description, method?, notes?, categoryId?, accountId?, empenho? }`.
+- **Datas e meses do Financeiro** (`usecase/finance-dates.ts`, SR-055): `date` do lançamento e da transferência e os filtros `from`/`to` (lista, CSV, resumo) só aceitam ano de 1900 a 2999. Fora disso, ou texto que não é data → 400 "Data inválida: use um ano entre 1900 e 2999." (nos filtros, "Parâmetro inválido: from"). Os meses `AAAA-MM` (recorrência e fechamento) também: "Mês inválido (use AAAA-MM, com ano entre 1900 e 2999)". Antes, ano 0 dava 500, e "0026-01" no início de uma recorrência fazia a geração falhar toda vez que a tela abria.
 - `empenho` é a Nota de Empenho, JSON ou null: `numero, notaFiscal, nomeFantasia, razaoSocial, cnpjCpf, inscricaoEstadual, endereco, bairro, cep, cidade, uf, telefone, banco, conta, agencia, cheque, descontoCents, usuarioId, empresaId`.
 - Recusas → 400:
   - categoria sem tipo no lançamento;
   - categoria de outro tipo, inexistente ou excluída ("Categoria inválida");
   - caixa inexistente ou excluído ("Caixa inválido").
+- Mês fechado no caixa → 409 (ver "Mês fechado trava").
 - Perna de transferência não se edita → 400 "Transferências não podem ser editadas — exclua e refaça."; excluir uma perna apaga as duas.
 - `method` é texto livre; `payment-methods` é só a lista que o painel oferece.
 
@@ -773,7 +790,9 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 - Fica fora de receita e despesa, mas conta no saldo de cada caixa.
 
 **Listagem:**
-- Filtros `from`, `to` (inclui o dia inteiro), `type`, `categoryId`, `accountId`, `method` (sem diferenciar maiúsculas), `search` (descrição **ou** razão social / nome fantasia da Nota de Empenho, sem diferenciar maiúsculas nem acento; o nome do fornecedor é achado por SQL, `immutable_unaccent_lower` sobre `empenho->>'razaoSocial'`/`'nomeFantasia'`). Vale para a lista, os totais e o CSV.
+- Filtros `from`, `to` (inclui o dia inteiro), `type`, `categoryId`, `accountId`, `method` (sem diferenciar maiúsculas), `search` (descrição **ou** razão social / nome fantasia da Nota de Empenho, sem diferenciar maiúsculas nem acento; **ou** o CNPJ/CPF da Nota de Empenho, com ou sem pontuação). Vale para a lista, os totais e o CSV.
+- O fornecedor é achado por SQL (`idsByEmpenho` em `finance-adapter.ts`): `immutable_unaccent_lower` sobre `empenho->>'razaoSocial'`/`'nomeFantasia'`, e os dígitos de `empenho->>'cnpjCpf'` (`regexp_replace`).
+- CNPJ/CPF (SR-056) só entra quando o termo parece documento (números e `.-/()+`, a mesma regra da busca de pessoas, `docDigitsOf` em `list-filters.ts`) e tem 3 ou mais dígitos. Compara só os dígitos dos dois lados: "12.345.678/0001-90", "12345678000190" e "0001-90" acham o mesmo empenho, gravado com ou sem pontuação.
 - Ordem por data desc.
 - `totals: { incomeCents, expenseCents }` somam todos os filtrados, sem transferências nem "só nota".
 - Filtro com formato inválido → 400 "Parâmetro inválido: <campo>" (vale também para resumo, exportação e fechamentos).
@@ -786,14 +805,24 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 **Recorrência** (`FinanceRecurringTransaction`):
 - Meses são `"AAAA-MM"` (`startMonth`, `endMonth?`, `lastGeneratedMonth?`). `dayOfMonth` vai de 1 a 31; no mês mais curto, vale o último dia.
 - A geração roda quando a tela abre e é idempotente (unique `(recurringId, recurringMonth)`), com teto de 120 meses por rodada.
+- Pausar é `PATCH { active: false }`. **Reativar** (`active: true` numa pausada) pula os meses da pausa: o use case põe `lastGeneratedMonth` no mês anterior ao atual, e ela volta a lançar a partir do mês atual. Pausar e reativar no mesmo mês não pula nada. Os lançamentos já gerados não mudam. `lastGeneratedMonth` nunca vem do corpo.
+- **Mês fechado** no caixa da recorrência não recebe lançamento. A geração segue para os meses seguintes, mas o marcador para antes do mês fechado: as próximas rodadas voltam a tentar esse mês e lançam quando ele for reaberto.
 - Excluir é soft-delete do molde.
 
 **Formas de pagamento:** nome em caixa alta e único.
 
 **Fechamento** (`FinanceMonthlyClosing`, único por caixa e mês):
 - Esperado = abertura + entradas − saídas, recalculado no servidor; `differenceCents` = contado − esperado.
-- `DELETE` reabre sem tocar nos lançamentos.
-- Hoje o mês fechado **não** trava lançamentos (SR-020, aguardando decisão).
+- **Reabrir** é `DELETE /admin/finance/closings/:id` (`DELETE_FINANCE`): apaga a linha do fechamento, sem tocar nos lançamentos, e libera de novo o mês.
+- **Auditoria:** entidade "Fechamento de caixa", com o rótulo "MM/AAAA · CAIXA". Fechar → "Fechou o mês "10/2026 · BANCO""; reabrir → "Reabriu o mês "10/2026 · BANCO"", com os valores que estavam fechados em `changes` (mês, caixa, esperado, contado, diferença, observação, quem fechou e quando).
+
+**Mês fechado trava** (SR-054, decidido em 30/10; `usecase/finance-closed-month.ts`). A trava é por **caixa e mês**, como o fechamento:
+- Com o mês M fechado no caixa C, os lançamentos de C com data em M não podem ser criados, editados (nenhum campo) nem excluídos. Também não dá para mover um lançamento para dentro ou para fora de (C, M), pela data ou pelo caixa.
+- Transferência: criar com data em M é recusado se M está fechado na origem **ou** no destino. Excluir uma perna é recusado se qualquer uma das duas está num mês fechado; nenhuma sai.
+- Recusa → **409** `{ error: "O mês 10/2026 está fechado no caixa \"BANCO\". Reabra o mês para mudar lançamentos dele." }` (`ClosedMonthError`, um `BusinessRuleError`), e nada é gravado. Vale para `POST`/`PATCH`/`DELETE /admin/finance/transactions[/:id]` e `POST /admin/finance/transfers`. Quando mais de um mês está fechado, a mensagem cita o mais antigo.
+- O mês do lançamento é o da data em UTC (`date.toISOString().slice(0, 7)`), o mesmo relógio do cálculo do fechamento (`monthRange`). O painel manda `"AAAA-MM-DD"`.
+- Fica de fora: lançamento sem caixa (não entra em fechamento nenhum), o mesmo mês em outro caixa e os comprovantes (anexar e remover continuam livres).
+- As respostas não ganharam campo novo: o painel sabe o que está fechado por `GET /admin/finance/closings` (pares `accountId` + `month`).
 
 ## Modelos
 
@@ -877,7 +906,7 @@ Helpers que não são adapters:
 1. **Port** em `ports/external/foo-repository.ts` e **adapter** em `adapter/database/foo-adapter.ts` (`createFooAdapter(prisma)`, `semRegistro` no `catch`).
 2. **Use case** em `usecase/`: valida com Zod (`safeParse`, nunca `parse`) e devolve `{ error?, ...resultado }`.
 3. **Controller** em `http/controllers/`: não confere permissão (a rota declara); quem chamou é `adminOf(request)`. Responde com `errorToStatus`.
-4. **Router** em `http/router/`: `config: { auth: requires('X') }` (ou `publicRoute()`, `loggedIn()`, `requiresFrom`) e schema Swagger com `tags`, `summary`, `description`, `body`/`params`/`querystring` e `response`. O `security` e a permissão na descrição saem da declaração. Registrado em `http/register-routers.ts`, o que já vale para o servidor e para os E2E.
+4. **Router** em `http/router/`: `config: { auth: requires('X') }` (ou `publicRoute()`, `loggedIn()`, `requiresFrom`) e schema Swagger com `tags`, `summary`, `description`, `body`/`params`/`querystring` e `response`. O `security` e a permissão na descrição saem da declaração, e os inteiros de entrada ganham o limite do int4 sozinhos. Registrado em `http/register-routers.ts`, o que já vale para o servidor e para os E2E.
 5. **Auditoria:** rota que edita um registro → `SNAPSHOTS` (`lib/audit-snapshot.ts`); ação diferente de criar/editar/excluir → `SPECIAL` (`lib/audit-sentence.ts`); entidade nova → `AUDIT_ENTITY_NOUNS`.
 6. **Permissão nova** → enum no schema + migration que a concede (ver Autenticação).
 7. **Testes:** unitário do use case e, para rota protegida, E2E com 401 sem token e 403 sem a permissão.

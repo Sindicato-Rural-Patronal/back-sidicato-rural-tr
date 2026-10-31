@@ -102,7 +102,9 @@ isDeleted: false },
             where: { courseId,
 isDeleted: false },
             include: registrationInclude,
-            orderBy: { createdAt: 'desc' },
+            // Ordem de chegada: a inscrição mais antiga primeiro (o `id` desempata
+            // as que entraram no mesmo instante, para a paginação não repetir linha).
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
             skip,
             take,
         });
