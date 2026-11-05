@@ -4,6 +4,7 @@ import type { FinanceRepository } from '../../ports/external/finance-repository.
 
 const row = (over: object) => ({
     id: 'tx',
+    number: 12,
     type: 'OUT',
     date: new Date('2026-05-10T00:00:00Z'),
     description: 'Compra',
@@ -41,12 +42,30 @@ nomeFantasia: ['x'] })).toBe('');
 });
 
 describe('CSV dos lançamentos', () => {
-    it('duas colunas novas logo depois da Descrição', async () => {
+    it('"Nº" primeiro; depois da Descrição, o fornecedor e o "Nº anterior"', async () => {
         const [header] = await csvOf([]);
         expect(header).toEqual([
-            'Data', 'Tipo', 'Caixa', 'Categoria', 'Descrição', 'Nome / Razão social', 'CNPJ / CPF',
-            'Método', 'Recorrente', 'Valor (R$)', 'Observações',
+            'Nº', 'Data', 'Tipo', 'Caixa', 'Categoria', 'Descrição', 'Nome / Razão social', 'CNPJ / CPF',
+            'Nº anterior', 'Método', 'Recorrente', 'Valor (R$)', 'Observações',
         ]);
+    });
+
+    it('"Nº" é o number (vazio sem número) e "Nº anterior" é o empenho.numero (SR-064)', async () => {
+        const [, a, b] = await csvOf([
+            row({ number: 128,
+empenho: { numero: ' 0045 ' } }),
+            row({ number: null }),
+        ]);
+        expect(a[0]).toBe('128');
+        expect(a[8]).toBe('0045');
+        expect(b[0]).toBe('');
+        expect(b[8]).toBe('');
+    });
+
+    it('passa a ordem pedida para a consulta', async () => {
+        const repo = { listTransactionsForExport: vi.fn().mockResolvedValue([]) } as unknown as FinanceRepository;
+        await new ExportFinanceTransactionsUseCase(repo).execute({ orderBy: 'number' });
+        expect(vi.mocked(repo.listTransactionsForExport).mock.calls[0][0].orderBy).toBe('number');
     });
 
     it('preenche com o empenho; lançamento sem empenho fica com as duas vazias', async () => {
@@ -57,8 +76,8 @@ cnpjCpf: '12.345.678/0001-90' } }),
             row({ empenho: { nomeFantasia: 'MECANICA DO ZE' } }),
             row({}),
         ]);
-        expect(a.slice(4, 7)).toEqual(['Compra', 'COOP LTDA', '12.345.678/0001-90']);
-        expect(b.slice(4, 7)).toEqual(['Compra', 'MECANICA DO ZE', '']);
-        expect(c.slice(4, 7)).toEqual(['Compra', '', '']);
+        expect(a.slice(5, 8)).toEqual(['Compra', 'COOP LTDA', '12.345.678/0001-90']);
+        expect(b.slice(5, 8)).toEqual(['Compra', 'MECANICA DO ZE', '']);
+        expect(c.slice(5, 8)).toEqual(['Compra', '', '']);
     });
 });

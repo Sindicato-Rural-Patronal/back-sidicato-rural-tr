@@ -18,7 +18,7 @@ import { CourseFullError, IdentityNotConfirmedError } from '../errors/business-r
 import { TooManyAttemptsError } from '../errors/too-many-attempts.js';
 import { phoneMatches } from '../lib/phone-match.js';
 import type { CpfAttemptLimiter } from '../lib/cpf-attempt-limiter.js';
-import { isPrismaSerializationError, isPrismaUniqueViolation, uniqueViolationFields } from '../lib/prisma-errors.js';
+import { isPrismaSerializationError, isPrismaUniqueViolation, uniqueViolationTarget } from '../lib/prisma-errors.js';
 import { personEmailSchema } from '../lib/person-email.js';
 import type { NotificationPublisher } from '../ports/external/notification-repository.js';
 import { courseRegistrationEvent, publishSafely } from '../lib/notification-events.js';
@@ -226,7 +226,9 @@ function knownRegistrationError(e: unknown): Error | null {
     if (e instanceof CourseFullError) return e;
     if (e instanceof IdentityNotConfirmedError) return e;
     if (e instanceof TooManyAttemptsError) return e;
-    const fields = uniqueViolationFields(e);
+    // Qual índice estourou: "UserData_cpf_active_unique" (o CPF) ou
+    // "courseUserRegistration_courseId_userDataId_active_key" (a inscrição).
+    const fields = uniqueViolationTarget(e);
     // CPF primeiro: o índice "UserData_cpf_active_unique" também tem "active" no nome.
     if (fields.some(f => f.includes('cpf'))) return new CpfAlreadyInUseError();
     const isRegistrationDup = fields.some(

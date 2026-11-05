@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CreateUserAdminUseCase } from '../create-user-admin.js';
+import { AdminAccountAlreadyExistsError, UsernameAlreadyExistsError } from '../../errors/conflict.js';
 import type { UserAdminRepository } from '../../ports/external/user-admin-repository.js';
 import type { UserDataRepository } from '../../ports/external/user-data-repository.js';
 import type { RuleRepository } from '../../ports/external/rule-repository.js';
@@ -116,6 +117,53 @@ permissions: [] } as any);
             const result = await uc.execute(validInput);
             expect(result.error).toBeUndefined();
             expect(result.userAdminId).toBe('new-admin-001');
+        });
+    });
+
+    describe('corrida: o P2002 diz qual índice estourou (SR-069)', () => {
+        // Com o @prisma/adapter-pg o P2002 vem sem `meta.target`; o índice está
+        // em `meta.driverAdapterError.cause.constraint.index`.
+        const adapterP2002 = (index: string) => ({
+            code: 'P2002',
+            meta: { driverAdapterError: { cause: { constraint: { index } } } },
+        });
+
+        beforeEach(() => {
+            vi.mocked(mockUserAdminRepo.findByUsername).mockResolvedValue(null);
+            vi.mocked(mockUserDataRepo.findById).mockResolvedValue({ id: 'ud-001' } as any);
+            vi.mocked(mockUserAdminRepo.findByUserDataIdAny).mockResolvedValue(null);
+            vi.mocked(mockRuleRepo.findById).mockResolvedValue({ id: 'role-001',
+permissions: [] } as any);
+        });
+        const run = () =>
+            new CreateUserAdminUseCase(mockUserAdminRepo, mockUserDataRepo, mockRuleRepo).execute(validInput);
+
+        it('índice do usuário → "usuário já existe"', async () => {
+            vi.mocked(mockUserAdminRepo.create).mockRejectedValue(adapterP2002('UserAdmin_username_active_key'));
+            expect((await run()).error).toBeInstanceOf(UsernameAlreadyExistsError);
+        });
+
+        it('índice da pessoa → "esta pessoa já tem conta de administrador"', async () => {
+            vi.mocked(mockUserAdminRepo.create).mockRejectedValue(adapterP2002('UserAdmin_userDataId_key'));
+            expect((await run()).error).toBeInstanceOf(AdminAccountAlreadyExistsError);
+        });
+
+        it('o `meta.target` do Prisma sem adapter também vale', async () => {
+            vi.mocked(mockUserAdminRepo.create).mockRejectedValue({ code: 'P2002',
+meta: { target: ['userDataId'] } });
+            expect((await run()).error).toBeInstanceOf(AdminAccountAlreadyExistsError);
+        });
+
+        it('sem dizer o índice, fica o do usuário', async () => {
+            vi.mocked(mockUserAdminRepo.create).mockRejectedValue({ code: 'P2002' });
+            expect((await run()).error).toBeInstanceOf(UsernameAlreadyExistsError);
+        });
+
+        it('a reativação (pessoa com conta excluída) só pode estourar o do usuário', async () => {
+            vi.mocked(mockUserAdminRepo.findByUserDataIdAny).mockResolvedValue({ id: 'old',
+isDeleted: true } as any);
+            vi.mocked(mockUserAdminRepo.reactivate).mockRejectedValue(adapterP2002('UserAdmin_username_active_key'));
+            expect((await run()).error).toBeInstanceOf(UsernameAlreadyExistsError);
         });
     });
 

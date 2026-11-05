@@ -95,4 +95,16 @@ search: 'luz' });
         // `to` inclui o dia inteiro
         expect(sumFilters.to?.toISOString()).toBe('2026-09-30T23:59:59.999Z');
     });
+
+    it('orderBy: passa date ou number para a consulta; outro valor → 400 (SR-064)', async () => {
+        vi.mocked(repo.listTransactions).mockResolvedValue({ items: [],
+total: 0 });
+        vi.mocked(repo.sumTransactions).mockResolvedValue([]);
+        const uc = new ListFinanceTransactionsUseCase(repo);
+        await uc.execute({ orderBy: 'number' });
+        expect(vi.mocked(repo.listTransactions).mock.calls[0][0].orderBy).toBe('number');
+        await uc.execute({});
+        expect(vi.mocked(repo.listTransactions).mock.calls[1][0].orderBy).toBeUndefined();
+        await expect(uc.execute({ orderBy: 'valor' })).rejects.toThrow('Parâmetro inválido: orderBy');
+    });
 });

@@ -2,9 +2,17 @@ import { randomUUID } from 'node:crypto';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 import { semRegistro } from './prisma-errors.js';
 import { docDigitsOf, searchKey } from './list-filters.js';
+import { uniqueViolationTarget } from '../../lib/prisma-errors.js';
+import {
+    financeNumberSearchTerm,
+    nextFinanceNumber,
+    pickFinanceNumber,
+    type FinanceNumberReader,
+} from '../../lib/finance-number.js';
 import type { FinancialCategoryModel } from '../../generated/prisma/models/FinancialCategory.js';
 import type { FinancialTransactionModel } from '../../generated/prisma/models/FinancialTransaction.js';
 import type {
+    FinancialTransactionOrderByWithRelationInput,
     FinancialTransactionUncheckedCreateInput,
     FinancialTransactionUncheckedUpdateInput,
 } from '../../generated/prisma/models/FinancialTransaction.js';
@@ -31,6 +39,8 @@ import type {
     FinanceAccountUpdateInput,
     FinanceTransactionCreateInput,
     FinanceTransactionUpdateInput,
+    FinanceNumberedWrite,
+    FinanceNumberConflict,
     FinanceTransferInput,
     FinanceTransactionFilters,
     FinanceTransactionSum,
@@ -51,6 +61,55 @@ createdAt: true },
 
 export function createFinanceAdapter(prisma: PrismaClient): FinanceRepository {
     return new FinanceAdapter(prisma);
+}
+
+/**
+ * Trava do Nº dos lançamentos (decisão 005, item 3). Toda gravação que dá ou
+ * troca o número (criar, transferir, gerar recorrência e corrigir o Nº) pega
+ * esta trava ANTES de ler o maior, em READ COMMITTED, e a solta no fim da
+ * transação: dois lançamentos gravados ao mesmo tempo nunca levam o mesmo
+ * número, e o "maior + 1" nunca pula. Mesmo padrão das vagas de curso
+ * (`lockCourseSeats`) e das salas (`lockRoom`). O volume do Financeiro é de
+ * poucos lançamentos por dia: a fila nesta trava não se percebe.
+ */
+export async function lockFinanceNumbers(tx: PrismaClient): Promise<void> {
+    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext('finance-transaction-number'))`;
+}
+
+/** O que a regra do Nº lê, dentro da transação travada. Conta os excluídos. */
+function numberReader(tx: PrismaClient): FinanceNumberReader {
+    return {
+        maxNumber: async () => (await tx.financialTransaction.aggregate({ _max: { number: true } }))._max.number,
+        ownerOf: number => tx.financialTransaction.findUnique({
+            where: { number },
+            select: { id: true,
+isDeleted: true },
+        }),
+    };
+}
+
+// Nomes dos índices únicos do lançamento, como o adapter-pg os devolve no P2002.
+const NUMBER_KEY = 'FinancialTransaction_number_key';
+const RECURRENCE_MONTH_KEY = 'FinancialTransaction_recurringId_recurringMonth_key';
+
+/** O P2002 foi no Nº (a defesa final: o índice único)? */
+function isNumberTaken(e: unknown): boolean {
+    const target = uniqueViolationTarget(e);
+    return target.includes(NUMBER_KEY) || target.includes('number');
+}
+
+/** O P2002 foi no par (recorrência, mês)? Só isso quer dizer "este mês já foi gerado". */
+function isRecurrenceMonthTaken(e: unknown): boolean {
+    const target = uniqueViolationTarget(e);
+    return target.includes(RECURRENCE_MONTH_KEY)
+        || (target.includes('recurringId') && target.includes('recurringMonth'));
+}
+
+/** Ordem da lista e do CSV: data (padrão) ou Nº, do mais novo para o mais antigo. */
+function transactionOrder(orderBy: FinanceTransactionFilters['orderBy']): FinancialTransactionOrderByWithRelationInput[] {
+    if (orderBy === 'number') return [{ number: { sort: 'desc',
+nulls: 'last' } }, { createdAt: 'desc' }];
+    return [{ date: 'desc' }, { createdAt: 'desc' }];
 }
 
 class FinanceAdapter implements FinanceRepository {
@@ -139,7 +198,7 @@ total: number
                     attachments: { ...attachmentMetaSelect,
 orderBy: { createdAt: 'asc' } },
                 },
-                orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+                orderBy: transactionOrder(filters.orderBy),
                 skip: filters.skip,
                 take: filters.take,
             }),
@@ -160,7 +219,7 @@ total };
                 attachments: { ...attachmentMetaSelect,
 orderBy: { createdAt: 'asc' } },
             },
-            orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+            orderBy: transactionOrder(filters.orderBy),
         });
     }
 
@@ -196,17 +255,81 @@ isDeleted: false } });
     // Os ids das relacoes (categoryId, accountId) vao soltos no `data`, que no
     // Prisma e a variante "Unchecked" do input; o TypeScript nao escolhe o ramo
     // da uniao sozinho. A anotacao continua conferindo campo a campo.
-    createTransaction(data: FinanceTransactionCreateInput): Promise<FinancialTransactionModel> {
-        return this.prisma.financialTransaction.create({
-            data: data as FinancialTransactionUncheckedCreateInput,
-        });
+    async createTransaction(
+        data: FinanceTransactionCreateInput,
+    ): Promise<FinanceNumberedWrite<FinancialTransactionModel>> {
+        const { number: typed, ...rest } = data;
+        let tried: number | undefined = typed;
+        try {
+            return await this.prisma.$transaction(async (tx: unknown) => {
+                const t = tx as PrismaClient;
+                await lockFinanceNumbers(t);
+                const picked = await pickFinanceNumber(numberReader(t), typed);
+                if ('conflict' in picked) return picked;
+                tried = picked.number;
+                const result = await t.financialTransaction.create({
+                    data: { ...rest,
+number: picked.number } as FinancialTransactionUncheckedCreateInput,
+                });
+                return { result };
+            });
+        } catch (e) {
+            return this.numberTakenConflict(e, tried);
+        }
     }
 
-    updateTransaction(id: string, data: FinanceTransactionUpdateInput): Promise<FinancialTransactionModel> {
-        return this.prisma.financialTransaction.update({
-            where: { id },
-            data: data as FinancialTransactionUncheckedUpdateInput,
+    async updateTransaction(
+        id: string,
+        data: FinanceTransactionUpdateInput,
+    ): Promise<FinanceNumberedWrite<FinancialTransactionModel>> {
+        const { number: typed, ...rest } = data;
+        // Sem trocar o Nº, não há o que travar.
+        if (typed === undefined) {
+            const result = await this.prisma.financialTransaction.update({
+                where: { id },
+                data: rest as FinancialTransactionUncheckedUpdateInput,
+            });
+            return { result };
+        }
+        try {
+            return await this.prisma.$transaction(async (tx: unknown) => {
+                const t = tx as PrismaClient;
+                await lockFinanceNumbers(t);
+                // Manter o próprio número não é conflito.
+                const picked = await pickFinanceNumber(numberReader(t), typed, id);
+                if ('conflict' in picked) return picked;
+                const result = await t.financialTransaction.update({
+                    where: { id },
+                    data: { ...rest,
+number: picked.number } as FinancialTransactionUncheckedUpdateInput,
+                });
+                return { result };
+            });
+        } catch (e) {
+            return this.numberTakenConflict(e, typed);
+        }
+    }
+
+    async nextTransactionNumber(): Promise<number> {
+        return nextFinanceNumber(await numberReader(this.prisma).maxNumber());
+    }
+
+    /**
+     * Defesa final (decisão 005, item 3): se o índice único recusar o Nº mesmo
+     * com a trava (alguém gravou fora dela), responde o conflito, e nada fica
+     * gravado repetido. Qualquer outro erro sobe como veio.
+     */
+    private async numberTakenConflict(
+        e: unknown,
+        tried: number | undefined,
+    ): Promise<{ conflict: FinanceNumberConflict }> {
+        if (tried === undefined || !isNumberTaken(e)) throw e;
+        const owner = await this.prisma.financialTransaction.findUnique({
+            where: { number: tried },
+            select: { isDeleted: true },
         });
+        return { conflict: { number: tried,
+deleted: owner?.isDeleted ?? false } };
     }
 
     async softDeleteTransaction(id: string): Promise<boolean> {
@@ -219,7 +342,8 @@ deletedAt: new Date() },
         return r.count === 1;
     }
 
-    // A saída é gravada primeiro, a entrada depois (a ordem do array).
+    // Dois números seguidos, dentro da trava: a saída, gravada primeiro, leva o
+    // menor; a entrada, o seguinte.
     async createTransfer(input: FinanceTransferInput): Promise<FinancialTransactionModel[]> {
         const transferId = randomUUID();
         const base = {
@@ -230,18 +354,24 @@ deletedAt: new Date() },
             method: input.method ?? null,
             createdBy: input.createdBy ?? null,
         };
-        return this.prisma.$transaction([
-            this.prisma.financialTransaction.create({
+        return this.prisma.$transaction(async (tx: unknown) => {
+            const t = tx as PrismaClient;
+            await lockFinanceNumbers(t);
+            const first = nextFinanceNumber(await numberReader(t).maxNumber());
+            const out = await t.financialTransaction.create({
                 data: { ...base,
+number: first,
 type: 'OUT',
 accountId: input.fromAccountId },
-            }),
-            this.prisma.financialTransaction.create({
+            });
+            const into = await t.financialTransaction.create({
                 data: { ...base,
+number: first + 1,
 type: 'IN',
 accountId: input.toAccountId },
-            }),
-        ]);
+            });
+            return [out, into];
+        });
     }
 
     async softDeleteTransfer(transferId: string): Promise<boolean> {
@@ -452,15 +582,17 @@ outCents: 0 };
 mode: 'insensitive' };
         }
         if (filters.search) {
-            // Descrição, ou o fornecedor da Nota de Empenho: razão social, nome
-            // fantasia e CNPJ/CPF. Esses dados ficam num JSON, que o Prisma só
-            // filtra diferenciando maiúscula e sem tirar pontuação; por isso os
-            // ids vêm de SQL.
-            const bySupplier = await this.idsByEmpenho(filters.search);
+            // Descrição, o Nº (termo só de dígitos, igual), ou a Nota de Empenho:
+            // razão social, nome fantasia, CNPJ/CPF e "Nº anterior". Esses dados
+            // ficam num JSON, que o Prisma só filtra diferenciando maiúscula e
+            // sem tirar pontuação; por isso os ids vêm de SQL.
+            const byEmpenho = await this.idsByEmpenho(filters.search);
+            const number = financeNumberSearchTerm(filters.search);
             where.OR = [
                 { description: { contains: filters.search,
 mode: 'insensitive' } },
-                ...(bySupplier.length ? [{ id: { in: bySupplier } }] : []),
+                ...(number !== null ? [{ number }] : []),
+                ...(byEmpenho.length ? [{ id: { in: byEmpenho } }] : []),
             ];
         }
         return where;
@@ -475,13 +607,24 @@ mode: 'insensitive' } },
         // documento como foi digitado, com ou sem pontuação.
         const digits = docDigitsOf(term.trim());
         const docLike = digits.length >= 3 ? `%${digits}%` : null;
+        // "Nº anterior" (`empenho.numero`, o antigo "Nº empenho"; decisão 005):
+        // termo só de dígitos acha o igual sem contar os zeros à esquerda ("45"
+        // acha "0045", mas não "1450"); outro termo acha o que contém, como os nomes.
+        const onlyDigits = /^[0-9]+$/.test(term.trim());
+        const previousEq = onlyDigits ? term.trim().replace(/^0+/, '') : null;
+        const previousLike = onlyDigits ? null : like;
         const rows = await this.prisma.$queryRaw<{ id: string }[]>`
             SELECT "id" FROM "FinancialTransaction"
             WHERE "isDeleted" = false
               AND (immutable_unaccent_lower("empenho"->>'razaoSocial') LIKE ${like}
                 OR immutable_unaccent_lower("empenho"->>'nomeFantasia') LIKE ${like}
                 OR (${docLike}::text IS NOT NULL
-                    AND regexp_replace("empenho"->>'cnpjCpf', '[^0-9]', '', 'g') LIKE ${docLike}::text))`;
+                    AND regexp_replace("empenho"->>'cnpjCpf', '[^0-9]', '', 'g') LIKE ${docLike}::text)
+                OR (${previousEq}::text IS NOT NULL
+                    AND btrim("empenho"->>'numero') ~ '^[0-9]+$'
+                    AND ltrim(btrim("empenho"->>'numero'), '0') = ${previousEq}::text)
+                OR (${previousLike}::text IS NOT NULL
+                    AND immutable_unaccent_lower("empenho"->>'numero') LIKE ${previousLike}::text))`;
         return rows.map(r => r.id);
     }
 
@@ -535,24 +678,33 @@ active: false },
 
     async createRecurrenceTransaction(run: FinanceRecurrenceRun): Promise<boolean> {
         try {
-            await this.prisma.financialTransaction.create({
-                data: {
-                    recurringId: run.recurringId,
-                    recurringMonth: run.recurringMonth,
-                    type: run.type,
-                    amountCents: run.amountCents,
-                    date: run.date,
-                    description: run.description,
-                    method: run.method ?? null,
-                    notes: run.notes ?? null,
-                    categoryId: run.categoryId ?? null,
-                    accountId: run.accountId ?? null,
-                },
+            await this.prisma.$transaction(async (tx: unknown) => {
+                const t = tx as PrismaClient;
+                await lockFinanceNumbers(t);
+                await t.financialTransaction.create({
+                    data: {
+                        number: nextFinanceNumber(await numberReader(t).maxNumber()),
+                        recurringId: run.recurringId,
+                        recurringMonth: run.recurringMonth,
+                        type: run.type,
+                        amountCents: run.amountCents,
+                        date: run.date,
+                        description: run.description,
+                        method: run.method ?? null,
+                        notes: run.notes ?? null,
+                        categoryId: run.categoryId ?? null,
+                        accountId: run.accountId ?? null,
+                    },
+                });
             });
             return true;
         } catch (e) {
-            // P2002 = o unique (recurringId, recurringMonth) já tem esse mês.
-            if ((e as { code?: string }).code === 'P2002') return false;
+            // Só o P2002 do par (recurringId, recurringMonth) quer dizer "este mês
+            // já foi gerado". Antes todo P2002 era tratado assim, e uma colisão
+            // de Nº seria engolida calada. A gravação falhou dentro da
+            // transação, então o número não foi gasto: a sequência não fica
+            // com buraco.
+            if (isRecurrenceMonthTaken(e)) return false;
             throw e;
         }
     }

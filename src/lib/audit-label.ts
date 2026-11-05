@@ -1,5 +1,6 @@
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { deriveAuditEntity } from './audit-entity.js';
+import { financeTransactionLabel } from './finance-number.js';
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
@@ -48,6 +49,36 @@ export function shouldLookupTargetLabel(method: string, path: string): boolean {
     return method === 'POST' && !!firstId(path) && !PUBLIC_REGISTER_RE.test(path);
 }
 
+// Criar lançamento: o Nº só existe depois de gravar, então o rótulo não vem do
+// corpo (que traz a descrição, mas não o número automático) e sim da resposta.
+const TRANSACTION_CREATE_PATH = '/admin/finance/transactions';
+
+/** É a criação de um lançamento (e não a de transferência, comprovante...)? */
+export function isTransactionCreate(method: string, path: string): boolean {
+    return method === 'POST' && path.replace(/\/+$/, '') === TRANSACTION_CREATE_PATH;
+}
+
+/**
+ * Rótulo do lançamento recém-criado a partir da resposta (201 com a linha):
+ * "nº 123 — descrição". Resposta que não dá para ler → null (a trilha fica
+ * "Criou um lançamento", como antes).
+ */
+export function createdTransactionLabel(payload: unknown): string | null {
+    const text = typeof payload === 'string' ? payload : Buffer.isBuffer(payload) ? payload.toString('utf8') : null;
+    if (!text) return null;
+    try {
+        const row = JSON.parse(text) as {
+ number?: unknown;
+description?: unknown 
+} | null;
+        if (!row || typeof row.description !== 'string' || !row.description.trim()) return null;
+        const number = typeof row.number === 'number' ? row.number : null;
+        return financeTransactionLabel(number, row.description.trim()).slice(0, 140);
+    } catch {
+        return null;
+    }
+}
+
 /** Fechar o mês: rótulo pelo corpo (ainda não validado; o caixa vem do banco). */
 async function closingCreateLabel(prisma: PrismaClient, body: unknown): Promise<string | null> {
     if (!body || typeof body !== 'object') return null;
@@ -61,6 +92,16 @@ async function closingCreateLabel(prisma: PrismaClient, body: unknown): Promise<
         select: { name: true },
     });
     return closingAuditLabel(month, account?.name);
+}
+
+/** Lançamento do Financeiro: "nº 123 — descrição" (decisão 005); sem número, só a descrição. */
+async function transactionLabel(prisma: PrismaClient, id: string): Promise<string | null> {
+    const t = await prisma.financialTransaction.findUnique({
+        where: { id },
+        select: { number: true,
+description: true },
+    });
+    return t ? financeTransactionLabel(t.number, t.description) : null;
 }
 
 // Busca o nome/rótulo do alvo pelo id no caminho — chamado ANTES da mutação
@@ -157,14 +198,10 @@ select: { name: true } }))?.name ?? null;
                 return (await prisma.financialAccount.findUnique({ where: { id },
 select: { name: true } }))?.name ?? null;
             case 'Lançamento':
-                return (await prisma.financialTransaction.findUnique({ where: { id },
-select: { description: true } }))?.description ?? null;
+                return transactionLabel(prisma, id);
             case 'Comprovante':
                 // POST /transactions/:id/attachments → lançamento; DELETE /attachments/:id → arquivo
-                if (p.includes('/transactions/')) {
-                    return (await prisma.financialTransaction.findUnique({ where: { id },
-select: { description: true } }))?.description ?? null;
-                }
+                if (p.includes('/transactions/')) return transactionLabel(prisma, id);
                 return (await prisma.financialAttachment.findUnique({ where: { id },
 select: { filename: true } }))?.filename ?? null;
             case 'Fechamento de caixa': {

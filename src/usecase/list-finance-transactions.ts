@@ -17,6 +17,8 @@ export const financeFiltersSchema = z.object({
     // Forma de pagamento (texto do lançamento) — o filtro ignora maiúsculas.
     method: z.preprocess(v => (v === '' ? undefined : v), z.string().optional()),
     search: z.preprocess(v => (v === '' ? undefined : v), z.string().optional()),
+    // Ordem: data (padrão, a de sempre) ou Nº, os dois do mais novo para o mais antigo.
+    orderBy: z.preprocess(v => (v === '' ? undefined : v), z.enum(['date', 'number']).optional()),
 });
 
 /** `to` costuma vir como data (00:00 UTC) — inclui o dia inteiro. */
@@ -73,6 +75,7 @@ export class ListFinanceTransactionsUseCase {
             accountId: q.accountId,
             method: q.method,
             search: q.search,
+            orderBy: q.orderBy,
         };
 
         const [{ items, total }, sums] = await Promise.all([

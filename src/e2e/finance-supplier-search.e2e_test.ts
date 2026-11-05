@@ -140,8 +140,9 @@ headers: bearer(token) });
 
     it('traz Nome / Razão social e CNPJ / CPF depois da Descrição', async () => {
         const [header, ...rows] = await csv();
-        expect(header.slice(4, 7)).toEqual(['Descrição', 'Nome / Razão social', 'CNPJ / CPF']);
-        const byDesc = Object.fromEntries(rows.map(r => [r[4], r.slice(5, 7)]));
+        // A coluna "Nº" (SR-064) é a primeira.
+        expect(header.slice(5, 8)).toEqual(['Descrição', 'Nome / Razão social', 'CNPJ / CPF']);
+        const byDesc = Object.fromEntries(rows.map(r => [r[5], r.slice(6, 8)]));
         expect(byDesc['Compra de adubo']).toEqual(['COOPERATIVA AGRÍCOLA SÃO JOÃO LTDA', '12.345.678/0001-90']);
         // Sem razão social, vale o nome fantasia.
         expect(byDesc['Conserto da bomba']).toEqual(['MECANICA DO ZE', '123.456.789-09']);
@@ -152,7 +153,7 @@ headers: bearer(token) });
 
     it('a busca vale também para o CSV', async () => {
         const [, ...rows] = await csv('?search=coopagro');
-        expect(rows.map(r => r[4])).toEqual(['Compra de adubo']);
+        expect(rows.map(r => r[5])).toEqual(['Compra de adubo']);
     });
 });
 

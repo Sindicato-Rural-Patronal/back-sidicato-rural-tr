@@ -4,10 +4,18 @@ import type {
     FinancialTransactionModel,
 } from '../ports/external/finance-repository.js';
 import { ValidationError } from '../errors/validation.js';
+import { FinanceNumberInUseError } from '../errors/conflict.js';
 import { closedMonthError } from './finance-closed-month.js';
 import { financeDate } from './finance-dates.js';
 
 export const financeTransactionSchema = z.object({
+    // Nº do lançamento (decisão 005). Ausente = automático (o maior + 1).
+    // null não é aceito: o número não se apaga.
+    number: z
+        .number()
+        .int('O número do lançamento deve ser inteiro.')
+        .positive('O número do lançamento deve ser maior que zero.')
+        .optional(),
     // null/ausente = "só nota" (sem lançamento no caixa): não entra em saldo/KPIs.
     type: z.preprocess(v => (v === '' ? null : v), z.enum(['IN', 'OUT']).nullable().optional()),
     amountCents: z.number().int().positive('O valor deve ser maior que zero'),
@@ -90,9 +98,13 @@ transaction?: FinancialTransactionModel
         }]);
         if (locked) return { error: locked };
 
-        const transaction = await this.repo.createTransaction({ ...data,
+        // O número (automático ou o digitado) é escolhido e gravado dentro da trava.
+        const written = await this.repo.createTransaction({ ...data,
 type: data.type ?? null,
 createdBy });
-        return { transaction };
+        if ('conflict' in written) {
+            return { error: new FinanceNumberInUseError(written.conflict.number, written.conflict.deleted) };
+        }
+        return { transaction: written.result };
     }
 }

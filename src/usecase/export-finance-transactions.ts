@@ -16,7 +16,10 @@ export function empenhoName(empenho: unknown): string {
     return empenhoField(empenho, 'razaoSocial') || empenhoField(empenho, 'nomeFantasia');
 }
 
+// "Nº" primeiro e "Nº anterior" junto dos dados da nota (decisão 005, item 8).
 const columns: CsvColumn<Row>[] = [
+    { header: 'Nº',
+value: t => t.number },
     { header: 'Data',
 value: t => csvDate(t.date) },
     { header: 'Tipo',
@@ -31,6 +34,9 @@ value: t => t.description },
 value: t => empenhoName(t.empenho) },
     { header: 'CNPJ / CPF',
 value: t => empenhoField(t.empenho, 'cnpjCpf') },
+    // O "Nº empenho" de antes (sistema antigo ou nota em papel).
+    { header: 'Nº anterior',
+value: t => empenhoField(t.empenho, 'numero') },
     { header: 'Método',
 value: t => t.method },
     { header: 'Recorrente',
@@ -55,6 +61,7 @@ export class ExportFinanceTransactionsUseCase {
             accountId: q.accountId,
             method: q.method,
             search: q.search,
+            orderBy: q.orderBy,
         });
         return toCsv(columns, rows);
     }
