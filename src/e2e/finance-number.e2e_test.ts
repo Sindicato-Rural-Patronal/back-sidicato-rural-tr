@@ -791,7 +791,7 @@ describe('edição do Nº na auditoria (ida B)', () => {
         await prisma.auditLog.deleteMany({});
     });
 
-    it('corrigir o Nº fica na trilha: "nº 1 — descrição" e o antes e depois', async () => {
+    it('corrigir o Nº fica na trilha: título com o Nº de depois, "(antes nº 1)", e o antes e depois', async () => {
         const t = await create({ description: 'COMPRA DE ADUBO' });
         const res = await call('PATCH', `/admin/finance/transactions/${t.id}`, { number: 15 });
         expect(res.statusCode, res.body).toBe(200);
@@ -801,7 +801,7 @@ describe('edição do Nº na auditoria (ida B)', () => {
             method: 'PATCH',
             entity: 'Lançamento',
         });
-        expect(log.targetLabel).toBe('nº 1 — COMPRA DE ADUBO');
+        expect(log.targetLabel).toBe('nº 15 (antes nº 1) — COMPRA DE ADUBO');
         expect(log.changes).toEqual(expect.arrayContaining([{
             field: 'number',
             before: 1,
@@ -810,7 +810,16 @@ describe('edição do Nº na auditoria (ida B)', () => {
 
         const list = await call('GET', `/admin/audit-logs?entity=${encodeURIComponent('Lançamento')}`);
         const summaries = json<{ data: { summary: string }[] }>(list.body).data.map(r => r.summary);
-        expect(summaries).toContain('Editou o lançamento "nº 1 — COMPRA DE ADUBO"');
+        expect(summaries).toContain('Editou o lançamento "nº 15 (antes nº 1) — COMPRA DE ADUBO"');
+    });
+
+    it('editar só a descrição: título com a descrição nova e o mesmo Nº, sem "antes"', async () => {
+        const t = await create({ description: 'COMPRA DE ADUBO' });
+        const res = await call('PATCH', `/admin/finance/transactions/${t.id}`, { description: 'COMPRA DE SEMENTE' });
+        expect(res.statusCode, res.body).toBe(200);
+        const log = await waitForAudit({ method: 'PATCH',
+entity: 'Lançamento' });
+        expect(log.targetLabel).toBe('nº 1 — COMPRA DE SEMENTE');
     });
 
     it('criar cita o número, o automático e o digitado (SR-069)', async () => {

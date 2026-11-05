@@ -9,6 +9,8 @@ import {
     loginUsername,
     isTransactionCreate,
     createdTransactionLabel,
+    isTransactionEdit,
+    lookupEditedTransactionLabel,
 } from '../lib/audit-label.js';
 import { diffSnapshots, removedSnapshot, type AuditChange } from '../lib/audit-diff.js';
 import { shouldSnapshot, snapshotTarget } from '../lib/audit-snapshot.js';
@@ -156,7 +158,11 @@ data: { location } });
 
             if (!MUTATIONS.has(method) || reply.statusCode >= 400 || skipAudit(path)) return;
             const actorId = s._auditActorId ?? request.admin?.id ?? null;
-            const targetLabel = s._auditLabel ?? bodyLabel(request.body);
+            // Edição de lançamento: o título usa o Nº e a descrição de depois.
+            const editedLabel = isTransactionEdit(method, path)
+                ? await lookupEditedTransactionLabel(prisma, path, s._auditLabel)
+                : null;
+            const targetLabel = editedLabel ?? s._auditLabel ?? bodyLabel(request.body);
             const ctx = requestContext(request);
             const [location, changes] = await Promise.all([
                 lookupLocation(ctx.ip),
