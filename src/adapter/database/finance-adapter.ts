@@ -219,7 +219,8 @@ deletedAt: new Date() },
         return r.count === 1;
     }
 
-    async createTransfer(input: FinanceTransferInput): Promise<void> {
+    // A saída é gravada primeiro, a entrada depois (a ordem do array).
+    async createTransfer(input: FinanceTransferInput): Promise<FinancialTransactionModel[]> {
         const transferId = randomUUID();
         const base = {
             transferId,
@@ -229,7 +230,7 @@ deletedAt: new Date() },
             method: input.method ?? null,
             createdBy: input.createdBy ?? null,
         };
-        await this.prisma.$transaction([
+        return this.prisma.$transaction([
             this.prisma.financialTransaction.create({
                 data: { ...base,
 type: 'OUT',

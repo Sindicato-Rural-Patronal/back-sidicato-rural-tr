@@ -759,10 +759,10 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 | `POST` · `PATCH` · `DELETE` | `/admin/finance/categories[/:id]` | `{ name, type: IN\|OUT, color?, active?, order? }` → 201 · `{ message }` · 204 (soft) | `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
 | `GET` · `POST` · `PATCH` · `DELETE` | `/admin/finance/accounts[/:id]` | caixas `{ name, color?, active?, order? }` (mesmo padrão) | `READ_` · `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
 | `GET` | `/admin/finance/transactions` | paginada; filtros abaixo; traz `totals` | `READ_FINANCE` |
-| `POST` | `/admin/finance/transactions` | criar lançamento → 201 (a linha); mês fechado → 409 | `CREATE_FINANCE` |
-| `PATCH` · `DELETE` | `/admin/finance/transactions/:id` | editar → `{ message }` · excluir (soft) → 204; mês fechado → 409 | `UPDATE_` · `DELETE_FINANCE` |
+| `POST` | `/admin/finance/transactions` | criar lançamento → 201 (a linha, com o `number`); mês fechado → 409 | `CREATE_FINANCE` |
+| `PATCH` · `DELETE` | `/admin/finance/transactions/:id` | editar → `{ message, transaction }` (a linha como ficou) · excluir (soft) → 204; mês fechado → 409 | `UPDATE_` · `DELETE_FINANCE` |
 | `GET` | `/admin/finance/transactions/export` | CSV dos lançamentos filtrados; depois de "Descrição": "Nome / Razão social" (razão social do empenho, ou o nome fantasia se ela estiver vazia) e "CNPJ / CPF" | `READ_FINANCE` |
-| `POST` | `/admin/finance/transfers` | transferência entre caixas → 201 `{ message }`; mês fechado na origem ou no destino → 409 | `CREATE_FINANCE` |
+| `POST` | `/admin/finance/transfers` | transferência entre caixas → 201 `{ message, transactions: [saída, entrada] }`; mês fechado na origem ou no destino → 409 | `CREATE_FINANCE` |
 | `POST` | `/admin/finance/transactions/:id/attachments` | comprovante (multipart: PDF, JPG, PNG, WEBP até 15 MB) → 201 `{ id, filename, mimeType, size, createdAt }` | `UPDATE_FINANCE` |
 | `GET` · `DELETE` | `/admin/finance/attachments/:attachmentId` | baixar (inline) · apagar de verdade | `READ_FINANCE` · `UPDATE_FINANCE` |
 | `GET` | `/admin/finance/summary?from&to` | resumo (abaixo) | `READ_FINANCE` |
@@ -774,6 +774,10 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 | `DELETE` | `/admin/finance/closings/:id` | **reabrir o mês** → 204; inexistente → 404 | `DELETE_FINANCE` |
 
 **Lançamento:** `{ type?: IN|OUT|null, amountCents, date, description, method?, notes?, categoryId?, accountId?, empenho? }`.
+- **Nº do lançamento** (`number`, decisão 005, SR-064). **Ida A:** a coluna existe e a migration `…_finance_transaction_number_fill` numerou os lançamentos ativos em ordem de data. Os excluídos ficaram com null. O código ainda **não** dá número a lançamento novo, que nasce com `number: null`.
+  - Vem em toda resposta que traz o lançamento: a lista (`data[]`), a criação, a edição (`transaction`) e a transferência (`transactions`). null sai como null (o front mostra "—").
+  - Ordem da numeração: `date`, depois `createdAt`; no empate, saída e "só nota" antes da entrada; por fim o `id`. As duas pernas de uma transferência ficam juntas, saída e depois entrada, na posição do `createdAt` da saída (o Prisma grava a entrada alguns milissegundos depois).
+  - A migration pode rodar de novo: só numera quem está sem número, continuando do maior (excluídos contam).
 - **Datas e meses do Financeiro** (`usecase/finance-dates.ts`, SR-055): `date` do lançamento e da transferência e os filtros `from`/`to` (lista, CSV, resumo) só aceitam ano de 1900 a 2999. Fora disso, ou texto que não é data → 400 "Data inválida: use um ano entre 1900 e 2999." (nos filtros, "Parâmetro inválido: from"). Os meses `AAAA-MM` (recorrência e fechamento) também: "Mês inválido (use AAAA-MM, com ano entre 1900 e 2999)". Antes, ano 0 dava 500, e "0026-01" no início de uma recorrência fazia a geração falhar toda vez que a tela abria.
 - `empenho` é a Nota de Empenho, JSON ou null: `numero, notaFiscal, nomeFantasia, razaoSocial, cnpjCpf, inscricaoEstadual, endereco, bairro, cep, cidade, uf, telefone, banco, conta, agencia, cheque, descontoCents, usuarioId, empresaId`.
 - Recusas → 400:
@@ -861,7 +865,7 @@ Nomes como estão no `prisma/schema.prisma` (alguns em minúsculas). Detalhe de 
 | `Notification` / `NotificationRead` | evento: id, type, title, body, link, permission, entityId · leitura: notificationId (cascade), adminId, readAt — única por (evento, admin) |
 | `FinancialCategory` | id, name, type, color, active, order, isDeleted |
 | `FinancialAccount` | id, name, color, active, order, isDeleted |
-| `FinancialTransaction` | id, type? (null = só nota), amountCents, date, description, method, notes, categoryId?, accountId?, transferId, createdBy, recurringId (SetNull), recurringMonth, empenho (Json?), isDeleted — único por (recurringId, recurringMonth) |
+| `FinancialTransaction` | id, number? (Nº do lançamento; sem índice único na ida A), type? (null = só nota), amountCents, date, description, method, notes, categoryId?, accountId?, transferId, createdBy, recurringId (SetNull), recurringMonth, empenho (Json?), isDeleted — único por (recurringId, recurringMonth) |
 | `FinancialAttachment` | id, transactionId (cascade), data (Bytes), filename, mimeType, size |
 | `FinanceRecurringTransaction` | id, type, description, amountCents, dayOfMonth, startMonth, endMonth, lastGeneratedMonth, paymentMethod, notes, active, categoryId?, accountId?, isDeleted |
 | `FinancePaymentMethod` | id, name (único), active, order, isDeleted |

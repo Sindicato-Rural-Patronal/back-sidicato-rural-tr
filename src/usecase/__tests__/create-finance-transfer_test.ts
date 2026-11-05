@@ -56,10 +56,17 @@ name: 'Dinheiro' } : null) as any);
             (id === A ? { id: A,
 name: 'Dinheiro' } : { id: B,
 name: 'Banco' }) as any);
-        vi.mocked(repo.createTransfer).mockResolvedValue(undefined as any);
+        const legs = [{ id: 'out',
+type: 'OUT',
+number: null }, { id: 'in',
+type: 'IN',
+number: null }];
+        vi.mocked(repo.createTransfer).mockResolvedValue(legs as any);
         const uc = new CreateFinanceTransferUseCase(repo);
         const r = await uc.execute(base, 'admin-1');
         expect(r.error).toBeUndefined();
+        // Devolve as duas pernas, para a tela dizer os números.
+        expect(r.transactions).toEqual(legs);
         const arg = vi.mocked(repo.createTransfer).mock.calls[0][0];
         expect(arg.amountCents).toBe(5000);
         expect(arg.fromAccountId).toBe(A);

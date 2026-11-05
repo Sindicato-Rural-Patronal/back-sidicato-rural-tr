@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import type { FinanceRepository } from '../ports/external/finance-repository.js';
+import type {
+    FinanceRepository,
+    FinancialTransactionModel,
+} from '../ports/external/finance-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import { closedMonthError } from './finance-closed-month.js';
 import { financeDate } from './finance-dates.js';
@@ -16,7 +19,14 @@ export const financeTransferSchema = z.object({
 export class CreateFinanceTransferUseCase {
     constructor(private readonly repo: FinanceRepository) {}
 
-    async execute(input: unknown, createdBy: string | null): Promise<{ error?: Error }> {
+    async execute(
+        input: unknown,
+        createdBy: string | null,
+    ): Promise<{
+        error?: Error;
+        /** As duas pernas gravadas: [saída, entrada]. */
+        transactions?: FinancialTransactionModel[];
+    }> {
         const parsed = financeTransferSchema.safeParse(input);
         if (!parsed.success) {
             return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Dados inválidos') };
@@ -48,7 +58,7 @@ export class CreateFinanceTransferUseCase {
 
         const description = data.description?.trim() || `Transferência: ${from.name} → ${to.name}`;
 
-        await this.repo.createTransfer({
+        const transactions = await this.repo.createTransfer({
             fromAccountId: data.fromAccountId,
             toAccountId: data.toAccountId,
             amountCents: data.amountCents,
@@ -57,6 +67,6 @@ export class CreateFinanceTransferUseCase {
             method: data.method ?? null,
             createdBy,
         });
-        return {};
+        return { transactions };
     }
 }
