@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createdTransactionLabel, isTransactionCreate } from '../audit-label.js';
+import { createdTransactionLabel, editedTransactionLabel, isTransactionCreate, isTransactionEdit } from '../audit-label.js';
 import { describeAuditAction } from '../audit-sentence.js';
 
 describe('isTransactionCreate', () => {
@@ -56,5 +56,40 @@ describe('frase de criar lançamento', () => {
 
     it('linha antiga, sem rótulo, continua "Criou um lançamento"', () => {
         expect(describeAuditAction(entry(null))).toBe('Criou um lançamento');
+    });
+});
+
+describe('isTransactionEdit', () => {
+    it('só o PATCH do lançamento', () => {
+        const id = '0d9f6c40-0000-4000-8000-000000000000';
+        expect(isTransactionEdit('PATCH', `/admin/finance/transactions/${id}`)).toBe(true);
+        expect(isTransactionEdit('DELETE', `/admin/finance/transactions/${id}`)).toBe(false);
+        expect(isTransactionEdit('PATCH', `/admin/finance/transactions/${id}/attachments`)).toBe(false);
+        expect(isTransactionEdit('PATCH', '/admin/finance/transactions')).toBe(false);
+        expect(isTransactionEdit('PATCH', `/admin/finance/accounts/${id}`)).toBe(false);
+    });
+});
+
+describe('editedTransactionLabel', () => {
+    it('Nº mudou: Nº novo, o antigo entre parênteses e a descrição nova', () => {
+        expect(editedTransactionLabel('nº 301 — VELHA', { number: 250,
+description: 'NOVA' })).toBe('nº 250 (antes nº 301) — NOVA');
+    });
+
+    it('Nº igual: como antes, mas com a descrição de depois', () => {
+        expect(editedTransactionLabel('nº 7 — VELHA', { number: 7,
+description: 'NOVA' })).toBe('nº 7 — NOVA');
+    });
+
+    it('sem número: só a descrição', () => {
+        expect(editedTransactionLabel('VELHA', { number: null,
+description: 'NOVA' })).toBe('NOVA');
+        expect(editedTransactionLabel(null, { number: null,
+description: 'NOVA' })).toBe('NOVA');
+    });
+
+    it('sem Nº antes e com Nº depois: não inventa o antigo', () => {
+        expect(editedTransactionLabel('VELHA', { number: 9,
+description: 'NOVA' })).toBe('nº 9 — NOVA');
     });
 });

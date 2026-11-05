@@ -79,6 +79,50 @@ description?: unknown
     }
 }
 
+// Editar lançamento: PATCH /admin/finance/transactions/:id (só ele; comprovante,
+// transferência e as demais ações do lançamento seguem com o rótulo de antes).
+const TRANSACTION_EDIT_RE = /^\/admin\/finance\/transactions\/[^/]+$/i;
+
+/** É a edição de um lançamento? */
+export function isTransactionEdit(method: string, path: string): boolean {
+    return method === 'PATCH' && TRANSACTION_EDIT_RE.test(path);
+}
+
+/**
+ * Rótulo do lançamento editado, com o Nº e a descrição de DEPOIS da edição.
+ * Se o Nº mudou, cita o antigo: "nº 250 (antes nº 301) — descrição". `before` é
+ * o rótulo de antes ("nº 301 — descrição"); sem Nº antes ou depois, só a descrição.
+ */
+export function editedTransactionLabel(
+    before: string | null | undefined,
+    after: {
+ number: number | null;
+description: string 
+},
+): string {
+    const oldNumber = Number(before?.match(/^nº (\d+) — /)?.[1]);
+    if (after.number != null && Number.isInteger(oldNumber) && oldNumber !== after.number) {
+        return `nº ${after.number} (antes nº ${oldNumber}) — ${after.description}`.slice(0, 140);
+    }
+    return financeTransactionLabel(after.number, after.description).slice(0, 140);
+}
+
+/** Relê o lançamento depois da edição e monta o rótulo; falhou → null (fica o de antes). */
+export async function lookupEditedTransactionLabel(
+    prisma: PrismaClient,
+    path: string,
+    before: string | null | undefined,
+): Promise<string | null> {
+    const id = firstId(path);
+    if (!id) return null;
+    const t = await prisma.financialTransaction.findUnique({
+        where: { id },
+        select: { number: true,
+description: true },
+    });
+    return t ? editedTransactionLabel(before, t) : null;
+}
+
 /** Fechar o mês: rótulo pelo corpo (ainda não validado; o caixa vem do banco). */
 async function closingCreateLabel(prisma: PrismaClient, body: unknown): Promise<string | null> {
     if (!body || typeof body !== 'object') return null;
