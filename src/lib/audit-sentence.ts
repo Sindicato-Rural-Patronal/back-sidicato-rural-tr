@@ -173,6 +173,9 @@ const SPECIAL: Record<string, Sentence> = {
     'POST /news/:id/banner': fixed('Trocou a imagem da notícia'),
     'POST /news/:id/image': fixed('Enviou imagem para a notícia'),
     'POST /admin/convenios/:id/logo': fixed('Trocou o logo do convênio'),
+    // Rótulo: "4 lançamentos recorrentes (INTERNET (2), LUZ (2))" (generatedAuditLabel).
+    // Sem nada a gerar a rota nem grava linha; a frase sem rótulo é de linhas antigas.
+    'POST /admin/finance/recurrences/generate': l => (l ? `Gerou ${l}` : 'Gerou lançamentos recorrentes'),
     'POST /admin/finance/transactions/:id/attachments': fixed('Anexou comprovante ao lançamento'),
     // Rótulo do fechamento: "10/2026 · BANCO" (closingAuditLabel).
     'POST /admin/finance/closings': fixed('Fechou o mês de um caixa', 'Fechou o mês'),

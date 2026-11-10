@@ -217,6 +217,41 @@ export class DeleteFinanceRecurrenceUseCase {
     }
 }
 
+export type GeneratedByRecurrence = {
+    description: string;
+    created: number;
+};
+
+export type GenerateRecurrencesResult = {
+    created: number;
+    /** Quantos lançamentos saíram de cada recorrência (só as que geraram). Não vai na resposta da rota; é para a auditoria. */
+    generated: GeneratedByRecurrence[];
+};
+
+/**
+ * Texto da auditoria para o que a geração criou; a frase (`audit-sentence.ts`)
+ * o precede com "Gerou ": "4 lançamentos recorrentes (INTERNET (2), LUZ (2))".
+ * Uma recorrência só: o nome, sem o número. Cabe nos 140 caracteres do rótulo.
+ */
+export function generatedAuditLabel(generated: GeneratedByRecurrence[]): string | null {
+    const total = generated.reduce((sum, g) => sum + g.created, 0);
+    if (total === 0) return null;
+    const head = `${total} ${total === 1 ? 'lançamento recorrente' : 'lançamentos recorrentes'}`;
+    const names = generated
+        .map(g => (generated.length === 1 ? g.description : `${g.description} (${g.created})`))
+        .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const MAX = 140;
+    let list = '';
+    for (let i = 0; i < names.length; i++) {
+        const next = list ? `${list}, ${names[i]}` : names[i];
+        const rest = names.length - i - 1;
+        const full = `${head} (${next}${rest > 0 ? `, e mais ${rest}` : ''})`;
+        if (full.length > MAX && i > 0) return `${head} (${list}, e mais ${names.length - i})`;
+        list = next;
+    }
+    return `${head} (${list})`.slice(0, MAX);
+}
+
 /**
  * Gera os lançamentos que faltam de todas as recorrências ativas, até o mês
  * atual. Idempotente: além do `lastGeneratedMonth`, o unique
@@ -230,10 +265,11 @@ export class DeleteFinanceRecurrenceUseCase {
 export class GenerateFinanceRecurrencesUseCase {
     constructor(private readonly repo: FinanceRepository) {}
 
-    async execute(now: Date = new Date()): Promise<{ created: number }> {
+    async execute(now: Date = new Date()): Promise<GenerateRecurrencesResult> {
         const currentMonth = monthOf(now);
         const recurrences = await this.repo.listRecurrencesToGenerate();
         let created = 0;
+        const generated: GeneratedByRecurrence[] = [];
 
         for (const rec of recurrences) {
             const months = monthsToGenerate(rec, currentMonth);
@@ -243,6 +279,7 @@ export class GenerateFinanceRecurrencesUseCase {
             // Último mês até onde tudo foi resolvido (criado ou já existia).
             let mark: string | null = null;
             let skipped = false;
+            let createdHere = 0;
 
             for (const month of months) {
                 if (closed.has(month)) {
@@ -261,15 +298,21 @@ export class GenerateFinanceRecurrencesUseCase {
                     categoryId: rec.categoryId,
                     accountId: rec.accountId,
                 });
-                if (didCreate) created += 1;
+                if (didCreate) {
+                    created += 1;
+                    createdHere += 1;
+                }
                 if (!skipped) mark = month;
             }
+            if (createdHere > 0) generated.push({ description: rec.description,
+created: createdHere });
             // Marca o último mês percorrido mesmo quando nada foi criado (já existia):
             // a próxima passada não refaz o caminho todo.
             if (mark) await this.repo.setRecurrenceLastGeneratedMonth(rec.id, mark);
         }
 
-        return { created };
+        return { created,
+generated };
     }
 
     private async closedMonthsOf(accountId: string | null, months: string[]): Promise<Set<string>> {

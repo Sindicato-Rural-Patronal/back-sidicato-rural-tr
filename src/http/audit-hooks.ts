@@ -26,6 +26,8 @@ type AuditStash = {
     _auditActorId?: string | null;
     /** Linha já gravada pela rota (exportação) que ainda está sem o local. */
     _auditPendingLocation?: string;
+    /** A rota decidiu que esta chamada não é ação a registrar (nada mudou). */
+    _auditSkip?: boolean;
 };
 
 const stash = (request: FastifyRequest) => request as unknown as AuditStash;
@@ -38,6 +40,19 @@ const MUTATIONS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
  */
 export function fillAuditLocationLater(request: FastifyRequest, auditLogId: string) {
     stash(request)._auditPendingLocation = auditLogId;
+}
+
+/**
+ * A rota avisa que a chamada não mudou nada e não merece linha na trilha (ex.:
+ * a geração de recorrentes, que o painel chama toda vez que a tela abre).
+ */
+export function skipAuditLine(request: FastifyRequest) {
+    stash(request)._auditSkip = true;
+}
+
+/** A rota diz o que fez: vira o "alvo" da linha, no lugar do nome lido do corpo. */
+export function setAuditLabel(request: FastifyRequest, label: string | null) {
+    stash(request)._auditLabel = label;
 }
 
 // Tentativa bloqueada (429) já registrada por IP: não grava de novo até passar a janela.
@@ -156,7 +171,7 @@ data: { location } });
                 return;
             }
 
-            if (!MUTATIONS.has(method) || reply.statusCode >= 400 || skipAudit(path)) return;
+            if (!MUTATIONS.has(method) || reply.statusCode >= 400 || skipAudit(path) || s._auditSkip) return;
             const actorId = s._auditActorId ?? request.admin?.id ?? null;
             // Edição de lançamento: o título usa o Nº e a descrição de depois.
             const editedLabel = isTransactionEdit(method, path)

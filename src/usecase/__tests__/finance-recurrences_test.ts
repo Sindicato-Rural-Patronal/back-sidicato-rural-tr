@@ -11,6 +11,7 @@ import {
     UpdateFinanceRecurrenceUseCase,
     DeleteFinanceRecurrenceUseCase,
     GenerateFinanceRecurrencesUseCase,
+    generatedAuditLabel,
 } from '../finance-recurrences.js';
 import type { FinanceRepository } from '../../ports/external/finance-repository.js';
 
@@ -194,6 +195,39 @@ lastGeneratedMonth: '2026-03' }),
         expect(r.created).toBe(1);
         // Mesmo assim avança o marcador, para não refazer o caminho todo depois.
         expect(repo.setRecurrenceLastGeneratedMonth).toHaveBeenCalledWith('rec-1', '2026-03');
+    });
+
+    it('diz quantos lançamentos saíram de cada recorrência (e nada das que não geraram)', async () => {
+        vi.mocked(repo.listRecurrencesToGenerate).mockResolvedValue([
+            rec({ id: 'a',
+description: 'ALUGUEL',
+startMonth: '2026-02' }),
+            rec({ id: 'b',
+description: 'LUZ',
+startMonth: '2026-03',
+lastGeneratedMonth: '2026-03' }),
+            rec({ id: 'c',
+description: 'INTERNET',
+startMonth: '2026-03' }),
+        ] as never);
+        const uc = new GenerateFinanceRecurrencesUseCase(repo);
+        const r = await uc.execute(new Date(2026, 2, 15));
+        expect(r.created).toBe(3);
+        expect(r.generated).toEqual([
+            { description: 'ALUGUEL',
+created: 2 },
+            { description: 'INTERNET',
+created: 1 },
+        ]);
+    });
+
+    it('sem nada a gerar não devolve recorrência nenhuma', async () => {
+        vi.mocked(repo.listRecurrencesToGenerate).mockResolvedValue([] as never);
+        const r = await new GenerateFinanceRecurrencesUseCase(repo).execute(new Date(2026, 2, 15));
+        expect(r).toEqual({ created: 0,
+generated: [] });
+        expect(repo.createRecurrenceTransaction).not.toHaveBeenCalled();
+        expect(repo.setRecurrenceLastGeneratedMonth).not.toHaveBeenCalled();
     });
 
     it('usa o último dia em meses curtos', async () => {
@@ -413,5 +447,37 @@ describe('DeleteFinanceRecurrenceUseCase', () => {
 
         vi.mocked(repo.softDeleteRecurrence).mockResolvedValue(false);
         expect((await uc.execute('rec-x')).error).toBeDefined();
+    });
+});
+
+describe('generatedAuditLabel', () => {
+    it('nada gerado → null', () => {
+        expect(generatedAuditLabel([])).toBeNull();
+    });
+
+    it('uma recorrência: nome sem o número, singular e plural', () => {
+        expect(generatedAuditLabel([{ description: 'ALUGUEL',
+created: 1 }])).toBe('1 lançamento recorrente (ALUGUEL)');
+        expect(generatedAuditLabel([{ description: 'ALUGUEL',
+created: 3 }])).toBe('3 lançamentos recorrentes (ALUGUEL)');
+    });
+
+    it('várias: nome e quantidade de cada, em ordem alfabética', () => {
+        expect(
+            generatedAuditLabel([
+                { description: 'LUZ',
+created: 2 },
+                { description: 'INTERNET',
+created: 2 },
+            ]),
+        ).toBe('4 lançamentos recorrentes (INTERNET (2), LUZ (2))');
+    });
+
+    it('lista muito longa é cortada em "e mais N", dentro de 140 caracteres', () => {
+        const many = Array.from({ length: 30 }, (_, i) => ({ description: `RECORRENCIA NUMERO ${String(i).padStart(2, '0')}`,
+created: 1 }));
+        const label = generatedAuditLabel(many)!;
+        expect(label.length).toBeLessThanOrEqual(140);
+        expect(label).toMatch(/^30 lançamentos recorrentes \(.*, e mais \d+\)$/);
     });
 });

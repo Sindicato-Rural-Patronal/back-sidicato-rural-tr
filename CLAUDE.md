@@ -691,6 +691,7 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 **O que é gravado:**
 - O hook grava toda mutação com sucesso: método, caminho, `entity` (`deriveAuditEntity`) e `targetLabel` (nome do alvo).
 - Fica fora (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (que grava a própria linha), `/admin/notifications/read`, `/users/lookup-cpf` (consulta, não grava) e `/auth/login` (que tem registro próprio).
+- **A rota pode decidir** (`skipAuditLine` e `setAuditLabel`, em `http/audit-hooks.ts`): chamada que não mudou nada não deixa linha, e a que mudou diz o que fez no `targetLabel`. Quem usa: `POST /admin/finance/recurrences/generate` (ver Financeiro).
 
 **Login:** 2xx → `LOGIN`; 401 → `LOGIN_FAILED`; 429 → `LOGIN_BLOCKED`; `targetLabel` = usuário digitado. A senha nunca é lida.
 
@@ -768,7 +769,7 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 | `GET` · `DELETE` | `/admin/finance/attachments/:attachmentId` | baixar (inline) · apagar de verdade | `READ_FINANCE` · `UPDATE_FINANCE` |
 | `GET` | `/admin/finance/summary?from&to` | resumo (abaixo) | `READ_FINANCE` |
 | `GET` · `POST` · `PATCH` · `DELETE` | `/admin/finance/recurrences[/:id]` | molde do lançamento mensal | `READ_` · `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
-| `POST` | `/admin/finance/recurrences/generate` | gera o que falta até o mês atual, pulando mês fechado → `{ created }` | `CREATE_FINANCE` |
+| `POST` | `/admin/finance/recurrences/generate` | gera o que falta até o mês atual, pulando mês fechado → `{ created }`. Só deixa linha na Auditoria se gerou algo (abaixo) | `CREATE_FINANCE` |
 | `GET` · `POST` · `PATCH` · `DELETE` | `/admin/finance/payment-methods[/:id]` | formas de pagamento | `READ_` · `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
 | `GET` | `/admin/finance/closings[?accountId&year]` · `/admin/finance/closings/preview?accountId&month` | fechamentos `[{ id, accountId, month, expectedBalanceCents, countedBalanceCents, differenceCents, notes, closedAt, closedByAdminId }]` · prévia do mês | `READ_FINANCE` |
 | `POST` | `/admin/finance/closings` | fechar o mês `{ accountId, month, countedBalanceCents, notes? }` → 201 (o fechamento); já fechado → 409 | `CREATE_FINANCE` |
@@ -824,6 +825,7 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 **Recorrência** (`FinanceRecurringTransaction`):
 - Meses são `"AAAA-MM"` (`startMonth`, `endMonth?`, `lastGeneratedMonth?`). `dayOfMonth` vai de 1 a 31; no mês mais curto, vale o último dia.
 - A geração roda quando a tela abre e é idempotente (unique `(recurringId, recurringMonth)`), com teto de 120 meses por rodada.
+- **Auditoria da geração** (SR-079): como a tela chama a rota toda vez que abre, `created: 0` não grava linha nenhuma (antes saía "Criou um registro" a cada abertura) e também não escreve no banco. Com `created > 0`, a linha é `Gerou 4 lançamentos recorrentes (INTERNET (2), LUZ (2))` (uma recorrência só: `Gerou 3 lançamentos recorrentes (ALUGUEL)`); o texto vem de `generatedAuditLabel`, e o use case devolve `generated` (por recorrência) além de `created`, que o controller não repassa na resposta. A entidade segue "Outro".
 - Só o P2002 desse índice quer dizer "mês já gerado" (`isRecurrenceMonthTaken`, pelo índice em `uniqueViolationTarget`). Colisão de Nº, ou outro erro, sobe como erro (409 genérico do `apiErrorHandler`). A tentativa que falha não gasta número.
 - Pausar é `PATCH { active: false }`. **Reativar** (`active: true` numa pausada) pula os meses da pausa: o use case põe `lastGeneratedMonth` no mês anterior ao atual, e ela volta a lançar a partir do mês atual. Pausar e reativar no mesmo mês não pula nada. Os lançamentos já gerados não mudam. `lastGeneratedMonth` nunca vem do corpo.
 - **Mês fechado** no caixa da recorrência não recebe lançamento. A geração segue para os meses seguintes, mas o marcador para antes do mês fechado: as próximas rodadas voltam a tentar esse mês e lançam quando ele for reaberto.

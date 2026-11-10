@@ -17,6 +17,8 @@ import type { ExportFinanceTransactionsUseCase } from '../../usecase/export-fina
 import type { UploadFinanceAttachmentUseCase } from '../../usecase/upload-finance-attachment.js';
 import type { GetFinanceAttachmentUseCase } from '../../usecase/get-finance-attachment.js';
 import type { DeleteFinanceAttachmentUseCase } from '../../usecase/delete-finance-attachment.js';
+import { generatedAuditLabel } from '../../usecase/finance-recurrences.js';
+import { setAuditLabel, skipAuditLine } from '../audit-hooks.js';
 import type {
     ListFinanceRecurrencesUseCase,
     CreateFinanceRecurrenceUseCase,
@@ -234,8 +236,13 @@ transaction: res.transaction });
     }
 
     // Chamado quando a tela do Financeiro abre: cria os lançamentos que faltam.
+    // Só entra na auditoria quando gerou alguma coisa: aberta sem nada a gerar, não deixa linha.
     async postGenerateRecurrences(request: FastifyRequest, reply: FastifyReply) {
-        return reply.send(await this.generateRecurrences.execute());
+        const { created, generated } = await this.generateRecurrences.execute();
+        const label = generatedAuditLabel(generated);
+        if (label) setAuditLabel(request, label);
+        else skipAuditLine(request);
+        return reply.send({ created });
     }
 
     // ── Formas de pagamento ─────────────────────────────────────────────────
