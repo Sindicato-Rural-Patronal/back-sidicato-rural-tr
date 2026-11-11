@@ -220,3 +220,116 @@ after: '44988880000' },
         expect(res.body).not.toContain('"LOTE 00000"');
     }, 60_000);
 });
+
+describe('teste de ouro pelo banco: reservas de sala', () => {
+    const header = ['Tipo', 'Título', 'Sala', 'Início', 'Término', 'Responsável', 'Descrição', 'Série'];
+    const ids: Record<string, string> = {};
+
+    beforeAll(async () => {
+        const auditorio = await prisma.room.create({ data: { name: 'AUDITORIO OURO',
+description: 'x',
+maxCapacity: 80 } });
+        const sala = await prisma.room.create({ data: { name: 'SALA OURO',
+description: 'x',
+maxCapacity: 20 } });
+        const joao = await prisma.userData.create({ data: { name: 'JOÃO RESERVA',
+phone: '44911119100' } });
+        const booking = (data: Record<string, unknown>) => prisma.roomBooking.create({ data: data as never });
+
+        const palestra = await booking({
+            type: 'EVENT',
+            title: 'Palestra "Solo"; manejo',
+            description: 'Trazer projetor',
+            publicOnSite: true,
+            publicDescription: 'Aberta ao público',
+            roomId: auditorio.id,
+            startTime: d('2026-10-05T08:00:00.000Z'),
+            endTime: d('2026-10-05T12:00:00.000Z'),
+            responsibleUserDataId: joao.id,
+            responsibleName: 'NOME DIGITADO ANTES',
+            seriesId: 'serie-ouro',
+        });
+        // A mesma série na semana seguinte: fora do período.
+        await booking({
+            type: 'EVENT',
+            title: 'Palestra "Solo"; manejo',
+            roomId: auditorio.id,
+            startTime: d('2026-10-12T08:00:00.000Z'),
+            endTime: d('2026-10-12T12:00:00.000Z'),
+            responsibleUserDataId: joao.id,
+            seriesId: 'serie-ouro',
+        });
+        // Mesmo início da palestra: desempata pelo título.
+        await booking({
+            type: 'MEETING',
+            title: 'Almoço da equipe',
+            roomId: sala.id,
+            startTime: d('2026-10-05T08:00:00.000Z'),
+            endTime: d('2026-10-05T09:00:00.000Z'),
+        });
+        await booking({
+            type: 'MEETING',
+            title: '=Reunião da diretoria',
+            description: '-pauta: contas',
+            roomId: sala.id,
+            startTime: d('2026-10-06T19:30:00.000Z'),
+            endTime: d('2026-10-06T21:00:00.000Z'),
+            responsibleName: 'FORNECEDOR X',
+        });
+        // Começa antes do período e termina dentro dele: sai.
+        await booking({
+            type: 'EVENT',
+            title: 'Plantão',
+            roomId: sala.id,
+            startTime: d('2026-10-04T23:00:00.000Z'),
+            endTime: d('2026-10-05T01:30:00.000Z'),
+        });
+        // Reserva excluída não sai.
+        await booking({
+            type: 'EVENT',
+            title: 'Cancelada',
+            roomId: sala.id,
+            startTime: d('2026-10-07T08:00:00.000Z'),
+            endTime: d('2026-10-07T09:00:00.000Z'),
+            isDeleted: true,
+            deletedAt: d('2026-09-01T00:00:00.000Z'),
+        });
+        Object.assign(ids, { palestra: palestra.id,
+sala: sala.id });
+    });
+
+    const plantao = ['Evento', 'Plantão', 'SALA OURO', '04/10/2026 23:00', '05/10/2026 01:30', '', '', 'Não'];
+    const almoco = ['Reunião', 'Almoço da equipe', 'SALA OURO', '05/10/2026 08:00', '05/10/2026 09:00', '', '', 'Não'];
+    const palestra = [
+        'Evento', 'Palestra ""Solo""; manejo', 'AUDITORIO OURO', '05/10/2026 08:00', '05/10/2026 12:00', 'JOÃO RESERVA',
+        'Trazer projetor', 'Sim',
+    ];
+    const reuniao = [
+        'Reunião', `'=Reunião da diretoria`, 'SALA OURO', '06/10/2026 19:30', '06/10/2026 21:00', 'FORNECEDOR X',
+        `'-pauta: contas`, 'Não',
+    ];
+
+    it('o CSV padrão inteiro, pelo período, na ordem do início e do título', async () => {
+        const res = await get('/admin/export/room-bookings?from=2026-10-05&to=2026-10-11');
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.headers['content-type']).toBe('text/csv; charset=utf-8');
+        expect(res.headers['content-disposition']).toBe(`attachment; filename="reservas-de-sala-${todayBr()}.csv"`);
+        expect(res.headers['x-export-count']).toBe('4');
+        expect(res.body).toBe(file(header, plantao, almoco, palestra, reuniao));
+    });
+
+    it('filtros da Agenda: sala, tipo e busca (título sem acento, responsável)', async () => {
+        const period = 'from=2026-10-05&to=2026-10-11';
+        expect((await get(`/admin/export/room-bookings?${period}&roomId=${ids.sala}`)).body).toBe(file(header, plantao, almoco, reuniao));
+        expect((await get(`/admin/export/room-bookings?${period}&type=MEETING`)).body).toBe(file(header, almoco, reuniao));
+        expect((await get(`/admin/export/room-bookings?${period}&search=reuniao`)).body).toBe(file(header, reuniao));
+        expect((await get(`/admin/export/room-bookings?${period}&search=fornecedor`)).body).toBe(file(header, reuniao));
+        expect((await get(`/admin/export/room-bookings?${period}&search=${encodeURIComponent('joão')}`)).body).toBe(file(header, palestra));
+    });
+
+    it('uma reserva pelo id: o título no nome do arquivo', async () => {
+        const res = await get(`/admin/export/room-bookings?ids=${ids.palestra}`);
+        expect(res.headers['content-disposition']).toBe(`attachment; filename="reserva-palestra-solo-manejo-${todayBr()}.csv"`);
+        expect(res.body).toBe(file(header, palestra));
+    });
+});

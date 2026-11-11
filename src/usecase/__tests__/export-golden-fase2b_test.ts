@@ -239,3 +239,112 @@ page: '3' });
         }
     });
 });
+
+// ── Reservas de sala ─────────────────────────────────────────────────────────
+
+const BOOKINGS_HEADER = ['Tipo', 'Título', 'Sala', 'Início', 'Término', 'Responsável', 'Descrição', 'Série'];
+
+/** Evento de uma série, com responsável cadastrado (o nome vem da pessoa). */
+const palestra = {
+    id: 'b1',
+    type: 'EVENT',
+    title: 'Palestra "Solo"; manejo',
+    description: 'Trazer projetor',
+    publicOnSite: true,
+    publicDescription: 'Aberta ao público',
+    roomId: 'r1',
+    roomName: 'AUDITORIO',
+    startTime: d('2026-10-05T08:00:00.000Z'),
+    endTime: d('2026-10-05T12:00:00.000Z'),
+    responsible: { id: 'p1',
+name: 'JOÃO DA SILVA' },
+    responsibleName: 'NOME DIGITADO ANTES',
+    seriesId: 's1',
+};
+
+/** Reunião avulsa, responsável só digitado; título e descrição que viram fórmula. */
+const reuniao = {
+    id: 'b2',
+    type: 'MEETING',
+    title: '=Reunião da diretoria',
+    description: '-pauta: contas',
+    publicOnSite: false,
+    publicDescription: null,
+    roomId: 'r2',
+    roomName: 'SALA 1',
+    startTime: d('2026-10-06T19:30:00.000Z'),
+    endTime: d('2026-10-06T21:00:00.000Z'),
+    responsible: null,
+    responsibleName: 'FORNECEDOR X',
+    seriesId: null,
+};
+
+/** Sem responsável nenhum, entrando pela madrugada (horário de parede, sem fuso). */
+const plantao = {
+    id: 'b3',
+    type: 'EVENT',
+    title: 'Plantão',
+    description: null,
+    publicOnSite: false,
+    publicDescription: null,
+    roomId: 'r2',
+    roomName: 'SALA 1',
+    startTime: d('2026-10-06T23:00:00.000Z'),
+    endTime: d('2026-10-07T01:30:00.000Z'),
+    responsible: null,
+    responsibleName: null,
+    seriesId: null,
+};
+
+const PALESTRA_ROW = [
+    'Evento', 'Palestra ""Solo""; manejo', 'AUDITORIO', '05/10/2026 08:00', '05/10/2026 12:00', 'JOÃO DA SILVA',
+    'Trazer projetor', 'Sim',
+];
+const REUNIAO_ROW = [
+    'Reunião', `'=Reunião da diretoria`, 'SALA 1', '06/10/2026 19:30', '06/10/2026 21:00', 'FORNECEDOR X', `'-pauta: contas`,
+    'Não',
+];
+const PLANTAO_ROW = ['Evento', 'Plantão', 'SALA 1', '06/10/2026 23:00', '07/10/2026 01:30', '', '', 'Não'];
+
+describe('teste de ouro: CSV padrão das reservas de sala', () => {
+    it('8 colunas, na ordem e no formato de hoje; o período vira [de 00:00, até + 1 dia 00:00)', async () => {
+        for (const row of [BOOKINGS_HEADER, PALESTRA_ROW, REUNIAO_ROW, PLANTAO_ROW]) expect(row).toHaveLength(8);
+
+        vi.mocked(repo.roomBookings).mockResolvedValue([palestra, reuniao, plantao] as never);
+        const r = await useCase().execute('room-bookings', { from: '2026-10-05',
+to: '2026-10-11',
+roomId: 'r2',
+type: 'MEETING',
+search: 'reunião' });
+        expect(r.error).toBeUndefined();
+        expect(r.result!.csv).toBe(file(BOOKINGS_HEADER, PALESTRA_ROW, REUNIAO_ROW, PLANTAO_ROW));
+        expect(r.result!.count).toBe(3);
+        expect(r.result!.filename).toBe('reservas-de-sala-2026-09-17.csv');
+        expect(repo.roomBookings).toHaveBeenCalledWith(expect.objectContaining({
+            from: d('2026-10-05T00:00:00.000Z'),
+            to: d('2026-10-12T00:00:00.000Z'),
+            roomId: 'r2',
+            type: 'MEETING',
+            search: 'reunião',
+        }));
+    });
+
+    it('uma reserva pelo id: mesmo arquivo, o título no nome do arquivo', async () => {
+        vi.mocked(repo.roomBookings).mockResolvedValue([palestra] as never);
+        const r = await useCase().execute('room-bookings', { ids: ['b1'] });
+        expect(r.result!.csv).toBe(file(BOOKINGS_HEADER, PALESTRA_ROW));
+        expect(r.result!.filename).toBe('reserva-palestra-solo-manejo-2026-09-17.csv');
+        expect(repo.roomBookings).toHaveBeenCalledWith(expect.objectContaining({ ids: ['b1'] }));
+    });
+
+    it('lista vazia: só o cabeçalho; tipo ou data inválidos → 400 sem consultar', async () => {
+        vi.mocked(repo.roomBookings).mockResolvedValue([] as never);
+        const r = await useCase().execute('room-bookings', {});
+        expect(r.result!.csv).toBe(file(BOOKINGS_HEADER));
+        expect(r.result!.count).toBe(0);
+        vi.clearAllMocks();
+        expect((await useCase().execute('room-bookings', { type: 'CURSO' })).error!.message).toBe('Filtro inválido');
+        expect((await useCase().execute('room-bookings', { from: '05/10/2026' })).error!.message).toBe('Data inválida: use AAAA-MM-DD');
+        expect(repo.roomBookings).not.toHaveBeenCalled();
+    });
+});
