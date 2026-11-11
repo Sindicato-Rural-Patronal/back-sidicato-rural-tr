@@ -60,6 +60,19 @@ export function propertyLine(p: ExportProperty): string {
     return where ? `${name}: ${where}` : name;
 }
 
+/**
+ * Contagem com o milhar em ponto, como as telas do painel: 1234 → "1.234"
+ * (SR-112). Só para quantidades: ano, Nº e código não passam por aqui.
+ */
+export function milhar(n: number): string {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/** "0 registros", "1 registro", "1.234 registros" (alvo da auditoria e filtro "Seleção"). */
+export function registros(n: number): string {
+    return `${milhar(n)} registro${n === 1 ? '' : 's'}`;
+}
+
 export function ymd(d: Date): string {
     return d.toISOString().slice(0, 10);
 }

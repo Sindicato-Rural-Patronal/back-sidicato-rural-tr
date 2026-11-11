@@ -91,6 +91,14 @@ linhas: 30 });
         expect(ficha.log!.targetLabel).toBe('Ficha de inscrição: HORTA · 30 registros · com CPF, Nascimento, Telefone, E-mail, Endereço e mais 2');
     });
 
+    it('a contagem tem milhar, como a tela; nos detalhes, "linhas" continua número (SR-112)', () => {
+        const { log } = run('financeiro', { alvo: '01/01/2026 a 31/12/2026',
+linhas: 12345 });
+        expect(log!.targetLabel).toBe('Relatório do Financeiro: 01/01/2026 a 31/12/2026 · 12.345 registros');
+        expect(log!.details.linhas).toBe(12345);
+        expect(describeExportDetails(log!.details)).toBe('Formato: PDF; Modelo: Relatório do Financeiro; Escopo: todos; Linhas: 12.345');
+    });
+
     it('a frase: "Gerou o documento"; sem o alvo, diz qual', () => {
         const { log } = run('nota-empenho', { alvo: 'Nº 123 · COOP LTDA',
 ids: ['t1'],

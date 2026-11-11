@@ -9,7 +9,7 @@ import {
 import { todayInBrazil } from '../../lib/quote-products.js';
 import { buildXlsx, type XlsxCell } from '../../lib/xlsx.js';
 import { EXPORT_DATASETS } from './datasets.js';
-import { formatCep, formatCnpj, formatCns, formatCpf, formatPhone, slug, ymd } from './format.js';
+import { formatCep, formatCnpj, formatCns, formatCpf, formatPhone, registros, slug, ymd } from './format.js';
 import type { AnyExportSource } from './catalog/index.js';
 import type { ExportField, ExportFieldType, ExportFilterDescription } from './catalog/types.js';
 import { SCOPE_WORDS, aboutSheet, brasiliaWallClock, dataSheet, xlsxCell } from './xlsx.js';
@@ -335,13 +335,14 @@ now: Date
             : 'todos';
     const filtros: ExportFilterDescription[] = filters.ids?.length
         ? [{ nome: 'Seleção',
-valor: `${filters.ids.length} registro${filters.ids.length === 1 ? '' : 's'}` }]
+valor: registros(filters.ids.length) }]
         : await source.describeFilters(filters, rows, repo);
     const modeloText = modeloName(source, modelo, legacy);
 
+    // Contagem com milhar, como a tela ("1.234 registros", SR-112).
     const head = single
         ? `${meta.title}: ${firstName}`
-        : `${meta.title}: ${count} registro${count === 1 ? '' : 's'} (${scope})`;
+        : `${meta.title}: ${registros(count)} (${scope})`;
     const cited = citedPersonalFields(fields);
     const auditLabel = [head, FORMAT_LABEL[format], ...(cited ? [`com ${cited}`] : [])].join(' · ');
     const auditDetails: ExportAuditDetails = {

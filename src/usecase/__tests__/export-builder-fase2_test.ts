@@ -274,6 +274,11 @@ format: 'pdf' });
         expect(many.result!.pdf!.filters).toBe('Donos: 4');
         expect(many.result!.auditDetails!.filtros).toEqual([{ nome: 'Donos',
 valor: '4' }]);
+        // A quantidade com milhar, como a tela (SR-112).
+        const lots = await useCase().execute('properties', { ownerIds: Array.from({ length: 1500 }, (_, i) => `o${i}`),
+fields: ['name'],
+format: 'pdf' });
+        expect(lots.result!.pdf!.filters).toBe('Donos: 1.500');
     });
 });
 

@@ -4,6 +4,7 @@ import { describeAuditAction } from '../../../lib/audit-sentence.js';
 import { formatChanges } from '../../../lib/audit-diff.js';
 import { describeUserAgent } from '../../../lib/user-agent.js';
 import { day, describePeriod, empty, text } from '../filters.js';
+import { milhar } from '../format.js';
 import { reportFields } from './person-fields.js';
 import type { ExportField, ExportFilterDescription, ExportSource } from './types.js';
 
@@ -88,7 +89,7 @@ valor: string
     if (campos.length) parts.push(`Campos: ${campos.join(', ')}`);
     if (typeof d.escopo === 'string' && d.escopo) parts.push(`Escopo: ${d.escopo}`);
     if (filtros.length) parts.push(`Filtros: ${filtros.join(', ')}`);
-    if (typeof d.linhas === 'number') parts.push(`Linhas: ${d.linhas}`);
+    if (typeof d.linhas === 'number') parts.push(`Linhas: ${milhar(d.linhas)}`);
     return parts.join('; ');
 }
 

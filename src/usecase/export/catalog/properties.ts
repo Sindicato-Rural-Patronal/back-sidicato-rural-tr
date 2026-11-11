@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { PropertyExportRow } from '../../../ports/external/export-repository.js';
 import { idList } from '../filters.js';
-import { formatCnpj, formatCpf } from '../format.js';
+import { formatCnpj, formatCpf, milhar } from '../format.js';
 import { addressFields } from './address-fields.js';
 import { reportFields } from './person-fields.js';
 import type { ExportField, ExportFilterDescription, ExportSource } from './types.js';
@@ -119,7 +119,7 @@ const MAX_NAMED_OWNERS = 3;
 function describeOwners(ownerIds: string[], rows: PropertyExportRow[]): ExportFilterDescription {
     const unique = [...new Set(ownerIds)];
     const count = { nome: filterLabels.ownerIds,
-valor: String(unique.length) };
+valor: milhar(unique.length) };
     if (unique.length > MAX_NAMED_OWNERS) return count;
     const names = unique.map(id => {
         const row = rows.find(p => p.userDataId === id || p.companyId === id);

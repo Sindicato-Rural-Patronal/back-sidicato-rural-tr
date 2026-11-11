@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ExportRepository, RegistrationExportRow } from '../../../ports/external/export-repository.js';
 import { bool, idList } from '../filters.js';
+import { milhar } from '../format.js';
 import { personFields, reportFields } from './person-fields.js';
 import type { ExportField, ExportFilterDescription, ExportSource } from './types.js';
 
@@ -104,7 +105,7 @@ async function describeCourses(
 ): Promise<ExportFilterDescription> {
     const ids = [...new Set(courseIds)];
     const count = { nome: 'Cursos',
-valor: String(ids.length) };
+valor: milhar(ids.length) };
     if (ids.length > MAX_NAMED_COURSES) return count;
     let names = [...new Set(rows.map(r => r.course.name))];
     if (names.length !== ids.length) {

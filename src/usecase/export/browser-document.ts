@@ -4,6 +4,7 @@ import { ValidationError } from '../../errors/validation.js';
 import {
     BROWSER_DOCUMENTS, BROWSER_DOCUMENTS_PATH, isBrowserDocumentKind, type BrowserDocumentKind,
 } from '../../lib/browser-documents.js';
+import { registros } from './format.js';
 
 // Linha da auditoria de um documento montado no navegador (SR-104, decisão
 // 006, item 7.5): lista de presença, fichas, Agenda, PDFs do Financeiro e da
@@ -81,8 +82,7 @@ log?: BrowserDocumentLog
         const escopo = parsed.data.escopo ?? (ids?.length ? 'seleção' : 'todos');
 
         const head = alvo ? `${doc.name}: ${alvo}` : doc.name;
-        const count = `${linhas} registro${linhas === 1 ? '' : 's'}`;
-        const targetLabel = [head, count, ...(doc.cita.length ? [`com ${cited(doc.cita)}`] : [])].join(' · ');
+        const targetLabel = [head, registros(linhas), ...(doc.cita.length ? [`com ${cited(doc.cita)}`] : [])].join(' · ');
 
         return {
             log: {

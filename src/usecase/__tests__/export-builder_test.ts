@@ -8,7 +8,7 @@ import { EXPORT_SOURCES, NO_BUILDER_MESSAGE } from '../export/catalog/index.js';
 import { REGISTRATION_FREE_PERSON_FIELDS } from '../export/catalog/registrations.js';
 import { GetExportCatalogUseCase } from '../export/get-export-catalog.js';
 import { citedPersonalFields, type ExportActor } from '../export/engine.js';
-import { formatCns, formatPhone } from '../export/format.js';
+import { formatCns, formatPhone, milhar, registros } from '../export/format.js';
 import { MEMBER_TYPE_LABEL } from '../../lib/export-labels.js';
 import { MEMBER_TYPES } from '../../lib/member-types.js';
 
@@ -525,6 +525,10 @@ format: 'pdf' });
 format: 'pdf' });
         expect(many.result!.pdf!.filters).toBe('Cursos: 4');
         expect(repo.courseNames).not.toHaveBeenCalled();
+        // A quantidade com milhar, como a tela (SR-112).
+        const lots = await useCase().execute('registrations', { courseIds: Array.from({ length: 1001 }, (_, i) => `c${i}`),
+format: 'pdf' });
+        expect(lots.result!.pdf!.filters).toBe('Cursos: 1.001');
     });
 });
 
@@ -565,10 +569,45 @@ valor: '1 registro' }],
         });
     });
 
+    it('contagens com milhar, como a tela: no alvo, na seleção (PDF e detalhes) e no relatório de cadastros (SR-112)', async () => {
+        const many = Array.from({ length: 1234 }, (_, i) => person({ id: `p${i}` }));
+        vi.mocked(repo.people).mockResolvedValue(many as never);
+        const all = await useCase().execute('people', { fields: ['name', 'cpf'] });
+        expect(all.result!.auditLabel).toBe('Pessoas: 1.234 registros (todos) · CSV · com CPF');
+        expect(all.result!.auditDetails!.linhas).toBe(1234);
+
+        const selected = await useCase().execute('people', { ids: many.map(p => p.id),
+fields: ['name'],
+format: 'pdf' });
+        expect(selected.result!.auditLabel).toBe('Pessoas: 1.234 registros (seleção) · PDF');
+        expect(selected.result!.pdf!.filters).toBe('Seleção: 1.234 registros');
+        expect(selected.result!.auditDetails!.filtros).toEqual([{ nome: 'Seleção',
+valor: '1.234 registros' }]);
+
+        vi.mocked(repo.people).mockResolvedValue(many.slice(0, 600) as never);
+        vi.mocked(repo.companies).mockResolvedValue([] as never);
+        vi.mocked(repo.admins).mockResolvedValue([] as never);
+        const cadastros = await useCase().execute('cadastros', {});
+        expect(cadastros.result!.auditLabel).toBe('Relatório de cadastros: 1.200 registros (todos)');
+    });
+
     it('citedPersonalFields corta em 5 e diz quantos sobraram', () => {
         const fields = EXPORT_SOURCES.people.fields.filter(f => ['cpf', 'rg', 'email', 'phone', 'phone2', 'phone3', 'name'].includes(f.key));
         expect(citedPersonalFields(fields)).toBe('CPF, RG, E-mail, Telefone, Telefone 2 e mais 1');
         expect(citedPersonalFields(fields.filter(f => f.key === 'name'))).toBe('');
+    });
+});
+
+describe('contagens', () => {
+    it('milhar com ponto; "registro" no singular só com 1', () => {
+        expect(milhar(0)).toBe('0');
+        expect(milhar(999)).toBe('999');
+        expect(milhar(1000)).toBe('1.000');
+        expect(milhar(20000)).toBe('20.000');
+        expect(milhar(1234567)).toBe('1.234.567');
+        expect(registros(0)).toBe('0 registros');
+        expect(registros(1)).toBe('1 registro');
+        expect(registros(1234)).toBe('1.234 registros');
     });
 });
 

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ExportFilterDescription } from './catalog/types.js';
+import { milhar } from './format.js';
 
 // Leitura dos filtros das exportações: o mesmo para GET (tudo texto na query)
 // e POST (JSON).
@@ -66,7 +67,7 @@ export function describeByLabels(
         if (typeof v === 'boolean') out.push({ nome,
 valor: v ? 'Sim' : 'Não' });
         else if (Array.isArray(v)) out.push({ nome,
-valor: `${v.length}` });
+valor: milhar(v.length) });
         else out.push({ nome,
 valor: enums[key]?.[String(v)] ?? String(v) });
     }

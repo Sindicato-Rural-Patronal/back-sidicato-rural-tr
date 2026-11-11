@@ -10,7 +10,7 @@ import { adminsSource } from './catalog/admins.js';
 import { companiesSource } from './catalog/companies.js';
 import { peopleSource } from './catalog/people.js';
 import { FORMAT_LABEL, FORMAT_MESSAGE, padraoCsvBody, padraoXlsxSheet, type ExportResult } from './engine.js';
-import { ymd } from './format.js';
+import { registros, ymd } from './format.js';
 import { aboutSheet, brasiliaWallClock } from './xlsx.js';
 
 // Relatório de cadastros (`cadastros`, decisão 006, inventário, item 16): o
@@ -57,7 +57,7 @@ result?: ExportResult
     const count = pessoas.length + associados.length + empresas.length + administradores.length;
     const meta = EXPORT_DATASETS.cadastros;
     const base = `${meta.file}-${ymd(todayInBrazil(now))}`;
-    const auditLabel = `${meta.title}: ${count} registro${count === 1 ? '' : 's'} (todos)`;
+    const auditLabel = `${meta.title}: ${registros(count)} (todos)`;
 
     if (format === 'xlsx') {
         // No Excel, uma aba por seção, cada uma com o cabeçalho preso (SR-104).
