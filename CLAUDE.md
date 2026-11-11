@@ -54,7 +54,7 @@ src/
                            request-parsing.ts (parser de JSON, opções do Ajv, limites dos números),
                            export-reply.ts (resposta, auditoria e limite das exportações)
   usecase/                 regras de negócio (sem Fastify; Prisma só pelos ports)
-    export/                montador de relatórios (decisão 006): catálogo de campos por fonte e motor
+    export/                montador de relatórios (decisão 006): catálogo de campos por fonte, motor e modelos da equipe
   ports/external/          interfaces dos repositórios
   adapter/database/        implementações Prisma dos ports; list-filters.ts; prisma-errors.ts
   adapter/storage/         Supabase Storage (createStorageAdapter)
@@ -80,10 +80,10 @@ Exceções conhecidas à regra "Prisma só no adapter":
 1. *Antes de excluir*, barra só o que ainda está vivo e vai acontecer: sala presa por curso/reserva que não terminou, regra presa por administrador ativo. Registro já excluído ou coisa que já passou nunca barra.
 2. *Ao excluir*, o que só existe por causa do registro cai junto, na mesma transação. Ex.: excluir pessoa leva login, convite não usado, inscrições ativas, escala de instrutor, Unimed, propriedades, relações, contato público e vínculos com empresas.
 
-Nada disso é apagado de verdade; só sai das telas. Têm `isDeleted`: UserAdmin, UserData, UserInstructor, CourseInstructor, course, CoursePhoto, room, RoomBooking, News, courseUserRegistration, Property, Banner, ContactMessage, UserRelation, UnimedBeneficiario, Company e os modelos de categoria, caixa, lançamento, recorrência e forma de pagamento do financeiro. Todos esses têm `isDeleted` + `deletedAt`.
+Nada disso é apagado de verdade; só sai das telas. Têm `isDeleted`: UserAdmin, UserData, UserInstructor, CourseInstructor, course, CoursePhoto, room, RoomBooking, News, courseUserRegistration, Property, Banner, ContactMessage, UserRelation, UnimedBeneficiario, Company, ReportTemplate e os modelos de categoria, caixa, lançamento, recorrência e forma de pagamento do financeiro. Todos esses têm `isDeleted` + `deletedAt`.
 
 **Valor único + soft-delete.** Um `@unique` cheio conta as linhas excluídas e prende o valor para sempre. Há duas saídas:
-- **Índice parcial** `WHERE "isDeleted" = false`, quando o valor deve voltar a ficar livre: CPF de pessoa, inscrição ativa no curso, `UserAdmin.username`, nome da sala, CNPJ de empresa. Vai na migration (não dá para escrever no schema).
+- **Índice parcial** `WHERE "isDeleted" = false`, quando o valor deve voltar a ficar livre: CPF de pessoa, inscrição ativa no curso, `UserAdmin.username`, nome da sala, CNPJ de empresa, nome do modelo de relatório da equipe (por conjunto, sem diferenciar maiúsculas). Vai na migration (não dá para escrever no schema).
 - **Upsert que revive a linha**, quando é o mesmo registro voltando: `UnimedBeneficiario` por pessoa, `UserInstructor`, `CourseInstructor` por (instrutor, curso), forma de pagamento por nome.
 
 Conferência de conflito em use case enxerga só os ativos; sem uma das duas saídas o `create` estoura P2002.
@@ -122,7 +122,7 @@ Conferência de conflito em use case enxerga só os ativos; sem uma das duas sa�
 - `publicRoute()`: qualquer um.
 - `loggedIn()`: qualquer admin com login válido ("Minha conta", o sino, o Painel Geral, `/auth/refresh`, CEP).
 - `requires('X', 'Y')`: todas as permissões listadas (a junção de cadastros pede duas).
-- `requiresFrom(req => [...] | null)`: calculada por params/query, nunca pelo corpo; `null` = só o login. Só a exportação usa (`cadastros` pede duas) e o registro dos documentos do navegador (a permissão do `:kind`).
+- `requiresFrom(req => [...] | null)`: calculada por params/query, nunca pelo corpo; `null` = só o login. Só a exportação usa (`cadastros` pede duas), o registro dos documentos do navegador (a permissão do `:kind`) e os modelos de relatório da equipe (a do conjunto, `datasetPermissions`).
 
 Um hook `onRequest`, num plugin que envolve todos os routers (`registerRouters`), confere antes de ler o corpo. As respostas são as mesmas em todas as rotas:
 - sem token ou token inválido → 401 `{ error: "Unauthorized" }`; admin excluído/sem regra → 401 `{ error: "Admin not found" }`; sem a permissão → 403 `{ error: "Forbidden" }`;
@@ -667,6 +667,8 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 | `GET` · `POST` | `/admin/export/:dataset` | CSV (`;`, BOM, tudo entre aspas, fórmula neutralizada com `'`), com `format=xlsx` a planilha do Excel ou, com `format=pdf`, o JSON do PDF; POST recebe os parâmetros no corpo (listas como array); 30/min por IP | por conjunto |
 | `GET` | `/admin/export/:dataset/catalog` | catálogo do montador (abaixo); conjunto sem montador → 404 "Este conjunto ainda não tem o montador." | por conjunto |
 | `POST` | `/admin/export/documents/:kind` | registra na auditoria um PDF montado no navegador → 204 (ver Auditoria, "Documentos montados no navegador"); 30/min por IP | por documento |
+| `GET` · `POST` | `/admin/report-templates/:dataset` | modelos de relatório da equipe do conjunto: listar → 200 · salvar → 201 (ver "Modelos da equipe", abaixo) | por conjunto (salvar: e os campos) |
+| `PATCH` · `DELETE` | `/admin/report-templates/:dataset/:id` | renomear ou mudar → 200 · excluir (soft) → 204 | por conjunto e os campos do modelo |
 
 | Conjunto | Permissão | Filtros | Montador |
 |---|---|---|---|
@@ -741,6 +743,30 @@ Parâmetros (query no GET, corpo no POST), além dos filtros do conjunto:
 - **Modelos de fábrica:** `people`: `nome-cpf`, `nome-email`, `contato` (nome, telefones, e-mail, cidade), `lista-presenca` (Nº, nome, CPF, assinatura), `endereco-correspondencia` (nome, rua, número, complemento, bairro, cidade, UF, CEP), `associados` (nome, CPF, situação, desde, até, telefone). `registrations`: `nome-cpf`, `nome-email`, `contato` (nome, telefone, e-mail), `lista-presenca` (com `confirmed: true`). `companies`: `razao-social-cnpj`, `contato` (razão social, nome fantasia, telefones, e-mail, cidade da sede). `properties`: só o Padrão. `admins`: `contato` (nome, telefone, e-mail). `courses`: `calendario` (curso, início, término, sala, instrutores). `contact-messages`: `contato` (nome, e-mail, telefone). `unimed`: `nome-cpf-plano`. `audit-logs`: `resumida` (data e hora, quem, ação, alvo). `room-bookings`: só o Padrão. `finance-transactions`: `resumido` (Nº, data, descrição, nome / razão social, valor).
 - **Regra:** coluna exportável nova = um campo no catálogo, que aparece sozinho no montador, no CSV e no PDF. **A chave é contrato: nunca se renomeia nem se reaproveita.** O `export-builder_test.ts` confere chaves e rótulos únicos, e que o padrão e os modelos só usam chaves do catálogo sem permissão a mais. O padrão de cada fonte fica congelado pelo teste de ouro (`export-golden_test.ts` e `export-golden.e2e_test.ts`; as fontes da fase 2 em `export-golden-fase2_test.ts` e `export-golden-fase2.e2e_test.ts`, as da parte B, o CSV da rota antiga do Financeiro e o relatório de cadastros em `export-golden-fase2b_test.ts` e `export-golden-fase2b.e2e_test.ts`), escrito antes de a fonte sair do caminho antigo. Os testes do montador das fontes da parte B estão em `export-builder-fase2b_test.ts` e `export-builder-fase2b.e2e_test.ts`.
 - **Inscrições, administradores e Unimed leem a pessoa inteira** (o mesmo `include` de `people`, `personInclude` no adapter): os vínculos com empresa vêm todos, pelo nome da empresa, e "Empresa parceira" filtra as parceiras.
+
+**Modelos da equipe** (decisão 006, fase 3, SR-114; `usecase/export/report-templates.ts`, `http/router/report-template-router.ts`, tabela `ReportTemplate`). Os modelos que a equipe salva no montador. São **da equipe toda**, não de uma pessoa (decisão do usuário em 11/11). Os de fábrica continuam no catálogo; os da equipe têm rota própria, e não um grupo no catálogo, porque o catálogo é fixo (o painel o guarda por muito tempo) e os modelos mudam a cada salvar.
+- **Caminho** fora de `/admin/export/` (como a decisão pede): lá o hook geral da auditoria não grava nada e vale o limite de 30 exportações por minuto.
+- **O modelo** (resposta de todas as rotas): `{ id, dataset, name, fields: string[], missingFields: string[], format, confirmed, createdAt, updatedAt, createdBy: { id, username }, updatedBy: { id, username } | null }`.
+  - `fields`: só as chaves que ainda existem no catálogo, na ordem das colunas. `missingFields`: as gravadas que **saíram do catálogo** (`[]` quando nenhuma), para o montador avisar. A linha gravada não muda.
+  - Campo que quem lista **não pode exportar** vem em `fields` do mesmo jeito: o catálogo diz quais (`allowed: false`), e o montador os tira e avisa.
+  - `format`: `csv`, `pdf`, `xlsx` ou null (sem preferência). `confirmed`: só em `registrations` ("Só confirmadas"; ao criar, ausente = false), null nos outros.
+  - `createdBy`/`updatedBy`: o usuário do painel (`username`, null se o admin não for achado); `updatedBy` é null enquanto ninguém mudou. Quem exclui também fica em `updatedById`.
+- **Rotas:**
+  - `GET /admin/report-templates/:dataset` → 200 com a lista (array), pelo nome; sem modelo, `[]`.
+  - `POST /admin/report-templates/:dataset` `{ name, fields, format?, confirmed? }` → 201 com o modelo.
+  - `PATCH /admin/report-templates/:dataset/:id` `{ name?, fields?, format?, confirmed? }` → 200 com o modelo. Muda só o que vier; `format: null` tira a preferência.
+  - `DELETE /admin/report-templates/:dataset/:id` → 204, soft-delete: o modelo sai da lista e o nome fica livre de novo.
+- **Validação.** O `name` perde os espaços das pontas, os do meio são juntados e caractere de controle vira espaço; depois tem de ter de 1 a 64 caracteres (o limite do `modelo` da exportação, que leva o nome). Os campos passam pela mesma leitura da exportação.
+  - 400: "Informe o nome do modelo.", "O nome do modelo pode ter até 64 caracteres.", "Escolha pelo menos um campo.", "No máximo 80 campos por relatório.", "Campo desconhecido: <chave>.", "Campo repetido: <rótulo>.", "Formato inválido: use csv, pdf ou xlsx.", "Nada para alterar." (PATCH sem nada a mudar; `confirmed` fora de `registrations` é ignorado). Conjunto desconhecido → 400 do schema.
+  - 404: "Este conjunto ainda não tem o montador." (`cadastros`, como o catálogo); "Modelo não encontrado." (inexistente, excluído ou de outro conjunto).
+  - 409: "Já existe um modelo da equipe com esse nome." (no mesmo conjunto, entre os ativos, sem diferenciar maiúsculas; dois pedidos ao mesmo tempo, o índice parcial segura e a resposta é a mesma); "Já existe um modelo de fábrica com esse nome." (nome ou id de um modelo de fábrica do conjunto, ou o Padrão: a exportação troca o id de fábrica pelo nome, e o `modelo` da auditoria ficaria ambíguo); "Este relatório já tem 100 modelos da equipe. Exclua um antes de salvar outro." (só ao criar; a lista não é paginada).
+- **Permissão.**
+  - Ver, usar e salvar: a permissão de exportar o conjunto (`requiresFrom`, a mesma da exportação). Sem ela, 403 `Forbidden`.
+  - Salvar, e mudar os campos, pede também poder exportar **todos** os campos do modelo. Senão, 403 "Sem permissão para exportar: RG, Endereço: Cidade.", como na exportação.
+  - Mudar (até só renomear) e excluir pedem poder exportar todos os campos do modelo **como ele está**. Senão, 403 "Este modelo tem campos que você não pode exportar: RG.". Quem tem menos permissão não desfaz o modelo de quem tem mais, a mesma ideia do anti-escalonamento das regras. Campo que saiu do catálogo não conta.
+  - Hoje só `registrations` e `admins` têm campos com permissão própria; nos outros conjuntos, a do conjunto basta.
+- **Exportar com um modelo da equipe:** o painel manda as chaves em `fields` e o **nome** em `modelo`. O nome vai para o cabeçalho do PDF, para a aba "Sobre" do Excel e para `details.modelo`. Não há rota nova de exportação.
+- Testes: `usecase/__tests__/report-templates_test.ts` e `e2e/report-templates.e2e_test.ts`.
 
 ### Auditoria (`audit-router.ts`, `http/audit-hooks.ts`)
 | Método | Path | O que faz | Auth |
@@ -966,6 +992,7 @@ Nomes como estão no `prisma/schema.prisma` (alguns em minúsculas). Detalhe de 
 | `MarketQuote` | id, label (único), value (texto pronto), priceCents, unit, period, variation, referenceDate, isActive, order |
 | `MarketQuoteHistory` | id, marketQuoteId, value, numeric, referenceDate, period — único por produto, dia e período |
 | `AuditLog` | id, actorId (sem FK), method (POST/PATCH/PUT/DELETE/EXPORT/LOGIN/LOGIN_FAILED/LOGIN_BLOCKED), path, entity, targetLabel, statusCode, ip, userAgent, location, changes (Json), details (Json?, o que foi exportado), createdAt |
+| `ReportTemplate` | modelo de relatório da equipe (SR-114): id, dataset, name (único por conjunto entre os ativos, sem diferenciar maiúsculas: índice parcial), fields (String[], chaves do catálogo na ordem das colunas), format? (csv/pdf/xlsx), confirmed? (só inscrições), createdById e updatedById? (UserAdmin.id, sem FK), isDeleted — sem dono: é da equipe |
 | `Notification` / `NotificationRead` | evento: id, type, title, body, link, permission, entityId · leitura: notificationId (cascade), adminId, readAt — única por (evento, admin) |
 | `FinancialCategory` | id, name, type, color, active, order, isDeleted |
 | `FinancialAccount` | id, name, color, active, order, isDeleted |
@@ -999,7 +1026,7 @@ Todos recebem o `PrismaClient` e implementam o port de mesmo nome em `src/ports/
 - `createAddressAdapter`, `createAdminInviteAdapter`, `createBannerAdapter`, `createCompanyAdapter`, `createContactMessageAdapter`, `createConvenioAdapter`;
 - `createCourseAdapter`, `createDashboardAdapter`, `createExportAdapter`, `createFinanceAdapter`, `createGalleryAdapter`, `createInstructorAdapter`;
 - `createMarketQuoteAdapter`, `createNewsAdapter`, `createNotificationAdapter` e `createNotificationPublisher` (os dois em `notification-adapter.ts`), `createPendingNotificationsAdapter`;
-- `createPropertyAdapter`, `createPublicContactAdapter`, `createRegistrationAdapter`, `createRoomAdapter`, `createRoomBookingAdapter`, `createRuleAdapter`;
+- `createPropertyAdapter`, `createPublicContactAdapter`, `createRegistrationAdapter`, `createReportTemplateAdapter`, `createRoomAdapter`, `createRoomBookingAdapter`, `createRuleAdapter`;
 - `createSiteSettingsAdapter`, `createUnimedAdapter`, `createUserAdminAdapter`, `createUserDataAdapter` (`user-data.ts`), `createUserMergeAdapter` e `createUserRelationAdapter`.
 
 Storage: `createStorageAdapter()` (`adapter/storage/factory.ts`) devolve o `SupabaseStorageAdapter`, que lê `SUPABASE_URL` e `SUPABASE_SECRET_KEY`.

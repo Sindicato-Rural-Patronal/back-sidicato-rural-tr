@@ -71,3 +71,18 @@ single: string
 }>;
 
 export type ExportDataset = keyof typeof EXPORT_DATASETS;
+
+/**
+ * A permissão de um conjunto (as duas no relatório de cadastros). Conjunto
+ * desconhecido → null: a rota pede só o login, e o schema responde 400.
+ */
+export function datasetPermissions(dataset: string | undefined): Permission[] | null {
+    const spec: {
+ permission: Permission;
+alsoRequires?: Permission
+} | undefined = dataset && Object.hasOwn(EXPORT_DATASETS, dataset)
+        ? EXPORT_DATASETS[dataset as ExportDataset]
+        : undefined;
+    if (!spec) return null;
+    return spec.alsoRequires ? [spec.permission, spec.alsoRequires] : [spec.permission];
+}
