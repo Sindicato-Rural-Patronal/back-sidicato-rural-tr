@@ -443,3 +443,58 @@ describe('teste de ouro: CSV padrão de cursos', () => {
         expect(r.result!.csv).toBe(file(COURSES_HEADER));
     });
 });
+
+// ── Mensagens de contato ─────────────────────────────────────────────────────
+
+const MESSAGES_HEADER = ['Recebida em', 'Nome', 'E-mail', 'Telefone', 'Assunto', 'Mensagem', 'Lida'];
+
+const mensagemJoao = {
+    id: 'm1',
+    name: 'JOÃO',
+    email: 'joao@test.com',
+    phone: '44999990000',
+    subject: 'Dúvida; "curso"',
+    message: 'linha 1\nlinha 2',
+    read: true,
+    createdAt: d('2026-09-17T02:59:00.000Z'),
+};
+
+/** Fórmula no nome e na mensagem; sem telefone nem assunto. */
+const mensagemMaria = {
+    id: 'm2',
+    name: '@MARIA',
+    email: 'maria@test.com',
+    phone: null,
+    subject: null,
+    message: '+55 me liga',
+    read: false,
+    createdAt: d('2026-01-02T15:30:00.000Z'),
+};
+
+const JOAO_MESSAGE_ROW = ['16/09/2026 23:59', 'JOÃO', 'joao@test.com', '44999990000', 'Dúvida; ""curso""', 'linha 1\nlinha 2', 'Sim'];
+const MARIA_MESSAGE_ROW = ['02/01/2026 12:30', `'@MARIA`, 'maria@test.com', '', '', `'+55 me liga`, 'Não'];
+
+describe('teste de ouro: CSV padrão de mensagens de contato', () => {
+    it('7 colunas, na ordem e no formato de hoje', async () => {
+        vi.mocked(repo.contactMessages).mockResolvedValue([mensagemJoao, mensagemMaria] as never);
+        const r = await useCase().execute('contact-messages', { search: 'test',
+read: 'false' });
+        expect(r.error).toBeUndefined();
+        expect(r.result!.csv).toBe(file(MESSAGES_HEADER, JOAO_MESSAGE_ROW, MARIA_MESSAGE_ROW));
+        expect(r.result!.count).toBe(2);
+        expect(r.result!.filename).toBe('mensagens-2026-09-17.csv');
+    });
+
+    it('uma mensagem pelo id: o nome de quem mandou no nome do arquivo', async () => {
+        vi.mocked(repo.contactMessages).mockResolvedValue([mensagemJoao] as never);
+        const r = await useCase().execute('contact-messages', { ids: ['m1'] });
+        expect(r.result!.csv).toBe(file(MESSAGES_HEADER, JOAO_MESSAGE_ROW));
+        expect(r.result!.filename).toBe('mensagem-joao-2026-09-17.csv');
+    });
+
+    it('lista vazia: só o cabeçalho', async () => {
+        vi.mocked(repo.contactMessages).mockResolvedValue([] as never);
+        const r = await useCase().execute('contact-messages', {});
+        expect(r.result!.csv).toBe(file(MESSAGES_HEADER));
+    });
+});

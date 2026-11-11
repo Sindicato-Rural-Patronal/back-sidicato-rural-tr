@@ -448,3 +448,56 @@ isDeleted: true },
         expect(one.body).toBe(file(header, hortaRow));
     });
 });
+
+describe('teste de ouro pelo banco: mensagens de contato', () => {
+    const header = ['Recebida em', 'Nome', 'E-mail', 'Telefone', 'Assunto', 'Mensagem', 'Lida'];
+    let primeira: string;
+
+    beforeAll(async () => {
+        const first = await prisma.contactMessage.create({
+            data: {
+                name: 'JOAO MENSAGEM',
+                email: 'joao@msg.test',
+                phone: '44999990000',
+                subject: 'Dúvida; "curso"',
+                message: 'linha 1\nlinha 2',
+                read: true,
+                createdAt: d('2026-09-17T02:59:00.000Z'),
+            },
+        });
+        await prisma.contactMessage.create({
+            data: { name: '@MARIA MENSAGEM',
+email: 'maria@msg.test',
+message: '+55 me liga',
+createdAt: d('2026-09-18T15:30:00.000Z') },
+        });
+        // Mensagem excluída não sai.
+        await prisma.contactMessage.create({
+            data: { name: 'EXCLUIDA MENSAGEM',
+email: 'x@msg.test',
+message: 'x',
+isDeleted: true,
+createdAt: d('2026-09-19T15:30:00.000Z') },
+        });
+        primeira = first.id;
+    });
+
+    const joao = ['16/09/2026 23:59', 'JOAO MENSAGEM', 'joao@msg.test', '44999990000', 'Dúvida; ""curso""', 'linha 1\nlinha 2', 'Sim'];
+    const maria = ['18/09/2026 12:30', `'@MARIA MENSAGEM`, 'maria@msg.test', '', '', `'+55 me liga`, 'Não'];
+
+    it('o CSV padrão inteiro, pela busca, da mais nova para a mais antiga', async () => {
+        const res = await get('/admin/export/contact-messages?search=msg.test');
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.headers['content-disposition']).toBe(`attachment; filename="mensagens-${todayBr()}.csv"`);
+        expect(res.headers['x-export-count']).toBe('2');
+        expect(res.body).toBe(file(header, maria, joao));
+    });
+
+    it('filtro de lidas e uma mensagem pelo id', async () => {
+        expect((await get('/admin/export/contact-messages?search=msg.test&read=true')).body).toBe(file(header, joao));
+        expect((await get('/admin/export/contact-messages?search=msg.test&read=false')).body).toBe(file(header, maria));
+        const one = await get(`/admin/export/contact-messages?ids=${primeira}`);
+        expect(one.headers['content-disposition']).toBe(`attachment; filename="mensagem-joao-mensagem-${todayBr()}.csv"`);
+        expect(one.body).toBe(file(header, joao));
+    });
+});
