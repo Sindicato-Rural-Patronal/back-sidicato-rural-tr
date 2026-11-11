@@ -479,3 +479,175 @@ caixa: caixa.id });
         }
     });
 });
+
+describe('teste de ouro pelo banco: relatório de cadastros', () => {
+    // As seções de pessoas são o padrão de `people` (teste de ouro da fase 1):
+    // aqui elas são comparadas com a exportação de pessoas, e as de empresas e
+    // administradores, célula por célula.
+    const companiesHeader = [
+        'Razão social', 'Nome fantasia', 'CNPJ', 'Inscrição estadual', 'Tipo', 'E-mail', 'Telefone', 'Telefone 2',
+        'Telefone 3', 'Site', ...['Tipo', 'Rua', 'Número', 'Complemento', 'Bairro', 'Localidade', 'Estrada', 'Km', 'Lote', 'Seção', 'Cidade', 'UF', 'CEP'].map(h => `Sede: ${h}`),
+        'Pessoas vinculadas', 'Propriedades', 'Parceira', 'Link da parceria', 'Observações', 'Cadastrada em', 'Atualizada em',
+    ];
+    const adminsHeader = ['Usuário', 'Nome', 'E-mail', 'CPF', 'Telefone', 'Regra de acesso', 'Criado em'];
+
+    beforeAll(async () => {
+        const maria = await prisma.userData.create({
+            data: { name: 'MARIA CADASTRO',
+phone: '44911119200',
+memberStatus: 'ACTIVE' },
+        });
+        const sede = await prisma.address.create({
+            data: {
+                type: 'URBAN',
+                street: 'RUA X',
+                number: '10',
+                complement: 'SALA 2; FUNDOS',
+                neighborhood: 'CENTRO',
+                city: 'TERRA ROXA',
+                state: 'PR',
+                zipCode: '85990000',
+            },
+        });
+        const rural = await prisma.address.create({
+            data: {
+                type: 'RURAL',
+                localityName: 'AGUA DO SOL',
+                road: 'ESTRADA BOIADEIRA',
+                km: '12',
+                lot: '7',
+                section: 'B',
+                city: 'TERRA ROXA',
+                state: 'PR',
+                zipCode: '85990000',
+            },
+        });
+        const agro = await prisma.company.create({
+            data: {
+                name: 'AGRO "CADASTRO" LTDA',
+                tradeName: 'AGRO CADASTRO',
+                cnpj: '11222333000181',
+                stateRegistration: 'ISENTO',
+                type: 'PRIVATE',
+                email: 'agro@cad.test',
+                phone: '4436451234',
+                phone2: '(44) 99999-0000',
+                phone3: '+55 44 3333-2222',
+                website: 'https://agro.cad.test',
+                notes: '=HYPERLINK("x")',
+                isPartner: true,
+                partnerUrl: 'https://agro.cad.test/parceria',
+                addressId: sede.id,
+            },
+        });
+        const coop = await prisma.company.create({ data: { name: 'COOP CADASTRO VAZIA',
+type: 'PUBLIC' } });
+        // Empresa excluída não sai.
+        await prisma.company.create({ data: { name: 'EXCLUIDA CADASTRO',
+isDeleted: true,
+deletedAt: d('2026-01-01T00:00:00.000Z') } });
+        await prisma.companyMember.create({ data: { companyId: agro.id,
+userDataId: maria.id,
+title: 'GERENTE' } });
+        await prisma.property.create({ data: { name: 'FAZENDA CADASTRO',
+registration: '5',
+companyId: agro.id,
+addressId: rural.id } });
+        await prisma.$executeRaw`UPDATE "Company" SET "createdAt" = ${d('2026-01-02T15:30:00.000Z')}, "updatedAt" = ${d('2026-03-04T02:05:00.000Z')} WHERE id = ${agro.id}`;
+        await prisma.$executeRaw`UPDATE "Company" SET "createdAt" = ${d('2026-09-16T23:30:00.000Z')}, "updatedAt" = ${d('2026-09-16T23:30:00.000Z')} WHERE id = ${coop.id}`;
+
+        // Administradores: os dois de antes (o do E2E e o da auditoria) e dois novos.
+        const rule = await prisma.rule.create({ data: { name: 'CADASTRO; LEITURA',
+description: 'x',
+permissions: ['READ_COURSE'] } });
+        const ana = await prisma.userData.create({
+            data: { name: 'ANA CADASTRO',
+email: 'ana@cad.test',
+cpf: '11144477735',
+phone: '44911119201' },
+        });
+        const bia = await prisma.userData.create({ data: { name: 'BIA "CADASTRO"',
+phone: '+55 44 9999' } });
+        const dora = await prisma.userData.create({ data: { name: 'DORA CADASTRO',
+phone: '44911119203' } });
+        await prisma.userAdmin.create({ data: { username: 'ana.cadastro',
+passwordHash: 'x',
+userDataId: ana.id,
+rulesId: rule.id } });
+        await prisma.userAdmin.create({ data: { username: '=bia',
+passwordHash: 'x',
+userDataId: bia.id,
+rulesId: rule.id } });
+        // Administrador excluído não sai.
+        await prisma.userAdmin.create({
+            data: { username: 'dora.cadastro',
+passwordHash: 'x',
+userDataId: dora.id,
+rulesId: rule.id,
+isDeleted: true },
+        });
+        await prisma.$executeRaw`UPDATE "UserAdmin" SET "createdAt" = ${d('2026-02-01T10:00:00.000Z')}`;
+        await prisma.$executeRaw`UPDATE "UserAdmin" SET "createdAt" = ${d('2026-09-16T23:30:00.000Z')} WHERE username = '=bia'`;
+    });
+
+    const agroRow = [
+        'AGRO ""CADASTRO"" LTDA', 'AGRO CADASTRO', '11.222.333/0001-81', 'ISENTO', 'Privada', 'agro@cad.test', '4436451234',
+        '(44) 99999-0000', `'+55 44 3333-2222`, 'https://agro.cad.test',
+        'Urbano', 'RUA X', '10', 'SALA 2; FUNDOS', 'CENTRO', '', '', '', '', '', 'TERRA ROXA', 'PR', '85990-000',
+        'MARIA CADASTRO (GERENTE)',
+        'FAZENDA CADASTRO (matrícula 5): ESTRADA BOIADEIRA - AGUA DO SOL, km 12, lote 7, seção B - TERRA ROXA/PR - 85990-000',
+        'Sim', 'https://agro.cad.test/parceria', `'=HYPERLINK(""x"")`, '02/01/2026 12:30', '03/03/2026 23:05',
+    ];
+    const coopRow = [
+        'COOP CADASTRO VAZIA', '', '', '', 'Pública', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+        '', '', 'Não', '', '', '16/09/2026 20:30', '16/09/2026 20:30',
+    ];
+    const admins = [
+        ['ana.cadastro', 'ANA CADASTRO', 'ana@cad.test', '111.444.777-35', '44911119201', 'CADASTRO; LEITURA', '01/02/2026 07:00'],
+        ['bali.ouro', 'BALI OURO', '', '', '44911119001', 'OURO AUDITORIA', '01/02/2026 07:00'],
+        [`'=bia`, 'BIA ""CADASTRO""', '', '', `'+55 44 9999`, 'CADASTRO; LEITURA', '16/09/2026 20:30'],
+        ['e2eadmin', 'E2E Admin', 'e2eadmin@test.local', '', '44900000000', 'SUPER_RULE', '01/02/2026 07:00'],
+    ];
+
+    it('as quatro seções num arquivo, byte a byte', async () => {
+        const pessoas = await get('/admin/export/people');
+        const associados = await get('/admin/export/people?activeMember=true');
+        expect(pessoas.statusCode).toBe(200);
+        // A associada em dia sai nas duas seções de pessoas.
+        expect(associados.body).toContain('"MARIA CADASTRO"');
+        const pessoasCount = Number(pessoas.headers['x-export-count']);
+        const associadosCount = Number(associados.headers['x-export-count']);
+        const semBom = (body: string) => body.replace(BOM, '');
+
+        const res = await get('/admin/export/cadastros');
+        expect(res.statusCode, res.body.slice(0, 200)).toBe(200);
+        expect(res.headers['content-type']).toBe('text/csv; charset=utf-8');
+        expect(res.headers['content-disposition']).toBe(`attachment; filename="relatorio-de-cadastros-${todayBr()}.csv"`);
+        expect(res.headers['x-export-count']).toBe(String(pessoasCount + associadosCount + 2 + 4));
+        expect(res.body).toBe(
+            BOM
+                + line(['PESSOAS FISICAS']) + semBom(pessoas.body)
+                + '\r\n'
+                + line(['ASSOCIADOS EM DIA']) + semBom(associados.body)
+                + '\r\n'
+                + line(['PESSOAS JURIDICAS']) + line(companiesHeader) + line(agroRow) + line(coopRow)
+                + '\r\n'
+                + line(['ADMINISTRADORES']) + line(adminsHeader) + admins.map(line).join(''),
+        );
+    });
+
+    it('sem montador: catálogo 404, fields e PDF 400; a auditoria grava a linha de sempre, sem detalhes', async () => {
+        expect((await get('/admin/export/cadastros/catalog')).statusCode).toBe(404);
+        for (const query of ['fields=name', 'format=pdf']) {
+            const res = await get(`/admin/export/cadastros?${query}`);
+            expect(res.statusCode).toBe(400);
+            expect(res.json()).toEqual({ error: 'Este conjunto ainda não tem o montador.' });
+        }
+        await get('/admin/export/cadastros');
+        const log = await prisma.auditLog.findFirst({ where: { method: 'EXPORT',
+path: '/admin/export/cadastros' },
+orderBy: { createdAt: 'desc' } });
+        expect(log!.targetLabel).toMatch(/^Relatório de cadastros: \d+ registros \(todos\)$/);
+        expect(log!.details).toBeNull();
+    });
+});
