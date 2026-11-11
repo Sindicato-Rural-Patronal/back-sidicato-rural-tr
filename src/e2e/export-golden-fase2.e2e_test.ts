@@ -343,3 +343,108 @@ isDeleted: true },
         expect(res.body).toBe(file(header));
     });
 });
+
+describe('teste de ouro pelo banco: cursos', () => {
+    const header = [
+        'Curso', 'Nº do evento', 'Status', 'Início', 'Término', 'Inscrições até', 'Sala', 'Capacidade da sala',
+        'Instrutores', 'Carga horária (h)', 'Valor (R$)', 'Mínimo de alunos', 'Inscritos', 'Confirmados',
+        'Pré-inscritos', 'Lista de espera', 'Descrição', 'Observações', 'Criado em',
+    ];
+    let horta: string;
+
+    beforeAll(async () => {
+        const room = await prisma.room.create({ data: { name: 'SALA OURO',
+description: 'x',
+maxCapacity: 50 } });
+        const pedro = await prisma.userData.create({ data: { name: 'PEDRO OURO',
+phone: '44911118020' } });
+        const ana = await prisma.userData.create({ data: { name: 'ANA OURO',
+phone: '44911118021' } });
+        const instrPedro = await prisma.userInstructor.create({ data: { userDataId: pedro.id } });
+        const instrAna = await prisma.userInstructor.create({ data: { userDataId: ana.id } });
+        const course = await prisma.course.create({
+            data: {
+                name: 'Horta "Ouro"',
+                description: 'Aprenda; "na prática"',
+                eventNumber: '2026/77',
+                status: 'PUBLIC',
+                roomId: room.id,
+                startTime: d('2032-03-10T08:00:00.000Z'),
+                endTime: d('2032-03-10T12:00:00.000Z'),
+                registrationDeadline: d('2032-03-05T18:30:00.000Z'),
+                workloadHours: 4,
+                price: 150.5,
+                minStudents: 5,
+                preEnrolled: 2,
+                waitlist: 1,
+                observations: '=obs',
+            },
+        });
+        await prisma.courseInstructor.create({ data: { courseId: course.id,
+instructorId: instrPedro.id,
+title: 'ENGENHEIRO' } });
+        await prisma.courseInstructor.create({ data: { courseId: course.id,
+instructorId: instrAna.id } });
+        await prisma.courseUserRegistration.create({ data: { courseId: course.id,
+userDataId: ids.joao,
+confirmed: true } });
+        await prisma.courseUserRegistration.create({ data: { courseId: course.id,
+userDataId: ids.maria } });
+        // Inscrição cancelada não conta.
+        await prisma.courseUserRegistration.create({
+            data: { courseId: course.id,
+userDataId: ids.excluida,
+confirmed: true,
+isDeleted: true },
+        });
+        const cursoB = await prisma.course.create({
+            data: {
+                name: 'Curso Ouro B',
+                description: 'x',
+                status: 'COMPLETED',
+                roomId: room.id,
+                startTime: d('2031-11-30T19:30:00.000Z'),
+                endTime: d('2031-11-30T22:00:00.000Z'),
+            },
+        });
+        // Curso excluído não sai.
+        await prisma.course.create({
+            data: {
+                name: 'Curso Ouro Excluido',
+                description: 'x',
+                roomId: room.id,
+                startTime: d('2031-01-01T08:00:00.000Z'),
+                endTime: d('2031-01-01T12:00:00.000Z'),
+                isDeleted: true,
+            },
+        });
+        await prisma.$executeRaw`UPDATE "course" SET "createdAt" = ${d('2026-09-01T12:00:00.000Z')} WHERE id = ${course.id}`;
+        await prisma.$executeRaw`UPDATE "course" SET "createdAt" = ${d('2026-09-16T23:30:00.000Z')} WHERE id = ${cursoB.id}`;
+        horta = course.id;
+    });
+
+    const hortaRow = [
+        'Horta ""Ouro""', '2026/77', 'Público', '10/03/2032 08:00', '10/03/2032 12:00', '05/03/2032 18:30', 'SALA OURO',
+        '50', 'PEDRO OURO (ENGENHEIRO) | ANA OURO', '4', '150,50', '5', '2', '1', '2', '1', 'Aprenda; ""na prática""',
+        `'=obs`, '01/09/2026 09:00',
+    ];
+    const cursoBRow = [
+        'Curso Ouro B', '', 'Concluído', '30/11/2031 19:30', '30/11/2031 22:00', '', 'SALA OURO', '50', '', '0', '0,00', '0',
+        '0', '0', '0', '0', 'x', '', '16/09/2026 20:30',
+    ];
+
+    it('o CSV padrão inteiro, pela busca, na ordem do início', async () => {
+        const res = await get('/admin/export/courses?search=ouro');
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.headers['content-disposition']).toBe(`attachment; filename="cursos-${todayBr()}.csv"`);
+        expect(res.headers['x-export-count']).toBe('2');
+        expect(res.body).toBe(file(header, cursoBRow, hortaRow));
+    });
+
+    it('filtro de status e um curso pelo id', async () => {
+        expect((await get('/admin/export/courses?search=ouro&status=COMPLETED')).body).toBe(file(header, cursoBRow));
+        const one = await get(`/admin/export/courses?ids=${horta}`);
+        expect(one.headers['content-disposition']).toBe(`attachment; filename="curso-horta-ouro-${todayBr()}.csv"`);
+        expect(one.body).toBe(file(header, hortaRow));
+    });
+});

@@ -346,3 +346,100 @@ describe('teste de ouro: CSV padrão de administradores', () => {
         expect(r.result!.csv).toBe(file(ADMINS_HEADER));
     });
 });
+
+// ── Cursos ───────────────────────────────────────────────────────────────────
+
+const COURSES_HEADER = [
+    'Curso', 'Nº do evento', 'Status', 'Início', 'Término', 'Inscrições até', 'Sala', 'Capacidade da sala',
+    'Instrutores', 'Carga horária (h)', 'Valor (R$)', 'Mínimo de alunos', 'Inscritos', 'Confirmados',
+    'Pré-inscritos', 'Lista de espera', 'Descrição', 'Observações', 'Criado em',
+];
+
+/** Tudo preenchido: horário de parede, dinheiro, listas, aspas, ";" e fórmula. */
+const horta = {
+    id: 'c1',
+    name: 'HORTA "ORGÂNICA"',
+    description: 'Aprenda; "na prática"',
+    eventNumber: '2026/15',
+    status: 'PUBLIC',
+    startTime: d('2026-10-05T08:00:00.000Z'),
+    endTime: d('2026-10-05T12:00:00.000Z'),
+    registrationDeadline: d('2026-10-01T18:30:00.000Z'),
+    workloadHours: 4,
+    price: 1234.5,
+    minStudents: 5,
+    preEnrolled: 2,
+    waitlist: 1,
+    observations: '=obs',
+    createdAt: d('2026-09-01T12:00:00.000Z'),
+    room: { name: 'AUDITORIO',
+maxCapacity: 50 },
+    instructors: [
+        { title: 'ENGENHEIRO',
+instructor: { userData: { name: 'PEDRO' } } },
+        { title: null,
+instructor: { userData: { name: 'ANA' } } },
+    ],
+    courseUserRegistration: [{ confirmed: true }, { confirmed: false }, { confirmed: true }],
+};
+
+/** Quase tudo vazio ou zero. */
+const cursoB = {
+    id: 'c2',
+    name: 'CURSO B',
+    description: '',
+    eventNumber: null,
+    status: 'COMPLETED',
+    startTime: d('2026-11-30T19:30:00.000Z'),
+    endTime: d('2026-11-30T22:00:00.000Z'),
+    registrationDeadline: null,
+    workloadHours: 0,
+    price: 0,
+    minStudents: 0,
+    preEnrolled: 0,
+    waitlist: 0,
+    observations: null,
+    createdAt: d('2026-09-16T23:30:00.000Z'),
+    room: { name: 'SALA 1',
+maxCapacity: 10 },
+    instructors: [],
+    courseUserRegistration: [],
+};
+
+const HORTA_ROW = [
+    'HORTA ""ORGÂNICA""', '2026/15', 'Público', '05/10/2026 08:00', '05/10/2026 12:00', '01/10/2026 18:30', 'AUDITORIO',
+    '50', 'PEDRO (ENGENHEIRO) | ANA', '4', '1.234,50', '5', '3', '2', '2', '1', 'Aprenda; ""na prática""', `'=obs`,
+    '01/09/2026 09:00',
+];
+const CURSO_B_ROW = [
+    'CURSO B', '', 'Concluído', '30/11/2026 19:30', '30/11/2026 22:00', '', 'SALA 1', '10', '', '0', '0,00', '0', '0',
+    '0', '0', '0', '', '', '16/09/2026 20:30',
+];
+
+describe('teste de ouro: CSV padrão de cursos', () => {
+    it('19 colunas, na ordem e no formato de hoje', async () => {
+        expect(COURSES_HEADER).toHaveLength(19);
+        expect(HORTA_ROW).toHaveLength(19);
+        expect(CURSO_B_ROW).toHaveLength(19);
+
+        vi.mocked(repo.courses).mockResolvedValue([horta, cursoB] as never);
+        const r = await useCase().execute('courses', { search: 'curso' });
+        expect(r.error).toBeUndefined();
+        expect(r.result!.csv).toBe(file(COURSES_HEADER, HORTA_ROW, CURSO_B_ROW));
+        expect(r.result!.count).toBe(2);
+        expect(r.result!.filename).toBe('cursos-2026-09-17.csv');
+    });
+
+    it('um curso pelo id: o nome dele no nome do arquivo', async () => {
+        vi.mocked(repo.courses).mockResolvedValue([horta] as never);
+        const r = await useCase().execute('courses', { ids: ['c1'] });
+        expect(r.result!.csv).toBe(file(COURSES_HEADER, HORTA_ROW));
+        expect(r.result!.filename).toBe('curso-horta-organica-2026-09-17.csv');
+    });
+
+    it('lista vazia: só o cabeçalho', async () => {
+        vi.mocked(repo.courses).mockResolvedValue([] as never);
+        const r = await useCase().execute('courses', { status: 'PRIVATE' });
+        expect(r.result!.csv).toBe(file(COURSES_HEADER));
+    });
+});
