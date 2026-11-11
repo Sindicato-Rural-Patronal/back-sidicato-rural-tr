@@ -127,19 +127,24 @@ primaryPropertyId: true } },
         });
     }
 
-    admins({ ids, ...filters }: Parameters<ExportRepository['admins']>[0]): Promise<AdminExportRow[]> {
+    admins({ ids, take, ...filters }: Parameters<ExportRepository['admins']>[0]): Promise<AdminExportRow[]> {
         return this.prisma.userAdmin.findMany({
             where: byIds(ids) ? { ...byIds(ids),
 isDeleted: false } : buildAdminListWhere(filters),
             orderBy: { userData: { name: 'asc' } },
+            ...(take && { take }),
             include: {
-                userData: { select: { name: true,
-email: true,
-cpf: true,
-phone: true } },
+                // A pessoa inteira: os campos de pessoa do montador.
+                userData: { include: personInclude },
                 rules: { select: { name: true } },
             },
         });
+    }
+
+    async ruleName(id: string): Promise<string | null> {
+        const rule = await this.prisma.rule.findUnique({ where: { id },
+select: { name: true } });
+        return rule?.name ?? null;
     }
 
     courses({ ids, ...filters }: Parameters<ExportRepository['courses']>[0]): Promise<CourseExportRow[]> {

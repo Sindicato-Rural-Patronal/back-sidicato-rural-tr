@@ -1,4 +1,5 @@
 import type { ExportDataset } from '../datasets.js';
+import { adminsSource } from './admins.js';
 import { companiesSource } from './companies.js';
 import { peopleSource } from './people.js';
 import { propertiesSource } from './properties.js';
@@ -17,6 +18,7 @@ export const EXPORT_SOURCES: Record<EngineDataset, AnyExportSource> = {
     registrations: registrationsSource,
     companies: companiesSource,
     properties: propertiesSource,
+    admins: adminsSource,
 };
 
 export function sourceOf(dataset: ExportDataset): AnyExportSource | null {

@@ -153,7 +153,7 @@ export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClien
 - \`modelo\`: id ou nome do modelo (só para a auditoria e o PDF). \`confirmed\` (inscrições): só as confirmadas.
 - Limites: ${EXPORT_LIMITS.rows} linhas, ${EXPORT_LIMITS.pdfRows} no PDF, ${EXPORT_LIMITS.fields} campos.
 - Erros 400: "Escolha pelo menos um campo.", "Campo desconhecido: <chave>.", "Campo repetido: <rótulo>.", "No máximo 80 campos por relatório.", "Formato inválido: use csv ou pdf.", "O relatório passa de 20.000 linhas. Use um filtro para diminuir.", "O PDF aceita até 2.000 linhas. Baixe a planilha ou use um filtro.", "${NO_BUILDER_MESSAGE}" (fields ou PDF num conjunto sem montador).
-- Erro 403 por campo: "Sem permissão para exportar: RG, Endereço: Rua." (em \`registrations\`, os campos da pessoa além dos de sempre pedem também READ_USER).
+- Erro 403 por campo: "Sem permissão para exportar: RG, Endereço: Rua." (em \`registrations\` e \`admins\`, os campos da pessoa além dos que já saíam pedem também READ_USER; o catálogo os mostra com \`allowed: false\`).
 - ${EXPORT_RATE_LIMIT} exportações por minuto por IP → 429 "${EXPORT_RATE_LIMIT_MESSAGE}".
 
 | dataset | filtros | permissão |

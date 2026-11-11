@@ -50,9 +50,6 @@ export { EXPORT_DATASETS, type ExportDataset, type ExportResult };
 const schemas = {
     // O relatorio e sempre o retrato completo: nao aceita filtro nem selecao.
     cadastros: z.object({}),
-    admins: z.object({ ids: idList,
-search: text,
-rulesId: text }),
     courses: z.object({
         ids: idList,
         search: text,
@@ -416,12 +413,6 @@ body: csvBody(adminColumns, administradores) },
                 const count = pessoas.length + associados.length + empresas.length + administradores.length;
                 return { csv,
 count };
-            }
-            case 'admins': {
-                const rows = await this.repo.admins(q);
-                return { csv: toCsv(adminColumns, rows),
-count: rows.length,
-firstName: rows[0]?.userData.name };
             }
             case 'courses': {
                 const rows = await this.repo.courses(q);

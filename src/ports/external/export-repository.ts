@@ -164,12 +164,8 @@ export type AdminExportRow = {
     id: string;
     username: string;
     createdAt: Date;
-    userData: {
- name: string;
-email: string | null;
-cpf: string | null;
-phone: string 
-};
+    /** A pessoa inteira (os campos de pessoa do montador). */
+    userData: PersonExportRow;
     rules: { name: string };
 };
 
@@ -292,7 +288,9 @@ export interface ExportRepository {
     companies(filters: CompanyListFilters & ExportSelection & ExportTake): Promise<CompanyExportRow[]>;
     /** `ownerIds`: propriedades dessas pessoas/empresas. */
     properties(filters: ExportSelection & ExportTake & { ownerIds?: string[] }): Promise<PropertyExportRow[]>;
-    admins(filters: UserAdminListFilters & ExportSelection): Promise<AdminExportRow[]>;
+    admins(filters: UserAdminListFilters & ExportSelection & ExportTake): Promise<AdminExportRow[]>;
+    /** Nome da regra de acesso, para o filtro em palavras; null se não existe. */
+    ruleName(id: string): Promise<string | null>;
     courses(filters: CourseListFilters & ExportSelection): Promise<CourseExportRow[]>;
     /** `courseIds`: inscrições desses cursos; sem nada, de todos. `confirmed: true`: só as confirmadas. */
     registrations(filters: ExportSelection & ExportTake & {

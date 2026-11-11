@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExportDataUseCase } from '../export-data.js';
 import type { ExportRepository } from '../../ports/external/export-repository.js';
 import { EXPORT_SOURCES } from '../export/catalog/index.js';
+import { ADMIN_FREE_PERSON_FIELDS } from '../export/catalog/admins.js';
 import { GetExportCatalogUseCase } from '../export/get-export-catalog.js';
 import type { ExportActor } from '../export/engine.js';
+import { ForbiddenError } from '../../errors/auth.js';
 
 // Montador de relatórios, fase 2 (decisão 006): as fontes que saíram do
 // caminho antigo. O padrão de cada uma é congelado pelo teste de ouro
@@ -18,6 +20,7 @@ const repo = {
     courses: vi.fn(),
     registrations: vi.fn(),
     courseNames: vi.fn(),
+    ruleName: vi.fn(),
     contactMessages: vi.fn(),
     unimed: vi.fn(),
     auditLogs: vi.fn(),
@@ -271,5 +274,97 @@ format: 'pdf' });
         expect(many.result!.pdf!.filters).toBe('Donos: 4');
         expect(many.result!.auditDetails!.filtros).toEqual([{ nome: 'Donos',
 valor: '4' }]);
+    });
+});
+
+// ── Administradores ──────────────────────────────────────────────────────────
+
+function admin(overrides: Record<string, unknown> = {}) {
+    return {
+        id: 'a1',
+        username: 'joao',
+        createdAt: new Date('2026-02-01T10:00:00.000Z'),
+        userData: {
+            name: 'JOÃO',
+email: 'joao@test.com',
+cpf: '12345678909',
+phone: '44999990000',
+phone2: null,
+phone3: null,
+            rg: '1234567',
+primaryPropertyId: null,
+properties: [],
+createdAt: new Date('2025-01-01T12:00:00.000Z'),
+        },
+        rules: { name: 'SECRETARIA' },
+        ...overrides,
+    };
+}
+
+describe('administradores no montador', () => {
+    it('catálogo: os 4 campos de pessoa de sempre só com READ_USER_ADMIN; o resto da pessoa pede READ_USER', () => {
+        const source = EXPORT_SOURCES.admins;
+        expect(source.padrao).toEqual(['username', 'name', 'email', 'cpf', 'phone', 'rule', 'adminCreatedAt']);
+        expect(groupsOf('admins')[0]).toBe('Acesso');
+        // "Usuário do painel" repete o "Usuário".
+        expect(keysOf('admins')).not.toContain('adminUsername');
+        const personKeys = EXPORT_SOURCES.people.fields.filter(f => f.group !== 'Relatório' && f.key !== 'adminUsername').map(f => f.key);
+        for (const key of personKeys) {
+            const field = source.fields.find(f => f.key === key)!;
+            const free = (ADMIN_FREE_PERSON_FIELDS as readonly string[]).includes(key);
+            expect(field.permission, key).toBe(free ? undefined : 'READ_USER');
+        }
+        expect(source.modelos).toEqual([{ id: 'contato',
+name: 'Contato',
+fields: ['name', 'phone', 'email'] }]);
+
+        const only = new GetExportCatalogUseCase().execute('admins', can('READ_USER_ADMIN')).catalog!;
+        const fields = only.groups.flatMap(g => g.fields);
+        expect(fields.find(f => f.key === 'cpf')).toMatchObject({ allowed: true,
+reason: null });
+        expect(fields.find(f => f.key === 'rg')).toMatchObject({ allowed: false,
+reason: 'Pede a permissão Visualizar usuários' });
+        expect(only.filterLabels).toEqual({ search: 'Busca',
+rulesId: 'Regra de acesso' });
+    });
+
+    it('campo da pessoa além dos de sempre sem READ_USER → 403 com os rótulos; com READ_USER, sai', async () => {
+        vi.mocked(repo.admins).mockResolvedValue([admin()] as never);
+        const denied = await useCase().execute('admins', { fields: ['username', 'rg', 'createdAt'] }, can('READ_USER_ADMIN'));
+        expect(denied.error).toBeInstanceOf(ForbiddenError);
+        expect(denied.error!.message).toBe('Sem permissão para exportar: RG, Cadastrado em.');
+        expect(repo.admins).not.toHaveBeenCalled();
+
+        const ok = await useCase().execute(
+            'admins',
+            { fields: ['username', 'name', 'phone', 'rg', 'adminCreatedAt', 'createdAt'] },
+            can('READ_USER_ADMIN', 'READ_USER'),
+        );
+        expect(parse(ok.result!.csv)).toEqual([
+            ['Usuário', 'Nome', 'Telefone', 'RG', 'Criado em', 'Cadastrado em'],
+            ['joao', 'JOÃO', '(44) 99999-0000', '1234567', '01/02/2026 07:00', '01/01/2025 09:00'],
+        ]);
+    });
+
+    it('filtro de regra em palavras: o nome das linhas ou, sem linha, pelo id', async () => {
+        vi.mocked(repo.admins).mockResolvedValue([admin()] as never);
+        const r = await useCase().execute('admins', { rulesId: 'r1',
+fields: ['name'],
+format: 'pdf',
+modelo: 'contato' });
+        expect(r.result!.pdf).toMatchObject({ title: 'Administradores',
+filters: 'Regra de acesso: SECRETARIA',
+modelo: 'Contato' });
+        expect(repo.ruleName).not.toHaveBeenCalled();
+
+        vi.mocked(repo.admins).mockResolvedValue([] as never);
+        vi.mocked(repo.ruleName).mockResolvedValue('FINANCEIRO');
+        const empty = await useCase().execute('admins', { rulesId: 'r2',
+search: 'ana',
+fields: ['name'],
+format: 'pdf' });
+        expect(repo.ruleName).toHaveBeenCalledWith('r2');
+        expect(empty.result!.pdf!.filters).toBe('Busca: ana · Regra de acesso: FINANCEIRO');
+        expect(empty.result!.auditLabel).toBe('Administradores: 0 registros (com filtros) · PDF');
     });
 });

@@ -12,9 +12,9 @@ import {
 import { addressLine, ageOn, isActiveMember, propertyLine } from '../format.js';
 import type { ExportField, ExportFieldContext, ExportFieldType, ExportPrivacy } from './types.js';
 
-// Os campos de pessoa, escritos uma vez e usados por `people` e
-// `registrations` (e, na fase 2, por `unimed` e `admins`), cada um com o seu
-// `from` (decisão 006, item 2).
+// Os campos de pessoa, escritos uma vez e usados por `people`,
+// `registrations`, `admins` e `unimed`, cada um com o seu `from` (decisão 006,
+// item 2).
 //
 // AS CHAVES SÃO CONTRATO: não se renomeia nem se reaproveita uma chave. Os
 // rótulos dos campos que já saíam no CSV são os cabeçalhos de hoje.
@@ -396,18 +396,24 @@ value: p => p.updatedAt },
  * Os campos de pessoa para uma fonte cujo registro leva a pessoa em `from`.
  * `permission`: exigida pelos campos que não estão em `free` (os que a fonte
  * já exportava antes do montador), para ninguém ganhar acesso que não tinha.
+ * `exclude`: campos que repetem um da própria fonte (ex.: "Unimed" na fonte
+ * `unimed`). `labels`: rótulo trocado quando o de pessoa colide com um da
+ * fonte (o rótulo é o cabeçalho e tem de ser único; a chave não muda).
  */
 export function personFields<Row>(
     from: (row: Row) => PersonExportRow,
     options: {
  permission?: Permission;
-free?: readonly string[]
+free?: readonly string[];
+exclude?: readonly string[];
+labels?: Readonly<Record<string, string>>
 } = {},
 ): ExportField<Row>[] {
     const free = new Set(options.free ?? []);
-    return PERSON_FIELDS.map(def => ({
+    const exclude = new Set(options.exclude ?? []);
+    return PERSON_FIELDS.filter(def => !exclude.has(def.key)).map(def => ({
         key: def.key,
-        label: def.label,
+        label: options.labels?.[def.key] ?? def.label,
         group: def.group,
         type: def.type,
         privacy: def.privacy,

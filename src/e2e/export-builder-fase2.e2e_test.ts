@@ -234,3 +234,67 @@ format: 'pdf' });
         });
     });
 });
+
+describe('administradores', () => {
+    let soAdmins: string;
+    let regra: string;
+
+    beforeAll(async () => {
+        soAdmins = await adminWith('so_admins', ['READ_USER_ADMIN']);
+        const rule = await prisma.rule.findFirstOrThrow({ where: { name: 'RULE_so_admins' } });
+        regra = rule.id;
+        await prisma.userData.updateMany({ where: { name: 'ADMIN SO_ADMINS' },
+data: { rg: '998877',
+email: 'so@admins.test' } });
+    });
+
+    it('catálogo com só READ_USER_ADMIN: os campos novos da pessoa vêm desligados, com o motivo', async () => {
+        const res = await get('/admin/export/admins/catalog', soAdmins);
+        expect(res.statusCode, res.body).toBe(200);
+        const catalog = res.json() as Catalog;
+        expect(catalog.groups[0].name).toBe('Acesso');
+        const fields = catalog.groups.flatMap(g => g.fields);
+        expect(fields.find(f => f.key === 'cpf')).toMatchObject({ allowed: true,
+reason: null });
+        expect(fields.find(f => f.key === 'rg')).toMatchObject({ allowed: false,
+reason: 'Pede a permissão Visualizar usuários' });
+        expect(catalog.padrao).toEqual(['username', 'name', 'email', 'cpf', 'phone', 'rule', 'adminCreatedAt']);
+        // Sem READ_USER_ADMIN, nem o catálogo.
+        const semAdmins = await adminWith('adm_cursos', ['READ_COURSE']);
+        expect((await get('/admin/export/admins/catalog', semAdmins)).statusCode).toBe(403);
+    });
+
+    it('permissão por campo: RG sem READ_USER → 403; o padrão e os campos de sempre saem', async () => {
+        const denied = await post('/admin/export/admins', { rulesId: regra,
+fields: ['username', 'rg'] }, soAdmins);
+        expect(denied.statusCode).toBe(403);
+        expect(denied.json()).toEqual({ error: 'Sem permissão para exportar: RG.' });
+
+        const padrao = await get(`/admin/export/admins?rulesId=${regra}`, soAdmins);
+        expect(padrao.statusCode, padrao.body).toBe(200);
+        expect(rows(padrao.body)[1].slice(0, 3)).toEqual(['so_admins', 'ADMIN SO_ADMINS', 'so@admins.test']);
+
+        const pdf = await post('/admin/export/admins', { rulesId: regra,
+fields: ['username', 'name', 'email'],
+format: 'pdf',
+modelo: 'contato' }, soAdmins);
+        expect(pdf.statusCode, pdf.body).toBe(200);
+        expect(pdf.json()).toMatchObject({
+            title: 'Administradores',
+            filters: 'Regra de acesso: RULE_so_admins',
+            modelo: 'Contato',
+            rows: [['so_admins', 'ADMIN SO_ADMINS', 'so@admins.test']],
+        });
+    });
+
+    it('com READ_USER também, RG sai; a auditoria cita os documentos', async () => {
+        const res = await post('/admin/export/admins', { rulesId: regra,
+fields: ['username', 'cpf', 'rg'] });
+        expect(res.statusCode, res.body).toBe(200);
+        expect(rows(res.body)).toEqual([['Usuário', 'CPF', 'RG'], ['so_admins', '', '998877']]);
+        const log = await lastExport();
+        expect(log!.targetLabel).toBe('Administradores: 1 registro (com filtros) · CSV · com CPF, RG');
+        expect((log!.details as { filtros: unknown }).filtros).toEqual([{ nome: 'Regra de acesso',
+valor: 'RULE_so_admins' }]);
+    });
+});
