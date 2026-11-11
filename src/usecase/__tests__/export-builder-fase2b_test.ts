@@ -26,6 +26,8 @@ const repo = {
     adminUsername: vi.fn(),
     roomBookings: vi.fn(),
     roomName: vi.fn(),
+    financeTransactions: vi.fn(),
+    financeNames: vi.fn(),
     logExport: vi.fn(),
 } as unknown as ExportRepository;
 
@@ -323,5 +325,204 @@ to: '2026-10-11' });
         expect(semResponsavel.result!.auditLabel).toBe('Reservas de sala: 1 registro (com filtros) · CSV');
         expect(semResponsavel.result!.auditDetails!.filtros).toEqual([{ nome: 'Período',
 valor: '05/10/2026 a 11/10/2026' }]);
+    });
+});
+
+// ── Lançamentos do Financeiro ────────────────────────────────────────────────
+
+function transaction(overrides: Record<string, unknown> = {}) {
+    return {
+        id: 't1',
+        number: 128,
+        type: 'OUT',
+        amountCents: 1234567,
+        date: new Date('2026-05-10T00:00:00.000Z'),
+        description: 'Compra de adubo',
+        method: 'PIX',
+        notes: null,
+        categoryId: 'c1',
+        accountId: 'a1',
+        transferId: null,
+        createdBy: null,
+        recurringId: null,
+        recurringMonth: null,
+        empenho: {
+            razaoSocial: 'JOSE DA SILVA',
+            cnpjCpf: '52998224725',
+            telefone: '44999998888',
+            cep: '85990000',
+            banco: '001',
+            agencia: '1234',
+            conta: '5678-9',
+            notaFiscal: 'NF 77',
+            descontoCents: 1050,
+        },
+        isDeleted: false,
+        deletedAt: null,
+        createdAt: new Date('2026-05-10T15:30:00.000Z'),
+        updatedAt: new Date('2026-05-10T15:30:00.000Z'),
+        category: { name: 'INSUMOS' },
+        account: { name: 'BANCO' },
+        attachments: [{ id: 'f1' }, { id: 'f2' }],
+        ...overrides,
+    };
+}
+
+const CATEGORY_ID = '0b9f6a52-4d0f-4c1e-9d55-6b5f3c2a1e10';
+const ACCOUNT_ID = '7c1d1a0e-1f0e-4d7b-9a51-2f8e3b4c5d60';
+
+describe('lançamentos do Financeiro no montador', () => {
+    it('catálogo: grupos, padrão de 13 colunas, modelo Resumido; o favorecido identificável é pessoal', () => {
+        const source = EXPORT_SOURCES['finance-transactions'];
+        expect(source.padrao).toEqual([
+            'number', 'date', 'type', 'account', 'category', 'description', 'payeeName', 'payeeDocument', 'previousNumber',
+            'method', 'recurring', 'amount', 'notes',
+        ]);
+        expect(groupsOf('finance-transactions')).toEqual(['Lançamento', 'Valores', 'Favorecido', 'Nota de Empenho', 'Sistema', 'Relatório']);
+        expect(source.modelos).toEqual([
+            { id: 'resumido',
+name: 'Resumido',
+fields: ['number', 'date', 'description', 'payeeName', 'amount'] },
+        ]);
+        expect(source.fields.filter(f => f.permission)).toEqual([]);
+        const privacy = new Map(source.fields.map(f => [f.key, f.privacy]));
+        const personal = ['payeeDocument', 'payeeStateRegistration', 'payeePhone', 'payeeAddress', 'payeeZipCode', 'bank', 'bankAgency', 'bankAccount'];
+        for (const key of personal) expect(privacy.get(key), key).toBe('pessoal');
+        for (const key of ['number', 'description', 'payeeName', 'amount', 'previousNumber', 'invoiceNumber']) {
+            expect(privacy.get(key), key).toBe('comum');
+        }
+
+        const catalog = new GetExportCatalogUseCase().execute('finance-transactions', can('READ_FINANCE')).catalog!;
+        expect(catalog).toMatchObject({
+            dataset: 'finance-transactions',
+            title: 'Lançamentos',
+            filterLabels: {
+                from: 'De',
+                to: 'Até',
+                type: 'Tipo',
+                categoryId: 'Categoria',
+                accountId: 'Caixa',
+                method: 'Método',
+                search: 'Busca',
+                orderBy: 'Ordem',
+            },
+        });
+    });
+
+    it('os filtros chegam ao repositório como na lista: `to` até o fim do dia, a ordem e o limite de linhas', async () => {
+        vi.mocked(repo.financeTransactions).mockResolvedValue([] as never);
+        vi.mocked(repo.financeNames).mockResolvedValue({ category: 'INSUMOS',
+account: null } as never);
+        await useCase().execute('finance-transactions', {
+            from: '2026-01-01',
+            to: '2026-01-31',
+            type: 'OUT',
+            categoryId: CATEGORY_ID,
+            method: 'pix',
+            search: 'coop',
+            orderBy: 'number',
+        });
+        expect(repo.financeTransactions).toHaveBeenCalledWith({
+            from: new Date('2026-01-01T00:00:00.000Z'),
+            to: new Date('2026-01-31T23:59:59.999Z'),
+            type: 'OUT',
+            categoryId: CATEGORY_ID,
+            accountId: undefined,
+            method: 'pix',
+            search: 'coop',
+            orderBy: 'number',
+            take: 20001,
+        });
+    });
+
+    it('filtro inválido → 400 com a mensagem de sempre do Financeiro, sem consultar', async () => {
+        const cases: [Record<string, string>, string][] = [
+            [{ from: 'ontem' }, 'Parâmetro inválido: from'],
+            [{ to: '0000-01-01' }, 'Parâmetro inválido: to'],
+            [{ type: 'NOTA' }, 'Parâmetro inválido: type'],
+            [{ orderBy: 'valor' }, 'Parâmetro inválido: orderBy'],
+            [{ accountId: 'x' }, 'Parâmetro inválido: accountId'],
+        ];
+        for (const [query, message] of cases) {
+            expect((await useCase().execute('finance-transactions', query)).error!.message).toBe(message);
+        }
+        expect(repo.financeTransactions).not.toHaveBeenCalled();
+    });
+
+    it('campos novos: desconto, telefone e CEP com máscara, banco, nota fiscal, transferência e comprovantes', async () => {
+        vi.mocked(repo.financeTransactions).mockResolvedValue([
+            transaction(),
+            transaction({ id: 't2',
+number: null,
+type: null,
+transferId: 'tr1',
+empenho: null,
+attachments: [],
+category: null }),
+        ] as never);
+        const fields = [
+            'number', 'type', 'amount', 'discount', 'payeePhone', 'payeeZipCode', 'bank', 'bankAgency', 'bankAccount',
+            'invoiceNumber', 'transfer', 'attachments', 'createdAt',
+        ];
+        const r = await useCase().execute('finance-transactions', { fields });
+        expect(r.error).toBeUndefined();
+        expect(parse(r.result!.csv)).toEqual([
+            [
+                'Nº', 'Tipo', 'Valor (R$)', 'Desconto (R$)', 'Telefone', 'CEP', 'Banco', 'Agência', 'Conta', 'Nota fiscal',
+                'Transferência', 'Comprovantes', 'Lançado em',
+            ],
+            ['128', 'Saída', '12.345,67', '10,50', '(44) 99999-8888', '85990-000', '001', '1234', '5678-9', 'NF 77', 'Não', '2', '10/05/2026 12:30'],
+            ['', 'Nota', '12.345,67', '', '', '', '', '', '', '', 'Sim', '0', '10/05/2026 12:30'],
+        ]);
+    });
+
+    it('PDF: período, tipo, categoria e caixa (das linhas), método, busca e a ordem por Nº; o modelo Resumido', async () => {
+        vi.mocked(repo.financeTransactions).mockResolvedValue([transaction()] as never);
+        const r = await useCase().execute('finance-transactions', {
+            fields: ['number', 'date', 'description', 'payeeName', 'amount'],
+            format: 'pdf',
+            modelo: 'resumido',
+            from: '2026-05-01',
+            to: '2026-05-31',
+            type: 'OUT',
+            categoryId: CATEGORY_ID,
+            accountId: ACCOUNT_ID,
+            method: 'PIX',
+            search: 'adubo',
+            orderBy: 'number',
+        });
+        expect(r.result!.pdf).toMatchObject({
+            title: 'Lançamentos',
+            filename: 'lancamentos-2026-09-17.pdf',
+            filters: 'Período: 01/05/2026 a 31/05/2026 · Tipo: Saída · Categoria: INSUMOS · Caixa: BANCO · Método: PIX · Busca: adubo · Ordem: Nº',
+            modelo: 'Resumido',
+            rows: [['128', '10/05/2026', 'Compra de adubo', 'JOSE DA SILVA', '12.345,67']],
+        });
+        expect(repo.financeNames).not.toHaveBeenCalled();
+    });
+
+    it('categoria e caixa sem nenhum lançamento: os nomes pelo id; sumidos, o id', async () => {
+        vi.mocked(repo.financeTransactions).mockResolvedValue([] as never);
+        vi.mocked(repo.financeNames).mockResolvedValue({ category: 'INSUMOS',
+account: null } as never);
+        const r = await useCase().execute('finance-transactions', { format: 'pdf',
+categoryId: CATEGORY_ID,
+accountId: ACCOUNT_ID });
+        expect(r.result!.pdf!.filters).toBe(`Categoria: INSUMOS · Caixa: ${ACCOUNT_ID}`);
+        expect(repo.financeNames).toHaveBeenCalledWith({ categoryId: CATEGORY_ID,
+accountId: ACCOUNT_ID });
+    });
+
+    it('auditoria: o alvo cita o CNPJ / CPF; só a ordem não faz a exportação ser "com filtros"', async () => {
+        vi.mocked(repo.financeTransactions).mockResolvedValue([transaction(), transaction({ id: 't2' })] as never);
+        const padrao = await useCase().execute('finance-transactions', { orderBy: 'number' });
+        expect(padrao.result!.auditLabel).toBe('Lançamentos: 2 registros (todos) · CSV · com CNPJ / CPF');
+        expect(padrao.result!.auditDetails).toMatchObject({ escopo: 'todos',
+filtros: [{ nome: 'Ordem',
+valor: 'Nº' }],
+linhas: 2 });
+        const resumido = await useCase().execute('finance-transactions', { fields: 'number,date,description,payeeName,amount',
+search: 'adubo' });
+        expect(resumido.result!.auditLabel).toBe('Lançamentos: 2 registros (com filtros) · CSV');
     });
 });

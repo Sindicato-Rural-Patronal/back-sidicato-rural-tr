@@ -53,7 +53,7 @@ export type ExportFilterDescription = {
 
 export type EngineDataset =
     | 'people' | 'registrations' | 'companies' | 'properties' | 'admins' | 'courses' | 'contact-messages' | 'unimed'
-    | 'audit-logs' | 'room-bookings';
+    | 'audit-logs' | 'room-bookings' | 'finance-transactions';
 
 export type ExportSource<Row, Filters extends { ids?: string[] }> = {
     dataset: EngineDataset;
@@ -79,4 +79,14 @@ export type ExportSource<Row, Filters extends { ids?: string[] }> = {
     query: (repo: ExportRepository, filters: Filters, take: number, ctx: { now: Date }) => Promise<Row[]>;
     /** Nome do registro, para o arquivo de um registro só. */
     firstName: (row: Row) => string | undefined;
+    /**
+     * A mensagem do 400 de filtro inválido. Sem ela, a do zod. O Financeiro
+     * usa a de sempre da rota dele: "Parâmetro inválido: <campo>".
+     */
+    filterMessage?: (issue: {
+ path: PropertyKey[];
+message: string 
+}) => string;
+    /** Parâmetros que só ordenam as linhas: não fazem a exportação ser "com filtros". */
+    sortKeys?: string[];
 };

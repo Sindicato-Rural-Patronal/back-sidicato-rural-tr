@@ -4,6 +4,7 @@ import { auditLogsSource } from './audit-logs.js';
 import { companiesSource } from './companies.js';
 import { contactMessagesSource } from './contact-messages.js';
 import { coursesSource } from './courses.js';
+import { financeTransactionsSource } from './finance-transactions.js';
 import { peopleSource } from './people.js';
 import { propertiesSource } from './properties.js';
 import { registrationsSource } from './registrations.js';
@@ -29,6 +30,7 @@ export const EXPORT_SOURCES: Record<EngineDataset, AnyExportSource> = {
     unimed: unimedSource,
     'audit-logs': auditLogsSource,
     'room-bookings': roomBookingsSource,
+    'finance-transactions': financeTransactionsSource,
 };
 
 export function sourceOf(dataset: ExportDataset): AnyExportSource | null {

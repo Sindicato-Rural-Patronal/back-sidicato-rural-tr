@@ -276,9 +276,10 @@ export interface FinanceRepository {
  items: FinanceTransactionWithCategory[];
 total: number 
 }>;
-    // Todos os lançamentos que batem com os filtros (sem paginação) — export.
+    // Os lançamentos que batem com os filtros (sem paginação) — export. `take`:
+    // no máximo tantos (o montador de relatórios pede o limite + 1).
     listTransactionsForExport(
-        filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>,
+        filters: Omit<FinanceTransactionFilters, 'skip' | 'take'> & { take?: number },
     ): Promise<FinanceTransactionWithCategory[]>;
     // Somas de todos os lançamentos que batem com os filtros (mesmo where da lista).
     sumTransactions(

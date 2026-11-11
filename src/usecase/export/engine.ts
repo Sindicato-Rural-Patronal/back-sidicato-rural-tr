@@ -260,7 +260,9 @@ now: Date
 
     const parsed = source.filters.safeParse(body);
     if (!parsed.success) {
-        return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Filtro inválido') };
+        const issue = parsed.error.issues[0];
+        const message = issue ? (source.filterMessage?.(issue) ?? issue.message) : 'Filtro inválido';
+        return { error: new ValidationError(message) };
     }
     const filters = parsed.data as Record<string, unknown> & { ids?: string[] };
 
@@ -296,9 +298,10 @@ now: Date
     const base = single ? `${meta.single}-${slug(firstName) || 'registro'}-${ymd(today)}` : `${meta.file}-${ymd(today)}`;
     const filename = `${base}.${format}`;
 
+    const sortKeys = new Set(source.sortKeys ?? []);
     const scope: ExportScope = filters.ids?.length
         ? 'seleção'
-        : Object.values(filters).some(v => v !== undefined)
+        : Object.entries(filters).some(([key, v]) => v !== undefined && !sortKeys.has(key))
             ? 'com filtros'
             : 'todos';
     const filtros: ExportFilterDescription[] = filters.ids?.length

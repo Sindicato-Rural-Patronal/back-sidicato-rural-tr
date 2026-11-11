@@ -7,12 +7,15 @@ import type {
     ContactMessageExportRow,
     CourseExportRow,
     ExportRepository,
+    FinanceTransactionExportRow,
     PersonExportRow,
     PropertyExportRow,
     RegistrationExportRow,
     RoomBookingExportRow,
     UnimedExportRow,
 } from '../../ports/external/export-repository.js';
+import type { FinanceRepository } from '../../ports/external/finance-repository.js';
+import { createFinanceAdapter } from './finance-adapter.js';
 import {
     buildAdminListWhere,
     buildAuditLogWhere,
@@ -65,7 +68,12 @@ isDeleted: true } },
 };
 
 class ExportAdapter implements ExportRepository {
-    constructor(private prisma: PrismaClient) {}
+    /** A busca dos lançamentos (empenho por SQL, Nº) mora no adapter do Financeiro: um lugar só. */
+    private readonly finance: FinanceRepository;
+
+    constructor(private prisma: PrismaClient) {
+        this.finance = createFinanceAdapter(prisma);
+    }
 
     people({ ids, take, ...filters }: Parameters<ExportRepository['people']>[0]): Promise<PersonExportRow[]> {
         return this.prisma.userData.findMany({
@@ -289,6 +297,22 @@ select: { username: true } });
         const room = await this.prisma.room.findUnique({ where: { id },
 select: { name: true } });
         return room?.name ?? null;
+    }
+
+    // Os mesmos filtros, busca e ordem da lista de lançamentos.
+    financeTransactions(filters: Parameters<ExportRepository['financeTransactions']>[0]): Promise<FinanceTransactionExportRow[]> {
+        return this.finance.listTransactionsForExport(filters);
+    }
+
+    async financeNames({ categoryId, accountId }: Parameters<ExportRepository['financeNames']>[0]) {
+        const [category, account] = await Promise.all([
+            categoryId ? this.prisma.financialCategory.findUnique({ where: { id: categoryId },
+select: { name: true } }) : null,
+            accountId ? this.prisma.financialAccount.findUnique({ where: { id: accountId },
+select: { name: true } }) : null,
+        ]);
+        return { category: category?.name ?? null,
+account: account?.name ?? null };
     }
 
     // O local do IP é preenchido depois da resposta (http/audit-hooks.ts).

@@ -276,3 +276,111 @@ valor: 'Evento' },
         });
     });
 });
+
+describe('lançamentos do Financeiro', () => {
+    let categoria: string;
+
+    beforeAll(async () => {
+        // O `cleanDatabase` não limpa o Financeiro.
+        await prisma.$executeRawUnsafe(`
+            TRUNCATE TABLE
+                "FinanceMonthlyClosing", "FinancialAttachment", "FinancialTransaction",
+                "FinanceRecurringTransaction", "FinancialCategory", "FinancialAccount", "FinancePaymentMethod"
+            RESTART IDENTITY CASCADE
+        `);
+        const insumos = await prisma.financialCategory.create({ data: { name: 'INSUMOS MONTADOR',
+type: 'OUT' } });
+        const banco = await prisma.financialAccount.create({ data: { name: 'BANCO MONTADOR' } });
+        await prisma.financialTransaction.create({
+            data: {
+                number: 10,
+                type: 'OUT',
+                amountCents: 150000,
+                date: new Date('2026-05-10T00:00:00.000Z'),
+                description: 'Compra de semente',
+                method: 'PIX',
+                categoryId: insumos.id,
+                accountId: banco.id,
+                empenho: { razaoSocial: 'JOSE DA SILVA',
+cnpjCpf: '52998224725',
+telefone: '44999998888',
+descontoCents: 500 },
+            },
+        });
+        await prisma.financialTransaction.create({
+            data: {
+                number: 11,
+                type: 'IN',
+                amountCents: 2000,
+                date: new Date('2026-05-11T00:00:00.000Z'),
+                description: 'Mensalidade',
+                accountId: banco.id,
+            },
+        });
+        categoria = insumos.id;
+    });
+
+    it('catálogo: 200 com READ_FINANCE, padrão de 13 colunas e o modelo Resumido; sem READ_FINANCE, 403', async () => {
+        const financeOnly = await adminWith('so.financeiro', ['READ_FINANCE']);
+        const res = await get('/admin/export/finance-transactions/catalog', financeOnly);
+        expect(res.statusCode, res.body).toBe(200);
+        const catalog = res.json() as Catalog;
+        expect(catalog).toMatchObject({ dataset: 'finance-transactions',
+title: 'Lançamentos' });
+        expect(catalog.padrao).toHaveLength(13);
+        expect(catalog.modelos.map(m => m.id)).toEqual(['resumido']);
+        expect(catalog.groups.map(g => g.name)).toEqual(['Lançamento', 'Valores', 'Favorecido', 'Nota de Empenho', 'Sistema', 'Relatório']);
+        expect(catalog.groups.flatMap(g => g.fields).find(f => f.key === 'payeeDocument')).toMatchObject({ privacy: 'pessoal',
+allowed: true });
+
+        const userOnly = await adminWith('so.usuarios.financeiro', ['READ_USER']);
+        expect((await get('/admin/export/finance-transactions/catalog', userOnly)).statusCode).toBe(403);
+        expect((await get('/admin/export/finance-transactions', userOnly)).statusCode).toBe(403);
+    });
+
+    it('sem fields, a mesma planilha da rota do Financeiro, agora na auditoria', async () => {
+        for (const query of ['', '?orderBy=number', `?categoryId=${categoria}`, '?search=jose', '?from=2026-05-11&to=2026-05-11']) {
+            const motor = await get(`/admin/export/finance-transactions${query}`);
+            const antiga = await get(`/admin/finance/transactions/export${query}`);
+            expect(motor.statusCode, motor.body).toBe(200);
+            expect(motor.body, query).toBe(antiga.body);
+            expect(motor.headers['content-disposition']).toBe(`attachment; filename="lancamentos-${today()}.csv"`);
+        }
+        const log = await prisma.auditLog.findFirst({ where: { method: 'EXPORT',
+path: '/admin/export/finance-transactions' },
+orderBy: { createdAt: 'desc' } });
+        expect(log).toMatchObject({ targetLabel: 'Lançamentos: 1 registro (com filtros) · CSV · com CNPJ / CPF' });
+        expect(log!.details).toMatchObject({ formato: 'csv',
+modelo: 'Padrão (como hoje)',
+filtros: [{ nome: 'Dia',
+valor: '11/05/2026' }],
+linhas: 1 });
+    });
+
+    it('campos escolhidos, PDF com o modelo Resumido e os filtros em palavras', async () => {
+        const csv = await get('/admin/export/finance-transactions?fields=number,payeeName,payeeDocument,payeePhone,discount&orderBy=number');
+        expect(csv.statusCode, csv.body).toBe(200);
+        expect(rows(csv.body)).toEqual([
+            ['Nº', 'Nome / Razão social', 'CNPJ / CPF', 'Telefone', 'Desconto (R$)'],
+            ['11', '', '', '', ''],
+            ['10', 'JOSE DA SILVA', '52998224725', '(44) 99999-8888', '5,00'],
+        ]);
+
+        const pdf = await post('/admin/export/finance-transactions', {
+            fields: ['number', 'date', 'description', 'payeeName', 'amount'],
+            format: 'pdf',
+            modelo: 'resumido',
+            categoryId: categoria,
+            type: 'OUT',
+        });
+        expect(pdf.statusCode, pdf.body).toBe(200);
+        expect(pdf.json()).toMatchObject({
+            title: 'Lançamentos',
+            filename: `lancamentos-${today()}.pdf`,
+            filters: 'Tipo: Saída · Categoria: INSUMOS MONTADOR',
+            modelo: 'Resumido',
+            rows: [['10', '10/05/2026', 'Compra de semente', 'JOSE DA SILVA', '1.500,00']],
+        });
+        expect((await lastExport())!.targetLabel).toBe('Lançamentos: 1 registro (com filtros) · PDF');
+    });
+});

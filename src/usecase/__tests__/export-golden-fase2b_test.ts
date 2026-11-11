@@ -29,6 +29,7 @@ const repo = {
     unimed: vi.fn(),
     auditLogs: vi.fn(),
     roomBookings: vi.fn(),
+    financeTransactions: vi.fn(),
     logExport: vi.fn(),
 } as unknown as ExportRepository;
 
@@ -466,5 +467,15 @@ describe('teste de ouro: CSV dos lançamentos do Financeiro', () => {
 
     it('lista vazia: só o cabeçalho', async () => {
         expect(await financeCsv([], { search: 'ninguém' })).toBe(file(FINANCE_HEADER));
+    });
+
+    // A fonte nova do montador (SR-102): sem `fields`, a mesma planilha.
+    it('a fonte `finance-transactions` do montador, sem fields, sai igual, com o nome de arquivo do montador', async () => {
+        vi.mocked(repo.financeTransactions).mockResolvedValue([adubo, nota, mensalidade, estranho] as never);
+        const r = await useCase().execute('finance-transactions', { orderBy: 'date' });
+        expect(r.error).toBeUndefined();
+        expect(r.result!.csv).toBe(file(FINANCE_HEADER, ADUBO_ROW, NOTA_ROW, MENSALIDADE_ROW, ESTRANHO_ROW));
+        expect(r.result!.count).toBe(4);
+        expect(r.result!.filename).toBe('lancamentos-2026-09-17.csv');
     });
 });

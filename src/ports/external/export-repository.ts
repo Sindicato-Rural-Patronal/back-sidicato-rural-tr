@@ -4,6 +4,7 @@ import type { CourseListFilters } from './course-repository.js';
 import type { UserAdminListFilters } from './user-admin-repository.js';
 import type { ContactMessageFilters } from './contact-message-repository.js';
 import type { RoomBookingFilters, RoomBookingItem } from './room-booking-repository.js';
+import type { FinanceTransactionFilters, FinanceTransactionWithCategory } from './finance-repository.js';
 
 // Exportação de dados do painel. Cada método aceita os filtros da listagem
 // correspondente OU uma lista de ids (seleção / um registro só). Sem paginação.
@@ -278,6 +279,12 @@ valor: string
 /** Reserva de sala (evento/reunião), mesmo formato da listagem. */
 export type RoomBookingExportRow = RoomBookingItem;
 
+/** Lançamento do Financeiro, como a lista o lê (com categoria, caixa e comprovantes). */
+export type FinanceTransactionExportRow = FinanceTransactionWithCategory;
+
+/** Os filtros e a ordem da lista de lançamentos (`to` já no fim do dia). */
+export type FinanceTransactionExportFilters = Omit<FinanceTransactionFilters, 'skip' | 'take'>;
+
 export interface ExportRepository {
     people(filters: UserListFilters & ExportSelection & ExportTake): Promise<PersonExportRow[]>;
     companies(filters: CompanyListFilters & ExportSelection & ExportTake): Promise<CompanyExportRow[]>;
@@ -311,6 +318,16 @@ name: string
     roomBookings(filters: RoomBookingFilters & ExportTake): Promise<RoomBookingExportRow[]>;
     /** Nome da sala (mesmo excluída), para o filtro "Sala" em palavras; null se não existe. */
     roomName(id: string): Promise<string | null>;
+    /** Lançamentos do Financeiro: os mesmos filtros, busca e ordem da lista (`orderBy`). */
+    financeTransactions(filters: FinanceTransactionExportFilters & ExportTake): Promise<FinanceTransactionExportRow[]>;
+    /** Nome da categoria e do caixa (mesmo excluídos), para os filtros em palavras; null se não existe. */
+    financeNames(ids: {
+ categoryId?: string;
+accountId?: string 
+}): Promise<{
+ category: string | null;
+account: string | null 
+}>;
     /** Registra a exportação na trilha de auditoria. */
     logExport(entry: {
         actorId: string;

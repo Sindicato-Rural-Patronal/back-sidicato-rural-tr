@@ -46,6 +46,12 @@ single: 'auditoria' },
 title: 'Reservas de sala',
 file: 'reservas-de-sala',
 single: 'reserva' },
+    // Lançamentos do Financeiro (SR-102). Até o front trocar, a planilha também
+    // sai por `GET /admin/finance/transactions/export`, que passa pelo motor.
+    'finance-transactions': { permission: 'READ_FINANCE',
+title: 'Lançamentos',
+file: 'lancamentos',
+single: 'lancamento' },
     // Relatorio de cadastros: os quatro tipos num arquivo so. Pede
     // READ_USER_ADMIN porque traz os administradores e READ_USER porque traz
     // CPF, RG e endereco de todas as pessoas (as permissoes nao sao
