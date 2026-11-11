@@ -29,6 +29,22 @@ timeWindow: '1 minute',
 errorResponseBuilder: tooManyExports },
 };
 
+/** Documentos do navegador avisados por minuto por IP (SR-104): para não encher a auditoria. */
+export const DOCUMENT_RATE_LIMIT = 30;
+export const DOCUMENT_RATE_LIMIT_MESSAGE = 'Muitos documentos seguidos. Aguarde um minuto e tente de novo.';
+
+export const documentRateLimit = {
+    rateLimit: {
+        max: DOCUMENT_RATE_LIMIT,
+        timeWindow: '1 minute',
+        errorResponseBuilder: (_req: FastifyRequest, context: { statusCode: number }) => {
+            const err = new Error(DOCUMENT_RATE_LIMIT_MESSAGE) as Error & { statusCode: number };
+            err.statusCode = context.statusCode;
+            return err;
+        },
+    },
+};
+
 export async function replyWithExport(
     req: FastifyRequest,
     reply: FastifyReply,

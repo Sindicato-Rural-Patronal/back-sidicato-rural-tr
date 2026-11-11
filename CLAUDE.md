@@ -122,7 +122,7 @@ Conferência de conflito em use case enxerga só os ativos; sem uma das duas sa�
 - `publicRoute()`: qualquer um.
 - `loggedIn()`: qualquer admin com login válido ("Minha conta", o sino, o Painel Geral, `/auth/refresh`, CEP).
 - `requires('X', 'Y')`: todas as permissões listadas (a junção de cadastros pede duas).
-- `requiresFrom(req => [...] | null)`: calculada por params/query, nunca pelo corpo; `null` = só o login. Só a exportação usa (`cadastros` pede duas).
+- `requiresFrom(req => [...] | null)`: calculada por params/query, nunca pelo corpo; `null` = só o login. Só a exportação usa (`cadastros` pede duas) e o registro dos documentos do navegador (a permissão do `:kind`).
 
 Um hook `onRequest`, num plugin que envolve todos os routers (`registerRouters`), confere antes de ler o corpo. As respostas são as mesmas em todas as rotas:
 - sem token ou token inválido → 401 `{ error: "Unauthorized" }`; admin excluído/sem regra → 401 `{ error: "Admin not found" }`; sem a permissão → 403 `{ error: "Forbidden" }`;
@@ -162,6 +162,7 @@ O teste de inventário (`http/__tests__/route-auth-inventory_test.ts`) monta tod
 - **Login e refresh:** 10 a cada 5 min.
 - **`PATCH /admin/me`:** 10 a cada 5 min.
 - **Exportação** (`GET`/`POST /admin/export/:dataset` e `GET /admin/finance/transactions/export`): 30/min, cada rota e método contando separado. O excesso responde 429 `{ error: "Muitas exportações seguidas. Aguarde um minuto e tente de novo." }`. O catálogo não tem limite próprio.
+- **Documentos do navegador** (`POST /admin/export/documents/:kind`): 30/min, contando à parte das exportações → 429 `{ error: "Muitos documentos seguidos. Aguarde um minuto e tente de novo." }`.
 - **Rotas públicas** (`http/lib/public-rate-limit.ts`): inscrição (`register-by-cpf`, `register-full`) e `POST /contacts/message` com 10/min; `POST /users/lookup-cpf` com 20/min.
 - Cada rota conta separado. O excesso nas rotas públicas responde 429 `{ error: "Muitas tentativas seguidas. Aguarde um minuto e tente de novo." }`; no login, a mensagem padrão do plugin.
 - **Por CPF** (`lib/cpf-attempt-limiter.ts`, na memória do processo): 5 erros na última hora para o mesmo CPF, somando a consulta, o `register-by-cpf` e o `register-full`, → 429 "Muitas tentativas com este CPF. Aguarde uma hora ou procure o Sindicato.", até com o par certo. Conta erro também para CPF sem cadastro, para o 429 não revelar quem tem. Ver Inscrições.
@@ -665,6 +666,7 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 |---|---|---|---|
 | `GET` · `POST` | `/admin/export/:dataset` | CSV (`;`, BOM, tudo entre aspas, fórmula neutralizada com `'`), com `format=xlsx` a planilha do Excel ou, com `format=pdf`, o JSON do PDF; POST recebe os parâmetros no corpo (listas como array); 30/min por IP | por conjunto |
 | `GET` | `/admin/export/:dataset/catalog` | catálogo do montador (abaixo); conjunto sem montador → 404 "Este conjunto ainda não tem o montador." | por conjunto |
+| `POST` | `/admin/export/documents/:kind` | registra na auditoria um PDF montado no navegador → 204 (ver Auditoria, "Documentos montados no navegador"); 30/min por IP | por documento |
 
 | Conjunto | Permissão | Filtros | Montador |
 |---|---|---|---|
@@ -748,10 +750,32 @@ Parâmetros (query no GET, corpo no POST), além dos filtros do conjunto:
 
 **O que é gravado:**
 - O hook grava toda mutação com sucesso: método, caminho, `entity` (`deriveAuditEntity`) e `targetLabel` (nome do alvo).
-- Fica fora (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (que grava a própria linha), `/admin/notifications/read`, `/users/lookup-cpf` (consulta, não grava) e `/auth/login` (que tem registro próprio).
+- Fica fora (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (que grava a própria linha, inclusive a dos documentos do navegador), `/admin/notifications/read`, `/users/lookup-cpf` (consulta, não grava) e `/auth/login` (que tem registro próprio).
 - **A rota pode decidir** (`skipAuditLine` e `setAuditLabel`, em `http/audit-hooks.ts`): chamada que não mudou nada não deixa linha, e a que mudou diz o que fez no `targetLabel`. Quem usa: `POST /admin/finance/recurrences/generate` (ver Financeiro).
 
 **Login:** 2xx → `LOGIN`; 401 → `LOGIN_FAILED`; 429 → `LOGIN_BLOCKED`; `targetLabel` = usuário digitado. A senha nunca é lida.
+
+**Documentos montados no navegador** (SR-104, decisão 006, item 7.5; `lib/browser-documents.ts`, `usecase/export/browser-document.ts`, rota em `export-router.ts`). Os PDFs que o painel desenha sozinho não passam pela API; para ficarem na trilha, o painel chama, **ao gerar o documento**, `POST /admin/export/documents/:kind`. Não é barreira (quem tem a permissão lê os dados de outro jeito), é trilha.
+- **`:kind`** (lista fechada; **o tipo é contrato**, não se renomeia), com o nome e a permissão do documento:
+
+  | kind | documento | permissão | dados citados no alvo |
+  |---|---|---|---|
+  | `lista-presenca` | Lista de presença | `READ_COURSE` | CPF |
+  | `ficha-inscricao` | Ficha de inscrição (uma ou todas) | `READ_COURSE` e `READ_USER` | CPF, Nascimento, Telefone, E-mail, Endereço, Etnia, Renda familiar |
+  | `agenda` | Agenda (Painel Geral › Imprimir) | `READ_COURSE` | Responsável |
+  | `financeiro` | Relatório do Financeiro ("Baixar PDF") | `READ_FINANCE` | — |
+  | `relatorio-despesas` | Relatório de despesas | `READ_FINANCE` | — |
+  | `nota-empenho` | Nota de Empenho | `READ_FINANCE` | CNPJ / CPF, Endereço, Telefone, Banco |
+  | `recibo` | Recibo | `READ_FINANCE` | — |
+  | `unimed-ficha` | Ficha da Unimed | `READ_USER` | CPF, RG, CNS, Nascimento, Nome da mãe, Plano |
+  | `unimed-termo-adesao` | Termo de adesão da Unimed | `READ_USER` | CPF, RG, Endereço, Plano |
+  | `unimed-contrato` | Contrato da Unimed | `READ_USER` | CPF, RG, Telefone, Plano |
+  | `relatorio-cadastros` | Relatório de cadastros em PDF (montado do CSV de `/admin/export/cadastros`) | `READ_USER_ADMIN` e `READ_USER` | CPF, RG, Nascimento, Telefone, Endereço, Etnia |
+- **Corpo** (JSON): `linhas` (obrigatório, inteiro de 0 a 100.000: quantos registros o documento tem); `alvo` (opcional, até 120: o que o documento cobre em palavras, ex.: o curso, a pessoa, o período, "Nº 123 · COOP LTDA"); `ids` (opcional, 1 a 1000 textos de até 64: os registros do documento, ex.: o curso, as inscrições, o lançamento, o beneficiário); `escopo` (opcional: `seleção`, `com filtros` ou `todos`; sem ele, `seleção` com `ids`, senão `todos`).
+- **Resposta:** 204, sem corpo. Erros: tipo desconhecido → 400 `Valor não aceito em "kind".` (antes da permissão, como o conjunto desconhecido da exportação); corpo inválido → 400 do Ajv (`Informe o campo "linhas".`, `Valor menor que o mínimo em "linhas": 0.`, `Lista curta demais em "ids": mínimo de 1 itens.`, `Texto longo demais em "alvo": máximo de 120 caracteres.`, `Valor não aceito em "escopo".`); sem a permissão do documento → 403 `Forbidden`; sem token → 401; 30/min por IP → 429. Erro não deixa linha; falha ao gravar a linha → 500 (aqui a linha é o serviço).
+- **A linha:** `method: 'EXPORT'`, `entity: 'Exportação'`, `path: '/admin/export/documents/<kind>'` (o hook geral não grava outra), IP, aparelho e local como nas outras. `targetLabel` = "<documento>[: <alvo>] · N registro(s)[ · com <dados citados, até 5, depois "e mais N">]", ex.: "Lista de presença: HORTA · 12 registros · com CPF". `details` no formato da exportação, sem campos: `{ formato: 'pdf', modelo: <nome do documento>, campos: [], escopo, filtros: [], linhas, documento: <kind>, alvo?, ids? }`. Entra no filtro "Exportações" (`action=export`) e na busca pelo alvo.
+- **Frase:** `Gerou o documento "Lista de presença: HORTA · 12 registros · com CPF"`; sem o alvo (coluna "Ação" da planilha da auditoria), `Gerou o documento "Lista de presença"`. "Detalhes da exportação": "Formato: PDF; Modelo: Lista de presença; Escopo: seleção; Linhas: 12".
+- Testes: `usecase/__tests__/browser-document_test.ts` e `e2e/export-documents.e2e_test.ts`.
 
 **O que foi exportado** (`details`, decisão 006): nas exportações das fontes com montador de relatórios (com ou sem `fields`), `{ formato: 'csv'|'pdf'|'xlsx', modelo: string|null, campos: [rótulos, na ordem], escopo: 'seleção'|'com filtros'|'todos', filtros: [{ nome, valor }], linhas }`. Nas outras linhas (e no relatório de cadastros, que não tem montador), `null`. O painel mostra no bloco "O que foi exportado" da linha; a planilha da auditoria tem o campo "Detalhes da exportação" (fora do padrão) com o mesmo conteúdo numa célula.
 
