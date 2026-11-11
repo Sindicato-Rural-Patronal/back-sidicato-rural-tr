@@ -7,6 +7,7 @@ import type { Permission } from '../generated/prisma/enums.js';
 import { registerRouters } from '../http/register-routers.js';
 import { routeKey, type RouteAuthEntry } from '../http/lib/route-auth.js';
 import { EXPORT_DATASETS } from '../usecase/export-data.js';
+import { BROWSER_DOCUMENT_KINDS } from '../lib/browser-documents.js';
 import { createTestApp } from './helpers/create-test-app.js';
 import {
     createTestPrisma,
@@ -76,8 +77,9 @@ function fill(url: string, overrides: Record<string, string> = {}): string {
 /**
  * Um caso por rota. A exportação (`requiresFrom` pelo conjunto) vira um caso
  * por conjunto, porque o UUID aleatório cairia no ramo "conjunto inexistente",
- * que só pede login. O CEP vai inválido de propósito: rota que passa na
- * checagem não pode consultar o ViaCEP.
+ * que só pede login; o registro dos documentos do navegador (`requiresFrom`
+ * pelo tipo, SR-104), um caso por tipo, pelo mesmo motivo. O CEP vai inválido
+ * de propósito: rota que passa na checagem não pode consultar o ViaCEP.
  */
 function casesFor(list: Route[]): Case[] {
     return list.flatMap(route => {
@@ -87,6 +89,13 @@ function casesFor(list: Route[]): Case[] {
                 label: `${label} [${dataset}]`,
                 route,
                 path: fill(route.url, { dataset }),
+            }));
+        }
+        if (route.url === '/admin/export/documents/:kind') {
+            return BROWSER_DOCUMENT_KINDS.map(kind => ({
+                label: `${label} [${kind}]`,
+                route,
+                path: fill(route.url, { kind }),
             }));
         }
         return [{ label,
@@ -168,6 +177,11 @@ describe('a matriz parte das rotas registradas', () => {
     it('a exportação tem um caso por conjunto de dados', () => {
         const exportCases = protectedCases.filter(c => c.route.url === '/admin/export/:dataset');
         expect(exportCases.length).toBe(2 * Object.keys(EXPORT_DATASETS).length);
+    });
+
+    it('o registro dos documentos do navegador tem um caso por tipo', () => {
+        const documentCases = protectedCases.filter(c => c.route.url === '/admin/export/documents/:kind');
+        expect(documentCases.length).toBe(BROWSER_DOCUMENT_KINDS.length);
     });
 });
 
