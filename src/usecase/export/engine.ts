@@ -117,7 +117,7 @@ result?: ExportResult
 
 // ── Leitura do pedido ────────────────────────────────────────────────────────
 
-function readFormat(value: unknown): ExportFormat | Error {
+export function readFormat(value: unknown): ExportFormat | Error {
     if (value === undefined || value === null || value === '') return 'csv';
     const v = String(value).trim().toLowerCase();
     if (v === 'csv' || v === 'pdf' || v === 'xlsx') return v;
@@ -125,7 +125,7 @@ function readFormat(value: unknown): ExportFormat | Error {
 }
 
 /** `fields`: "a,b,c" (GET) ou ['a','b'] (POST). undefined = o padrão. */
-function readFieldKeys(value: unknown): string[] | undefined | Error {
+export function readFieldKeys(value: unknown): string[] | undefined | Error {
     if (value === undefined || value === null) return undefined;
     const list = Array.isArray(value) ? value : typeof value === 'string' ? [value] : null;
     if (!list) return new ValidationError('Parâmetro inválido: fields');
@@ -170,6 +170,17 @@ export function resolveFields<Row>(
         chosen.push(field);
     }
     return chosen;
+}
+
+/**
+ * Os campos que pedem uma permissão que quem pede não tem viram o 403 com os
+ * rótulos ("Sem permissão para exportar: RG, Endereço: Cidade."); null quando
+ * pode todos. Vale para exportar e para salvar um modelo da equipe.
+ */
+export function deniedFieldsError<Row>(fields: ExportField<Row>[], actor: ExportActor): ForbiddenError | null {
+    const denied = fields.filter(f => f.permission && !actor.has(f.permission));
+    if (!denied.length) return null;
+    return new ForbiddenError(`Sem permissão para exportar: ${denied.map(f => f.label).join(', ')}.`);
 }
 
 // ── Células ──────────────────────────────────────────────────────────────────
@@ -306,10 +317,8 @@ now: Date
     const fields = resolveFields(source.fields, keys ?? source.padrao);
     if (fields instanceof Error) return { error: fields };
 
-    const denied = fields.filter(f => f.permission && !actor.has(f.permission));
-    if (denied.length) {
-        return { error: new ForbiddenError(`Sem permissão para exportar: ${denied.map(f => f.label).join(', ')}.`) };
-    }
+    const denied = deniedFieldsError(fields, actor);
+    if (denied) return { error: denied };
 
     const rows: unknown[] = await source.query(repo, filters, EXPORT_LIMITS.rows + 1, { now });
     if (rows.length > EXPORT_LIMITS.rows) {
