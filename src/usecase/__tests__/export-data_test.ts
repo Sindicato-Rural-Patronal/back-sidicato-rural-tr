@@ -176,7 +176,7 @@ gender: '' });
 
         expect(r.result).toMatchObject({ count: 1,
 filename: 'pessoas-2026-09-17.csv',
-auditLabel: 'Pessoas: 1 registro (com filtros)' });
+auditLabel: 'Pessoas: 1 registro (com filtros) · CSV · com CPF, RG, Órgão emissor, Emissão do RG, CNH e mais 29' });
     });
 
     it('um registro pelo id: nome no arquivo e na auditoria', async () => {
@@ -184,7 +184,7 @@ auditLabel: 'Pessoas: 1 registro (com filtros)' });
         const r = await new ExportDataUseCase(repo, now).execute('people', { ids: 'p1' });
         expect(repo.people).toHaveBeenCalledWith(expect.objectContaining({ ids: ['p1'] }));
         expect(r.result).toMatchObject({ filename: 'pessoa-joao-da-silva-2026-09-17.csv',
-auditLabel: 'Pessoas: JOÃO DA SILVA' });
+auditLabel: 'Pessoas: JOÃO DA SILVA · CSV · com CPF, RG, Órgão emissor, Emissão do RG, CNH e mais 29' });
     });
 
     it('seleção de vários ids e lista vazia só com cabeçalho', async () => {

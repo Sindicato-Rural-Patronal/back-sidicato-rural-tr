@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { EducationLevel, Ethnicity, Gender, type Permission } from '../generated/prisma/enums.js';
 import type {
     AdminExportRow,
     AuditLogExportRow,
@@ -8,16 +7,12 @@ import type {
     ContactMessageExportRow,
     CourseExportRow,
     ExportAddress,
-    ExportProperty,
     ExportRepository,
-    PersonExportRow,
     PropertyExportRow,
-    RegistrationExportRow,
     RoomBookingExportRow,
     UnimedExportRow,
 } from '../ports/external/export-repository.js';
 import { ValidationError } from '../errors/validation.js';
-import { stripAccents } from '../lib/text.js';
 import {
     csvBody, csvDate, csvDateTime, csvList, csvMoney, csvWallClock, toCsv, toCsvSections,
     type CsvColumn,
@@ -27,127 +22,31 @@ import {
     BOOKING_TYPE_LABEL,
     COMPANY_TYPE_LABEL,
     COURSE_STATUS_LABEL,
-    EDUCATION_LABEL,
-    ETHNICITY_LABEL,
-    GENDER_LABEL,
-    MARITAL_STATUS_LABEL,
-    MEMBER_STATUS_LABEL,
     label,
 } from '../lib/export-labels.js';
 import { todayInBrazil } from '../lib/quote-products.js';
 import { describeAuditAction } from '../lib/audit-sentence.js';
 import { formatChanges } from '../lib/audit-diff.js';
 import { describeUserAgent } from '../lib/user-agent.js';
+import { EXPORT_DATASETS, type ExportDataset } from './export/datasets.js';
+import { bool, day, empty, idList, text } from './export/filters.js';
+import { formatCep, formatCnpj, formatCpf, propertyLine, slug, ymd } from './export/format.js';
+import { NO_BUILDER_MESSAGE, sourceOf } from './export/catalog/index.js';
+import { peopleSource } from './export/catalog/people.js';
+import {
+    NO_EXTRA_PERMISSIONS, padraoCsvBody, runSourceExport,
+    type ExportActor, type ExportResult,
+} from './export/engine.js';
 
+// Exportação de dados (`/admin/export/:dataset`). `people` e `registrations`
+// já passaram para o montador de relatórios (`usecase/export/`, decisão 006);
+// os outros conjuntos continuam aqui, com as colunas fixas, até a fase 2.
 
-// ── Conjuntos exportáveis ────────────────────────────────────────────────────
+export { EXPORT_DATASETS, type ExportDataset, type ExportResult };
 
-export const EXPORT_DATASETS = {
-    people: { permission: 'READ_USER',
-title: 'Pessoas',
-file: 'pessoas',
-single: 'pessoa' },
-    companies: { permission: 'READ_USER',
-title: 'Empresas',
-file: 'empresas',
-single: 'empresa' },
-    properties: { permission: 'READ_USER',
-title: 'Propriedades',
-file: 'propriedades',
-single: 'propriedade' },
-    admins: { permission: 'READ_USER_ADMIN',
-title: 'Administradores',
-file: 'administradores',
-single: 'administrador' },
-    courses: { permission: 'READ_COURSE',
-title: 'Cursos',
-file: 'cursos',
-single: 'curso' },
-    registrations: { permission: 'READ_COURSE',
-title: 'Inscrições',
-file: 'inscricoes',
-single: 'inscricao' },
-    'contact-messages': { permission: 'READ_CONTACT',
-title: 'Mensagens de contato',
-file: 'mensagens',
-single: 'mensagem' },
-    unimed: { permission: 'READ_USER',
-title: 'Beneficiários Unimed',
-file: 'unimed',
-single: 'unimed' },
-    'audit-logs': { permission: 'READ_AUDIT',
-title: 'Auditoria',
-file: 'auditoria',
-single: 'auditoria' },
-    'room-bookings': { permission: 'READ_COURSE',
-title: 'Reservas de sala',
-file: 'reservas-de-sala',
-single: 'reserva' },
-    // Relatorio de cadastros: os quatro tipos num arquivo so. Pede
-    // READ_USER_ADMIN porque traz os administradores e READ_USER porque traz
-    // CPF, RG e endereco de todas as pessoas (as permissoes nao sao
-    // hierarquicas: uma nao implica a outra). Quem so tem READ_USER continua
-    // com as exportacoes de cada tipo, que ja existem.
-    cadastros: { permission: 'READ_USER_ADMIN',
-alsoRequires: 'READ_USER',
-title: 'Relatório de cadastros',
-file: 'relatorio-de-cadastros',
-single: 'cadastro' },
-} as const satisfies Record<string, {
- permission: Permission;
-alsoRequires?: Permission;
-title: string;
-file: string;
-single: string 
-}>;
-
-export type ExportDataset = keyof typeof EXPORT_DATASETS;
-
-export type ExportResult = {
-    csv: string;
-    count: number;
-    filename: string;
-    /** Texto para a trilha de auditoria. */
-    auditLabel: string;
-};
-
-// ── Leitura da query ─────────────────────────────────────────────────────────
-
-const empty = (v: unknown) => (v === '' || v == null ? undefined : v);
-const text = z.preprocess(empty, z.string().trim().max(200).optional());
-const bool = z.preprocess(
-    v => (v === true || v === 'true' ? true : v === false || v === 'false' ? false : undefined),
-    z.boolean().optional(),
-);
-const enumOf = <T extends Record<string, string>>(e: T) =>
-    z.preprocess(empty, z.enum(Object.values(e) as [T[keyof T], ...T[keyof T][]], { message: 'Filtro inválido' }).optional());
-const day = z.preprocess(empty, z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida: use AAAA-MM-DD').optional());
-// "a,b,c" (GET) ou ['a','b'] (POST). Lista enviada vazia é erro: exportaria tudo sem querer.
-const idList = z.preprocess(
-    v => {
-        if (v == null) return undefined;
-        const list = Array.isArray(v) ? v : typeof v === 'string' ? v.split(',') : v;
-        return Array.isArray(list) ? list.map(s => String(s).trim()).filter(Boolean) : list;
-    },
-    z
-        .array(z.string().max(64))
-        .min(1, 'Nenhum registro selecionado')
-        .max(5000, 'Selecione no máximo 5000 registros')
-        .optional(),
-);
+// ── Leitura da query (conjuntos do caminho antigo) ───────────────────────────
 
 const schemas = {
-    people: z.object({
-        ids: idList,
-        search: text,
-        memberType: text,
-        memberClassification: text,
-        gender: enumOf(Gender),
-        ethnicity: enumOf(Ethnicity),
-        educationLevel: enumOf(EducationLevel),
-        incompleteRegistration: bool,
-        activeMember: bool,
-    }),
     companies: z.object({
         ids: idList,
         search: text,
@@ -166,8 +65,6 @@ rulesId: text }),
         search: text,
         status: z.preprocess(empty, z.enum(['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS', 'COMPLETED']).optional()),
     }),
-    registrations: z.object({ ids: idList,
-courseIds: idList }),
     'contact-messages': z.object({ ids: idList,
 search: text,
 read: bool }),
@@ -190,46 +87,11 @@ search: text }),
         type: z.preprocess(empty, z.enum(['EVENT', 'MEETING'], { message: 'Filtro inválido' }).optional()),
         search: text,
     }),
-} satisfies Record<ExportDataset, z.ZodTypeAny>;
+} satisfies Record<Exclude<ExportDataset, 'people' | 'registrations'>, z.ZodTypeAny>;
+
+type LegacyDataset = keyof typeof schemas;
 
 // ── Formatação ───────────────────────────────────────────────────────────────
-
-// CPF sempre como 000.000.000-00 (gravado só com dígitos). Valor antigo que não
-// tem 11 dígitos sai só com os dígitos, sem máscara pela metade.
-function formatCpf(cpf: string | null): string {
-    if (!cpf) return '';
-    const d = cpf.replace(/\D/g, '');
-    return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : d;
-}
-
-function formatCnpj(cnpj: string | null): string {
-    if (!cnpj) return '';
-    const d = cnpj.replace(/\D/g, '');
-    return d.length === 14 ? `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}` : cnpj;
-}
-
-function formatCep(cep: string | null): string {
-    if (!cep) return '';
-    const d = cep.replace(/\D/g, '');
-    return d.length === 8 ? `${d.slice(0, 5)}-${d.slice(5)}` : cep;
-}
-
-/** Endereço numa linha: "Rua X, 10 - Centro - Terra Roxa/PR - 85990-000". */
-function addressLine(a: ExportAddress | null): string {
-    if (!a) return '';
-    const street = [a.street ?? a.road, a.number].filter(Boolean).join(', ');
-    const rural = [a.localityName, a.km && `km ${a.km}`, a.lot && `lote ${a.lot}`, a.section && `seção ${a.section}`]
-        .filter(Boolean)
-        .join(', ');
-    const city = [a.city, a.state].filter(Boolean).join('/');
-    return [street, a.complement, a.neighborhood, rural, city, formatCep(a.zipCode)].filter(Boolean).join(' - ');
-}
-
-function propertyLine(p: ExportProperty): string {
-    const name = p.registration ? `${p.name} (matrícula ${p.registration})` : p.name;
-    const where = addressLine(p.address);
-    return where ? `${name}: ${where}` : name;
-}
 
 /** Colunas de endereço separadas (planilha filtrável por cidade, CEP…). */
 function addressColumns<T>(prefix: string, get: (row: T) => ExportAddress | null | undefined): CsvColumn<T>[] {
@@ -257,137 +119,7 @@ function addressColumns<T>(prefix: string, get: (row: T) => ExportAddress | null
     ];
 }
 
-function ymd(d: Date): string {
-    return d.toISOString().slice(0, 10);
-}
-
-function isActiveMember(status: string | null, validUntil: Date | null, today: Date): boolean {
-    if (status !== 'ACTIVE') return false;
-    return !validUntil || ymd(validUntil) >= ymd(today);
-}
-
-/** Idade em anos completos na data de hoje. */
-function ageOn(birth: Date | null, today: Date): number | null {
-    if (!birth) return null;
-    let age = today.getUTCFullYear() - birth.getUTCFullYear();
-    const beforeBirthday =
-        today.getUTCMonth() < birth.getUTCMonth() ||
-        (today.getUTCMonth() === birth.getUTCMonth() && today.getUTCDate() < birth.getUTCDate());
-    if (beforeBirthday) age -= 1;
-    return age;
-}
-
-function slug(value: string): string {
-    return stripAccents(value)
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '')
-        .slice(0, 50);
-}
-
 // ── Colunas de cada conjunto ─────────────────────────────────────────────────
-
-function primaryProperty(p: PersonExportRow): ExportProperty | undefined {
-    return p.properties.find(x => x.id === p.primaryPropertyId) ?? p.properties[0];
-}
-
-function peopleColumns(today: Date): CsvColumn<PersonExportRow>[] {
-    return [
-        { header: 'Nome',
-value: p => p.name },
-        { header: 'Apelido',
-value: p => p.nickname },
-        { header: 'CPF',
-value: p => formatCpf(p.cpf) },
-        { header: 'RG',
-value: p => p.rg },
-        { header: 'Órgão emissor',
-value: p => p.rgIssuer },
-        { header: 'Emissão do RG',
-value: p => csvDate(p.rgIssuedAt) },
-        { header: 'Nascimento',
-value: p => csvDate(p.birthDate) },
-        { header: 'Sexo',
-value: p => label(GENDER_LABEL, p.gender) },
-        { header: 'Estado civil',
-value: p => label(MARITAL_STATUS_LABEL, p.maritalStatus) },
-        { header: 'Nacionalidade',
-value: p => p.nationality },
-        { header: 'Naturalidade',
-value: p => p.birthPlace },
-        { header: 'Etnia',
-value: p => label(ETHNICITY_LABEL, p.ethnicity) },
-        { header: 'Escolaridade',
-value: p => label(EDUCATION_LABEL, p.educationLevel) },
-        { header: 'Necessidades especiais',
-value: p => p.specialNeeds },
-        { header: 'CNH',
-value: p => p.driverLicense },
-        { header: 'Categoria CNH',
-value: p => p.driverLicenseCategory },
-        { header: 'E-mail',
-value: p => p.email },
-        { header: 'Telefone',
-value: p => p.phone },
-        { header: 'Telefone 2',
-value: p => p.phone2 },
-        { header: 'Telefone 3',
-value: p => p.phone3 },
-        { header: 'Tipo de membro',
-value: p => p.memberType },
-        { header: 'Classificação',
-value: p => p.memberClassification },
-        { header: 'Categoria funcional',
-value: p => p.functionalCategory },
-        { header: 'Renda familiar',
-value: p => p.familyIncome },
-        { header: 'CAD/PRO',
-value: p => csvList(p.cadPro) },
-        { header: 'Situação de associado',
-value: p => label(MEMBER_STATUS_LABEL, p.memberStatus) },
-        { header: 'Associado em dia',
-value: p => isActiveMember(p.memberStatus, p.membershipValidUntil, today) },
-        { header: 'Associado desde',
-value: p => csvDate(p.memberSince) },
-        { header: 'Associado até',
-value: p => csvDate(p.membershipValidUntil) },
-        { header: 'Nº da observação',
-value: p => p.memberNotesNumber },
-        { header: 'Observações',
-value: p => p.memberNotes },
-        { header: 'Diretoria',
-value: p => p.boardMember },
-        { header: 'Cargo na diretoria',
-value: p => p.boardPosition },
-        { header: 'Propriedade principal',
-value: p => primaryProperty(p)?.name },
-        ...addressColumns<PersonExportRow>('Endereço: ', p => primaryProperty(p)?.address),
-        { header: 'Todas as propriedades',
-value: p => csvList(p.properties.map(propertyLine)) },
-        {
-            header: 'Empresas vinculadas',
-            value: p => csvList(p.companyMemberships.map(m => `${m.company.tradeName || m.company.name} (${m.title})`)),
-        },
-        {
-            header: 'Relacionamentos',
-            value: p => csvList(p.relations.map(r => (r.label ? `${r.target.name} (${r.label})` : r.target.name))),
-        },
-        { header: 'Instrutor',
-value: p => !!p.userInstructor },
-        { header: 'Usuário do painel',
-value: p => (p.userAdmin && !p.userAdmin.isDeleted ? p.userAdmin.username : '') },
-        { header: 'Unimed',
-value: p => (p.unimed && !p.unimed.isDeleted ? p.unimed.plano || 'Sim' : '') },
-        { header: 'Contato público',
-value: p => (p.publicContact ? p.publicContact.title || 'Sim' : '') },
-        { header: 'Inscrições em cursos',
-value: p => p._count.courseUserRegistration },
-        { header: 'Cadastrado em',
-value: p => csvDateTime(p.createdAt) },
-        { header: 'Atualizado em',
-value: p => csvDateTime(p.updatedAt) },
-    ];
-}
 
 const companyColumns: CsvColumn<CompanyExportRow>[] = [
     { header: 'Razão social',
@@ -511,47 +243,6 @@ value: c => c.observations },
 value: c => csvDateTime(c.createdAt) },
 ];
 
-function registrationColumns(today: Date): CsvColumn<RegistrationExportRow>[] {
-    return [
-        { header: 'Curso',
-value: r => r.course.name },
-        { header: 'Nº do evento',
-value: r => r.course.eventNumber },
-        { header: 'Início do curso',
-value: r => csvWallClock(r.course.startTime) },
-        { header: 'Nome',
-value: r => r.userData.name },
-        { header: 'CPF',
-value: r => formatCpf(r.userData.cpf) },
-        { header: 'E-mail',
-value: r => r.userData.email },
-        { header: 'Telefone',
-value: r => r.userData.phone },
-        { header: 'Nascimento',
-value: r => csvDate(r.userData.birthDate) },
-        { header: 'Idade',
-value: r => ageOn(r.userData.birthDate, today) },
-        { header: 'Confirmada',
-value: r => r.confirmed },
-        { header: 'Presença',
-value: r => (r.attended === null ? '' : r.attended ? 'Presente' : 'Faltou') },
-        { header: 'Associado em dia',
-value: r => isActiveMember(r.userData.memberStatus, r.userData.membershipValidUntil, today) },
-        {
-            header: 'Empresa parceira',
-            value: r => csvList(r.userData.companyMemberships.map(m => m.company.tradeName || m.company.name)),
-        },
-        { header: 'Cargo na diretoria',
-value: r => r.userData.boardPosition },
-        { header: 'Contato público',
-value: r => (r.userData.publicContact ? r.userData.publicContact.title || 'Sim' : '') },
-        { header: 'Ficha anexada',
-value: r => !!r.ficha },
-        { header: 'Inscrito em',
-value: r => csvDateTime(r.createdAt) },
-    ];
-}
-
 const contactMessageColumns: CsvColumn<ContactMessageExportRow>[] = [
     { header: 'Recebida em',
 value: m => csvDateTime(m.createdAt) },
@@ -660,15 +351,28 @@ value: b => !!b.seriesId },
 
 // ── Caso de uso ──────────────────────────────────────────────────────────────
 
-// Planilha CSV de um conjunto de dados: com `ids` exporta só os selecionados
-// (um ou vários); sem, tudo o que bate com os filtros da listagem.
+// Exportação de um conjunto de dados: com `ids` exporta só os selecionados
+// (um ou vários); sem, tudo o que bate com os filtros da listagem. `people` e
+// `registrations` vão para o montador (campos, formato e permissão por campo);
+// os outros saem em CSV com as colunas fixas.
 export class ExportDataUseCase {
     constructor(
         private readonly repo: ExportRepository,
         private readonly now: () => Date = () => new Date(),
     ) {}
 
-    async execute(dataset: ExportDataset, query: unknown): Promise<{
+    /** `actor`: as permissões de quem exporta, para os campos que pedem uma a mais. */
+    async execute(dataset: ExportDataset, query: unknown, actor: ExportActor = NO_EXTRA_PERMISSIONS): Promise<{
+ error?: Error;
+result?: ExportResult 
+}> {
+        const source = sourceOf(dataset);
+        if (source) return runSourceExport(source, this.repo, query, { actor,
+now: this.now() });
+        return this.legacy(dataset as LegacyDataset, query);
+    }
+
+    private async legacy(dataset: LegacyDataset, query: unknown): Promise<{
  error?: Error;
 result?: ExportResult 
 }> {
@@ -676,10 +380,17 @@ result?: ExportResult
         if (!parsed.success) {
             return { error: new ValidationError(parsed.error.issues[0]?.message ?? 'Filtro inválido') };
         }
-        const q = parsed.data as Record<string, unknown> & { ids?: string[] };
-        const today = todayInBrazil(this.now());
+        // Campos e PDF só nos conjuntos que já têm o montador.
+        const body = (query ?? {}) as Record<string, unknown>;
+        const format = body.format == null || body.format === '' ? 'csv' : String(body.format).trim().toLowerCase();
+        if (format !== 'csv' && format !== 'pdf') return { error: new ValidationError('Formato inválido: use csv ou pdf.') };
+        if (format === 'pdf' || body.fields != null) return { error: new ValidationError(NO_BUILDER_MESSAGE) };
 
-        const built = await this.build(dataset, q, today);
+        const q = parsed.data as Record<string, unknown> & { ids?: string[] };
+        const now = this.now();
+        const today = todayInBrazil(now);
+
+        const built = await this.build(dataset, q, now);
         const meta = EXPORT_DATASETS[dataset];
         const date = ymd(today);
         const single = built.count === 1 && q.ids?.length === 1 && built.firstName;
@@ -690,16 +401,18 @@ result?: ExportResult
         const auditLabel = single
             ? `${meta.title}: ${built.firstName}`
             : `${meta.title}: ${built.count} registro${built.count === 1 ? '' : 's'} (${scope})`;
-        return { result: { csv: built.csv,
+        return { result: { format: 'csv',
+csv: built.csv,
 count: built.count,
 filename,
-auditLabel } };
+auditLabel,
+auditDetails: null } };
     }
 
     private async build(
-        dataset: ExportDataset,
+        dataset: LegacyDataset,
         q: Record<string, unknown> & { ids?: string[] },
-        today: Date,
+        now: Date,
     ): Promise<{
  csv: string;
 count: number;
@@ -713,11 +426,12 @@ firstName?: string
                     this.repo.companies({}),
                     this.repo.admins({}),
                 ]);
+                // As pessoas saem no padrão do montador (o mesmo CSV de hoje).
                 const csv = toCsvSections([
                     { title: 'PESSOAS FISICAS',
-body: csvBody(peopleColumns(today), pessoas) },
+body: padraoCsvBody(peopleSource, pessoas, now) },
                     { title: 'ASSOCIADOS EM DIA',
-body: csvBody(peopleColumns(today), associados) },
+body: padraoCsvBody(peopleSource, associados, now) },
                     { title: 'PESSOAS JURIDICAS',
 body: csvBody(companyColumns, empresas) },
                     { title: 'ADMINISTRADORES',
@@ -728,12 +442,6 @@ body: csvBody(adminColumns, administradores) },
                 const count = pessoas.length + associados.length + empresas.length + administradores.length;
                 return { csv,
 count };
-            }
-            case 'people': {
-                const rows = await this.repo.people(q);
-                return { csv: toCsv(peopleColumns(today), rows),
-count: rows.length,
-firstName: rows[0]?.name };
             }
             case 'companies': {
                 const rows = await this.repo.companies(q);
@@ -761,15 +469,6 @@ firstName: rows[0]?.userData.name };
                 return { csv: toCsv(courseColumns, rows),
 count: rows.length,
 firstName: rows[0]?.name };
-            }
-            case 'registrations': {
-                const rows = await this.repo.registrations(q as {
- ids?: string[];
-courseIds?: string[] 
-});
-                return { csv: toCsv(registrationColumns(today), rows),
-count: rows.length,
-firstName: rows[0]?.userData.name };
             }
             case 'contact-messages': {
                 const rows = await this.repo.contactMessages(q);

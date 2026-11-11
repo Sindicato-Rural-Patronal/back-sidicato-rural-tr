@@ -334,11 +334,22 @@ const registrationPerson = {
     membershipValidUntil: null,
     boardPosition: 'TESOUREIRO',
     publicContact: { title: null },
+    // Desde o montador (SR-088) o adapter traz todos os vínculos da pessoa, com
+    // `isPartner`, e a coluna "Empresa parceira" filtra as parceiras. Antes o
+    // adapter já trazia só as parceiras. A saída esperada é a mesma.
     companyMemberships: [
-        { company: { name: 'AGRO LTDA',
-tradeName: 'AGRO' } },
-        { company: { name: 'COOP',
-tradeName: null } },
+        { title: 'SOCIO',
+company: { name: 'AGRO LTDA',
+tradeName: 'AGRO',
+isPartner: true } },
+        { title: 'FORNECEDOR',
+company: { name: 'BETA LTDA',
+tradeName: null,
+isPartner: false } },
+        { title: 'SOCIO',
+company: { name: 'COOP',
+tradeName: null,
+isPartner: true } },
     ],
 };
 

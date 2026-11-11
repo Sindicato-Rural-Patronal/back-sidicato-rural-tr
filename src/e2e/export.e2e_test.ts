@@ -190,7 +190,10 @@ method: 'POST' } });
         const [header, ...data] = rows(res.body);
         expect(data.length).toBeGreaterThanOrEqual(5);
         expect(data.every(r => r[header.indexOf('Ação')] === 'Exportou uma planilha')).toBe(true);
-        expect(data.map(r => r[header.indexOf('Alvo')])).toContain('Pessoas: BRUNO EXPORTA');
+        // O alvo diz o formato e cita os campos pessoais (documentos primeiro).
+        expect(data.map(r => r[header.indexOf('Alvo')])).toContain(
+            'Pessoas: BRUNO EXPORTA · CSV · com CPF, RG, Órgão emissor, Emissão do RG, CNH e mais 29',
+        );
 
         const list = await app.inject({ method: 'GET',
 url: '/admin/audit-logs?action=export',

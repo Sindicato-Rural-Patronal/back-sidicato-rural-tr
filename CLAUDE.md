@@ -53,6 +53,7 @@ src/
     lib/                   route-auth.ts (acesso por rota), require-permission.ts (errorToStatus), public-rate-limit.ts, swagger-schemas.ts,
                            request-parsing.ts (parser de JSON, opções do Ajv, limites dos números)
   usecase/                 regras de negócio (sem Fastify; Prisma só pelos ports)
+    export/                montador de relatórios (decisão 006): catálogo de campos por fonte e motor
   ports/external/          interfaces dos repositórios
   adapter/database/        implementações Prisma dos ports; list-filters.ts; prisma-errors.ts
   adapter/storage/         Supabase Storage (createStorageAdapter)
@@ -159,6 +160,7 @@ O teste de inventário (`http/__tests__/route-auth-inventory_test.ts`) monta tod
 - **Global:** 600/min. O IP real vem do proxy por `trustProxy` em `index.ts`; a decisão 002 da Arquitetura trata da topologia.
 - **Login e refresh:** 10 a cada 5 min.
 - **`PATCH /admin/me`:** 10 a cada 5 min.
+- **Exportação** (`GET`/`POST /admin/export/:dataset`): 30/min, cada método contando separado. O excesso responde 429 `{ error: "Muitas exportações seguidas. Aguarde um minuto e tente de novo." }`. O catálogo não tem limite próprio.
 - **Rotas públicas** (`http/lib/public-rate-limit.ts`): inscrição (`register-by-cpf`, `register-full`) e `POST /contacts/message` com 10/min; `POST /users/lookup-cpf` com 20/min.
 - Cada rota conta separado. O excesso nas rotas públicas responde 429 `{ error: "Muitas tentativas seguidas. Aguarde um minuto e tente de novo." }`; no login, a mensagem padrão do plugin.
 - **Por CPF** (`lib/cpf-attempt-limiter.ts`, na memória do processo): 5 erros na última hora para o mesmo CPF, somando a consulta, o `register-by-cpf` e o `register-full`, → 429 "Muitas tentativas com este CPF. Aguarde uma hora ou procure o Sindicato.", até com o par certo. Conta erro também para CPF sem cadastro, para o 429 não revelar quem tem. Ver Inscrições.
@@ -657,29 +659,64 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 - **Produtos:** não se cria nem exclui cotação; os produtos são fixos.
 - **No painel:** a unidade trocada só vai junto do "Salvar cotações", e preço mais de 20% diferente do último pede confirmação.
 
-### Exportação CSV (`export-router.ts`, `usecase/export-data.ts`, `adapter/database/export-adapter.ts`)
+### Exportação e montador de relatórios (`export-router.ts`, `usecase/export-data.ts`, `usecase/export/`, `adapter/database/export-adapter.ts`)
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
-| `GET` · `POST` | `/admin/export/:dataset` | CSV (`;`, BOM, tudo entre aspas, fórmula neutralizada com `'`); POST recebe os parâmetros no corpo (listas como array) | por conjunto |
+| `GET` · `POST` | `/admin/export/:dataset` | CSV (`;`, BOM, tudo entre aspas, fórmula neutralizada com `'`) ou, com `format=pdf`, o JSON do PDF; POST recebe os parâmetros no corpo (listas como array); 30/min por IP | por conjunto |
+| `GET` | `/admin/export/:dataset/catalog` | catálogo do montador (abaixo); conjunto sem montador → 404 "Este conjunto ainda não tem o montador." | por conjunto |
 
-| Conjunto | Permissão | Filtros |
-|---|---|---|
-| `people` | `READ_USER` | os da lista de pessoas |
-| `companies` | `READ_USER` | search, type, isPartner |
-| `properties` | `READ_USER` | ownerIds |
-| `unimed` | `READ_USER` | search |
-| `admins` | `READ_USER_ADMIN` | search, rulesId |
-| `cadastros` | `READ_USER_ADMIN` **e** `READ_USER` (`alsoRequires`) | nenhum (pessoas, empresas, propriedades e administradores num arquivo) |
-| `courses` | `READ_COURSE` | search, status |
-| `registrations` | `READ_COURSE` | courseIds |
-| `room-bookings` | `READ_COURSE` | from, to, roomId, type, search |
-| `contact-messages` | `READ_CONTACT` | search, read |
-| `audit-logs` | `READ_AUDIT` | os da auditoria; no máximo 20.000 linhas mais recentes |
+| Conjunto | Permissão | Filtros | Montador |
+|---|---|---|---|
+| `people` | `READ_USER` | os da lista de pessoas | sim |
+| `registrations` | `READ_COURSE` | courseIds, `confirmed` (true = só as confirmadas) | sim |
+| `companies` | `READ_USER` | search, type, isPartner | fase 2 |
+| `properties` | `READ_USER` | ownerIds | fase 2 |
+| `unimed` | `READ_USER` | search | fase 2 |
+| `admins` | `READ_USER_ADMIN` | search, rulesId | fase 2 |
+| `cadastros` | `READ_USER_ADMIN` **e** `READ_USER` (`alsoRequires`) | nenhum (pessoas, empresas, propriedades e administradores num arquivo) | não (as pessoas já saem pelo padrão do motor) |
+| `courses` | `READ_COURSE` | search, status | fase 2 |
+| `room-bookings` | `READ_COURSE` | from, to, roomId, type, search | fase 2 |
+| `contact-messages` | `READ_CONTACT` | search, read | fase 2 |
+| `audit-logs` | `READ_AUDIT` | os da auditoria; no máximo 20.000 linhas mais recentes | fase 2 |
 
-- **`ids`:** exporta só esses registros; lista vazia → 400. Sem `ids`, vale o mesmo filtro da listagem.
-- **Headers:** `Content-Disposition` (`pessoas-AAAA-MM-DD.csv`, ou `pessoa-<nome>-…` para um registro) e `X-Export-Count`.
+- **`ids`:** exporta só esses registros; lista vazia → 400 "Nenhum registro selecionado"; mais de 5000 → 400 "Selecione no máximo 5000 registros". Sem `ids`, vale o mesmo filtro da listagem.
+- **Headers:** `X-Export-Count` sempre; no CSV, também `Content-Disposition` (`pessoas-AAAA-MM-DD.csv`, ou `pessoa-<nome>-…` para um registro).
 - **Datas:** horário de curso e de reserva sai como gravado (`csvWallClock`); "criado em" sai no horário de Brasília (`csvDateTime`).
-- **Auditoria:** cada exportação grava um `AuditLog` `method: 'EXPORT'` (entity "Exportação"). O hook geral ignora `/admin/export/*`.
+- **Auditoria:** cada exportação grava um `AuditLog` `method: 'EXPORT'` (entity "Exportação"). O hook geral ignora `/admin/export/*`. Nos conjuntos com montador, o `targetLabel` diz o formato e cita os campos pessoais e sensíveis, documentos primeiro, até 5 ("Pessoas: 123 registros (com filtros) · PDF · com CPF, Nascimento e mais 2"): a busca da Auditoria por "CPF" acha quem exportou CPF. Erro não deixa linha.
+
+**Montador de relatórios** (decisão 006, fase 1 em `people` e `registrations`). O back é o único lugar que define colunas, formatos e permissões; o front lê o catálogo.
+
+Parâmetros (query no GET, corpo no POST), além dos filtros do conjunto:
+
+| Parâmetro | Regra |
+|---|---|
+| `fields` | chaves do catálogo **na ordem das colunas** (GET `a,b,c`; POST array); de 1 a 80, sem repetir. **Ausente = o padrão de hoje, byte a byte** (teste de ouro) |
+| `format` | `csv` (padrão) ou `pdf` |
+| `modelo` | id ou nome do modelo usado (até 64). Só vai para a auditoria e o cabeçalho do PDF; o id de fábrica vira o nome ("nome-cpf" → "Nome e CPF") |
+| `confirmed` | só em `registrations`: true = só as inscrições confirmadas |
+
+- **CSV:** como sempre. Com `fields`, o telefone sai com máscara ("(44) 99999-8888", para o Excel não virar "4,5E+10"); **sem `fields` ele sai como gravado**, como sempre saiu. É a única diferença entre "sem `fields`" e "`fields` = o padrão".
+- **PDF:** `application/json` `{ title, filename (….pdf), count, filters, modelo, columns: [{ key, label, type, weight }], rows: string[][] }`. `filters` = os filtros em palavras ("Busca: silva · Só associados em dia"; "Seleção: 8 registros"; "" sem filtro); `modelo` = o nome, "Padrão (como hoje)" sem `fields`, ou null; `weight` = largura relativa; as células chegam formatadas como no CSV, **sem** o `'` contra fórmula (PDF não executa nada).
+- **Erros 400:** "Escolha pelo menos um campo.", "Campo desconhecido: <chave>.", "Campo repetido: <rótulo>.", "No máximo 80 campos por relatório.", "Formato inválido: use csv ou pdf.", "Parâmetro inválido: modelo" (mais de 64), "O relatório passa de 20.000 linhas. Use um filtro para diminuir.", "O PDF aceita até 2.000 linhas. Baixe a planilha ou use um filtro.". `fields` ou `format=pdf` num conjunto sem montador → 400 "Este conjunto ainda não tem o montador.".
+- **Erro 403 por campo** (`ForbiddenError` no use case, porque depende do pedido): "Sem permissão para exportar: RG, Endereço: Cidade.". Continua o 403 `Forbidden` da rota quando falta a permissão do conjunto.
+- **Limites:** 20.000 linhas (o adapter lê no máximo 20.001), 2.000 no PDF, 80 campos, 5000 `ids`, 30 exportações por minuto por IP.
+
+**Catálogo** (`GET /admin/export/:dataset/catalog`, `usecase/export/get-export-catalog.ts`):
+`{ dataset, title, groups: [{ name, fields: [{ key, label, type, privacy, allowed, reason }] }], padrao: string[], modelos: [{ id, name, fields, confirmed? }], filterLabels: { filtro: nome }, limits: { rows, pdfRows, fields } }`.
+- `type`: `text`, `number`, `money`, `boolean`, `list`, `date` (dd/mm/aaaa), `datetime` (Brasília), `wallclock` (como gravado), `cpf`, `cnpj`, `cep`, `phone`, `cns` (com máscara), `blank` (coluna em branco). O tipo formata; o campo só devolve o valor cru.
+- `privacy`: `comum`, `pessoal` ou `sensivel`. É informação (etiqueta no montador e texto da auditoria), não bloqueio.
+- Campo que pede permissão além da do conjunto vem com `allowed: false` e `reason` "Pede a permissão Visualizar usuários"; o montador o mostra desligado.
+- `padrao` são as colunas de hoje; `modelos` são os de fábrica (o Padrão não está na lista). `confirmed: true` só no "Lista de presença" das inscrições.
+- Grupos de `people`, na ordem: Identificação, Documentos, Contato, Endereço, Associado, Vínculos, Sistema, Relatório. Em `registrations`, "Inscrição" vem antes.
+
+**Campos** (`usecase/export/catalog/`; pessoa em `person-fields.ts`, escritos uma vez e reaproveitados com `from`):
+- **Pessoa:** `name`, `nickname`, `birthDate`, `age` (Idade), `gender`, `maritalStatus`, `nationality`, `birthPlace`, `ethnicity`, `educationLevel`, `specialNeeds` · documentos `cpf`, `rg`, `rgIssuer`, `rgIssuedAt`, `driverLicense`, `driverLicenseCategory`, `cadPro` · contato `email`, `phone`, `phone2`, `phone3` · endereço da propriedade principal `primaryProperty`, `addressType`, `addressStreet`, `addressNumber`, `addressComplement`, `addressNeighborhood`, `addressLocality`, `addressRoad`, `addressKm`, `addressLot`, `addressSection`, `addressCity`, `addressState`, `addressZipCode`, `addressLine` (Endereço numa linha), `properties` (Todas as propriedades) · associado `memberType`, `memberClassification`, `functionalCategory`, `familyIncome`, `memberStatus`, `activeMember`, `memberSince`, `membershipValidUntil`, `memberNotesNumber`, `memberNotes`, `boardMember`, `boardPosition` · vínculos `companies`, `partnerCompanies` (Empresa parceira), `relations`, `instructor`, `adminUsername`, `unimedPlan`, `publicContact`, `registrationsCount` · sistema `createdAt`, `updatedAt`.
+- **Inscrição:** `course`, `eventNumber`, `courseStart`, `confirmed`, `attendance` (Presença), `hasFicha`, `registeredAt` (Inscrito em), mais os de pessoa.
+- **Todo relatório:** `ordinal` (Nº de ordem: 1, 2, 3…) e `signature` (Assinatura, em branco e larga).
+- **Permissão por campo em `registrations`:** os campos de pessoa que já saíam (`name`, `cpf`, `email`, `phone`, `birthDate`, `age`, `activeMember`, `partnerCompanies`, `boardPosition`, `publicContact`) pedem só `READ_COURSE`; o resto da pessoa pede também `READ_USER`. Em `people`, tudo sai com `READ_USER`.
+- **Modelos de fábrica:** `people`: `nome-cpf`, `nome-email`, `contato` (nome, telefones, e-mail, cidade), `lista-presenca` (Nº, nome, CPF, assinatura), `endereco-correspondencia` (nome, rua, número, complemento, bairro, cidade, UF, CEP), `associados` (nome, CPF, situação, desde, até, telefone). `registrations`: `nome-cpf`, `nome-email`, `contato` (nome, telefone, e-mail), `lista-presenca` (com `confirmed: true`).
+- **Regra:** coluna exportável nova = um campo no catálogo, que aparece sozinho no montador, no CSV e no PDF. **A chave é contrato: nunca se renomeia nem se reaproveita.** O `export-builder_test.ts` confere chaves e rótulos únicos, e que o padrão e os modelos só usam chaves do catálogo sem permissão a mais. O padrão de cada fonte fica congelado pelo teste de ouro (`export-golden_test.ts` e `export-golden.e2e_test.ts`).
+- **Inscrições leem a pessoa inteira** (o mesmo `include` de `people`): os vínculos com empresa vêm todos, pelo nome da empresa, e "Empresa parceira" filtra as parceiras.
 
 ### Auditoria (`audit-router.ts`, `http/audit-hooks.ts`)
 | Método | Path | O que faz | Auth |

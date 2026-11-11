@@ -1,0 +1,138 @@
+import { z } from 'zod';
+import type { RegistrationExportRow } from '../../../ports/external/export-repository.js';
+import { bool, idList } from '../filters.js';
+import { personFields, reportFields } from './person-fields.js';
+import type { ExportField, ExportFilterDescription, ExportSource } from './types.js';
+
+// Fonte `registrations`: inscrições dos cursos (permissão READ_COURSE).
+//
+// Permissão cruzada (decisão 006, item 2): quem só tem READ_COURSE já
+// exportava nome, CPF, e-mail, telefone, nascimento, idade, associado em dia,
+// empresa parceira, cargo na diretoria e contato público. Esses continuam só
+// com READ_COURSE. O resto da pessoa (RG, endereço, renda…) pede também
+// READ_USER, para ninguém ganhar acesso que não tinha.
+
+const filters = z.object({
+    ids: idList,
+    courseIds: idList,
+    // true = só as confirmadas; ausente ou false = todas.
+    confirmed: bool,
+});
+
+type RegistrationFilters = z.infer<typeof filters>;
+
+const filterLabels = {
+    courseIds: 'Cursos',
+    confirmed: 'Só confirmadas',
+};
+
+/** Campos da pessoa que já saíam na planilha de inscrições antes do montador. */
+export const REGISTRATION_FREE_PERSON_FIELDS = [
+    'name', 'cpf', 'email', 'phone', 'birthDate', 'age', 'activeMember', 'partnerCompanies', 'boardPosition',
+    'publicContact',
+] as const;
+
+const registrationFields: ExportField<RegistrationExportRow>[] = [
+    { key: 'course',
+label: 'Curso',
+group: 'Inscrição',
+type: 'text',
+privacy: 'comum',
+weight: 3,
+value: r => r.course.name },
+    { key: 'eventNumber',
+label: 'Nº do evento',
+group: 'Inscrição',
+type: 'text',
+privacy: 'comum',
+value: r => r.course.eventNumber },
+    { key: 'courseStart',
+label: 'Início do curso',
+group: 'Inscrição',
+type: 'wallclock',
+privacy: 'comum',
+value: r => r.course.startTime },
+    { key: 'confirmed',
+label: 'Confirmada',
+group: 'Inscrição',
+type: 'boolean',
+privacy: 'comum',
+value: r => r.confirmed },
+    {
+        key: 'attendance',
+        label: 'Presença',
+        group: 'Inscrição',
+        type: 'text',
+        privacy: 'comum',
+        value: r => (r.attended === null ? '' : r.attended ? 'Presente' : 'Faltou'),
+    },
+    { key: 'hasFicha',
+label: 'Ficha anexada',
+group: 'Inscrição',
+type: 'boolean',
+privacy: 'comum',
+value: r => !!r.ficha },
+    { key: 'registeredAt',
+label: 'Inscrito em',
+group: 'Inscrição',
+type: 'datetime',
+privacy: 'comum',
+value: r => r.createdAt },
+];
+
+/** As 17 colunas de hoje, na ordem de hoje. Congeladas pelo teste de ouro. */
+const PADRAO = [
+    'course', 'eventNumber', 'courseStart', 'name', 'cpf', 'email', 'phone', 'birthDate', 'age', 'confirmed',
+    'attendance', 'activeMember', 'partnerCompanies', 'boardPosition', 'publicContact', 'hasFicha', 'registeredAt',
+];
+
+/** "Curso: HORTA" quando dá para dizer o nome; senão "Cursos: 4". */
+function describeCourses(courseIds: string[], rows: RegistrationExportRow[]): ExportFilterDescription {
+    const names = [...new Set(rows.map(r => r.course.name))];
+    if (names.length && names.length <= 3 && names.length === courseIds.length) {
+        return { nome: names.length === 1 ? 'Curso' : 'Cursos',
+valor: names.join(', ') };
+    }
+    return { nome: 'Cursos',
+valor: String(courseIds.length) };
+}
+
+export const registrationsSource: ExportSource<RegistrationExportRow, RegistrationFilters> = {
+    dataset: 'registrations',
+    filters,
+    filterLabels,
+    describeFilters: (f, rows) => [
+        ...(f.courseIds?.length ? [describeCourses(f.courseIds, rows)] : []),
+        ...(f.confirmed ? [{ nome: filterLabels.confirmed,
+valor: 'Sim' }] : []),
+    ],
+    fields: [
+        ...registrationFields,
+        ...personFields<RegistrationExportRow>(r => r.userData, {
+            permission: 'READ_USER',
+            free: REGISTRATION_FREE_PERSON_FIELDS,
+        }),
+        ...reportFields<RegistrationExportRow>(),
+    ],
+    padrao: PADRAO,
+    modelos: [
+        { id: 'nome-cpf',
+name: 'Nome e CPF',
+fields: ['name', 'cpf'] },
+        { id: 'nome-email',
+name: 'Nome e e-mail',
+fields: ['name', 'email'] },
+        { id: 'contato',
+name: 'Contato',
+fields: ['name', 'phone', 'email'] },
+        { id: 'lista-presenca',
+name: 'Lista de presença',
+fields: ['ordinal', 'name', 'cpf', 'signature'],
+confirmed: true },
+    ],
+    query: (repo, { ids, courseIds, confirmed }, take) => repo.registrations({ ids,
+courseIds,
+confirmed,
+take }),
+    firstName: row => row.userData.name,
+};

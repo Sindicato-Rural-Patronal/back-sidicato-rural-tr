@@ -38,35 +38,41 @@ const propertyInclude = {
     orderBy: { createdAt: 'asc' as const },
 };
 
+// A pessoa inteira, como a exportação de pessoas e os campos de pessoa do
+// montador de relatórios (decisão 006) precisam. As inscrições usam o mesmo.
+const personInclude = {
+    properties: propertyInclude,
+    companyMemberships: {
+        where: { company: { isDeleted: false } },
+        include: { company: { select: { name: true,
+tradeName: true,
+isPartner: true } } },
+        orderBy: { company: { name: 'asc' as const } },
+    },
+    relations: {
+        where: { isDeleted: false,
+target: { isDeleted: false } },
+        include: { target: { select: { name: true } } },
+    },
+    userAdmin: { select: { username: true,
+isDeleted: true } },
+    userInstructor: { select: { id: true } },
+    unimed: { select: { plano: true,
+isDeleted: true } },
+    publicContact: { select: { title: true } },
+    _count: { select: { courseUserRegistration: { where: { isDeleted: false } } } },
+};
+
 class ExportAdapter implements ExportRepository {
     constructor(private prisma: PrismaClient) {}
 
-    people({ ids, ...filters }: Parameters<ExportRepository['people']>[0]): Promise<PersonExportRow[]> {
+    people({ ids, take, ...filters }: Parameters<ExportRepository['people']>[0]): Promise<PersonExportRow[]> {
         return this.prisma.userData.findMany({
             where: byIds(ids) ? { ...byIds(ids),
 isDeleted: false } : buildUserListWhere(filters),
             orderBy: { name: 'asc' },
-            include: {
-                properties: propertyInclude,
-                companyMemberships: {
-                    where: { company: { isDeleted: false } },
-                    include: { company: { select: { name: true,
-tradeName: true } } },
-                    orderBy: { company: { name: 'asc' } },
-                },
-                relations: {
-                    where: { isDeleted: false,
-target: { isDeleted: false } },
-                    include: { target: { select: { name: true } } },
-                },
-                userAdmin: { select: { username: true,
-isDeleted: true } },
-                userInstructor: { select: { id: true } },
-                unimed: { select: { plano: true,
-isDeleted: true } },
-                publicContact: { select: { title: true } },
-                _count: { select: { courseUserRegistration: { where: { isDeleted: false } } } },
-            },
+            ...(take && { take }),
+            include: personInclude,
         });
     }
 
@@ -151,39 +157,23 @@ select: { confirmed: true } },
         });
     }
 
-    registrations({ ids, courseIds }: Parameters<ExportRepository['registrations']>[0]): Promise<RegistrationExportRow[]> {
+    registrations({ ids, courseIds, confirmed, take }: Parameters<ExportRepository['registrations']>[0]): Promise<RegistrationExportRow[]> {
         return this.prisma.courseUserRegistration.findMany({
             where: {
                 isDeleted: false,
                 course: { isDeleted: false },
                 ...(byIds(ids) ?? {}),
                 ...(courseIds?.length && { courseId: { in: courseIds } }),
+                ...(confirmed === true && { confirmed: true }),
             },
             orderBy: [{ course: { startTime: 'asc' } }, { userData: { name: 'asc' } }],
+            ...(take && { take }),
             include: {
                 ficha: { select: { id: true } },
                 course: { select: { name: true,
 eventNumber: true,
 startTime: true } },
-                userData: {
-                    select: {
-                        name: true,
-                        cpf: true,
-                        email: true,
-                        phone: true,
-                        birthDate: true,
-                        memberStatus: true,
-                        membershipValidUntil: true,
-                        boardPosition: true,
-                        publicContact: { select: { title: true } },
-                        companyMemberships: {
-                            where: { company: { isPartner: true,
-isDeleted: false } },
-                            select: { company: { select: { name: true,
-tradeName: true } } },
-                        },
-                    },
-                },
+                userData: { include: personInclude },
             },
         });
     }

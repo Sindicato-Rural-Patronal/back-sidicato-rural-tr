@@ -23,6 +23,9 @@ export type AuditLogFilters = {
 /** Quando `ids` vem preenchido, os filtros são ignorados. */
 export type ExportSelection = { ids?: string[] };
 
+/** No máximo `take` linhas (o montador pede o limite + 1 para saber se passou). */
+export type ExportTake = { take?: number };
+
 export type ExportAddress = {
     type: string;
     street: string | null;
@@ -85,11 +88,13 @@ export type PersonExportRow = {
     createdAt: Date;
     updatedAt: Date;
     properties: ExportProperty[];
+    /** Vínculos com empresas ativas, pelo nome da empresa. */
     companyMemberships: {
  title: string;
 company: {
  name: string;
-tradeName: string | null 
+tradeName: string | null;
+isPartner: boolean 
 } 
 }[];
     relations: {
@@ -204,23 +209,8 @@ export type RegistrationExportRow = {
 eventNumber: string | null;
 startTime: Date 
 };
-    userData: {
-        name: string;
-        cpf: string | null;
-        email: string | null;
-        phone: string;
-        birthDate: Date | null;
-        memberStatus: string | null;
-        membershipValidUntil: Date | null;
-        boardPosition: string | null;
-        publicContact: { title: string | null } | null;
-        companyMemberships: {
- company: {
- name: string;
-tradeName: string | null 
-} 
-}[];
-    };
+    /** A pessoa inteira (os campos de pessoa do montador). */
+    userData: PersonExportRow;
 };
 
 export type ContactMessageExportRow = {
@@ -279,14 +269,17 @@ export type AuditLogExportRow = {
 export type RoomBookingExportRow = RoomBookingItem;
 
 export interface ExportRepository {
-    people(filters: UserListFilters & ExportSelection): Promise<PersonExportRow[]>;
+    people(filters: UserListFilters & ExportSelection & ExportTake): Promise<PersonExportRow[]>;
     companies(filters: CompanyListFilters & ExportSelection): Promise<CompanyExportRow[]>;
     /** `ownerIds`: propriedades dessas pessoas/empresas. */
     properties(filters: ExportSelection & { ownerIds?: string[] }): Promise<PropertyExportRow[]>;
     admins(filters: UserAdminListFilters & ExportSelection): Promise<AdminExportRow[]>;
     courses(filters: CourseListFilters & ExportSelection): Promise<CourseExportRow[]>;
-    /** `courseIds`: inscrições desses cursos; sem nada, de todos. */
-    registrations(filters: ExportSelection & { courseIds?: string[] }): Promise<RegistrationExportRow[]>;
+    /** `courseIds`: inscrições desses cursos; sem nada, de todos. `confirmed: true`: só as confirmadas. */
+    registrations(filters: ExportSelection & ExportTake & {
+ courseIds?: string[];
+confirmed?: boolean 
+}): Promise<RegistrationExportRow[]>;
     contactMessages(filters: ContactMessageFilters & ExportSelection): Promise<ContactMessageExportRow[]>;
     unimed(filters: { search?: string } & ExportSelection): Promise<UnimedExportRow[]>;
     auditLogs(filters: AuditLogFilters): Promise<AuditLogExportRow[]>;
