@@ -140,6 +140,11 @@ linhas: 4 };
         expect(exp(null, pdf)).toBe('Exportou um relatório em PDF');
         expect(exp('Pessoas: 4 registros (todos) · CSV', { ...pdf,
 formato: 'csv' })).toBe('Exportou a planilha "Pessoas: 4 registros (todos) · CSV"');
+        // Excel (SR-104): a planilha do Excel.
+        expect(exp('Pessoas: 4 registros (todos) · Excel', { ...pdf,
+formato: 'xlsx' })).toBe('Exportou a planilha do Excel "Pessoas: 4 registros (todos) · Excel"');
+        expect(exp(null, { ...pdf,
+formato: 'xlsx' })).toBe('Exportou uma planilha do Excel');
         // Linhas antigas e fontes sem montador: sem details.
         expect(exp(null, null)).toBe('Exportou uma planilha');
         expect(exp(null, [])).toBe('Exportou uma planilha');

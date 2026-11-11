@@ -264,7 +264,7 @@ export type AuditLogExportRow = {
 
 /** `AuditLog.details` de uma exportação (decisão 006): o que saiu. */
 export type ExportAuditLogDetails = {
-    formato: 'csv' | 'pdf';
+    formato: 'csv' | 'pdf' | 'xlsx';
     modelo: string | null;
     /** Rótulos, na ordem das colunas. */
     campos: string[];

@@ -7,14 +7,16 @@ import {
     type CsvColumn, type CsvValue,
 } from '../../lib/csv.js';
 import { todayInBrazil } from '../../lib/quote-products.js';
+import { buildXlsx, type XlsxCell } from '../../lib/xlsx.js';
 import { EXPORT_DATASETS } from './datasets.js';
 import { formatCep, formatCnpj, formatCns, formatCpf, formatPhone, slug, ymd } from './format.js';
 import type { AnyExportSource } from './catalog/index.js';
 import type { ExportField, ExportFieldType, ExportFilterDescription } from './catalog/types.js';
+import { SCOPE_WORDS, aboutSheet, brasiliaWallClock, dataSheet, xlsxCell } from './xlsx.js';
 
 // O motor do montador de relatórios (decisão 006): lê o pedido (`fields`,
 // `format`, `modelo`), resolve os campos do catálogo, confere permissões e
-// limites, monta a tabela e entrega em CSV ou no JSON do PDF.
+// limites, monta a tabela e entrega em CSV, em Excel (.xlsx) ou no JSON do PDF.
 //
 // Sem `fields` sai o padrão de hoje, byte a byte (teste de ouro). A única
 // diferença entre "sem fields" e "fields = o padrão" é o telefone e o CNS:
@@ -30,7 +32,14 @@ export const EXPORT_LIMITS = {
     fields: 80,
 } as const;
 
-export type ExportFormat = 'csv' | 'pdf';
+export type ExportFormat = 'csv' | 'pdf' | 'xlsx';
+
+export const FORMAT_MESSAGE = 'Formato inválido: use csv, pdf ou xlsx.';
+
+/** Como o formato aparece no alvo da auditoria: "· CSV", "· PDF", "· Excel". */
+export const FORMAT_LABEL: Record<ExportFormat, string> = { csv: 'CSV',
+pdf: 'PDF',
+xlsx: 'Excel' };
 
 /** Quem exporta: só o que importa aqui são as permissões. */
 export type ExportActor = { has(permission: Permission): boolean };
@@ -87,10 +96,12 @@ export type ExportScope = ExportAuditLogDetails['escopo'];
 
 export type ExportResult = {
     format: ExportFormat;
-    /** O arquivo, quando `format` é csv ("" no PDF). */
+    /** O arquivo, quando `format` é csv ("" nos outros). */
     csv: string;
     /** O JSON do PDF, quando `format` é pdf. */
     pdf?: ExportPdf;
+    /** O arquivo .xlsx, quando `format` é xlsx. */
+    xlsx?: Buffer;
     count: number;
     filename: string;
     /** Texto para a trilha de auditoria. */
@@ -109,8 +120,8 @@ result?: ExportResult
 function readFormat(value: unknown): ExportFormat | Error {
     if (value === undefined || value === null || value === '') return 'csv';
     const v = String(value).trim().toLowerCase();
-    if (v === 'csv' || v === 'pdf') return v;
-    return new ValidationError('Formato inválido: use csv ou pdf.');
+    if (v === 'csv' || v === 'pdf' || v === 'xlsx') return v;
+    return new ValidationError(FORMAT_MESSAGE);
 }
 
 /** `fields`: "a,b,c" (GET) ou ['a','b'] (POST). undefined = o padrão. */
@@ -223,6 +234,24 @@ export function padraoCsvBody<Row>(source: AnyExportSource, rows: Row[], now: Da
     return csvBody(csvColumns(fields, todayInBrazil(now), true), indexed(rows));
 }
 
+/** A célula do .xlsx de um campo numa linha: o texto é o mesmo do CSV, sem o `'`. */
+function fieldXlsxCell<Row>(f: ExportField<Row>, row: Row, ctx: {
+ today: Date;
+index: number 
+}, legacy: boolean): XlsxCell {
+    const raw = f.value(row, ctx);
+    return xlsxCell(f.type, raw, () => cellDisplay(cellValue(f.type, raw, legacy)));
+}
+
+/** A aba do padrão de uma fonte no .xlsx (o relatório de cadastros junta várias). */
+export function padraoXlsxSheet<Row>(source: AnyExportSource, name: string, rows: Row[], now: Date) {
+    const fields = resolveFields<Row>(source.fields, source.padrao);
+    if (fields instanceof Error) throw fields;
+    const today = todayInBrazil(now);
+    return dataSheet(name, fields, rows, (f, row, index) => fieldXlsxCell(f, row, { today,
+index }, true));
+}
+
 // ── Auditoria ────────────────────────────────────────────────────────────────
 
 const MAX_CITED = 5;
@@ -314,7 +343,7 @@ valor: `${filters.ids.length} registro${filters.ids.length === 1 ? '' : 's'}` }]
         ? `${meta.title}: ${firstName}`
         : `${meta.title}: ${count} registro${count === 1 ? '' : 's'} (${scope})`;
     const cited = citedPersonalFields(fields);
-    const auditLabel = [head, format.toUpperCase(), ...(cited ? [`com ${cited}`] : [])].join(' · ');
+    const auditLabel = [head, FORMAT_LABEL[format], ...(cited ? [`com ${cited}`] : [])].join(' · ');
     const auditDetails: ExportAuditDetails = {
         formato: format,
         modelo: modeloText,
@@ -332,6 +361,32 @@ auditDetails };
     if (format === 'csv') {
         return { result: { ...common,
 csv: toCsv(csvColumns(fields, today, legacy), indexed(rows)) } };
+    }
+    if (format === 'xlsx') {
+        const filtersLine = filtersText(filtros);
+        const xlsx = buildXlsx([
+            dataSheet(meta.title, fields, rows, (f, row, index) => fieldXlsxCell(f, row, { today,
+index }, legacy)),
+            aboutSheet([
+                ['Relatório', { kind: 'text',
+value: meta.title }],
+                ['Gerado em', { kind: 'datetime',
+value: brasiliaWallClock(now) }],
+                ['Registros', { kind: 'number',
+value: count }],
+                ['Escopo', { kind: 'text',
+value: SCOPE_WORDS[scope] ?? scope }],
+                ...(filtersLine ? [['Filtros', { kind: 'text',
+value: filtersLine }] as [string, XlsxCell]] : []),
+                ...(modeloText ? [['Modelo', { kind: 'text',
+value: modeloText }] as [string, XlsxCell]] : []),
+                ['Campos', { kind: 'text',
+value: fields.map(f => f.label).join(', ') }],
+            ]),
+        ], now);
+        return { result: { ...common,
+csv: '',
+xlsx } };
     }
     const pdf: ExportPdf = {
         title: meta.title,

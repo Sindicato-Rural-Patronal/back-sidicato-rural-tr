@@ -2,12 +2,13 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { ExportRepository } from '../../ports/external/export-repository.js';
 import type { ExportDataUseCase, ExportDataset } from '../../usecase/export-data.js';
 import { requestContext } from '../../lib/request-context.js';
+import { XLSX_CONTENT_TYPE } from '../../lib/xlsx.js';
 import { fillAuditLocationLater } from '../audit-hooks.js';
 import { errorToStatus } from './require-permission.js';
 import { adminOf } from './route-auth.js';
 
 // Resposta de uma exportação (decisão 006): roda o motor, grava a linha EXPORT
-// na auditoria e devolve o CSV ou o JSON do PDF. Usada por
+// na auditoria e devolve o CSV, o .xlsx ou o JSON do PDF. Usada por
 // `/admin/export/:dataset` e pela rota antiga do CSV do Financeiro
 // (`GET /admin/finance/transactions/export`), que passa pelo mesmo motor.
 
@@ -64,6 +65,12 @@ export async function replyWithExport(
         .header('X-Export-Count', String(r.result.count))
         .header('Access-Control-Expose-Headers', 'Content-Disposition, X-Export-Count');
     if (r.result.pdf) return reply.send(r.result.pdf);
+    if (r.result.xlsx) {
+        return reply
+            .header('Content-Type', XLSX_CONTENT_TYPE)
+            .header('Content-Disposition', `attachment; filename="${r.result.filename}"`)
+            .send(r.result.xlsx);
+    }
     return reply
         .header('Content-Type', 'text/csv; charset=utf-8')
         .header('Content-Disposition', `attachment; filename="${opts.filename ?? r.result.filename}"`)

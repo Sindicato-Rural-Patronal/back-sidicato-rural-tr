@@ -297,7 +297,7 @@ describe('erros e limites', () => {
         ['fields=name,senha', 'Campo desconhecido: senha.'],
         ['fields=name,cpf,name', 'Campo repetido: Nome.'],
         [`fields=${Array.from({ length: 81 }, () => 'name').join(',')}`, 'No máximo 80 campos por relatório.'],
-        ['format=xlsx', 'Formato inválido: use csv ou pdf.'],
+        ['format=ods', 'Formato inválido: use csv, pdf ou xlsx.'],
     ];
     for (const [query, message] of cases) {
         it(`?${query.slice(0, 30)} → 400 "${message}"`, async () => {

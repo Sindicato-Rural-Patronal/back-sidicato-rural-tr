@@ -146,6 +146,9 @@ valor: '8 registros' }],
 campos: 'Nome',
 filtros: [null, 3],
 linhas: '2' })).toBe('Formato: CSV');
+        // O .xlsx (SR-104) aparece como Excel.
+        expect(describeExportDetails({ formato: 'xlsx',
+linhas: 5 })).toBe('Formato: Excel; Linhas: 5');
         for (const value of [null, undefined, 'pdf', [], {}, { formato: 3 }]) expect(describeExportDetails(value)).toBeNull();
     });
 

@@ -82,7 +82,7 @@ valor: string
             .map(f => (f.valor === 'Sim' ? f.nome : `${f.nome}: ${f.valor}`))
         : [];
     const campos = strings(d.campos);
-    const parts = [`Formato: ${d.formato.toUpperCase()}`];
+    const parts = [`Formato: ${d.formato === 'xlsx' ? 'Excel' : d.formato.toUpperCase()}`];
     if (typeof d.modelo === 'string' && d.modelo) parts.push(`Modelo: ${d.modelo}`);
     if (campos.length) parts.push(`Campos: ${campos.join(', ')}`);
     if (typeof d.escopo === 'string' && d.escopo) parts.push(`Escopo: ${d.escopo}`);

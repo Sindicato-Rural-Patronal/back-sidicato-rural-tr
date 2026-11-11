@@ -396,7 +396,7 @@ describe('montador: erros e limites', () => {
         ['chave desconhecida', { fields: ['name', 'senha'] }, 'Campo desconhecido: senha.'],
         ['chave repetida', { fields: 'name,cpf,name' }, 'Campo repetido: Nome.'],
         ['81 campos', { fields: Array.from({ length: 81 }, () => 'name') }, 'No máximo 80 campos por relatório.'],
-        ['formato', { format: 'xlsx' }, 'Formato inválido: use csv ou pdf.'],
+        ['formato', { format: 'ods' }, 'Formato inválido: use csv, pdf ou xlsx.'],
         ['modelo longo', { modelo: 'x'.repeat(65) }, 'Parâmetro inválido: modelo'],
     ];
     for (const [name, input, message] of cases) {
@@ -449,7 +449,7 @@ format: 'pdf' });
             const r = await useCase().execute('cadastros', input);
             expect(r.error!.message).toBe(NO_BUILDER_MESSAGE);
         }
-        expect((await useCase().execute('cadastros', { format: 'xlsx' })).error!.message).toBe('Formato inválido: use csv ou pdf.');
+        expect((await useCase().execute('cadastros', { format: 'ods' })).error!.message).toBe('Formato inválido: use csv, pdf ou xlsx.');
         const ok = await useCase().execute('cadastros', { format: 'csv' });
         expect(ok.result).toMatchObject({ format: 'csv',
 auditDetails: null,

@@ -9,6 +9,7 @@ import { EXPORT_LIMITS } from '../../usecase/export/engine.js';
 import { errorToStatus } from '../lib/require-permission.js';
 import { adminOf, requiresFrom } from '../lib/route-auth.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
+import { XLSX_CONTENT_TYPE } from '../../lib/xlsx.js';
 import { EXPORT_RATE_LIMIT, EXPORT_RATE_LIMIT_MESSAGE, exportRateLimit, replyWithExport } from '../lib/export-reply.js';
 
 const builderDatasets = Object.keys(EXPORT_SOURCES).join(', ');
@@ -22,7 +23,7 @@ const builderParams = {
         description: `Chaves do catálogo, na ordem das colunas (GET: "a,b,c"). De 1 a ${EXPORT_LIMITS.fields}, sem repetir. Ausente = o padrão de hoje. Só em: ${builderDatasets}.`,
     },
     format: { type: 'string',
-description: '`csv` (padrão) ou `pdf` (devolve o JSON para o painel desenhar o PDF). PDF só nos conjuntos com montador.' },
+description: '`csv` (padrão), `xlsx` (planilha do Excel, gerada aqui, com o mesmo limite do CSV) ou `pdf` (devolve o JSON para o painel desenhar o PDF). PDF só nos conjuntos com montador; `xlsx` também no relatório de cadastros, sem `fields` (uma aba por seção).' },
     modelo: { type: 'string',
 description: 'Id ou nome do modelo usado (até 64). Só vai para a auditoria e o cabeçalho do PDF.' },
     confirmed: { type: 'boolean',
@@ -124,7 +125,7 @@ export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClien
     const exportData = new ExportDataUseCase(repo);
     const getCatalog = new GetExportCatalogUseCase();
 
-    const description = `Exporta um conjunto de dados: planilha CSV (\`;\`, UTF-8 com BOM) ou, nos conjuntos com montador de relatórios, o JSON do PDF.
+    const description = `Exporta um conjunto de dados: planilha CSV (\`;\`, UTF-8 com BOM), planilha do Excel (\`format=xlsx\`) ou, nos conjuntos com montador de relatórios, o JSON do PDF.
 
 - \`ids\`: só esses registros (seleção na lista ou um registro só). Lista vazia → 400.
 - Sem \`ids\`: tudo o que bate com os mesmos filtros da listagem.
@@ -132,10 +133,11 @@ export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClien
 
 **Montador de relatórios** (decisão 006; hoje em ${builderDatasets}; o catálogo está em \`GET /admin/export/:dataset/catalog\`):
 - \`fields\`: chaves do catálogo na ordem das colunas. **Sem \`fields\` sai exatamente o CSV de hoje** (o modelo padrão). Com \`fields\`, telefone e CNS saem com máscara.
-- \`format\`: \`csv\` ou \`pdf\` (JSON \`{ title, filename, count, filters, modelo, columns, rows }\`).
+- \`format\`: \`csv\`, \`xlsx\` ou \`pdf\` (JSON \`{ title, filename, count, filters, modelo, columns, rows }\`).
+- **Excel (\`xlsx\`):** \`${XLSX_CONTENT_TYPE}\`, \`Content-Disposition\` com \`.xlsx\` e \`X-Export-Count\`. A primeira aba tem os dados, com o cabeçalho preso e largura nas colunas; a aba "Sobre" tem o título, a data, o total, o escopo, os filtros, o modelo e os campos. O tipo do campo decide a célula: texto (telefone, CPF, CNS, CEP, listas, Sim/Não) é sempre texto, nunca fórmula; dinheiro é número com o formato "R$ #.##0,00"; data e data e hora são datas (dd/mm/aaaa e dd/mm/aaaa hh:mm; "criado em" no horário de Brasília). Mesmo limite do CSV. O relatório de cadastros também sai em \`xlsx\`, uma aba por seção.
 - \`modelo\`: id ou nome do modelo (só para a auditoria e o PDF). \`confirmed\` (inscrições): só as confirmadas.
 - Limites: ${EXPORT_LIMITS.rows} linhas, ${EXPORT_LIMITS.pdfRows} no PDF, ${EXPORT_LIMITS.fields} campos.
-- Erros 400: "Escolha pelo menos um campo.", "Campo desconhecido: <chave>.", "Campo repetido: <rótulo>.", "No máximo 80 campos por relatório.", "Formato inválido: use csv ou pdf.", "O relatório passa de 20.000 linhas. Use um filtro para diminuir.", "O PDF aceita até 2.000 linhas. Baixe a planilha ou use um filtro.", "${NO_BUILDER_MESSAGE}" (fields ou PDF num conjunto sem montador).
+- Erros 400: "Escolha pelo menos um campo.", "Campo desconhecido: <chave>.", "Campo repetido: <rótulo>.", "No máximo 80 campos por relatório.", "Formato inválido: use csv, pdf ou xlsx.", "O relatório passa de 20.000 linhas. Use um filtro para diminuir.", "O PDF aceita até 2.000 linhas. Baixe a planilha ou use um filtro.", "${NO_BUILDER_MESSAGE}" (fields ou PDF num conjunto sem montador).
 - Erro 403 por campo: "Sem permissão para exportar: RG, Endereço: Rua." (em \`registrations\` e \`admins\`, os campos da pessoa além dos que já saíam pedem também READ_USER; o catálogo os mostra com \`allowed: false\`).
 - ${EXPORT_RATE_LIMIT} exportações por minuto por IP → 429 "${EXPORT_RATE_LIMIT_MESSAGE}".
 
@@ -177,9 +179,11 @@ additionalProperties: true,
 properties: builderParams } }),
         response: {
             200: {
-                description: 'CSV (`text/csv`) ou, com `format=pdf`, o JSON do PDF.',
+                description: 'CSV (`text/csv`), com `format=xlsx` a planilha do Excel ou, com `format=pdf`, o JSON do PDF.',
                 content: {
                     'text/csv': { schema: { type: 'string' } },
+                    [XLSX_CONTENT_TYPE]: { schema: { type: 'string',
+format: 'binary' } },
                     'application/json': { schema: pdfResponse },
                 },
             },

@@ -206,7 +206,7 @@ export function auditRouteKey(method: string, path: string): string {
     return `${method.toUpperCase()} ${normalized}`;
 }
 
-/** O formato gravado em `details` pela exportação do montador ('csv' | 'pdf'); null nas outras linhas. */
+/** O formato gravado em `details` pela exportação do montador ('csv' | 'pdf' | 'xlsx'); null nas outras linhas. */
 function exportFormat(details: unknown): string | null {
     if (!details || typeof details !== 'object' || Array.isArray(details)) return null;
     const formato = (details as { formato?: unknown }).formato;
@@ -215,7 +215,8 @@ function exportFormat(details: unknown): string | null {
 
 /**
  * Frase da ação para o painel e a planilha. `targetLabel` null → frase sem o nome do alvo.
- * `details` (o que foi exportado) só muda a frase da exportação em PDF, que não é planilha.
+ * `details` (o que foi exportado) muda a frase da exportação em PDF, que não é
+ * planilha, e a do Excel.
  */
 export function describeAuditAction(entry: {
     method: string;
@@ -230,8 +231,10 @@ export function describeAuditAction(entry: {
             ? `Excluiu a reserva de sala ${q(label)} e as próximas da série`
             : 'Excluiu uma reserva de sala e as próximas da série';
     }
-    if (entry.method === 'EXPORT' && exportFormat(entry.details) === 'pdf') {
-        return label ? `Exportou o relatório em PDF ${q(label)}` : 'Exportou um relatório em PDF';
+    if (entry.method === 'EXPORT') {
+        const format = exportFormat(entry.details);
+        if (format === 'pdf') return label ? `Exportou o relatório em PDF ${q(label)}` : 'Exportou um relatório em PDF';
+        if (format === 'xlsx') return label ? `Exportou a planilha do Excel ${q(label)}` : 'Exportou uma planilha do Excel';
     }
     const special = SPECIAL[auditRouteKey(entry.method, entry.path)];
     if (special) return special(label);

@@ -58,7 +58,7 @@ src/
   ports/external/          interfaces dos repositórios
   adapter/database/        implementações Prisma dos ports; list-filters.ts; prisma-errors.ts
   adapter/storage/         Supabase Storage (createStorageAdapter)
-  lib/                     utilitários puros (datas, CPF, CSV, auditoria, imagens, listas fixas…)
+  lib/                     utilitários puros (datas, CPF, CSV, Excel, auditoria, imagens, listas fixas…)
   errors/                  erros tipados
   scripts/                 scripts avulsos (seed local, normalização antiga)
   e2e/                     testes E2E + helpers
@@ -663,7 +663,7 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 ### Exportação e montador de relatórios (`export-router.ts`, `http/lib/export-reply.ts`, `usecase/export-data.ts`, `usecase/export/`, `adapter/database/export-adapter.ts`)
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
-| `GET` · `POST` | `/admin/export/:dataset` | CSV (`;`, BOM, tudo entre aspas, fórmula neutralizada com `'`) ou, com `format=pdf`, o JSON do PDF; POST recebe os parâmetros no corpo (listas como array); 30/min por IP | por conjunto |
+| `GET` · `POST` | `/admin/export/:dataset` | CSV (`;`, BOM, tudo entre aspas, fórmula neutralizada com `'`), com `format=xlsx` a planilha do Excel ou, com `format=pdf`, o JSON do PDF; POST recebe os parâmetros no corpo (listas como array); 30/min por IP | por conjunto |
 | `GET` | `/admin/export/:dataset/catalog` | catálogo do montador (abaixo); conjunto sem montador → 404 "Este conjunto ainda não tem o montador." | por conjunto |
 
 | Conjunto | Permissão | Filtros | Montador |
@@ -674,7 +674,7 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 | `properties` | `READ_USER` | ownerIds | sim |
 | `unimed` | `READ_USER` | search | sim |
 | `admins` | `READ_USER_ADMIN` | search, rulesId | sim |
-| `cadastros` | `READ_USER_ADMIN` **e** `READ_USER` (`alsoRequires`) | nenhum: o retrato completo, com filtro e seleção ignorados (quatro seções num arquivo: pessoas físicas, associados em dia, pessoas jurídicas e administradores) | não (catálogo 404; `fields` e PDF 400). Desde a SR-102 as seções são o padrão de `people`, `companies` e `admins` do motor (`usecase/export/cadastros.ts`), byte a byte como antes; a linha da auditoria segue "Relatório de cadastros: N registros (todos)", sem `details` |
+| `cadastros` | `READ_USER_ADMIN` **e** `READ_USER` (`alsoRequires`) | nenhum: o retrato completo, com filtro e seleção ignorados (quatro seções num arquivo: pessoas físicas, associados em dia, pessoas jurídicas e administradores) | não (catálogo 404; `fields` e PDF 400). Desde a SR-102 as seções são o padrão de `people`, `companies` e `admins` do motor (`usecase/export/cadastros.ts`), byte a byte como antes; a linha da auditoria segue "Relatório de cadastros: N registros (todos)", sem `details`. Com `format=xlsx` (SR-104, sem `fields`): uma aba por seção (Pessoas físicas, Associados em dia, Pessoas jurídicas, Administradores) e a aba "Sobre" com as contagens; o alvo termina em " · Excel" |
 | `courses` | `READ_COURSE` | search, status, `view`, `year` (os da lista de cursos) | sim |
 | `room-bookings` | `READ_COURSE` | from, to (AAAA-MM-DD), roomId, type, search (os da Agenda) | sim |
 | `contact-messages` | `READ_CONTACT` | search, read | sim |
@@ -682,9 +682,9 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 | `finance-transactions` | `READ_FINANCE` | from, to, type, categoryId, accountId, method, search e `orderBy` (os da lista de lançamentos, ver Financeiro); sem `ids` | sim |
 
 - **`ids`:** exporta só esses registros; lista vazia → 400 "Nenhum registro selecionado"; mais de 5000 → 400 "Selecione no máximo 5000 registros". Sem `ids`, vale o mesmo filtro da listagem.
-- **Headers:** `X-Export-Count` sempre; no CSV, também `Content-Disposition` (`pessoas-AAAA-MM-DD.csv`, ou `pessoa-<nome>-…` para um registro).
+- **Headers:** `X-Export-Count` sempre; no CSV e no Excel, também `Content-Disposition` (`pessoas-AAAA-MM-DD.csv` ou `.xlsx`, ou `pessoa-<nome>-…` para um registro).
 - **Datas:** horário de curso e de reserva sai como gravado (`csvWallClock`); "criado em" sai no horário de Brasília (`csvDateTime`).
-- **Auditoria:** cada exportação grava um `AuditLog` `method: 'EXPORT'` (entity "Exportação"), inclusive o CSV do Financeiro pela rota antiga (com `path` `/admin/finance/transactions/export`, desde a SR-102). O hook geral ignora `/admin/export/*`. A resposta e a linha saem de `replyWithExport` (`http/lib/export-reply.ts`), o mesmo para as duas rotas. Nos conjuntos com montador, o `targetLabel` diz o formato e cita os campos pessoais e sensíveis, documentos primeiro, até 5 ("Pessoas: 123 registros (com filtros) · PDF · com CPF, Nascimento e mais 2"): a busca da Auditoria por "CPF" acha quem exportou CPF. Erro não deixa linha.
+- **Auditoria:** cada exportação grava um `AuditLog` `method: 'EXPORT'` (entity "Exportação"), inclusive o CSV do Financeiro pela rota antiga (com `path` `/admin/finance/transactions/export`, desde a SR-102). O hook geral ignora `/admin/export/*`. A resposta e a linha saem de `replyWithExport` (`http/lib/export-reply.ts`), o mesmo para as duas rotas. Nos conjuntos com montador, o `targetLabel` diz o formato (CSV, PDF ou Excel) e cita os campos pessoais e sensíveis, documentos primeiro, até 5 ("Pessoas: 123 registros (com filtros) · PDF · com CPF, Nascimento e mais 2"): a busca da Auditoria por "CPF" acha quem exportou CPF. Erro não deixa linha.
 
 **Montador de relatórios** (decisão 006: fase 1 em `people` e `registrations`; fase 2, parte A, em `companies`, `properties`, `admins`, `courses`, `contact-messages` e `unimed`; parte B, em `audit-logs`, `room-bookings` e na fonte nova `finance-transactions`). O back é o único lugar que define colunas, formatos e permissões; o front lê o catálogo. Toda lista exportável tem montador: as fontes estão em `usecase/export/catalog/index.ts`. Só o relatório de cadastros não tem (`usecase/export/cadastros.ts`). O caminho antigo, com colunas fixas, não existe mais (SR-102): `usecase/export-data.ts` é só a entrada (`ExportDataUseCase`), que manda cada conjunto para o motor (`usecase/export/engine.ts`) ou para o relatório de cadastros.
 
@@ -693,17 +693,24 @@ Parâmetros (query no GET, corpo no POST), além dos filtros do conjunto:
 | Parâmetro | Regra |
 |---|---|
 | `fields` | chaves do catálogo **na ordem das colunas** (GET `a,b,c`; POST array); de 1 a 80, sem repetir. **Ausente = o padrão de hoje, byte a byte** (teste de ouro) |
-| `format` | `csv` (padrão) ou `pdf` |
+| `format` | `csv` (padrão), `xlsx` ou `pdf` |
 | `modelo` | id ou nome do modelo usado (até 64). Só vai para a auditoria e o cabeçalho do PDF; o id de fábrica vira o nome ("nome-cpf" → "Nome e CPF") |
 | `confirmed` | só em `registrations`: true = só as inscrições confirmadas |
 
 - **CSV:** como sempre. Com `fields`, o telefone e o CNS saem com máscara ("(44) 99999-8888", "123 4567 8901 2345", para o Excel não virar "4,5E+10"); **sem `fields` eles saem como gravados**, como sempre saíram. É a única diferença entre "sem `fields`" e "`fields` = o padrão".
+- **Excel** (`format=xlsx`, SR-104): `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `Content-Disposition` com `.xlsx` e `X-Export-Count`; o mesmo limite do CSV (20.000). Gerado no back sem biblioteca (`lib/xlsx.ts`: OOXML mínimo num ZIP do `node:zlib`; o `write-excel-file` levou 10 s e 330 MB em 20.000 × 80, este 1,5 s). Não use o `xlsx` (SheetJS) do npm.
+  - **Aba dos dados** (o título do conjunto, ex.: "Pessoas"): linha 1 = cabeçalho em negrito e preso (`pane` frozen), uma coluna por campo, largura pelo maior entre o cabeçalho e o conteúdo (de 8 a 60 caracteres; `blank` pelo menos 30). Sem linhas acima do cabeçalho, para ordenar, filtrar e montar tabela dinâmica direto.
+  - **Aba "Sobre":** Relatório, Gerado em (Brasília), Registros, Escopo ("Selecionados", "Todos com os filtros", "Todos"), Filtros (só com filtro), Modelo (só com modelo) e Campos.
+  - **Célula pelo tipo do catálogo** (`usecase/export/xlsx.ts`): `number` → número; `money` → número com `"R$" #,##0.00`; `date` → data dd/mm/aaaa; `datetime` → data e hora no horário de Brasília; `wallclock` → data e hora como gravada; `blank` → vazia; o resto (`text`, `list`, `boolean` "Sim/Não", `cpf`, `cnpj`, `cep`, `phone`, `cns`) → **texto**, com o mesmo conteúdo do CSV (sem `fields`, telefone e CNS como gravados). Data antes de 01/03/1900 vai como texto; texto acima de 32.767 caracteres é cortado (limite do Excel).
+  - **Fórmula:** toda célula de texto é `inlineStr` com o formato "@", nunca `<f>`, e sem o `'` do CSV: "=HYPERLINK(…)", "+55 44…", "@SUM(…)" e "-1+1" aparecem como escritos e não executam. Caractere de controle que o XML não aceita é tirado.
+  - A rota antiga do Financeiro (`GET /admin/finance/transactions/export`) continua só CSV.
+  - Testes: `lib/__tests__/xlsx_test.ts`, `usecase/__tests__/export-xlsx_test.ts` e `e2e/export-xlsx.e2e_test.ts`, que abrem o arquivo com o leitor de teste `lib/__tests__/xlsx-reader.ts` (descompacta, confere o CRC e lê as células).
 - **PDF:** `application/json` `{ title, filename (….pdf), count, filters, modelo, columns: [{ key, label, type, weight }], rows: string[][] }`. `filters` = os filtros em palavras ("Busca: silva · Só associados em dia"; "Seleção: 8 registros"; "" sem filtro); `modelo` = o nome, "Padrão (como hoje)" sem `fields`, ou null; `weight` = largura relativa; as células chegam formatadas como no CSV, **sem** o `'` contra fórmula (PDF não executa nada).
 - **Filtro de lista fixa em palavras** (PDF e `details.filtros`): sai pelo rótulo das telas, não pelo valor gravado: "Sexo: Masculino", "Etnia: Parda", "Escolaridade: Fundamental incompleto", "Tipo de membro: Produtor rural" (`lib/export-labels.ts`; tipo de membro desde a SR-095). Valor fora da lista sai como veio. Busca e classificação são texto livre e saem como digitadas. A coluna "Tipo de membro" continua saindo como gravada ("PRODUTOR RURAL"), no CSV e no PDF.
 - **Filtro de cursos em palavras** (PDF e `details.filtros`): até 3 cursos sai pelo nome, "Curso: HORTA" ou "Cursos: HORTA, CURSO B", também quando o curso não deu nenhuma linha (ex.: "Só confirmadas" sem nenhuma confirmada; o nome vem pelo id, `courseNames` do port, SR-093). Mais de 3, curso não achado ou dois com o mesmo nome → a quantidade, "Cursos: 4".
-- **Erros 400:** "Escolha pelo menos um campo.", "Campo desconhecido: <chave>.", "Campo repetido: <rótulo>.", "No máximo 80 campos por relatório.", "Formato inválido: use csv ou pdf.", "Parâmetro inválido: modelo" (mais de 64), "O relatório passa de 20.000 linhas. Use um filtro para diminuir.", "O PDF aceita até 2.000 linhas. Baixe a planilha ou use um filtro.". `fields` ou `format=pdf` num conjunto sem montador → 400 "Este conjunto ainda não tem o montador.".
+- **Erros 400:** "Escolha pelo menos um campo.", "Campo desconhecido: <chave>.", "Campo repetido: <rótulo>.", "No máximo 80 campos por relatório.", "Formato inválido: use csv, pdf ou xlsx.", "Parâmetro inválido: modelo" (mais de 64), "O relatório passa de 20.000 linhas. Use um filtro para diminuir.", "O PDF aceita até 2.000 linhas. Baixe a planilha ou use um filtro.". `fields` ou `format=pdf` num conjunto sem montador → 400 "Este conjunto ainda não tem o montador.".
 - **Erro 403 por campo** (`ForbiddenError` no use case, porque depende do pedido): "Sem permissão para exportar: RG, Endereço: Cidade.". Continua o 403 `Forbidden` da rota quando falta a permissão do conjunto.
-- **Limites:** 20.000 linhas (o adapter lê no máximo 20.001), 2.000 no PDF, 80 campos, 5000 `ids`, 30 exportações por minuto por IP.
+- **Limites:** 20.000 linhas no CSV e no Excel (o adapter lê no máximo 20.001), 2.000 no PDF, 80 campos, 5000 `ids`, 30 exportações por minuto por IP.
 
 **Catálogo** (`GET /admin/export/:dataset/catalog`, `usecase/export/get-export-catalog.ts`):
 `{ dataset, title, groups: [{ name, fields: [{ key, label, type, privacy, allowed, reason }] }], padrao: string[], modelos: [{ id, name, fields, confirmed? }], filterLabels: { filtro: nome }, limits: { rows, pdfRows, fields } }`.
@@ -746,7 +753,7 @@ Parâmetros (query no GET, corpo no POST), além dos filtros do conjunto:
 
 **Login:** 2xx → `LOGIN`; 401 → `LOGIN_FAILED`; 429 → `LOGIN_BLOCKED`; `targetLabel` = usuário digitado. A senha nunca é lida.
 
-**O que foi exportado** (`details`, decisão 006): nas exportações das fontes com montador de relatórios (com ou sem `fields`), `{ formato: 'csv'|'pdf', modelo: string|null, campos: [rótulos, na ordem], escopo: 'seleção'|'com filtros'|'todos', filtros: [{ nome, valor }], linhas }`. Nas outras linhas (e no relatório de cadastros, que não tem montador), `null`. O painel mostra no bloco "O que foi exportado" da linha; a planilha da auditoria tem o campo "Detalhes da exportação" (fora do padrão) com o mesmo conteúdo numa célula.
+**O que foi exportado** (`details`, decisão 006): nas exportações das fontes com montador de relatórios (com ou sem `fields`), `{ formato: 'csv'|'pdf'|'xlsx', modelo: string|null, campos: [rótulos, na ordem], escopo: 'seleção'|'com filtros'|'todos', filtros: [{ nome, valor }], linhas }`. Nas outras linhas (e no relatório de cadastros, que não tem montador), `null`. O painel mostra no bloco "O que foi exportado" da linha; a planilha da auditoria tem o campo "Detalhes da exportação" (fora do padrão) com o mesmo conteúdo numa célula.
 
 **De onde veio:**
 - `ip`, `userAgent` (até 300 caracteres) e `location` "Cidade, UF, País".
@@ -760,7 +767,7 @@ Parâmetros (query no GET, corpo no POST), além dos filtros do conjunto:
 
 **Frase** (`summary`, `lib/audit-sentence.ts`):
 - Rota especial por método + caminho (`SPECIAL`); as demais viram verbo + entidade com artigo pelo gênero.
-- **Exportação:** em CSV, `Exportou a planilha "Pessoas: 3 registros (todos) · CSV"`; com `details.formato` `pdf` (SR-093), `Exportou o relatório em PDF "Pessoas: 4 registros (com filtros) · PDF · com CPF"`. Linha antiga ou fonte sem montador (`details` null) segue planilha. A coluna "Ação" da planilha da auditoria usa a mesma frase sem o alvo: "Exportou uma planilha" ou "Exportou um relatório em PDF".
+- **Exportação:** em CSV, `Exportou a planilha "Pessoas: 3 registros (todos) · CSV"`; com `details.formato` `pdf` (SR-093), `Exportou o relatório em PDF "Pessoas: 4 registros (com filtros) · PDF · com CPF"`; com `xlsx` (SR-104), `Exportou a planilha do Excel "Pessoas: 3 registros (todos) · Excel"`. Linha antiga ou fonte sem montador (`details` null) segue planilha. A coluna "Ação" da planilha da auditoria usa a mesma frase sem o alvo: "Exportou uma planilha", "Exportou uma planilha do Excel" ou "Exportou um relatório em PDF"; a coluna "Detalhes da exportação" diz "Formato: Excel".
 - Entidade nova → `AUDIT_ENTITY_NOUNS` e o filtro "Tipo" do painel.
 
 **Retenção** (`usecase/audit-retention.ts`, `adapter/database/audit-cleanup.ts`):
