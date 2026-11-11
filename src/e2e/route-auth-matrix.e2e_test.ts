@@ -179,6 +179,18 @@ describe('a matriz parte das rotas registradas', () => {
         expect(exportCases.length).toBe(2 * Object.keys(EXPORT_DATASETS).length);
     });
 
+    it('os modelos de relatório da equipe (SR-114) têm um caso por conjunto em cada uma das 4 rotas', () => {
+        const templateCases = protectedCases.filter(c => c.route.url.startsWith('/admin/report-templates/'));
+        expect(new Set(templateCases.map(c => routeKey(c.route.method, c.route.url)))).toEqual(new Set([
+            'GET /admin/report-templates/:dataset',
+            'POST /admin/report-templates/:dataset',
+            'PATCH /admin/report-templates/:dataset/:id',
+            'DELETE /admin/report-templates/:dataset/:id',
+        ]));
+        expect(templateCases.length).toBe(4 * Object.keys(EXPORT_DATASETS).length);
+        expect(templateCases.every(c => c.route.auth.kind === 'requiresFrom')).toBe(true);
+    });
+
     it('o registro dos documentos do navegador tem um caso por tipo', () => {
         const documentCases = protectedCases.filter(c => c.route.url === '/admin/export/documents/:kind');
         expect(documentCases.length).toBe(BROWSER_DOCUMENT_KINDS.length);
