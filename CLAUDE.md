@@ -673,11 +673,11 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 | `properties` | `READ_USER` | ownerIds | sim |
 | `unimed` | `READ_USER` | search | sim |
 | `admins` | `READ_USER_ADMIN` | search, rulesId | sim |
-| `cadastros` | `READ_USER_ADMIN` **e** `READ_USER` (`alsoRequires`) | nenhum (pessoas, empresas, propriedades e administradores num arquivo) | não (as pessoas já saem pelo padrão do motor) |
+| `cadastros` | `READ_USER_ADMIN` **e** `READ_USER` (`alsoRequires`) | nenhum (pessoas, empresas, propriedades e administradores num arquivo) | não (as pessoas já saem pelo padrão do motor; empresas e administradores ainda pelas colunas antigas de `export-data.ts`, até a parte B) |
 | `courses` | `READ_COURSE` | search, status, `view`, `year` (os da lista de cursos) | sim |
-| `room-bookings` | `READ_COURSE` | from, to, roomId, type, search | fase 2 |
+| `room-bookings` | `READ_COURSE` | from, to, roomId, type, search | fase 2, parte B |
 | `contact-messages` | `READ_CONTACT` | search, read | sim |
-| `audit-logs` | `READ_AUDIT` | os da auditoria; no máximo 20.000 linhas mais recentes | fase 2 |
+| `audit-logs` | `READ_AUDIT` | os da auditoria; no máximo 20.000 linhas mais recentes | fase 2, parte B |
 
 - **`ids`:** exporta só esses registros; lista vazia → 400 "Nenhum registro selecionado"; mais de 5000 → 400 "Selecione no máximo 5000 registros". Sem `ids`, vale o mesmo filtro da listagem.
 - **Headers:** `X-Export-Count` sempre; no CSV, também `Content-Disposition` (`pessoas-AAAA-MM-DD.csv`, ou `pessoa-<nome>-…` para um registro).
@@ -725,7 +725,7 @@ Parâmetros (query no GET, corpo no POST), além dos filtros do conjunto:
 - **Permissão por campo em `registrations`:** os campos de pessoa que já saíam (`name`, `cpf`, `email`, `phone`, `birthDate`, `age`, `activeMember`, `partnerCompanies`, `boardPosition`, `publicContact`) pedem só `READ_COURSE`; o resto da pessoa pede também `READ_USER`. **Em `admins`**, a mesma regra: `name`, `email`, `cpf` e `phone` (os de hoje) pedem só `READ_USER_ADMIN`; o resto da pessoa pede também `READ_USER`. Em `people`, `companies`, `properties` e `unimed`, tudo sai com `READ_USER`.
 - **Modelos de fábrica:** `people`: `nome-cpf`, `nome-email`, `contato` (nome, telefones, e-mail, cidade), `lista-presenca` (Nº, nome, CPF, assinatura), `endereco-correspondencia` (nome, rua, número, complemento, bairro, cidade, UF, CEP), `associados` (nome, CPF, situação, desde, até, telefone). `registrations`: `nome-cpf`, `nome-email`, `contato` (nome, telefone, e-mail), `lista-presenca` (com `confirmed: true`). `companies`: `razao-social-cnpj`, `contato` (razão social, nome fantasia, telefones, e-mail, cidade da sede). `properties`: só o Padrão. `admins`: `contato` (nome, telefone, e-mail). `courses`: `calendario` (curso, início, término, sala, instrutores). `contact-messages`: `contato` (nome, e-mail, telefone). `unimed`: `nome-cpf-plano`.
 - **Regra:** coluna exportável nova = um campo no catálogo, que aparece sozinho no montador, no CSV e no PDF. **A chave é contrato: nunca se renomeia nem se reaproveita.** O `export-builder_test.ts` confere chaves e rótulos únicos, e que o padrão e os modelos só usam chaves do catálogo sem permissão a mais. O padrão de cada fonte fica congelado pelo teste de ouro (`export-golden_test.ts` e `export-golden.e2e_test.ts`; as fontes da fase 2 em `export-golden-fase2_test.ts` e `export-golden-fase2.e2e_test.ts`), escrito antes de a fonte sair do caminho antigo.
-- **Inscrições leem a pessoa inteira** (o mesmo `include` de `people`): os vínculos com empresa vêm todos, pelo nome da empresa, e "Empresa parceira" filtra as parceiras.
+- **Inscrições, administradores e Unimed leem a pessoa inteira** (o mesmo `include` de `people`, `personInclude` no adapter): os vínculos com empresa vêm todos, pelo nome da empresa, e "Empresa parceira" filtra as parceiras.
 
 ### Auditoria (`audit-router.ts`, `http/audit-hooks.ts`)
 | Método | Path | O que faz | Auth |
