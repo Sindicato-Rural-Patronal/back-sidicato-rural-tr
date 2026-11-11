@@ -75,6 +75,7 @@ const urbanAddress = {
 
 /** As 13 colunas de endereço vazias. */
 const NO_ADDRESS = ['', '', '', '', '', '', '', '', '', '', '', '', ''];
+const RURAL_CELLS = ['Rural', '', '', '', '', 'AGUA DO SOL', 'ESTRADA BOIADEIRA', '12', '7', 'B', 'TERRA ROXA', 'PR', '85990-000'];
 const URBAN_CELLS = ['Urbano', 'RUA X', '10', 'SALA 2; FUNDOS', 'CENTRO', '', '', '', '', '', 'TERRA ROXA', 'PR', '85990-000'];
 const ADDRESS_HEADERS = ['Tipo', 'Rua', 'Número', 'Complemento', 'Bairro', 'Localidade', 'Estrada', 'Km', 'Lote', 'Seção', 'Cidade', 'UF', 'CEP'];
 
@@ -191,5 +192,103 @@ type: 'PUBLIC',
 isPartner: 'true' });
         expect(r.result!.csv).toBe(file(COMPANIES_HEADER));
         expect(r.result!.count).toBe(0);
+    });
+});
+
+// ── Propriedades ─────────────────────────────────────────────────────────────
+
+const PROPERTIES_HEADER = [
+    'Propriedade', 'Matrícula', 'Dono', 'Nome do dono', 'CPF/CNPJ', 'Principal', ...ADDRESS_HEADERS,
+    'Observações do endereço', 'Cadastrada em',
+];
+
+/** De pessoa, a principal dela. */
+const sitio = {
+    id: 'pr1',
+    name: 'SITIO "A"',
+    registration: '99',
+    createdAt: d('2026-01-02T15:30:00.000Z'),
+    address: ruralAddress,
+    userData: { name: 'JOÃO',
+cpf: '12345678909',
+primaryPropertyId: 'pr1' },
+    company: null,
+};
+
+/** De empresa, que não é a principal dela: o nome do dono é o nome fantasia. */
+const sede = {
+    id: 'pr2',
+    name: 'SEDE',
+    registration: null,
+    createdAt: d('2026-09-16T23:30:00.000Z'),
+    address: urbanAddress,
+    userData: null,
+    company: { name: 'AGRO LTDA',
+tradeName: 'AGRO',
+cnpj: '11222333000181',
+primaryPropertyId: 'outra' },
+};
+
+/** De empresa sem nome fantasia nem CNPJ; nome e matrícula que viram fórmula. */
+const lote = {
+    id: 'pr3',
+    name: '=LOTE',
+    registration: '-5',
+    createdAt: d('2025-12-31T12:00:00.000Z'),
+    address: null,
+    userData: null,
+    company: { name: 'COOP',
+tradeName: null,
+cnpj: null,
+primaryPropertyId: 'pr3' },
+};
+
+/** De pessoa sem CPF. */
+const chacara = {
+    id: 'pr4',
+    name: 'CHACARA',
+    registration: null,
+    createdAt: d('2026-01-01T02:59:00.000Z'),
+    address: { ...urbanAddress,
+notes: null },
+    userData: { name: 'MARIA',
+cpf: null,
+primaryPropertyId: null },
+    company: null,
+};
+
+const SITIO_ROW = [
+    'SITIO ""A""', '99', 'Pessoa', 'JOÃO', '123.456.789-09', 'Sim', ...RURAL_CELLS, 'PERTO DO RIO', '02/01/2026 12:30',
+];
+const SEDE_ROW = [
+    'SEDE', '', 'Empresa', 'AGRO', '11.222.333/0001-81', 'Não', ...URBAN_CELLS, 'PORTÃO AZUL', '16/09/2026 20:30',
+];
+const LOTE_ROW = [`'=LOTE`, `'-5`, 'Empresa', 'COOP', '', 'Sim', ...NO_ADDRESS, '', '31/12/2025 09:00'];
+const CHACARA_ROW = ['CHACARA', '', 'Pessoa', 'MARIA', '', 'Não', ...URBAN_CELLS, '', '31/12/2025 23:59'];
+
+describe('teste de ouro: CSV padrão de propriedades', () => {
+    it('21 colunas, na ordem e no formato de hoje', async () => {
+        expect(PROPERTIES_HEADER).toHaveLength(21);
+        for (const row of [SITIO_ROW, SEDE_ROW, LOTE_ROW, CHACARA_ROW]) expect(row).toHaveLength(21);
+
+        vi.mocked(repo.properties).mockResolvedValue([sitio, sede, lote, chacara] as never);
+        const r = await useCase().execute('properties', { ownerIds: ['u1', 'c1'] });
+        expect(r.error).toBeUndefined();
+        expect(r.result!.csv).toBe(file(PROPERTIES_HEADER, SITIO_ROW, SEDE_ROW, LOTE_ROW, CHACARA_ROW));
+        expect(r.result!.count).toBe(4);
+        expect(r.result!.filename).toBe('propriedades-2026-09-17.csv');
+    });
+
+    it('uma propriedade pelo id: o nome dela no nome do arquivo', async () => {
+        vi.mocked(repo.properties).mockResolvedValue([sitio] as never);
+        const r = await useCase().execute('properties', { ids: ['pr1'] });
+        expect(r.result!.csv).toBe(file(PROPERTIES_HEADER, SITIO_ROW));
+        expect(r.result!.filename).toBe('propriedade-sitio-a-2026-09-17.csv');
+    });
+
+    it('lista vazia: só o cabeçalho', async () => {
+        vi.mocked(repo.properties).mockResolvedValue([] as never);
+        const r = await useCase().execute('properties', { ownerIds: 'ninguem' });
+        expect(r.result!.csv).toBe(file(PROPERTIES_HEADER));
     });
 });

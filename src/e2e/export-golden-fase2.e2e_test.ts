@@ -117,7 +117,7 @@ createdAt: d('2026-01-01T10:00:00.000Z') },
     const lote = await prisma.address.create({ data: { type: 'URBAN',
 city: 'GUAIRA',
 state: 'PR' } });
-    await prisma.property.create({
+    const loteOuro = await prisma.property.create({
         data: { name: 'LOTE OURO',
 companyId: agro.id,
 addressId: lote.id,
@@ -132,11 +132,53 @@ isDeleted: true,
 createdAt: d('2026-01-03T10:00:00.000Z') },
     });
 
+    await prisma.company.update({ where: { id: agro.id },
+data: { primaryPropertyId: loteOuro.id } });
+
+    // Propriedades de pessoa: a principal do João (com CPF) e uma da Maria (sem CPF).
+    const sitio = await prisma.property.create({
+        data: { name: 'SITIO JOAO',
+registration: '99',
+userDataId: joao.id,
+addressId: rural.id,
+createdAt: d('2026-02-01T10:00:00.000Z') },
+    });
+    await prisma.userData.update({ where: { id: joao.id },
+data: { primaryPropertyId: sitio.id } });
+    const chacaraAddress = await prisma.address.create({
+        data: {
+            type: 'URBAN',
+            street: 'RUA X',
+            number: '10',
+            complement: 'SALA 2; FUNDOS',
+            neighborhood: 'CENTRO',
+            city: 'TERRA ROXA',
+            state: 'PR',
+            zipCode: '85990000',
+            notes: 'PORTÃO AZUL',
+        },
+    });
+    await prisma.property.create({
+        data: { name: 'CHACARA MARIA',
+userDataId: maria.id,
+addressId: chacaraAddress.id,
+createdAt: d('2026-02-02T10:00:00.000Z') },
+    });
+    // Dono excluído: a propriedade some junto.
+    await prisma.property.create({
+        data: { name: 'DA EXCLUIDA',
+userDataId: excluida.id,
+addressId: chacaraAddress.id,
+createdAt: d('2026-02-03T10:00:00.000Z') },
+    });
+
     // Por último: as gravações acima mexem no `updatedAt` (é @updatedAt).
     await prisma.$executeRaw`UPDATE "Company" SET "createdAt" = ${d('2026-01-02T15:30:00.000Z')}, "updatedAt" = ${d('2026-03-04T02:05:00.000Z')} WHERE id = ${agro.id}`;
     await prisma.$executeRaw`UPDATE "Company" SET "createdAt" = ${d('2026-09-16T23:30:00.000Z')}, "updatedAt" = ${d('2026-09-16T23:30:00.000Z')} WHERE id = ${coop.id}`;
 
-    Object.assign(ids, { joao: joao.id,
+    Object.assign(ids, { excluida: excluida.id,
+sitio: sitio.id,
+joao: joao.id,
 maria: maria.id,
 agro: agro.id,
 coop: coop.id });
@@ -189,5 +231,38 @@ describe('teste de ouro pelo banco: empresas', () => {
         const res = await get(`/admin/export/companies?ids=${ids.agro}`);
         expect(res.headers['content-disposition']).toBe(`attachment; filename="empresa-agro-ouro-${todayBr()}.csv"`);
         expect(res.body).toBe(file(header, agroRow));
+    });
+});
+
+describe('teste de ouro pelo banco: propriedades', () => {
+    const header = [
+        'Propriedade', 'Matrícula', 'Dono', 'Nome do dono', 'CPF/CNPJ', 'Principal', ...ADDRESS_HEADERS,
+        'Observações do endereço', 'Cadastrada em',
+    ];
+    const rural = ['Rural', '', '', '', '', 'AGUA DO SOL', 'ESTRADA BOIADEIRA', '12', '7', 'B', 'TERRA ROXA', 'PR', '85990-000'];
+    const fazenda = ['FAZENDA OURO', '5', 'Empresa', 'AGRO OURO', '11.222.333/0001-81', 'Não', ...rural, 'PERTO DO RIO', '01/01/2026 07:00'];
+    const lote = [
+        'LOTE OURO', '', 'Empresa', 'AGRO OURO', '11.222.333/0001-81', 'Sim',
+        'Urbano', '', '', '', '', '', '', '', '', '', 'GUAIRA', 'PR', '', '', '02/01/2026 07:00',
+    ];
+    const sitio = ['SITIO JOAO', '99', 'Pessoa', 'JOAO OURO', '529.982.247-25', 'Sim', ...rural, 'PERTO DO RIO', '01/02/2026 07:00'];
+    const chacara = [
+        'CHACARA MARIA', '', 'Pessoa', 'MARIA OURO', '', 'Não',
+        'Urbano', 'RUA X', '10', 'SALA 2; FUNDOS', 'CENTRO', '', '', '', '', '', 'TERRA ROXA', 'PR', '85990-000',
+        'PORTÃO AZUL', '02/02/2026 07:00',
+    ];
+
+    it('o CSV padrão inteiro, pelos donos, na ordem de cadastro', async () => {
+        const res = await get(`/admin/export/properties?ownerIds=${ids.maria},${ids.agro},${ids.joao},${ids.excluida}`);
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.headers['content-disposition']).toBe(`attachment; filename="propriedades-${todayBr()}.csv"`);
+        expect(res.headers['x-export-count']).toBe('4');
+        expect(res.body).toBe(file(header, fazenda, lote, sitio, chacara));
+    });
+
+    it('uma propriedade pelo id: o nome dela no arquivo', async () => {
+        const res = await get(`/admin/export/properties?ids=${ids.sitio}`);
+        expect(res.headers['content-disposition']).toBe(`attachment; filename="propriedade-sitio-joao-${todayBr()}.csv"`);
+        expect(res.body).toBe(file(header, sitio));
     });
 });
