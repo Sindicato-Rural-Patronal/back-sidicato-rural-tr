@@ -1,6 +1,7 @@
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { auditRouteKey } from './audit-sentence.js';
 import { SETTING_KEYS } from '../usecase/get-site-settings.js';
+import { reportTemplateAuditSnapshot } from '../usecase/export/report-templates.js';
 
 // Leitura do registro alvo de uma edição/exclusão, antes e depois da ação, para
 // a auditoria guardar o que mudou (lib/audit-diff.ts). Só rotas que mexem em UM
@@ -259,10 +260,19 @@ size: true } }),
     },
 };
 
+// Modelo de relatório da equipe (SR-114): o conjunto vai no caminho
+// (/admin/report-templates/people/:id), então a chave não é fixa. Os campos
+// saem pelo rótulo do catálogo e o formato pelo nome.
+const REPORT_TEMPLATE_KEY = /^\/admin\/report-templates\/[^/]+\/:id$/;
+const reportTemplate: Snapshot = async (prisma, ids) => {
+    const t = await prisma.reportTemplate.findUnique({ where: { id: ids[0] } });
+    return t ? reportTemplateAuditSnapshot(t) : null;
+};
+
 function snapshotFor(method: string, path: string): Snapshot | null {
     if (method !== 'PATCH' && method !== 'PUT' && method !== 'DELETE') return null;
     const key = auditRouteKey(method, path).slice(method.length + 1);
-    return SNAPSHOTS[key] ?? null;
+    return SNAPSHOTS[key] ?? (REPORT_TEMPLATE_KEY.test(key) ? reportTemplate : null);
 }
 
 /** Esta edição/exclusão tem leitura de antes/depois? */

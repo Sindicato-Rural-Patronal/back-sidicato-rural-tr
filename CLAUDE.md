@@ -778,7 +778,13 @@ Parâmetros (query no GET, corpo no POST), além dos filtros do conjunto:
 **O que é gravado:**
 - O hook grava toda mutação com sucesso: método, caminho, `entity` (`deriveAuditEntity`) e `targetLabel` (nome do alvo).
 - Fica fora (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (que grava a própria linha, inclusive a dos documentos do navegador), `/admin/notifications/read`, `/users/lookup-cpf` (consulta, não grava) e `/auth/login` (que tem registro próprio).
-- **A rota pode decidir** (`skipAuditLine` e `setAuditLabel`, em `http/audit-hooks.ts`): chamada que não mudou nada não deixa linha, e a que mudou diz o que fez no `targetLabel`. Quem usa: `POST /admin/finance/recurrences/generate` (ver Financeiro).
+- **A rota pode decidir** (`skipAuditLine` e `setAuditLabel`, em `http/audit-hooks.ts`): chamada que não mudou nada não deixa linha, e a que mudou diz o que fez no `targetLabel`. Quem usa: `POST /admin/finance/recurrences/generate` (ver Financeiro) e os modelos de relatório da equipe (abaixo).
+
+**Modelos de relatório da equipe** (SR-114, ver Exportação, "Modelos da equipe"). Criar, mudar e excluir entram pelo hook geral; listar e pedido com erro não deixam linha.
+- **Entidade "Modelo de relatório"**: `deriveAuditEntity` a reconhece antes de todas, porque o conjunto vai no caminho (`/admin/report-templates/registrations/…` cairia em Inscrição, `…/companies` em Empresa).
+- **Alvo** (`setAuditLabel` na rota): "<relatório>: <nome>", ex.: "Pessoas: Só os nomes". Ao renomear, com o nome antigo: "Pessoas: Telefones da equipe (antes Contatos)".
+- **Frases:** `Criou o modelo de relatório "Pessoas: Só os nomes"`, `Editou o modelo de relatório "…"`, `Excluiu o modelo de relatório "…"`.
+- **O que mudou** (`changes`, no PATCH e no DELETE): `name`, `fields` (pelos rótulos do catálogo, "Nome, CPF"; a chave, se saiu dele), `format` ("CSV", "PDF", "Excel") e, nas inscrições, `onlyConfirmed`. Na planilha, "Nome", "Campos", "Formato" e "Só confirmadas" (`AUDIT_FIELD_LABELS`). A leitura de antes e depois é `reportTemplateAuditSnapshot`, ligada em `lib/audit-snapshot.ts` por padrão de caminho, porque o conjunto varia.
 
 **Login:** 2xx → `LOGIN`; 401 → `LOGIN_FAILED`; 429 → `LOGIN_BLOCKED`; `targetLabel` = usuário digitado. A senha nunca é lida.
 

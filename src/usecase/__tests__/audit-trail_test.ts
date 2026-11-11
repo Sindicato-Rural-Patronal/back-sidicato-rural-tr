@@ -184,6 +184,36 @@ describe('auditoria: fechamento do mês (SR-054)', () => {
     });
 });
 
+describe('auditoria: modelo de relatório da equipe (SR-114)', () => {
+    it('entidade própria, mesmo com o conjunto no caminho (registrations, companies, courses…)', () => {
+        for (const dataset of ['people', 'registrations', 'companies', 'courses', 'contact-messages', 'unimed', 'finance-transactions']) {
+            expect(deriveAuditEntity(`/admin/report-templates/${dataset}`), dataset).toBe('Modelo de relatório');
+            expect(deriveAuditEntity(`/admin/report-templates/${dataset}/${ID}`), dataset).toBe('Modelo de relatório');
+        }
+        expect(AUDIT_ENTITY_NOUNS['Modelo de relatório']).toEqual({ noun: 'modelo de relatório',
+g: 'm' });
+        expect(skipAudit('/admin/report-templates/people')).toBe(false);
+    });
+
+    it('frases de criar, editar e excluir', () => {
+        expect(sentence('POST', '/admin/report-templates/people', 'Pessoas: Só os nomes'))
+            .toBe('Criou o modelo de relatório "Pessoas: Só os nomes"');
+        expect(sentence('PATCH', `/admin/report-templates/registrations/${ID}`, 'Inscrições: Equipe (antes equipe)'))
+            .toBe('Editou o modelo de relatório "Inscrições: Equipe (antes equipe)"');
+        expect(sentence('DELETE', `/admin/report-templates/people/${ID}`, 'Pessoas: Só os nomes'))
+            .toBe('Excluiu o modelo de relatório "Pessoas: Só os nomes"');
+        expect(sentence('DELETE', `/admin/report-templates/people/${ID}`)).toBe('Excluiu um modelo de relatório');
+    });
+
+    it('editar e excluir guardam o que mudou; criar e listar não', () => {
+        expect(shouldSnapshot('PATCH', `/admin/report-templates/people/${ID}`)).toBe(true);
+        expect(shouldSnapshot('DELETE', `/admin/report-templates/finance-transactions/${ID}`)).toBe(true);
+        expect(shouldSnapshot('POST', '/admin/report-templates/people')).toBe(false);
+        expect(shouldSnapshot('PATCH', '/admin/report-templates/people')).toBe(false);
+        expect(shouldSnapshot('PATCH', `/admin/report-templates/people/${ID}/outra`)).toBe(false);
+    });
+});
+
 describe('auditoria: login', () => {
     it('status da resposta vira o tipo da tentativa', () => {
         expect(loginAuditMethod(200)).toBe('LOGIN');
