@@ -441,3 +441,65 @@ format: 'pdf' });
 rows: [['BIA MONTADOR', '=1+1']] });
     });
 });
+
+describe('Unimed', () => {
+    beforeAll(async () => {
+        const address = await prisma.address.create({ data: { type: 'URBAN',
+street: 'RUA U',
+number: '1',
+city: 'TERRA ROXA',
+state: 'PR' } });
+        const pessoa = await prisma.userData.create({
+            data: { name: 'BENEFICIARIO MONTADOR',
+cpf: '39053344705',
+phone: '44911116001',
+rg: '556677' },
+        });
+        const prop = await prisma.property.create({ data: { name: 'CASA',
+userDataId: pessoa.id,
+addressId: address.id } });
+        await prisma.userData.update({ where: { id: pessoa.id },
+data: { primaryPropertyId: prop.id } });
+        await prisma.unimedBeneficiario.create({
+            data: { userDataId: pessoa.id,
+plano: 'ENFERMARIA',
+cns: '123456789012345',
+nomeMae: 'MAE MONTADOR' },
+        });
+    });
+
+    it('catálogo: 200, com os campos de pessoa e os do plano', async () => {
+        const res = await get('/admin/export/unimed/catalog');
+        expect(res.statusCode, res.body).toBe(200);
+        const catalog = res.json() as Catalog;
+        expect(catalog.title).toBe('Beneficiários Unimed');
+        expect(catalog.groups[0].name).toBe('Plano Unimed');
+        const fields = catalog.groups.flatMap(g => g.fields);
+        expect(fields.find(f => f.key === 'cns')).toMatchObject({ label: 'CNS',
+allowed: true });
+        expect(fields.find(f => f.key === 'addressCity')).toMatchObject({ label: 'Endereço: Cidade',
+allowed: true });
+        expect(catalog.modelos.map(m => m.id)).toEqual(['nome-cpf-plano']);
+    });
+
+    it('campos da pessoa e do plano juntos; CNS com máscara; auditoria cita o CNS', async () => {
+        const res = await post('/admin/export/unimed', { search: 'montador',
+fields: ['name', 'cpf', 'cns', 'nomeMae', 'rg', 'addressLine'] });
+        expect(res.statusCode, res.body).toBe(200);
+        expect(rows(res.body)).toEqual([
+            ['Nome', 'CPF', 'CNS', 'Nome da mãe', 'RG', 'Endereço numa linha'],
+            ['BENEFICIARIO MONTADOR', '390.533.447-05', '123 4567 8901 2345', 'MAE MONTADOR', '556677', 'RUA U, 1 - TERRA ROXA/PR'],
+        ]);
+        const log = await lastExport();
+        expect(log!.targetLabel).toBe('Beneficiários Unimed: 1 registro (com filtros) · CSV · com CPF, CNS, RG, Nome da mãe, Endereço numa linha');
+
+        const pdf = await post('/admin/export/unimed', { search: 'montador',
+fields: ['name', 'cpf', 'plano'],
+modelo: 'nome-cpf-plano',
+format: 'pdf' });
+        expect(pdf.statusCode, pdf.body).toBe(200);
+        expect(pdf.json()).toMatchObject({ modelo: 'Nome, CPF e plano',
+filters: 'Busca: montador',
+rows: [['BENEFICIARIO MONTADOR', '390.533.447-05', 'ENFERMARIA']] });
+    });
+});

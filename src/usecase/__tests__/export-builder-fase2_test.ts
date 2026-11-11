@@ -539,3 +539,98 @@ read: false });
         expect(naoLidas.result!.pdf!.filters).toBe('Só não lidas');
     });
 });
+
+// ── Unimed ───────────────────────────────────────────────────────────────────
+
+function beneficiario(overrides: Record<string, unknown> = {}) {
+    return {
+        id: 'u1',
+        dataAdesao: new Date('2020-03-01T00:00:00.000Z'),
+        tipoMovimento: 'INCLUSAO DE TITULAR',
+        tipoDependente: null,
+        grauDependencia: 'TITULAR',
+        cns: '123456789012345',
+        nomeMae: 'MARIA',
+        profissao: 'AGRICULTOR',
+        plano: 'ENFERMARIA',
+        matricula: '0001',
+        empresa: null,
+        contratante: null,
+        motivo: null,
+        obs: 'obs da unimed',
+        createdAt: new Date('2026-01-02T15:30:00.000Z'),
+        titularName: null,
+        userData: {
+            name: 'JOÃO',
+cpf: '12345678909',
+birthDate: new Date('1980-09-18T00:00:00.000Z'),
+phone: '44999990000',
+email: null,
+            rg: '1234567',
+memberNotes: 'obs do associado',
+createdAt: new Date('2025-01-01T12:00:00.000Z'),
+            primaryPropertyId: null,
+properties: [],
+        },
+        ...overrides,
+    };
+}
+
+describe('Unimed no montador', () => {
+    it('catálogo: plano e CNS sensíveis, nome da mãe e matrícula pessoais; campos de pessoa sem permissão a mais', () => {
+        const source = EXPORT_SOURCES.unimed;
+        expect(source.padrao).toHaveLength(20);
+        expect(groupsOf('unimed').slice(0, 4)).toEqual(['Plano Unimed', 'Documentos', 'Titular e dependência', 'Ficha da Unimed']);
+        expect(source.fields.filter(f => f.permission)).toEqual([]);
+        const privacy = new Map(source.fields.map(f => [f.key, f.privacy]));
+        expect(privacy.get('plano')).toBe('sensivel');
+        expect(privacy.get('cns')).toBe('sensivel');
+        expect(privacy.get('nomeMae')).toBe('pessoal');
+        expect(privacy.get('matricula')).toBe('pessoal');
+        // O "Unimed" da pessoa repete o plano; os rótulos que colidiam mudam, as chaves não.
+        expect(keysOf('unimed')).not.toContain('unimedPlan');
+        const label = new Map(source.fields.map(f => [f.key, f.label]));
+        expect(label.get('obs')).toBe('Observações');
+        expect(label.get('memberNotes')).toBe('Observações do associado');
+        expect(label.get('unimedCreatedAt')).toBe('Cadastrado em');
+        expect(label.get('createdAt')).toBe('Pessoa cadastrada em');
+        expect(source.modelos).toEqual([{ id: 'nome-cpf-plano',
+name: 'Nome, CPF e plano',
+fields: ['name', 'cpf', 'plano'] }]);
+    });
+
+    it('com fields o CNS e o telefone saem com máscara; sem fields, como gravados', async () => {
+        vi.mocked(repo.unimed).mockResolvedValue([beneficiario()] as never);
+        const r = await useCase().execute('unimed', { fields: 'name,cns,phone,age,rg,memberNotes,obs' });
+        expect(parse(r.result!.csv)).toEqual([
+            ['Nome', 'CNS', 'Telefone', 'Idade', 'RG', 'Observações do associado', 'Observações'],
+            ['JOÃO', '123 4567 8901 2345', '(44) 99999-0000', '45', '1234567', 'obs do associado', 'obs da unimed'],
+        ]);
+        expect(repo.unimed).toHaveBeenCalledWith({ ids: undefined,
+search: undefined,
+take: 20001 });
+
+        const padrao = await useCase().execute('unimed', {});
+        const [header, row] = parse(padrao.result!.csv);
+        expect(row[header.indexOf('CNS')]).toBe('123456789012345');
+        expect(row[header.indexOf('Telefone')]).toBe('44999990000');
+        // Os documentos primeiro no texto da auditoria: a busca por "CNS" acha.
+        expect(padrao.result!.auditLabel).toBe('Beneficiários Unimed: 1 registro (todos) · CSV · com CPF, Matrícula, CNS, Nascimento, Telefone e mais 3');
+    });
+
+    it('PDF com o modelo de fábrica e a busca em palavras', async () => {
+        vi.mocked(repo.unimed).mockResolvedValue([beneficiario()] as never);
+        const r = await useCase().execute('unimed', { fields: ['name', 'cpf', 'plano'],
+modelo: 'nome-cpf-plano',
+format: 'pdf',
+search: 'joão' });
+        expect(r.result!.pdf).toMatchObject({
+            title: 'Beneficiários Unimed',
+            filename: 'unimed-2026-09-17.pdf',
+            filters: 'Busca: joão',
+            modelo: 'Nome, CPF e plano',
+            rows: [['JOÃO', '123.456.789-09', 'ENFERMARIA']],
+        });
+        expect(r.result!.auditLabel).toBe('Beneficiários Unimed: 1 registro (com filtros) · PDF · com CPF, Plano');
+    });
+});

@@ -240,13 +240,8 @@ export type UnimedExportRow = {
     obs: string | null;
     createdAt: Date;
     titularName: string | null;
-    userData: {
- name: string;
-cpf: string | null;
-birthDate: Date | null;
-phone: string;
-email: string | null
-};
+    /** A pessoa inteira (os campos de pessoa do montador). */
+    userData: PersonExportRow;
 };
 
 export type AuditLogExportRow = {
@@ -307,7 +302,7 @@ confirmed?: boolean
 name: string
 }[]>;
     contactMessages(filters: ContactMessageFilters & ExportSelection & ExportTake): Promise<ContactMessageExportRow[]>;
-    unimed(filters: { search?: string } & ExportSelection): Promise<UnimedExportRow[]>;
+    unimed(filters: { search?: string } & ExportSelection & ExportTake): Promise<UnimedExportRow[]>;
     auditLogs(filters: AuditLogFilters): Promise<AuditLogExportRow[]>;
     /** Reservas de sala: período (from inclusivo, to exclusivo), sala, tipo, busca ou ids. */
     roomBookings(filters: RoomBookingFilters): Promise<RoomBookingExportRow[]>;

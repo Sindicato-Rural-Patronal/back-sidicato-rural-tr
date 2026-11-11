@@ -6,6 +6,7 @@ import { coursesSource } from './courses.js';
 import { peopleSource } from './people.js';
 import { propertiesSource } from './properties.js';
 import { registrationsSource } from './registrations.js';
+import { unimedSource } from './unimed.js';
 import type { EngineDataset, ExportSource } from './types.js';
 
 // Fontes que já passaram para o montador de relatórios (decisão 006, fases 1
@@ -23,6 +24,7 @@ export const EXPORT_SOURCES: Record<EngineDataset, AnyExportSource> = {
     admins: adminsSource,
     courses: coursesSource,
     'contact-messages': contactMessagesSource,
+    unimed: unimedSource,
 };
 
 export function sourceOf(dataset: ExportDataset): AnyExportSource | null {

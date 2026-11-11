@@ -211,18 +211,14 @@ isDeleted: false } : buildContactMessageWhere(filters),
         });
     }
 
-    async unimed({ ids, search }: Parameters<ExportRepository['unimed']>[0]): Promise<UnimedExportRow[]> {
+    async unimed({ ids, search, take }: Parameters<ExportRepository['unimed']>[0]): Promise<UnimedExportRow[]> {
         const rows = await this.prisma.unimedBeneficiario.findMany({
             where: byIds(ids) ? { ...byIds(ids),
 isDeleted: false } : buildUnimedListWhere(search),
             orderBy: { userData: { name: 'asc' } },
-            include: {
-                userData: { select: { name: true,
-cpf: true,
-birthDate: true,
-phone: true,
-email: true } },
-            },
+            ...(take && { take }),
+            // A pessoa inteira: os campos de pessoa do montador.
+            include: { userData: { include: personInclude } },
         });
         // `filter(Boolean)` nao tira o null do TIPO: sem isto o null ia parar
         // dentro do `in` da consulta seguinte.

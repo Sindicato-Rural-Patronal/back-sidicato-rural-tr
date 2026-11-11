@@ -17,9 +17,9 @@ import type { ExportField, ExportFieldType, ExportFilterDescription } from './ca
 // limites, monta a tabela e entrega em CSV ou no JSON do PDF.
 //
 // Sem `fields` sai o padrão de hoje, byte a byte (teste de ouro). A única
-// diferença entre "sem fields" e "fields = o padrão" é o telefone: sem
-// `fields` ele sai como foi gravado, como sempre saiu; com `fields`, com
-// máscara (para o Excel não virar "4,5E+10").
+// diferença entre "sem fields" e "fields = o padrão" é o telefone e o CNS:
+// sem `fields` eles saem como foram gravados, como sempre saíram; com
+// `fields`, com máscara (para o Excel não virar "4,5E+10").
 
 export const EXPORT_LIMITS = {
     /** Linhas por exportação. */
@@ -194,7 +194,7 @@ export function cellValue(type: ExportFieldType, raw: unknown, legacy: boolean):
         case 'phone':
             return legacy ? asText(raw) : formatPhone(asText(raw));
         case 'cns':
-            return formatCns(asText(raw));
+            return legacy ? asText(raw) : formatCns(asText(raw));
         case 'blank':
             return '';
     }

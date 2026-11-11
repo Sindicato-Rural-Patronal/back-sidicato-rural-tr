@@ -148,7 +148,7 @@ export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClien
 - **POST** recebe os parâmetros no corpo JSON (listas como array) — use para seleções grandes. **GET** aceita os mesmos na query (listas "a,b,c").
 
 **Montador de relatórios** (decisão 006; hoje em ${builderDatasets}; o catálogo está em \`GET /admin/export/:dataset/catalog\`):
-- \`fields\`: chaves do catálogo na ordem das colunas. **Sem \`fields\` sai exatamente o CSV de hoje** (o modelo padrão). Com \`fields\`, telefone sai com máscara.
+- \`fields\`: chaves do catálogo na ordem das colunas. **Sem \`fields\` sai exatamente o CSV de hoje** (o modelo padrão). Com \`fields\`, telefone e CNS saem com máscara.
 - \`format\`: \`csv\` ou \`pdf\` (JSON \`{ title, filename, count, filters, modelo, columns, rows }\`).
 - \`modelo\`: id ou nome do modelo (só para a auditoria e o PDF). \`confirmed\` (inscrições): só as confirmadas.
 - Limites: ${EXPORT_LIMITS.rows} linhas, ${EXPORT_LIMITS.pdfRows} no PDF, ${EXPORT_LIMITS.fields} campos.

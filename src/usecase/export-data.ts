@@ -7,11 +7,10 @@ import type {
     ExportAddress,
     ExportRepository,
     RoomBookingExportRow,
-    UnimedExportRow,
 } from '../ports/external/export-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import {
-    csvBody, csvDate, csvDateTime, csvList, csvWallClock, toCsv, toCsvSections,
+    csvBody, csvDateTime, csvList, csvWallClock, toCsv, toCsvSections,
     type CsvColumn,
 } from '../lib/csv.js';
 import {
@@ -47,8 +46,6 @@ export { EXPORT_DATASETS, type ExportDataset, type ExportResult };
 const schemas = {
     // O relatorio e sempre o retrato completo: nao aceita filtro nem selecao.
     cadastros: z.object({}),
-    unimed: z.object({ ids: idList,
-search: text }),
     'audit-logs': z.object({
         action: z.preprocess(empty, z.enum(['create', 'edit', 'delete', 'export', 'login', 'login_failed']).optional()),
         entity: text,
@@ -158,49 +155,6 @@ value: a => a.userData.phone },
 value: a => a.rules.name },
     { header: 'Criado em',
 value: a => csvDateTime(a.createdAt) },
-];
-
-const unimedColumns: CsvColumn<UnimedExportRow>[] = [
-    { header: 'Nome',
-value: u => u.userData.name },
-    { header: 'CPF',
-value: u => formatCpf(u.userData.cpf) },
-    { header: 'Nascimento',
-value: u => csvDate(u.userData.birthDate) },
-    { header: 'Telefone',
-value: u => u.userData.phone },
-    { header: 'E-mail',
-value: u => u.userData.email },
-    { header: 'Plano',
-value: u => u.plano },
-    { header: 'Matrícula',
-value: u => u.matricula },
-    { header: 'CNS',
-value: u => u.cns },
-    { header: 'Nome da mãe',
-value: u => u.nomeMae },
-    { header: 'Profissão',
-value: u => u.profissao },
-    { header: 'Empresa',
-value: u => u.empresa },
-    { header: 'Contratante',
-value: u => u.contratante },
-    { header: 'Tipo de movimento',
-value: u => u.tipoMovimento },
-    { header: 'Tipo de dependente',
-value: u => u.tipoDependente },
-    { header: 'Grau de dependência',
-value: u => u.grauDependencia },
-    { header: 'Titular',
-value: u => u.titularName },
-    { header: 'Data de adesão',
-value: u => csvDate(u.dataAdesao) },
-    { header: 'Motivo',
-value: u => u.motivo },
-    { header: 'Observações',
-value: u => u.obs },
-    { header: 'Cadastrado em',
-value: u => csvDateTime(u.createdAt) },
 ];
 
 const auditColumns: CsvColumn<AuditLogExportRow>[] = [
@@ -342,12 +296,6 @@ body: csvBody(adminColumns, administradores) },
                 const count = pessoas.length + associados.length + empresas.length + administradores.length;
                 return { csv,
 count };
-            }
-            case 'unimed': {
-                const rows = await this.repo.unimed(q);
-                return { csv: toCsv(unimedColumns, rows),
-count: rows.length,
-firstName: rows[0]?.userData.name };
             }
             case 'audit-logs': {
                 const rows = await this.repo.auditLogs(q as AuditLogFilters);
