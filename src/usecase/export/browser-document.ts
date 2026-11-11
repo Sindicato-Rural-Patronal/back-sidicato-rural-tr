@@ -82,7 +82,9 @@ log?: BrowserDocumentLog
         const escopo = parsed.data.escopo ?? (ids?.length ? 'seleção' : 'todos');
 
         const head = alvo ? `${doc.name}: ${alvo}` : doc.name;
-        const targetLabel = [head, registros(linhas), ...(doc.cita.length ? [`com ${cited(doc.cita)}`] : [])].join(' · ');
+        // Com 0 registros nenhum dado pessoal saiu: o alvo não cita nada (SR-112).
+        const cita = linhas > 0 ? doc.cita : [];
+        const targetLabel = [head, registros(linhas), ...(cita.length ? [`com ${cited(cita)}`] : [])].join(' · ');
 
         return {
             log: {

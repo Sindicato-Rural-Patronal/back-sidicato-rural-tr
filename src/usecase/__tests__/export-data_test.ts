@@ -192,8 +192,9 @@ auditLabel: 'Pessoas: JOÃO DA SILVA · CSV · com CPF, RG, Órgão emissor, Emi
         const r = await new ExportDataUseCase(repo, now).execute('companies', { ids: 'a, b ,,c' });
         expect(repo.companies).toHaveBeenCalledWith(expect.objectContaining({ ids: ['a', 'b', 'c'] }));
         expect(parse(r.result!.csv)).toHaveLength(1);
-        // Empresas saem pelo montador (SR-100): o alvo diz o formato e os campos pessoais.
-        expect(r.result!.auditLabel).toBe('Empresas: 0 registros (seleção) · CSV · com E-mail, Telefone, Telefone 2, Telefone 3, Pessoas vinculadas');
+        // Empresas saem pelo montador (SR-100): o alvo diz o formato e os campos
+        // pessoais, mas com 0 linhas nenhum dado saiu e ele não cita nada (SR-112).
+        expect(r.result!.auditLabel).toBe('Empresas: 0 registros (seleção) · CSV');
     });
 
     it('filtro inválido é 400', async () => {

@@ -101,6 +101,17 @@ linhas: 12 }, courseOnly);
         });
     });
 
+    it('com 0 registros a linha não cita dado pessoal (SR-112)', async () => {
+        const res = await send('agenda', { alvo: '05/10/2026 a 11/10/2026',
+linhas: 0,
+escopo: 'com filtros' }, courseOnly);
+        expect(res.statusCode, res.body).toBe(204);
+        const log = await lastExport();
+        expect(log).toMatchObject({ path: '/admin/export/documents/agenda',
+targetLabel: 'Agenda: 05/10/2026 a 11/10/2026 · 0 registros',
+statusCode: 204 });
+    });
+
     it('na tela da Auditoria: filtro "Exportações", busca pelo nome e a frase "Gerou o documento"', async () => {
         const res = await get('/admin/audit-logs?action=export&q=presença');
         expect(res.statusCode, res.body).toBe(200);

@@ -339,11 +339,13 @@ valor: registros(filters.ids.length) }]
         : await source.describeFilters(filters, rows, repo);
     const modeloText = modeloName(source, modelo, legacy);
 
-    // Contagem com milhar, como a tela ("1.234 registros", SR-112).
+    // Contagem com milhar, como a tela ("1.234 registros", SR-112). Com 0
+    // linhas nenhum dado pessoal saiu: o alvo não cita campos (os escolhidos
+    // continuam em `details.campos`).
     const head = single
         ? `${meta.title}: ${firstName}`
         : `${meta.title}: ${registros(count)} (${scope})`;
-    const cited = citedPersonalFields(fields);
+    const cited = count > 0 ? citedPersonalFields(fields) : '';
     const auditLabel = [head, FORMAT_LABEL[format], ...(cited ? [`com ${cited}`] : [])].join(' · ');
     const auditDetails: ExportAuditDetails = {
         formato: format,

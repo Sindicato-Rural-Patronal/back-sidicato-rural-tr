@@ -501,7 +501,9 @@ valor: 'GESTÃO DA PROPRIEDADE RURAL' },
             { nome: 'Só confirmadas',
 valor: 'Sim' },
         ]);
-        expect(r.result!.auditLabel).toBe('Inscrições: 0 registros (com filtros) · PDF · com CPF');
+        // 0 linhas: nenhum CPF saiu, o alvo não cita; os campos ficam nos detalhes (SR-112).
+        expect(r.result!.auditLabel).toBe('Inscrições: 0 registros (com filtros) · PDF');
+        expect(r.result!.auditDetails!.campos).toEqual(['Nº de ordem', 'Nome', 'CPF', 'Assinatura']);
     });
 
     it('um dos cursos sem linha: os nomes vêm pelo id; curso não achado ou mais de 3 → a quantidade', async () => {

@@ -85,10 +85,22 @@ linhas: 12 });
 linhas: 0,
 escopo: 'com filtros' });
         expect(agenda.log!.details.escopo).toBe('com filtros');
-        expect(agenda.log!.targetLabel).toBe('Agenda: 05/10/2026 a 11/10/2026 · 0 registros · com Responsável');
+        // 0 registros: nenhum dado saiu, o alvo não cita o Responsável (SR-112).
+        expect(agenda.log!.targetLabel).toBe('Agenda: 05/10/2026 a 11/10/2026 · 0 registros');
         const ficha = run('ficha-inscricao', { alvo: 'HORTA',
 linhas: 30 });
         expect(ficha.log!.targetLabel).toBe('Ficha de inscrição: HORTA · 30 registros · com CPF, Nascimento, Telefone, E-mail, Endereço e mais 2');
+    });
+
+    it('com 0 registros o alvo não cita dado pessoal; com 1, cita (SR-112)', () => {
+        expect(run('lista-presenca', { alvo: 'HORTA',
+linhas: 0 }).log!.targetLabel).toBe('Lista de presença: HORTA · 0 registros');
+        expect(run('lista-presenca', { alvo: 'HORTA',
+linhas: 1 }).log!.targetLabel).toBe('Lista de presença: HORTA · 1 registro · com CPF');
+        const empty = run('unimed-ficha', { linhas: 0 });
+        expect(empty.log!.targetLabel).toBe('Ficha da Unimed · 0 registros');
+        expect(empty.log!.details).toMatchObject({ linhas: 0,
+documento: 'unimed-ficha' });
     });
 
     it('a contagem tem milhar, como a tela; nos detalhes, "linhas" continua número (SR-112)', () => {
