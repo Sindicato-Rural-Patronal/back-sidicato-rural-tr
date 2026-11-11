@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { ExportFilterDescription } from './catalog/types.js';
 
 // Leitura dos filtros das exportações: o mesmo para GET (tudo texto na query)
-// e POST (JSON). Usado pelo montador e pelo caminho antigo.
+// e POST (JSON).
 
 export const empty = (v: unknown) => (v === '' || v == null ? undefined : v);
 export const text = z.preprocess(empty, z.string().trim().max(200).optional());

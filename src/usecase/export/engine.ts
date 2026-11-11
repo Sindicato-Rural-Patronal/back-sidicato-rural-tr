@@ -95,7 +95,7 @@ export type ExportResult = {
     filename: string;
     /** Texto para a trilha de auditoria. */
     auditLabel: string;
-    /** Detalhes para a trilha (null no caminho antigo). */
+    /** Detalhes para a trilha (null no relatório de cadastros, que não tem montador). */
     auditDetails: ExportAuditDetails | null;
 };
 

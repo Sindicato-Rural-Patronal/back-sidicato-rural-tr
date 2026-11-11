@@ -1,9 +1,9 @@
 import type { Permission } from '../../generated/prisma/enums.js';
 
 // Conjuntos exportáveis por `/admin/export/:dataset`: a permissão de cada um,
-// o título e o começo do nome do arquivo. Os que já têm o montador de
-// relatórios (decisão 006) estão em `catalog/index.ts`; os outros ainda saem
-// pelo caminho antigo de `usecase/export-data.ts` (fase 2).
+// o título e o começo do nome do arquivo. Todos saem pelo montador de
+// relatórios (decisão 006): as fontes estão em `catalog/index.ts`, e o
+// relatório de cadastros, que não tem montador, em `cadastros.ts`.
 
 export const EXPORT_DATASETS = {
     people: { permission: 'READ_USER',

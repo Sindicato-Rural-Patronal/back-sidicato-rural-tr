@@ -12,8 +12,8 @@ import { roomBookingsSource } from './room-bookings.js';
 import { unimedSource } from './unimed.js';
 import type { EngineDataset, ExportSource } from './types.js';
 
-// Fontes que já passaram para o montador de relatórios (decisão 006, fases 1
-// e 2). As outras continuam no caminho antigo (`usecase/export-data.ts`).
+// As fontes do montador de relatórios (decisão 006, fases 1 e 2): todo
+// conjunto exportável, menos o relatório de cadastros (`../cadastros.ts`).
 
 /** Fonte com os tipos apagados, para a tabela abaixo (cada uma é tipada no próprio arquivo). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

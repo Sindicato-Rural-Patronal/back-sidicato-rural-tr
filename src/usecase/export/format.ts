@@ -1,7 +1,7 @@
 import type { ExportAddress, ExportProperty } from '../../ports/external/export-repository.js';
 import { stripAccents } from '../../lib/text.js';
 
-// Formatação compartilhada pelas exportações (montador e caminho antigo).
+// Formatação compartilhada pelas exportações.
 
 // CPF sempre como 000.000.000-00 (gravado só com dígitos). Valor antigo que não
 // tem 11 dígitos sai só com os dígitos, sem máscara pela metade.

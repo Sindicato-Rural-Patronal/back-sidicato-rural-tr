@@ -335,7 +335,7 @@ account: string | null
         targetLabel: string;
         ip: string | null;
         userAgent: string | null;
-        /** O que foi exportado (montador de relatórios); null no caminho antigo. */
+        /** O que foi exportado (montador de relatórios); null no relatório de cadastros. */
         details?: ExportAuditLogDetails | null;
     }): Promise<{ id: string }>;
 }
