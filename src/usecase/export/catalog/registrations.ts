@@ -52,11 +52,14 @@ group: 'Inscrição',
 type: 'wallclock',
 privacy: 'comum',
 value: r => r.course.startTime },
+    // 1,25 (e não 1, o de sim/não): "Confirmada" cabe sem cortar a palavra em
+    // relatórios de até 8 colunas (SR-093).
     { key: 'confirmed',
 label: 'Confirmada',
 group: 'Inscrição',
 type: 'boolean',
 privacy: 'comum',
+weight: 1.25,
 value: r => r.confirmed },
     {
         key: 'attendance',

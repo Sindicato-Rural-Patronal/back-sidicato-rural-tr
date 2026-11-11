@@ -185,6 +185,28 @@ fields: source.padrao }, ...source.modelos]) {
         }
         expect(privacy.get('name')).toBe('comum');
     });
+
+    it('largura no PDF: Nº de ordem cabe o rótulo; UF, número e Confirmada sem a largura de texto (SR-093)', async () => {
+        vi.mocked(repo.registrations).mockResolvedValue([] as never);
+        const r = await useCase().execute(
+            'registrations',
+            { fields: 'ordinal,name,age,confirmed,addressNumber,addressKm,addressLot,addressSection,addressState',
+format: 'pdf' },
+            can('READ_COURSE', 'READ_USER'),
+        );
+        const weight = Object.fromEntries(r.result!.pdf!.columns.map(c => [c.key, c.weight]));
+        expect(weight).toEqual({
+            ordinal: 1.5,
+            name: 3,
+            age: 1,
+            confirmed: 1.25,
+            addressNumber: 1.25,
+            addressKm: 1.25,
+            addressLot: 1.25,
+            addressSection: 1.25,
+            addressState: 1,
+        });
+    });
 });
 
 describe('GetExportCatalogUseCase', () => {

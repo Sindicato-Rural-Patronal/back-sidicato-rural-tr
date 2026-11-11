@@ -33,12 +33,26 @@ function primaryProperty(p: PersonExportRow): ExportProperty | undefined {
     return p.properties.find(x => x.id === p.primaryPropertyId) ?? p.properties[0];
 }
 
+/**
+ * Larguras no PDF dos campos de valor curto (SR-093). O texto padrão vale 2,
+ * largo demais para "PR" ou "123"; com menos, a palavra mais longa do rótulo
+ * ("Endereço:") ainda cabe sem ser cortada nos modelos de fábrica e nos
+ * relatórios de até 8 colunas (letra de 8 pt).
+ */
+const SHORT_WEIGHT = {
+    /** Número, Km, Lote e Seção do endereço. */
+    addressPart: 1.25,
+    /** UF: duas letras. */
+    addressState: 1,
+} as const;
+
 /** Uma coluna do endereço da propriedade principal. */
 function addressField(
     key: string,
     header: string,
     pick: (a: ExportAddress) => unknown,
     type: ExportFieldType = 'text',
+    weight?: number,
 ): PersonFieldDef {
     return {
         key,
@@ -46,6 +60,7 @@ function addressField(
         group: 'Endereço',
         type,
         privacy: 'pessoal',
+        ...(weight !== undefined && { weight }),
         value: p => {
             const a = primaryProperty(p)?.address;
             return a ? pick(a) : null;
@@ -203,16 +218,16 @@ privacy: 'comum',
 value: p => primaryProperty(p)?.name },
     addressField('addressType', 'Tipo', a => label(ADDRESS_TYPE_LABEL, a.type)),
     addressField('addressStreet', 'Rua', a => a.street),
-    addressField('addressNumber', 'Número', a => a.number),
+    addressField('addressNumber', 'Número', a => a.number, 'text', SHORT_WEIGHT.addressPart),
     addressField('addressComplement', 'Complemento', a => a.complement),
     addressField('addressNeighborhood', 'Bairro', a => a.neighborhood),
     addressField('addressLocality', 'Localidade', a => a.localityName),
     addressField('addressRoad', 'Estrada', a => a.road),
-    addressField('addressKm', 'Km', a => a.km),
-    addressField('addressLot', 'Lote', a => a.lot),
-    addressField('addressSection', 'Seção', a => a.section),
+    addressField('addressKm', 'Km', a => a.km, 'text', SHORT_WEIGHT.addressPart),
+    addressField('addressLot', 'Lote', a => a.lot, 'text', SHORT_WEIGHT.addressPart),
+    addressField('addressSection', 'Seção', a => a.section, 'text', SHORT_WEIGHT.addressPart),
     addressField('addressCity', 'Cidade', a => a.city),
-    addressField('addressState', 'UF', a => a.state),
+    addressField('addressState', 'UF', a => a.state, 'text', SHORT_WEIGHT.addressState),
     addressField('addressZipCode', 'CEP', a => a.zipCode, 'cep'),
     { key: 'addressLine',
 label: 'Endereço numa linha',
@@ -405,12 +420,15 @@ free?: readonly string[]
 /** Campos de todo relatório: o número da linha e a coluna de assinatura. */
 export function reportFields<Row>(): ExportField<Row>[] {
     return [
+        // 1,5 (e não 1, o de número): o rótulo "Nº de ordem" cabe numa linha só na
+        // Lista de presença (em pé) e em relatórios de até 8 colunas (SR-093). Com 1,
+        // o cabeçalho quebrava em "Nº de or-/dem".
         { key: 'ordinal',
 label: 'Nº de ordem',
 group: 'Relatório',
 type: 'number',
 privacy: 'comum',
-weight: 1,
+weight: 1.5,
 value: (_row, ctx) => ctx.index },
         { key: 'signature',
 label: 'Assinatura',
