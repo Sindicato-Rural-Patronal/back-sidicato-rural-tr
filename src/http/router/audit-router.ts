@@ -17,6 +17,36 @@ import { requires } from '../lib/route-auth.js';
 // Valor de antes/depois: texto, número, sim/não ou vazio.
 const auditValue = { type: ['string', 'number', 'boolean', 'null'] };
 
+// "O que foi exportado" (decisão 006): só nas exportações do montador de
+// relatórios; nas outras linhas, null.
+const exportDetails = {
+    type: 'object',
+    nullable: true,
+    properties: {
+        // csv | pdf
+        formato: { type: 'string' },
+        // Nome do modelo ("Nome e CPF", "Padrão (como hoje)") ou null.
+        modelo: { type: 'string',
+nullable: true },
+        // Rótulos das colunas, na ordem.
+        campos: { type: 'array',
+items: { type: 'string' } },
+        // seleção | com filtros | todos
+        escopo: { type: 'string' },
+        filtros: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    nome: { type: 'string' },
+                    valor: { type: 'string' },
+                },
+            },
+        },
+        linhas: { type: 'integer' },
+    },
+};
+
 // Resposta de GET/PATCH /admin/audit-settings.
 const auditSettingsResponse = {
     type: 'object',
@@ -115,6 +145,8 @@ nullable: true },
                                     },
                                 },
                             },
+                            // O que foi exportado (exportações do montador); null nas outras
+                            details: exportDetails,
                             createdAt: { type: 'string' },
                         },
                     }),
@@ -158,6 +190,7 @@ q?: string;
                 userAgent: string | null;
                 location: string | null;
                 changes: unknown;
+                details: unknown;
                 createdAt: Date;
             };
             const [rows, total]: [AuditRow[], number] = await Promise.all([
@@ -186,6 +219,7 @@ username: true },
                 summary: describeAuditAction(r),
                 device: r.userAgent ? describeUserAgent(r.userAgent) : null,
                 changes: Array.isArray(r.changes) ? r.changes : null,
+                details: r.details && typeof r.details === 'object' && !Array.isArray(r.details) ? r.details : null,
             }));
 
             return res.send({

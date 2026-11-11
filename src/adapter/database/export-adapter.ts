@@ -1,4 +1,5 @@
 import type { PrismaClient } from '../../generated/prisma/client.js';
+import type { InputJsonValue } from '../../generated/prisma/internal/prismaNamespace.js';
 import type {
     AdminExportRow,
     AuditLogExportRow,
@@ -258,7 +259,7 @@ username: true } })
     }
 
     // O local do IP é preenchido depois da resposta (http/audit-hooks.ts).
-    async logExport({ actorId, path, targetLabel, ip, userAgent }: Parameters<ExportRepository['logExport']>[0]): Promise<{ id: string }> {
+    async logExport({ actorId, path, targetLabel, ip, userAgent, details }: Parameters<ExportRepository['logExport']>[0]): Promise<{ id: string }> {
         return this.prisma.auditLog.create({
             data: { actorId,
 method: 'EXPORT',
@@ -267,7 +268,8 @@ entity: 'Exportação',
 targetLabel,
 statusCode: 200,
 ip,
-userAgent },
+userAgent,
+...(details && { details: details as unknown as InputJsonValue }) },
             select: { id: true },
         });
     }

@@ -721,7 +721,7 @@ Parâmetros (query no GET, corpo no POST), além dos filtros do conjunto:
 ### Auditoria (`audit-router.ts`, `http/audit-hooks.ts`)
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
-| `GET` | `/admin/audit-logs` | paginada; filtros `action` (create, edit, delete, export, login, login_failed), `entity`, `actorId`, `ip`, `from`, `to`, `q`; cada linha traz `summary`, `ip`, `location`, `device`, `userAgent`, `changes` | `READ_AUDIT` |
+| `GET` | `/admin/audit-logs` | paginada; filtros `action` (create, edit, delete, export, login, login_failed), `entity`, `actorId`, `ip`, `from`, `to`, `q` (no `targetLabel` e no caminho); cada linha traz `summary`, `ip`, `location`, `device`, `userAgent`, `changes`, `details` | `READ_AUDIT` |
 | `GET` | `/admin/audit-settings` | `{ retentionDays, options, oldestAt, total }` | `READ_AUDIT` |
 | `PATCH` | `/admin/audit-settings` | `{ retentionDays }` (0 = para sempre, ou 30–3650); limpa na hora → `deleted` | `UPDATE_AUDIT` |
 
@@ -731,6 +731,8 @@ Parâmetros (query no GET, corpo no POST), além dos filtros do conjunto:
 - **A rota pode decidir** (`skipAuditLine` e `setAuditLabel`, em `http/audit-hooks.ts`): chamada que não mudou nada não deixa linha, e a que mudou diz o que fez no `targetLabel`. Quem usa: `POST /admin/finance/recurrences/generate` (ver Financeiro).
 
 **Login:** 2xx → `LOGIN`; 401 → `LOGIN_FAILED`; 429 → `LOGIN_BLOCKED`; `targetLabel` = usuário digitado. A senha nunca é lida.
+
+**O que foi exportado** (`details`, decisão 006): nas exportações do montador de relatórios (`people` e `registrations`, com ou sem `fields`), `{ formato: 'csv'|'pdf', modelo: string|null, campos: [rótulos, na ordem], escopo: 'seleção'|'com filtros'|'todos', filtros: [{ nome, valor }], linhas }`. Nas outras linhas (e nas exportações das fontes que ainda não têm o montador), `null`. O painel mostra no bloco "O que foi exportado" da linha.
 
 **De onde veio:**
 - `ip`, `userAgent` (até 300 caracteres) e `location` "Cidade, UF, País".
@@ -916,7 +918,7 @@ Nomes como estão no `prisma/schema.prisma` (alguns em minúsculas). Detalhe de 
 | `SiteSetting` | key, value |
 | `MarketQuote` | id, label (único), value (texto pronto), priceCents, unit, period, variation, referenceDate, isActive, order |
 | `MarketQuoteHistory` | id, marketQuoteId, value, numeric, referenceDate, period — único por produto, dia e período |
-| `AuditLog` | id, actorId (sem FK), method (POST/PATCH/PUT/DELETE/EXPORT/LOGIN/LOGIN_FAILED/LOGIN_BLOCKED), path, entity, targetLabel, statusCode, ip, userAgent, location, changes (Json), createdAt |
+| `AuditLog` | id, actorId (sem FK), method (POST/PATCH/PUT/DELETE/EXPORT/LOGIN/LOGIN_FAILED/LOGIN_BLOCKED), path, entity, targetLabel, statusCode, ip, userAgent, location, changes (Json), details (Json?, o que foi exportado), createdAt |
 | `Notification` / `NotificationRead` | evento: id, type, title, body, link, permission, entityId · leitura: notificationId (cascade), adminId, readAt — única por (evento, admin) |
 | `FinancialCategory` | id, name, type, color, active, order, isDeleted |
 | `FinancialAccount` | id, name, color, active, order, isDeleted |

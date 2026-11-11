@@ -1,5 +1,5 @@
 import type { Permission } from '../../generated/prisma/enums.js';
-import type { ExportRepository } from '../../ports/external/export-repository.js';
+import type { ExportAuditLogDetails, ExportRepository } from '../../ports/external/export-repository.js';
 import { ForbiddenError } from '../../errors/auth.js';
 import { ValidationError } from '../../errors/validation.js';
 import {
@@ -81,17 +81,9 @@ export type ExportPdf = {
 };
 
 /** `AuditLog.details` de uma exportação (decisão 006, item 7.2). */
-export type ExportAuditDetails = {
-    formato: ExportFormat;
-    modelo: string | null;
-    /** Rótulos, na ordem das colunas. */
-    campos: string[];
-    escopo: ExportScope;
-    filtros: ExportFilterDescription[];
-    linhas: number;
-};
+export type ExportAuditDetails = ExportAuditLogDetails;
 
-export type ExportScope = 'seleção' | 'com filtros' | 'todos';
+export type ExportScope = ExportAuditLogDetails['escopo'];
 
 export type ExportResult = {
     format: ExportFormat;

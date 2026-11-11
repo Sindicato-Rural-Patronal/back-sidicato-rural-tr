@@ -354,9 +354,67 @@ orderBy: { createdAt: 'desc' } });
             entity: 'Exportação',
             targetLabel: 'Pessoas: 2 registros (seleção) · PDF · com CPF, Telefone',
         });
-        // A busca da auditoria por "CPF" acha quem exportou CPF.
+        // O que foi exportado vai em `details`.
+        expect(log!.details).toEqual({
+            formato: 'pdf',
+            modelo: null,
+            campos: ['Nome', 'Telefone', 'CPF'],
+            escopo: 'seleção',
+            filtros: [{ nome: 'Seleção',
+valor: '2 registros' }],
+            linhas: 2,
+        });
+        // A busca da auditoria por "CPF" acha quem exportou CPF, e a lista devolve os detalhes.
         const found = await get('/admin/audit-logs?action=export&q=CPF');
-        expect((found.json() as { data: { targetLabel: string }[] }).data[0].targetLabel).toContain('com CPF');
+        expect(found.statusCode).toBe(200);
+        const row = (found.json() as {
+ data: {
+ targetLabel: string;
+details: unknown 
+}[] 
+}).data[0];
+        expect(row.targetLabel).toBe('Pessoas: 2 registros (seleção) · PDF · com CPF, Telefone');
+        expect(row.details).toEqual(log!.details);
+    });
+
+    it('filtros e modelo nos detalhes; sem fields o modelo é o Padrão', async () => {
+        await post('/admin/export/registrations', { courseIds: [ids.course],
+confirmed: true,
+modelo: 'lista-presenca',
+fields: ['ordinal', 'name', 'cpf', 'signature'] });
+        const lista = await prisma.auditLog.findFirst({ where: { method: 'EXPORT' },
+orderBy: { createdAt: 'desc' } });
+        expect(lista!.details).toEqual({
+            formato: 'csv',
+            modelo: 'Lista de presença',
+            campos: ['Nº de ordem', 'Nome', 'CPF', 'Assinatura'],
+            escopo: 'com filtros',
+            filtros: [{ nome: 'Curso',
+valor: 'CURSO MONTADOR' }, { nome: 'Só confirmadas',
+valor: 'Sim' }],
+            linhas: 1,
+        });
+        expect(lista!.targetLabel).toBe('Inscrições: 1 registro (com filtros) · CSV · com CPF');
+
+        await get('/admin/export/people?search=montador');
+        const padrao = await prisma.auditLog.findFirst({ where: { method: 'EXPORT' },
+orderBy: { createdAt: 'desc' } });
+        expect(padrao!.details).toMatchObject({ formato: 'csv',
+modelo: 'Padrão (como hoje)',
+escopo: 'com filtros',
+linhas: 2 });
+        expect((padrao!.details as { campos: string[] }).campos).toHaveLength(57);
+    });
+
+    it('conjunto ainda sem montador: linha como antes, sem detalhes', async () => {
+        await get('/admin/export/courses');
+        const log = await prisma.auditLog.findFirst({ where: { method: 'EXPORT' },
+orderBy: { createdAt: 'desc' } });
+        expect(log).toMatchObject({ path: '/admin/export/courses',
+targetLabel: 'Cursos: 1 registro (todos)',
+details: null });
+        const list = await get('/admin/audit-logs?action=export&limit=1');
+        expect((list.json() as { data: { details: unknown }[] }).data[0].details).toBeNull();
     });
 
     it('erro de campo não deixa linha', async () => {

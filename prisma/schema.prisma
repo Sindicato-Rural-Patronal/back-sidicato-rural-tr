@@ -347,6 +347,9 @@ model AuditLog {
   location    String?
   // Campos alterados: [{ field, before, after }] (lib/audit-diff.ts).
   changes     Json?
+  // Exportação: { formato, modelo, campos, escopo, filtros, linhas } (decisão
+  // 006). Só nas exportações do montador de relatórios; o resto fica null.
+  details     Json?
   createdAt   DateTime @default(now())
 
   @@index([createdAt])

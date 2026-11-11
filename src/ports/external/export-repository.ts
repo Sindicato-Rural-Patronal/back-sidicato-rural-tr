@@ -265,6 +265,20 @@ export type AuditLogExportRow = {
     actorName: string;
 };
 
+/** `AuditLog.details` de uma exportação (decisão 006): o que saiu. */
+export type ExportAuditLogDetails = {
+    formato: 'csv' | 'pdf';
+    modelo: string | null;
+    /** Rótulos, na ordem das colunas. */
+    campos: string[];
+    escopo: 'seleção' | 'com filtros' | 'todos';
+    filtros: {
+ nome: string;
+valor: string 
+}[];
+    linhas: number;
+};
+
 /** Reserva de sala (evento/reunião), mesmo formato da listagem. */
 export type RoomBookingExportRow = RoomBookingItem;
 
@@ -292,5 +306,7 @@ confirmed?: boolean
         targetLabel: string;
         ip: string | null;
         userAgent: string | null;
+        /** O que foi exportado (montador de relatórios); null no caminho antigo. */
+        details?: ExportAuditLogDetails | null;
     }): Promise<{ id: string }>;
 }

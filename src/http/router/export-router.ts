@@ -230,6 +230,7 @@ alsoRequires?: Permission
                 actorId: admin.id,
                 path: `/admin/export/${dataset}`,
                 targetLabel: r.result.auditLabel,
+                details: r.result.auditDetails,
                 ...requestContext(req),
             });
             fillAuditLocationLater(req, logged.id);
