@@ -179,6 +179,21 @@ startTime: true } },
         });
     }
 
+    // Mesma ordem das inscrições (início do curso, depois o nome).
+    courseNames(ids: string[]): Promise<{
+ id: string;
+name: string
+}[]> {
+        if (!ids.length) return Promise.resolve([]);
+        return this.prisma.course.findMany({
+            where: { id: { in: ids },
+isDeleted: false },
+            orderBy: [{ startTime: 'asc' }, { name: 'asc' }],
+            select: { id: true,
+name: true },
+        });
+    }
+
     contactMessages({ ids, ...filters }: Parameters<ExportRepository['contactMessages']>[0]): Promise<ContactMessageExportRow[]> {
         return this.prisma.contactMessage.findMany({
             where: byIds(ids) ? { ...byIds(ids),

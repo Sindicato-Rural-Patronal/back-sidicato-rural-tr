@@ -59,7 +59,12 @@ export type ExportSource<Row, Filters extends { ids?: string[] }> = {
     filters: z.ZodType<Filters>;
     /** Nome de cada filtro em palavras. */
     filterLabels: Record<string, string>;
-    describeFilters: (filters: Filters, rows: Row[]) => ExportFilterDescription[];
+    /** `repo`: para o que as linhas não dizem (ex.: o nome do curso sem nenhuma inscrição). */
+    describeFilters: (
+        filters: Filters,
+        rows: Row[],
+        repo: ExportRepository,
+    ) => ExportFilterDescription[] | Promise<ExportFilterDescription[]>;
     fields: ExportField<Row>[];
     /** As colunas de hoje, na ordem de hoje: o que sai sem `fields`. */
     padrao: string[];

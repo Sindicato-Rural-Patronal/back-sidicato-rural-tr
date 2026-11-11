@@ -304,7 +304,7 @@ now: Date
     const filtros: ExportFilterDescription[] = filters.ids?.length
         ? [{ nome: 'Seleção',
 valor: `${filters.ids.length} registro${filters.ids.length === 1 ? '' : 's'}` }]
-        : source.describeFilters(filters, rows);
+        : await source.describeFilters(filters, rows, repo);
     const modeloText = modeloName(source, modelo, legacy);
 
     const head = single

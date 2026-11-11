@@ -409,6 +409,40 @@ linhas: 2 });
         expect((padrao!.details as { campos: string[] }).campos).toHaveLength(57);
     });
 
+    it('curso sem nenhuma linha: o filtro diz o nome do curso no PDF e nos detalhes', async () => {
+        // Curso só deste teste, sem inscrição; sai no fim para não mudar as contagens dos outros.
+        const { roomId } = await prisma.course.findUniqueOrThrow({ where: { id: ids.course },
+select: { roomId: true } });
+        const vazio = await prisma.course.create({
+            data: { name: 'Gestão da Propriedade Rural',
+description: 'x',
+roomId,
+                startTime: new Date('2032-02-01T08:00:00Z'),
+endTime: new Date('2032-02-01T12:00:00Z') },
+        });
+        try {
+            const res = await post('/admin/export/registrations', { courseIds: [vazio.id],
+confirmed: true,
+modelo: 'lista-presenca',
+fields: ['ordinal', 'name', 'cpf', 'signature'],
+format: 'pdf' }, courseOnly);
+            expect(res.statusCode).toBe(200);
+            expect(res.json()).toMatchObject({ count: 0,
+filters: 'Curso: Gestão da Propriedade Rural · Só confirmadas',
+rows: [] });
+            const log = await prisma.auditLog.findFirst({ where: { method: 'EXPORT' },
+orderBy: { createdAt: 'desc' } });
+            expect((log!.details as { filtros: unknown }).filtros).toEqual([
+                { nome: 'Curso',
+valor: 'Gestão da Propriedade Rural' },
+                { nome: 'Só confirmadas',
+valor: 'Sim' },
+            ]);
+        } finally {
+            await prisma.course.delete({ where: { id: vazio.id } });
+        }
+    });
+
     it('conjunto ainda sem montador: linha como antes, sem detalhes', async () => {
         await get('/admin/export/courses');
         const log = await prisma.auditLog.findFirst({ where: { method: 'EXPORT' },

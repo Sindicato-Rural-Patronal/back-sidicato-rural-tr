@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { RegistrationExportRow } from '../../../ports/external/export-repository.js';
+import type { ExportRepository, RegistrationExportRow } from '../../../ports/external/export-repository.js';
 import { bool, idList } from '../filters.js';
 import { personFields, reportFields } from './person-fields.js';
 import type { ExportField, ExportFilterDescription, ExportSource } from './types.js';
@@ -86,23 +86,40 @@ const PADRAO = [
     'attendance', 'activeMember', 'partnerCompanies', 'boardPosition', 'publicContact', 'hasFicha', 'registeredAt',
 ];
 
-/** "Curso: HORTA" quando dá para dizer o nome; senão "Cursos: 4". */
-function describeCourses(courseIds: string[], rows: RegistrationExportRow[]): ExportFilterDescription {
-    const names = [...new Set(rows.map(r => r.course.name))];
-    if (names.length && names.length <= 3 && names.length === courseIds.length) {
-        return { nome: names.length === 1 ? 'Curso' : 'Cursos',
-valor: names.join(', ') };
+/** Até quantos cursos o filtro diz pelo nome; acima, só a quantidade. */
+const MAX_NAMED_COURSES = 3;
+
+/**
+ * "Curso: HORTA" quando dá para dizer o nome; senão "Cursos: 4". O nome vem
+ * das linhas; o curso que não deu nenhuma linha (ex.: "Só confirmadas" sem
+ * nenhuma confirmada) não aparece nelas, e então os nomes vêm pelo id.
+ */
+async function describeCourses(
+    courseIds: string[],
+    rows: RegistrationExportRow[],
+    repo: ExportRepository,
+): Promise<ExportFilterDescription> {
+    const ids = [...new Set(courseIds)];
+    const count = { nome: 'Cursos',
+valor: String(ids.length) };
+    if (ids.length > MAX_NAMED_COURSES) return count;
+    let names = [...new Set(rows.map(r => r.course.name))];
+    if (names.length !== ids.length) {
+        const found = await repo.courseNames(ids);
+        names = found.length === ids.length ? [...new Set(found.map(c => c.name))] : [];
     }
-    return { nome: 'Cursos',
-valor: String(courseIds.length) };
+    // Dois cursos com o mesmo nome também caem na quantidade.
+    if (!names.length || names.length !== ids.length) return count;
+    return { nome: names.length === 1 ? 'Curso' : 'Cursos',
+valor: names.join(', ') };
 }
 
 export const registrationsSource: ExportSource<RegistrationExportRow, RegistrationFilters> = {
     dataset: 'registrations',
     filters,
     filterLabels,
-    describeFilters: (f, rows) => [
-        ...(f.courseIds?.length ? [describeCourses(f.courseIds, rows)] : []),
+    describeFilters: async (f, rows, repo) => [
+        ...(f.courseIds?.length ? [await describeCourses(f.courseIds, rows, repo)] : []),
         ...(f.confirmed ? [{ nome: filterLabels.confirmed,
 valor: 'Sim' }] : []),
     ],

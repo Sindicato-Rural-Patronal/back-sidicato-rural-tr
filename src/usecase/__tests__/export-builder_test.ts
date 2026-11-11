@@ -17,6 +17,7 @@ const repo = {
     people: vi.fn(),
     companies: vi.fn(),
     registrations: vi.fn(),
+    courseNames: vi.fn(),
     courses: vi.fn(),
     logExport: vi.fn(),
 } as unknown as ExportRepository;
@@ -411,6 +412,53 @@ take: 20001 });
             modelo: 'Lista de presença',
             rows: [['1', 'JOÃO DA SILVA', '123.456.789-09', '']],
         });
+        // O nome veio das linhas: nada de consulta a mais.
+        expect(repo.courseNames).not.toHaveBeenCalled();
+    });
+
+    it('curso sem nenhuma linha: o nome do filtro vem pelo id (PDF e auditoria)', async () => {
+        vi.mocked(repo.registrations).mockResolvedValue([] as never);
+        vi.mocked(repo.courseNames).mockResolvedValue([{ id: 'c1',
+name: 'GESTÃO DA PROPRIEDADE RURAL' }]);
+        const r = await useCase().execute('registrations', {
+            courseIds: 'c1',
+            confirmed: 'true',
+            fields: 'ordinal,name,cpf,signature',
+            modelo: 'lista-presenca',
+            format: 'pdf',
+        });
+        expect(repo.courseNames).toHaveBeenCalledWith(['c1']);
+        expect(r.result!.pdf!.filters).toBe('Curso: GESTÃO DA PROPRIEDADE RURAL · Só confirmadas');
+        expect(r.result!.auditDetails!.filtros).toEqual([
+            { nome: 'Curso',
+valor: 'GESTÃO DA PROPRIEDADE RURAL' },
+            { nome: 'Só confirmadas',
+valor: 'Sim' },
+        ]);
+        expect(r.result!.auditLabel).toBe('Inscrições: 0 registros (com filtros) · PDF · com CPF');
+    });
+
+    it('um dos cursos sem linha: os nomes vêm pelo id; curso não achado ou mais de 3 → a quantidade', async () => {
+        vi.mocked(repo.registrations).mockResolvedValue([registration('r1', {})] as never);
+        vi.mocked(repo.courseNames).mockResolvedValue([{ id: 'c1',
+name: 'HORTA' }, { id: 'c2',
+name: 'CURSO B' }]);
+        const two = await useCase().execute('registrations', { courseIds: 'c1,c2,c1',
+format: 'pdf' });
+        expect(repo.courseNames).toHaveBeenCalledWith(['c1', 'c2']);
+        expect(two.result!.pdf!.filters).toBe('Cursos: HORTA, CURSO B');
+
+        vi.mocked(repo.registrations).mockResolvedValue([] as never);
+        vi.mocked(repo.courseNames).mockResolvedValue([]);
+        const missing = await useCase().execute('registrations', { courseIds: 'sumiu',
+format: 'pdf' });
+        expect(missing.result!.pdf!.filters).toBe('Cursos: 1');
+
+        vi.mocked(repo.courseNames).mockClear();
+        const many = await useCase().execute('registrations', { courseIds: 'a,b,c,d',
+format: 'pdf' });
+        expect(many.result!.pdf!.filters).toBe('Cursos: 4');
+        expect(repo.courseNames).not.toHaveBeenCalled();
     });
 });
 

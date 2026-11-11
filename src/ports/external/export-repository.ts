@@ -294,8 +294,16 @@ export interface ExportRepository {
     /** `courseIds`: inscrições desses cursos; sem nada, de todos. `confirmed: true`: só as confirmadas. */
     registrations(filters: ExportSelection & ExportTake & {
  courseIds?: string[];
-confirmed?: boolean 
+confirmed?: boolean
 }): Promise<RegistrationExportRow[]>;
+    /**
+     * Nome dos cursos não excluídos desses ids, na ordem das inscrições (início, depois nome).
+     * Dá o nome do filtro "Curso" quando o curso não deu nenhuma linha.
+     */
+    courseNames(ids: string[]): Promise<{
+ id: string;
+name: string
+}[]>;
     contactMessages(filters: ContactMessageFilters & ExportSelection): Promise<ContactMessageExportRow[]>;
     unimed(filters: { search?: string } & ExportSelection): Promise<UnimedExportRow[]>;
     auditLogs(filters: AuditLogFilters): Promise<AuditLogExportRow[]>;
