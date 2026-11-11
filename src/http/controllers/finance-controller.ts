@@ -13,7 +13,6 @@ import type { UpdateFinanceTransactionUseCase } from '../../usecase/update-finan
 import type { DeleteFinanceTransactionUseCase } from '../../usecase/delete-finance-transaction.js';
 import type { CreateFinanceTransferUseCase } from '../../usecase/create-finance-transfer.js';
 import type { FinanceSummaryUseCase } from '../../usecase/finance-summary.js';
-import type { ExportFinanceTransactionsUseCase } from '../../usecase/export-finance-transactions.js';
 import type { UploadFinanceAttachmentUseCase } from '../../usecase/upload-finance-attachment.js';
 import type { GetFinanceAttachmentUseCase } from '../../usecase/get-finance-attachment.js';
 import type { DeleteFinanceAttachmentUseCase } from '../../usecase/delete-finance-attachment.js';
@@ -60,7 +59,6 @@ export class FinanceController {
         private readonly deleteTransaction: DeleteFinanceTransactionUseCase,
         private readonly createTransfer: CreateFinanceTransferUseCase,
         private readonly summaryUseCase: FinanceSummaryUseCase,
-        private readonly exportUseCase: ExportFinanceTransactionsUseCase,
         private readonly uploadAttachmentUseCase: UploadFinanceAttachmentUseCase,
         private readonly getAttachmentUseCase: GetFinanceAttachmentUseCase,
         private readonly deleteAttachmentUseCase: DeleteFinanceAttachmentUseCase,
@@ -136,14 +134,6 @@ export class FinanceController {
     // Só informativo: o próximo Nº automático, sem reservar.
     async getNextNumber(_request: FastifyRequest, reply: FastifyReply) {
         return reply.send(await this.nextNumber.execute());
-    }
-
-    async exportTransactions(request: FastifyRequest, reply: FastifyReply) {
-        const csv = await this.exportUseCase.execute(request.query);
-        reply.header('Content-Type', 'text/csv; charset=utf-8');
-        reply.header('Content-Disposition', 'attachment; filename="lancamentos.csv"');
-        // toCsv já inclui o BOM (acentos no Excel).
-        return reply.send(csv);
     }
 
     async postTransaction(request: FastifyRequest, reply: FastifyReply) {

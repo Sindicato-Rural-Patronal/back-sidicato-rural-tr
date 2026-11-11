@@ -9,24 +9,7 @@ import { EXPORT_LIMITS } from '../../usecase/export/engine.js';
 import { errorToStatus } from '../lib/require-permission.js';
 import { adminOf, requiresFrom } from '../lib/route-auth.js';
 import { errorResponse } from '../lib/swagger-schemas.js';
-import { fillAuditLocationLater } from '../audit-hooks.js';
-import { requestContext } from '../../lib/request-context.js';
-
-/** Exportações por minuto por IP (decisão 006, item 7.4): uma conta invadida não baixa tudo em laço. */
-export const EXPORT_RATE_LIMIT = 30;
-export const EXPORT_RATE_LIMIT_MESSAGE = 'Muitas exportações seguidas. Aguarde um minuto e tente de novo.';
-
-function tooManyExports(_req: FastifyRequest, context: { statusCode: number }) {
-    const err = new Error(EXPORT_RATE_LIMIT_MESSAGE) as Error & { statusCode: number };
-    err.statusCode = context.statusCode;
-    return err;
-}
-
-const exportRateLimit = {
-    rateLimit: { max: EXPORT_RATE_LIMIT,
-timeWindow: '1 minute',
-errorResponseBuilder: tooManyExports },
-};
+import { EXPORT_RATE_LIMIT, EXPORT_RATE_LIMIT_MESSAGE, exportRateLimit, replyWithExport } from '../lib/export-reply.js';
 
 const builderDatasets = Object.keys(EXPORT_SOURCES).join(', ');
 
@@ -219,34 +202,11 @@ alsoRequires?: Permission
         return spec.alsoRequires ? [spec.permission, spec.alsoRequires] : [spec.permission];
     });
 
-    async function handle(req: FastifyRequest<{ Params: { dataset: ExportDataset } }>, reply: FastifyReply, input: unknown) {
-        const { dataset } = req.params;
-        const admin = adminOf(req);
-
-        const r = await exportData.execute(dataset, input, admin);
-        if (r.error || !r.result) return reply.status(errorToStatus(r.error)).send({ error: r.error?.message });
-
-        try {
-            const logged = await repo.logExport({
-                actorId: admin.id,
-                path: `/admin/export/${dataset}`,
-                targetLabel: r.result.auditLabel,
-                details: r.result.auditDetails,
-                ...requestContext(req),
-            });
-            fillAuditLocationLater(req, logged.id);
-        } catch {
-            /* auditoria nunca deve derrubar a exportação */
-        }
-
-        reply
-            .header('X-Export-Count', String(r.result.count))
-            .header('Access-Control-Expose-Headers', 'Content-Disposition, X-Export-Count');
-        if (r.result.pdf) return reply.send(r.result.pdf);
-        return reply
-            .header('Content-Type', 'text/csv; charset=utf-8')
-            .header('Content-Disposition', `attachment; filename="${r.result.filename}"`)
-            .send(r.result.csv);
+    function handle(req: FastifyRequest<{ Params: { dataset: ExportDataset } }>, reply: FastifyReply, input: unknown) {
+        return replyWithExport(req, reply, { exportData,
+repo,
+dataset: req.params.dataset,
+input });
     }
 
     fastify.get(

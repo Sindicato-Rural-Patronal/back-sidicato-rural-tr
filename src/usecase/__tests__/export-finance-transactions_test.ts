@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ExportFinanceTransactionsUseCase, empenhoName } from '../export-finance-transactions.js';
-import type { FinanceRepository } from '../../ports/external/finance-repository.js';
+import { ExportDataUseCase } from '../export-data.js';
+import { empenhoName } from '../export/catalog/finance-transactions.js';
+import type { ExportRepository } from '../../ports/external/export-repository.js';
+
+// O CSV dos lançamentos (SR-039, SR-064). Desde a SR-102 ele é o padrão da
+// fonte `finance-transactions` do montador de relatórios, que também atende a
+// rota antiga `GET /admin/finance/transactions/export`. O byte a byte está no
+// teste de ouro (`export-golden-fase2b_test.ts`).
 
 const row = (over: object) => ({
     id: 'tx',
@@ -18,10 +24,11 @@ const row = (over: object) => ({
     ...over,
 });
 
+const repoWith = (rows: object[]) => ({ financeTransactions: vi.fn().mockResolvedValue(rows) }) as unknown as ExportRepository;
+
 async function csvOf(rows: object[]) {
-    const repo = { listTransactionsForExport: vi.fn().mockResolvedValue(rows) } as unknown as FinanceRepository;
-    const csv = await new ExportFinanceTransactionsUseCase(repo).execute({});
-    return csv.replace(/^﻿/, '').trim().split('\r\n').map(l => l.slice(1, -1).split('";"'));
+    const r = await new ExportDataUseCase(repoWith(rows)).execute('finance-transactions', {});
+    return r.result!.csv.replace(/^﻿/, '').trim().split('\r\n').map(l => l.slice(1, -1).split('";"'));
 }
 
 describe('empenhoName', () => {
@@ -63,9 +70,9 @@ empenho: { numero: ' 0045 ' } }),
     });
 
     it('passa a ordem pedida para a consulta', async () => {
-        const repo = { listTransactionsForExport: vi.fn().mockResolvedValue([]) } as unknown as FinanceRepository;
-        await new ExportFinanceTransactionsUseCase(repo).execute({ orderBy: 'number' });
-        expect(vi.mocked(repo.listTransactionsForExport).mock.calls[0][0].orderBy).toBe('number');
+        const repo = repoWith([]);
+        await new ExportDataUseCase(repo).execute('finance-transactions', { orderBy: 'number' });
+        expect(vi.mocked(repo.financeTransactions).mock.calls[0][0].orderBy).toBe('number');
     });
 
     it('preenche com o empenho; lançamento sem empenho fica com as duas vazias', async () => {

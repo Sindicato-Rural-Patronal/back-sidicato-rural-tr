@@ -384,3 +384,53 @@ linhas: 1 });
         expect((await lastExport())!.targetLabel).toBe('Lançamentos: 1 registro (com filtros) · PDF');
     });
 });
+
+describe('rota antiga do CSV do Financeiro (GET /admin/finance/transactions/export)', () => {
+    it('passa pelo motor: mesma planilha, nome de sempre, e agora fica na auditoria', async () => {
+        const res = await get('/admin/finance/transactions/export?orderBy=number&search=semente');
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.headers['content-disposition']).toBe('attachment; filename="lancamentos.csv"');
+        expect(res.headers['x-export-count']).toBe('1');
+        expect(rows(res.body)[1].slice(0, 6)).toEqual(['10', '10/05/2026', 'Saída', 'BANCO MONTADOR', 'INSUMOS MONTADOR', 'Compra de semente']);
+
+        const log = await lastExport();
+        expect(log).toMatchObject({
+            path: '/admin/finance/transactions/export',
+            entity: 'Exportação',
+            targetLabel: 'Lançamentos: 1 registro (com filtros) · CSV · com CNPJ / CPF',
+        });
+        expect(log!.details).toMatchObject({
+            formato: 'csv',
+            modelo: 'Padrão (como hoje)',
+            escopo: 'com filtros',
+            filtros: [{ nome: 'Busca',
+valor: 'semente' }, { nome: 'Ordem',
+valor: 'Nº' }],
+            linhas: 1,
+        });
+        // Aparece na lista da Auditoria como as outras exportações.
+        const list = await get('/admin/audit-logs?action=export&limit=1');
+        expect((list.json() as { data: { summary: string }[] }).data[0].summary).toBe(
+            'Exportou a planilha "Lançamentos: 1 registro (com filtros) · CSV · com CNPJ / CPF"',
+        );
+    });
+
+    it('ignora fields, format e modelo: sai sempre o padrão em CSV', async () => {
+        const res = await get('/admin/finance/transactions/export?fields=number&format=pdf&modelo=resumido');
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.headers['content-type']).toBe('text/csv; charset=utf-8');
+        expect(rows(res.body)[0]).toHaveLength(13);
+        expect((await lastExport())!.details).toMatchObject({ formato: 'csv',
+modelo: 'Padrão (como hoje)' });
+    });
+
+    it('sem READ_FINANCE → 403 e nenhuma linha; erro de filtro também não deixa linha', async () => {
+        const userOnly = await adminWith('so.usuarios.csv.financeiro', ['READ_USER']);
+        const before = await prisma.auditLog.count({ where: { method: 'EXPORT' } });
+        expect((await get('/admin/finance/transactions/export', userOnly)).statusCode).toBe(403);
+        const bad = await get('/admin/finance/transactions/export?from=ontem');
+        expect(bad.statusCode).toBe(400);
+        expect(bad.json()).toEqual({ error: 'Parâmetro inválido: from' });
+        expect(await prisma.auditLog.count({ where: { method: 'EXPORT' } })).toBe(before);
+    });
+});

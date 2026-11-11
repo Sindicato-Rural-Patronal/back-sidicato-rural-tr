@@ -51,7 +51,8 @@ src/
     router/                um plugin Fastify por módulo (schema Swagger + handler)
     controllers/           leem a request, checam permissão, chamam o use case
     lib/                   route-auth.ts (acesso por rota), require-permission.ts (errorToStatus), public-rate-limit.ts, swagger-schemas.ts,
-                           request-parsing.ts (parser de JSON, opções do Ajv, limites dos números)
+                           request-parsing.ts (parser de JSON, opções do Ajv, limites dos números),
+                           export-reply.ts (resposta, auditoria e limite das exportações)
   usecase/                 regras de negócio (sem Fastify; Prisma só pelos ports)
     export/                montador de relatórios (decisão 006): catálogo de campos por fonte e motor
   ports/external/          interfaces dos repositórios
@@ -160,7 +161,7 @@ O teste de inventário (`http/__tests__/route-auth-inventory_test.ts`) monta tod
 - **Global:** 600/min. O IP real vem do proxy por `trustProxy` em `index.ts`; a decisão 002 da Arquitetura trata da topologia.
 - **Login e refresh:** 10 a cada 5 min.
 - **`PATCH /admin/me`:** 10 a cada 5 min.
-- **Exportação** (`GET`/`POST /admin/export/:dataset`): 30/min, cada método contando separado. O excesso responde 429 `{ error: "Muitas exportações seguidas. Aguarde um minuto e tente de novo." }`. O catálogo não tem limite próprio.
+- **Exportação** (`GET`/`POST /admin/export/:dataset` e `GET /admin/finance/transactions/export`): 30/min, cada rota e método contando separado. O excesso responde 429 `{ error: "Muitas exportações seguidas. Aguarde um minuto e tente de novo." }`. O catálogo não tem limite próprio.
 - **Rotas públicas** (`http/lib/public-rate-limit.ts`): inscrição (`register-by-cpf`, `register-full`) e `POST /contacts/message` com 10/min; `POST /users/lookup-cpf` com 20/min.
 - Cada rota conta separado. O excesso nas rotas públicas responde 429 `{ error: "Muitas tentativas seguidas. Aguarde um minuto e tente de novo." }`; no login, a mensagem padrão do plugin.
 - **Por CPF** (`lib/cpf-attempt-limiter.ts`, na memória do processo): 5 erros na última hora para o mesmo CPF, somando a consulta, o `register-by-cpf` e o `register-full`, → 429 "Muitas tentativas com este CPF. Aguarde uma hora ou procure o Sindicato.", até com o par certo. Conta erro também para CPF sem cadastro, para o 429 não revelar quem tem. Ver Inscrições.
@@ -683,7 +684,7 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 - **`ids`:** exporta só esses registros; lista vazia → 400 "Nenhum registro selecionado"; mais de 5000 → 400 "Selecione no máximo 5000 registros". Sem `ids`, vale o mesmo filtro da listagem.
 - **Headers:** `X-Export-Count` sempre; no CSV, também `Content-Disposition` (`pessoas-AAAA-MM-DD.csv`, ou `pessoa-<nome>-…` para um registro).
 - **Datas:** horário de curso e de reserva sai como gravado (`csvWallClock`); "criado em" sai no horário de Brasília (`csvDateTime`).
-- **Auditoria:** cada exportação grava um `AuditLog` `method: 'EXPORT'` (entity "Exportação"). O hook geral ignora `/admin/export/*`. Nos conjuntos com montador, o `targetLabel` diz o formato e cita os campos pessoais e sensíveis, documentos primeiro, até 5 ("Pessoas: 123 registros (com filtros) · PDF · com CPF, Nascimento e mais 2"): a busca da Auditoria por "CPF" acha quem exportou CPF. Erro não deixa linha.
+- **Auditoria:** cada exportação grava um `AuditLog` `method: 'EXPORT'` (entity "Exportação"), inclusive o CSV do Financeiro pela rota antiga (com `path` `/admin/finance/transactions/export`, desde a SR-102). O hook geral ignora `/admin/export/*`. A resposta e a linha saem de `replyWithExport` (`http/lib/export-reply.ts`), o mesmo para as duas rotas. Nos conjuntos com montador, o `targetLabel` diz o formato e cita os campos pessoais e sensíveis, documentos primeiro, até 5 ("Pessoas: 123 registros (com filtros) · PDF · com CPF, Nascimento e mais 2"): a busca da Auditoria por "CPF" acha quem exportou CPF. Erro não deixa linha.
 
 **Montador de relatórios** (decisão 006: fase 1 em `people` e `registrations`; fase 2, parte A, em `companies`, `properties`, `admins`, `courses`, `contact-messages` e `unimed`; parte B, em `audit-logs`, `room-bookings` e na fonte nova `finance-transactions`). O back é o único lugar que define colunas, formatos e permissões; o front lê o catálogo. As fontes com montador estão em `usecase/export/catalog/index.ts`; as outras continuam no caminho antigo de `usecase/export-data.ts` até a parte B.
 
@@ -816,7 +817,7 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 | `GET` | `/admin/finance/transactions/next-number` | `{ next }`: o próximo Nº automático (o maior + 1, contando excluídos). Só informativo, não reserva | `READ_FINANCE` |
 | `POST` | `/admin/finance/transactions` | criar lançamento, com `number?` → 201 (a linha, com o `number`); número em uso → 409; mês fechado → 409 | `CREATE_FINANCE` |
 | `PATCH` · `DELETE` | `/admin/finance/transactions/:id` | editar (aceita `number`) → `{ message, transaction }` (a linha como ficou) · excluir (soft) → 204; número em uso → 409; mês fechado → 409 | `UPDATE_` · `DELETE_FINANCE` |
-| `GET` | `/admin/finance/transactions/export` | CSV dos lançamentos filtrados, na ordem de `orderBy`. "Nº" é a primeira coluna (vazia sem número); depois de "Descrição": "Nome / Razão social" (razão social do empenho, ou o nome fantasia se ela estiver vazia), "CNPJ / CPF" e "Nº anterior" (`empenho.numero`) | `READ_FINANCE` |
+| `GET` | `/admin/finance/transactions/export` | **De saída.** CSV dos lançamentos filtrados, na ordem de `orderBy`. "Nº" é a primeira coluna (vazia sem número); depois de "Descrição": "Nome / Razão social" (razão social do empenho, ou o nome fantasia se ela estiver vazia), "CNPJ / CPF" e "Nº anterior" (`empenho.numero`). Desde a SR-102 é o padrão da fonte `finance-transactions` do montador, pelo mesmo motor (ver Exportação): mesma planilha byte a byte e o mesmo arquivo `lancamentos.csv`, mas agora **fica na auditoria**, tem o limite de 20.000 linhas (400 acima) e de 30 por minuto (429). `fields`, `format` e `modelo` são ignorados. O substituto é `GET`/`POST /admin/export/finance-transactions`; esta rota sai num commit seguinte, depois que o painel trocar (decisão 006, item 8) | `READ_FINANCE` |
 | `POST` | `/admin/finance/transfers` | transferência entre caixas → 201 `{ message, transactions: [saída, entrada] }`, com dois números seguidos; mês fechado na origem ou no destino → 409 | `CREATE_FINANCE` |
 | `POST` | `/admin/finance/transactions/:id/attachments` | comprovante (multipart: PDF, JPG, PNG, WEBP até 15 MB) → 201 `{ id, filename, mimeType, size, createdAt }` | `UPDATE_FINANCE` |
 | `GET` · `DELETE` | `/admin/finance/attachments/:attachmentId` | baixar (inline) · apagar de verdade | `READ_FINANCE` · `UPDATE_FINANCE` |

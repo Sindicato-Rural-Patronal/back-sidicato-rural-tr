@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExportDataUseCase } from '../export-data.js';
-import { ExportFinanceTransactionsUseCase } from '../export-finance-transactions.js';
 import type { ExportRepository } from '../../ports/external/export-repository.js';
-import type { FinanceRepository } from '../../ports/external/finance-repository.js';
 
 // Teste de ouro da fase 2, parte B, do montador de relatórios (decisão 006,
 // item 8; SR-102): o CSV padrão de cada fonte que ainda sai pelo caminho
@@ -354,12 +352,15 @@ search: 'reunião' });
 
 // ── Lançamentos do Financeiro ────────────────────────────────────────────────
 
-// Hoje o CSV sai por `GET /admin/finance/transactions/export`
-// (`ExportFinanceTransactionsUseCase`), fora de /admin/export. A planilha que
-// essa rota entrega é o padrão da fonte `finance-transactions`.
+// O CSV saía por `GET /admin/finance/transactions/export`
+// (`ExportFinanceTransactionsUseCase`), fora de /admin/export. Desde a SR-102,
+// aquela rota e a fonte `finance-transactions` saem pelo motor: a planilha é o
+// padrão da fonte. As linhas esperadas abaixo não mudaram com a troca.
 async function financeCsv(rows: object[], query: object = {}): Promise<string> {
-    const financeRepo = { listTransactionsForExport: vi.fn().mockResolvedValue(rows) } as unknown as FinanceRepository;
-    return new ExportFinanceTransactionsUseCase(financeRepo).execute(query);
+    vi.mocked(repo.financeTransactions).mockResolvedValue(rows as never);
+    const r = await useCase().execute('finance-transactions', query);
+    if (r.error) throw r.error;
+    return r.result!.csv;
 }
 
 const FINANCE_HEADER = [
