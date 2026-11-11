@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExportDataUseCase } from '../export-data.js';
+import { ExportFinanceTransactionsUseCase } from '../export-finance-transactions.js';
 import type { ExportRepository } from '../../ports/external/export-repository.js';
+import type { FinanceRepository } from '../../ports/external/finance-repository.js';
 
 // Teste de ouro da fase 2, parte B, do montador de relatórios (decisão 006,
 // item 8; SR-102): o CSV padrão de cada fonte que ainda sai pelo caminho
@@ -346,5 +348,123 @@ search: 'reunião' });
         expect((await useCase().execute('room-bookings', { type: 'CURSO' })).error!.message).toBe('Filtro inválido');
         expect((await useCase().execute('room-bookings', { from: '05/10/2026' })).error!.message).toBe('Data inválida: use AAAA-MM-DD');
         expect(repo.roomBookings).not.toHaveBeenCalled();
+    });
+});
+
+// ── Lançamentos do Financeiro ────────────────────────────────────────────────
+
+// Hoje o CSV sai por `GET /admin/finance/transactions/export`
+// (`ExportFinanceTransactionsUseCase`), fora de /admin/export. A planilha que
+// essa rota entrega é o padrão da fonte `finance-transactions`.
+async function financeCsv(rows: object[], query: object = {}): Promise<string> {
+    const financeRepo = { listTransactionsForExport: vi.fn().mockResolvedValue(rows) } as unknown as FinanceRepository;
+    return new ExportFinanceTransactionsUseCase(financeRepo).execute(query);
+}
+
+const FINANCE_HEADER = [
+    'Nº', 'Data', 'Tipo', 'Caixa', 'Categoria', 'Descrição', 'Nome / Razão social', 'CNPJ / CPF', 'Nº anterior', 'Método',
+    'Recorrente', 'Valor (R$)', 'Observações',
+];
+
+const tx = (over: object) => ({
+    id: 'tx',
+    number: null,
+    type: null,
+    amountCents: 0,
+    date: d('2026-01-01T00:00:00.000Z'),
+    description: '',
+    method: null,
+    notes: null,
+    categoryId: null,
+    accountId: null,
+    transferId: null,
+    createdBy: null,
+    recurringId: null,
+    recurringMonth: null,
+    empenho: null,
+    isDeleted: false,
+    deletedAt: null,
+    createdAt: d('2026-01-01T12:00:00.000Z'),
+    updatedAt: d('2026-01-01T12:00:00.000Z'),
+    category: null,
+    account: null,
+    attachments: [],
+    ...over,
+});
+
+/** Saída com Nota de Empenho completa: razão social, documento e "Nº anterior" aparados; fórmula nas observações. */
+const adubo = tx({
+    id: 't1',
+    number: 128,
+    type: 'OUT',
+    amountCents: 1234567,
+    date: d('2026-05-10T00:00:00.000Z'),
+    description: 'Compra de adubo; "NPK"',
+    method: 'PIX',
+    notes: '=SOMA(A1)',
+    category: { name: 'INSUMOS' },
+    account: { name: 'BANCO' },
+    empenho: { razaoSocial: ' COOP LTDA ',
+nomeFantasia: 'COOP',
+cnpjCpf: '12.345.678/0001-90',
+numero: ' 0045 ',
+notaFiscal: '99' },
+});
+
+/** Entrada recorrente, sem caixa nem categoria; sem razão social, vale o nome fantasia; CPF como digitado. */
+const mensalidade = tx({
+    id: 't2',
+    number: 7,
+    type: 'IN',
+    amountCents: 5,
+    date: d('2026-01-31T00:00:00.000Z'),
+    description: 'Mensalidade',
+    recurringId: 'r1',
+    recurringMonth: '2026-01',
+    empenho: { nomeFantasia: 'MECANICA DO ZE',
+cnpjCpf: '52998224725' },
+});
+
+/** "Só nota", sem número; descrição que vira fórmula. */
+const nota = tx({
+    id: 't3',
+    amountCents: 100000,
+    date: d('2026-03-15T00:00:00.000Z'),
+    description: '-desconto',
+    method: 'Cheque',
+    account: { name: 'CAIXA' },
+});
+
+/** Empenho com valores que não são texto (JSON livre): ficam vazios; documento que vira fórmula. */
+const estranho = tx({
+    id: 't4',
+    number: 3,
+    type: 'OUT',
+    amountCents: 99,
+    date: d('2025-12-31T00:00:00.000Z'),
+    description: 'Ajuste',
+    empenho: { razaoSocial: 42,
+nomeFantasia: ['x'],
+cnpjCpf: '=1+1',
+numero: 45 },
+});
+
+const ADUBO_ROW = [
+    '128', '10/05/2026', 'Saída', 'BANCO', 'INSUMOS', 'Compra de adubo; ""NPK""', 'COOP LTDA', '12.345.678/0001-90', '0045', 'PIX',
+    'Não', '12.345,67', `'=SOMA(A1)`,
+];
+const MENSALIDADE_ROW = ['7', '31/01/2026', 'Entrada', '', '', 'Mensalidade', 'MECANICA DO ZE', '52998224725', '', '', 'Sim', '0,05', ''];
+const NOTA_ROW = ['', '15/03/2026', 'Nota', 'CAIXA', '', `'-desconto`, '', '', '', 'Cheque', 'Não', '1.000,00', ''];
+const ESTRANHO_ROW = ['3', '31/12/2025', 'Saída', '', '', 'Ajuste', '', `'=1+1`, '', '', 'Não', '0,99', ''];
+
+describe('teste de ouro: CSV dos lançamentos do Financeiro', () => {
+    it('13 colunas, na ordem e no formato de hoje, na ordem que o repositório entrega', async () => {
+        for (const row of [FINANCE_HEADER, ADUBO_ROW, MENSALIDADE_ROW, NOTA_ROW, ESTRANHO_ROW]) expect(row).toHaveLength(13);
+        const csv = await financeCsv([adubo, nota, mensalidade, estranho], { orderBy: 'date' });
+        expect(csv).toBe(file(FINANCE_HEADER, ADUBO_ROW, NOTA_ROW, MENSALIDADE_ROW, ESTRANHO_ROW));
+    });
+
+    it('lista vazia: só o cabeçalho', async () => {
+        expect(await financeCsv([], { search: 'ninguém' })).toBe(file(FINANCE_HEADER));
     });
 });

@@ -333,3 +333,149 @@ sala: sala.id });
         expect(res.body).toBe(file(header, palestra));
     });
 });
+
+describe('teste de ouro pelo banco: CSV dos lançamentos (GET /admin/finance/transactions/export)', () => {
+    const header = [
+        'Nº', 'Data', 'Tipo', 'Caixa', 'Categoria', 'Descrição', 'Nome / Razão social', 'CNPJ / CPF', 'Nº anterior', 'Método',
+        'Recorrente', 'Valor (R$)', 'Observações',
+    ];
+    const ids: Record<string, string> = {};
+
+    beforeAll(async () => {
+        // O `cleanDatabase` não limpa o Financeiro.
+        await prisma.$executeRawUnsafe(`
+            TRUNCATE TABLE
+                "FinanceMonthlyClosing", "FinancialAttachment", "FinancialTransaction",
+                "FinanceRecurringTransaction", "FinancialCategory", "FinancialAccount", "FinancePaymentMethod"
+            RESTART IDENTITY CASCADE
+        `);
+        const insumos = await prisma.financialCategory.create({ data: { name: 'INSUMOS',
+type: 'OUT' } });
+        const mensalidades = await prisma.financialCategory.create({ data: { name: 'MENSALIDADES',
+type: 'IN' } });
+        const banco = await prisma.financialAccount.create({ data: { name: 'BANCO' } });
+        const caixa = await prisma.financialAccount.create({ data: { name: 'CAIXA' } });
+        const recorrencia = await prisma.financeRecurringTransaction.create({
+            data: { type: 'IN',
+description: 'MENSALIDADE',
+amountCents: 5,
+dayOfMonth: 31,
+startMonth: '2026-01' },
+        });
+        const t = (data: Record<string, unknown>) => prisma.financialTransaction.create({ data: data as never });
+
+        await t({
+            number: 128,
+            type: 'OUT',
+            amountCents: 1234567,
+            date: d('2026-05-10T00:00:00.000Z'),
+            description: 'Compra de adubo; "NPK"',
+            method: 'PIX',
+            notes: '=SOMA(A1)',
+            categoryId: insumos.id,
+            accountId: banco.id,
+            empenho: { razaoSocial: ' COOP LTDA ',
+nomeFantasia: 'COOP',
+cnpjCpf: '12.345.678/0001-90',
+numero: ' 0045 ' },
+            createdAt: d('2026-05-10T12:00:00.000Z'),
+        });
+        // Mesmo dia, gravado depois: vem antes na ordem por data.
+        await t({
+            number: 129,
+            type: 'OUT',
+            amountCents: 2500,
+            date: d('2026-05-10T00:00:00.000Z'),
+            description: 'Frete',
+            method: 'Pix',
+            categoryId: insumos.id,
+            accountId: banco.id,
+            createdAt: d('2026-05-10T15:00:00.000Z'),
+        });
+        await t({
+            number: 7,
+            type: 'IN',
+            amountCents: 5,
+            date: d('2026-01-31T00:00:00.000Z'),
+            description: 'Mensalidade',
+            categoryId: mensalidades.id,
+            accountId: caixa.id,
+            recurringId: recorrencia.id,
+            recurringMonth: '2026-01',
+            empenho: { nomeFantasia: 'MECANICA DO ZE',
+cnpjCpf: '52998224725' },
+            createdAt: d('2026-01-31T12:00:00.000Z'),
+        });
+        // "Só nota", sem número.
+        await t({
+            amountCents: 100000,
+            date: d('2026-03-15T00:00:00.000Z'),
+            description: '-desconto',
+            method: 'Cheque',
+            accountId: caixa.id,
+            createdAt: d('2026-03-15T12:00:00.000Z'),
+        });
+        // Excluído não sai.
+        await t({
+            number: 300,
+            type: 'OUT',
+            amountCents: 1,
+            date: d('2026-04-01T00:00:00.000Z'),
+            description: 'Excluído',
+            isDeleted: true,
+            deletedAt: d('2026-04-02T00:00:00.000Z'),
+        });
+        Object.assign(ids, { insumos: insumos.id,
+caixa: caixa.id });
+    });
+
+    const frete = ['129', '10/05/2026', 'Saída', 'BANCO', 'INSUMOS', 'Frete', '', '', '', 'Pix', 'Não', '25,00', ''];
+    const adubo = [
+        '128', '10/05/2026', 'Saída', 'BANCO', 'INSUMOS', 'Compra de adubo; ""NPK""', 'COOP LTDA', '12.345.678/0001-90', '0045',
+        'PIX', 'Não', '12.345,67', `'=SOMA(A1)`,
+    ];
+    const nota = ['', '15/03/2026', 'Nota', 'CAIXA', '', `'-desconto`, '', '', '', 'Cheque', 'Não', '1.000,00', ''];
+    const mensalidade = [
+        '7', '31/01/2026', 'Entrada', 'CAIXA', 'MENSALIDADES', 'Mensalidade', 'MECANICA DO ZE', '52998224725', '', '', 'Sim', '0,05', '',
+    ];
+
+    const csv = (query = '') => get(`/admin/finance/transactions/export${query}`);
+
+    it('o CSV inteiro, da data mais nova para a mais antiga, com o nome de arquivo de sempre', async () => {
+        const res = await csv();
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.headers['content-type']).toBe('text/csv; charset=utf-8');
+        expect(res.headers['content-disposition']).toBe('attachment; filename="lancamentos.csv"');
+        expect(res.body).toBe(file(header, frete, adubo, nota, mensalidade));
+    });
+
+    it('ordem pelo Nº (sem número por último)', async () => {
+        expect((await csv('?orderBy=number')).body).toBe(file(header, frete, adubo, mensalidade, nota));
+    });
+
+    it('filtros da tela: período (até o fim do dia), tipo, categoria, caixa, método e busca', async () => {
+        expect((await csv('?from=2026-03-01&to=2026-05-10')).body).toBe(file(header, frete, adubo, nota));
+        expect((await csv('?type=IN')).body).toBe(file(header, mensalidade));
+        expect((await csv(`?categoryId=${ids.insumos}`)).body).toBe(file(header, frete, adubo));
+        expect((await csv(`?accountId=${ids.caixa}`)).body).toBe(file(header, nota, mensalidade));
+        expect((await csv('?method=pix')).body).toBe(file(header, frete, adubo));
+        expect((await csv('?search=coop')).body).toBe(file(header, adubo));
+        expect((await csv('?search=45')).body).toBe(file(header, adubo));
+        expect((await csv('?search=128')).body).toBe(file(header, adubo));
+        expect((await csv('?search=529.982.247-25')).body).toBe(file(header, mensalidade));
+    });
+
+    it('filtro inválido → 400: o schema da rota barra tipo e ordem; o resto, "Parâmetro inválido: <campo>"', async () => {
+        for (const [query, error] of [
+            ['?from=ontem', 'Parâmetro inválido: from'],
+            ['?to=0000-01-01', 'Parâmetro inválido: to'],
+            [`?categoryId=${encodeURIComponent('não-é-uuid')}`, 'Parâmetro inválido: categoryId'],
+            ['?type=NOTA', 'Valor não aceito em "type".'],
+            ['?orderBy=valor', 'Valor não aceito em "orderBy".'],
+        ]) {
+            const res = await csv(query);
+            expect(res.statusCode, query).toBe(400);
+            expect(res.json(), query).toEqual({ error });
+        }
+    });
+});
