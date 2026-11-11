@@ -206,18 +206,32 @@ export function auditRouteKey(method: string, path: string): string {
     return `${method.toUpperCase()} ${normalized}`;
 }
 
-/** Frase da ação para o painel e a planilha. `targetLabel` null → frase sem o nome do alvo. */
+/** O formato gravado em `details` pela exportação do montador ('csv' | 'pdf'); null nas outras linhas. */
+function exportFormat(details: unknown): string | null {
+    if (!details || typeof details !== 'object' || Array.isArray(details)) return null;
+    const formato = (details as { formato?: unknown }).formato;
+    return typeof formato === 'string' ? formato : null;
+}
+
+/**
+ * Frase da ação para o painel e a planilha. `targetLabel` null → frase sem o nome do alvo.
+ * `details` (o que foi exportado) só muda a frase da exportação em PDF, que não é planilha.
+ */
 export function describeAuditAction(entry: {
     method: string;
     path: string;
     entity: string;
     targetLabel: string | null;
+    details?: unknown;
 }): string {
     const label = entry.targetLabel?.trim() || null;
     if (roomBookingScopeFuture(entry.method, entry.path)) {
         return label
             ? `Excluiu a reserva de sala ${q(label)} e as próximas da série`
             : 'Excluiu uma reserva de sala e as próximas da série';
+    }
+    if (entry.method === 'EXPORT' && exportFormat(entry.details) === 'pdf') {
+        return label ? `Exportou o relatório em PDF ${q(label)}` : 'Exportou um relatório em PDF';
     }
     const special = SPECIAL[auditRouteKey(entry.method, entry.path)];
     if (special) return special(label);

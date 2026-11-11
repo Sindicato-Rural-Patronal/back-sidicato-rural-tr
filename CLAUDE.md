@@ -746,6 +746,7 @@ Parâmetros (query no GET, corpo no POST), além dos filtros do conjunto:
 
 **Frase** (`summary`, `lib/audit-sentence.ts`):
 - Rota especial por método + caminho (`SPECIAL`); as demais viram verbo + entidade com artigo pelo gênero.
+- **Exportação:** em CSV, `Exportou a planilha "Pessoas: 3 registros (todos) · CSV"`; com `details.formato` `pdf` (SR-093), `Exportou o relatório em PDF "Pessoas: 4 registros (com filtros) · PDF · com CPF"`. Linha antiga ou fonte sem montador (`details` null) segue planilha. A coluna "Ação" da planilha da auditoria usa a mesma frase sem o alvo: "Exportou uma planilha" ou "Exportou um relatório em PDF".
 - Entidade nova → `AUDIT_ENTITY_NOUNS` e o filtro "Tipo" do painel.
 
 **Retenção** (`usecase/audit-retention.ts`, `adapter/database/audit-cleanup.ts`):

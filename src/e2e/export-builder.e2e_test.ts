@@ -370,11 +370,14 @@ valor: '2 registros' }],
         const row = (found.json() as {
  data: {
  targetLabel: string;
-details: unknown 
-}[] 
+summary: string;
+details: unknown
+}[]
 }).data[0];
         expect(row.targetLabel).toBe('Pessoas: 2 registros (seleção) · PDF · com CPF, Telefone');
         expect(row.details).toEqual(log!.details);
+        // PDF não é planilha: a frase fala do relatório (a de CSV segue "Exportou a planilha").
+        expect(row.summary).toBe('Exportou o relatório em PDF "Pessoas: 2 registros (seleção) · PDF · com CPF, Telefone"');
     });
 
     it('filtros e modelo nos detalhes; sem fields o modelo é o Padrão', async () => {

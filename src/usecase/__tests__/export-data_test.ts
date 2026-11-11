@@ -217,6 +217,31 @@ actorName: 'bali' },
         expect(row).toEqual(['17/09/2026 10:00', 'bali', 'Exportou uma planilha', 'Exportação', 'Pessoas: 3 registros (todos)', '/admin/export/people', '', '', '', '']);
     });
 
+    it('auditoria: a exportação em PDF sai como relatório na coluna Ação; a em CSV, como planilha', async () => {
+        const line = (id: string, formato: string, targetLabel: string) => ({ id,
+method: 'EXPORT',
+path: '/admin/export/people',
+entity: 'Exportação',
+targetLabel,
+createdAt: new Date('2026-09-17T13:00:00.000Z'),
+actorName: 'bali',
+details: { formato,
+modelo: null,
+campos: ['Nome'],
+escopo: 'todos',
+filtros: [],
+linhas: 3 } });
+        vi.mocked(repo.auditLogs).mockResolvedValue([
+            line('1', 'pdf', 'Pessoas: 3 registros (todos) · PDF'),
+            line('2', 'csv', 'Pessoas: 3 registros (todos) · CSV'),
+        ] as never);
+        const r = await new ExportDataUseCase(repo, now).execute('audit-logs', { action: 'export' });
+        const [header, pdf, csv] = parse(r.result!.csv);
+        const acao = header.indexOf('Ação');
+        expect(pdf[acao]).toBe('Exportou um relatório em PDF');
+        expect(csv[acao]).toBe('Exportou uma planilha');
+    });
+
     it('auditoria traz IP, local, aparelho e o que mudou', async () => {
         vi.mocked(repo.auditLogs).mockResolvedValue([
             { id: '2',

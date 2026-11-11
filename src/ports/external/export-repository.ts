@@ -261,6 +261,8 @@ export type AuditLogExportRow = {
     location: string | null;
     /** [{ field, before, after }] (lib/audit-diff.ts) ou null. */
     changes: unknown;
+    /** O que foi exportado (`ExportAuditLogDetails`) ou null: o PDF muda a frase da coluna "Ação". */
+    details: unknown;
     createdAt: Date;
     actorName: string;
 };

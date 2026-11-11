@@ -122,6 +122,35 @@ targetLabel: 'Pessoas: 3 registros' }))
             .toBe('Exportou a planilha "Pessoas: 3 registros"');
     });
 
+    it('exportação em PDF (details.formato) é relatório, não planilha; o CSV segue planilha', () => {
+        const exp = (targetLabel: string | null, details: unknown) =>
+            describeAuditAction({ method: 'EXPORT',
+path: '/admin/export/people',
+entity: 'Exportação',
+targetLabel,
+details });
+        const pdf = { formato: 'pdf',
+modelo: null,
+campos: ['Nome'],
+escopo: 'todos',
+filtros: [],
+linhas: 4 };
+        expect(exp('Pessoas: 4 registros (com filtros) · PDF · com CPF', pdf))
+            .toBe('Exportou o relatório em PDF "Pessoas: 4 registros (com filtros) · PDF · com CPF"');
+        expect(exp(null, pdf)).toBe('Exportou um relatório em PDF');
+        expect(exp('Pessoas: 4 registros (todos) · CSV', { ...pdf,
+formato: 'csv' })).toBe('Exportou a planilha "Pessoas: 4 registros (todos) · CSV"');
+        // Linhas antigas e fontes sem montador: sem details.
+        expect(exp(null, null)).toBe('Exportou uma planilha');
+        expect(exp(null, [])).toBe('Exportou uma planilha');
+        // `details` só conta na exportação.
+        expect(describeAuditAction({ method: 'POST',
+path: '/admin/galleries',
+entity: 'Galeria',
+targetLabel: null,
+details: pdf })).toBe('Criou uma galeria');
+    });
+
     it('entidade desconhecida (linha antiga) usa o nome em minúsculas', () => {
         expect(describeAuditAction({ method: 'DELETE',
 path: '/x',
