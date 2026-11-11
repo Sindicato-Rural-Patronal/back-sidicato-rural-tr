@@ -266,3 +266,80 @@ describe('teste de ouro pelo banco: propriedades', () => {
         expect(res.body).toBe(file(header, sitio));
     });
 });
+
+describe('teste de ouro pelo banco: administradores', () => {
+    const header = ['Usuário', 'Nome', 'E-mail', 'CPF', 'Telefone', 'Regra de acesso', 'Criado em'];
+    let regra: string;
+    let excluido: string;
+
+    beforeAll(async () => {
+        const rule = await prisma.rule.create({ data: { name: 'OURO; LEITURA',
+description: 'x',
+permissions: ['READ_COURSE'] } });
+        const outra = await prisma.rule.create({ data: { name: 'OUTRA',
+description: 'x',
+permissions: ['READ_COURSE'] } });
+        const ana = await prisma.userData.create({
+            data: { name: 'ANA ADMIN OURO',
+email: 'ana@ouro.test',
+cpf: '11144477735',
+phone: '44911118010' },
+        });
+        const bia = await prisma.userData.create({ data: { name: 'BIA "ADMIN" OURO',
+phone: '+55 44 9999' } });
+        const caio = await prisma.userData.create({ data: { name: 'CAIO ADMIN OURO',
+phone: '44911118012' } });
+        const dora = await prisma.userData.create({ data: { name: 'DORA ADMIN OURO',
+phone: '44911118013' } });
+        await prisma.userAdmin.create({
+            data: { username: 'ana.ouro',
+passwordHash: 'x',
+userDataId: ana.id,
+rulesId: rule.id,
+createdAt: d('2026-02-01T10:00:00.000Z') },
+        });
+        await prisma.userAdmin.create({
+            data: { username: '=bia',
+passwordHash: 'x',
+userDataId: bia.id,
+rulesId: rule.id,
+createdAt: d('2026-09-16T23:30:00.000Z') },
+        });
+        await prisma.userAdmin.create({
+            data: { username: 'caio.ouro',
+passwordHash: 'x',
+userDataId: caio.id,
+rulesId: outra.id,
+createdAt: d('2026-03-01T10:00:00.000Z') },
+        });
+        // Administrador excluído não sai.
+        const old = await prisma.userAdmin.create({
+            data: { username: 'dora.ouro',
+passwordHash: 'x',
+userDataId: dora.id,
+rulesId: rule.id,
+isDeleted: true },
+        });
+        regra = rule.id;
+        excluido = old.id;
+    });
+
+    const ana = ['ana.ouro', 'ANA ADMIN OURO', 'ana@ouro.test', '111.444.777-35', '44911118010', 'OURO; LEITURA', '01/02/2026 07:00'];
+    const bia = [`'=bia`, 'BIA ""ADMIN"" OURO', '', '', `'+55 44 9999`, 'OURO; LEITURA', '16/09/2026 20:30'];
+
+    it('o CSV padrão inteiro, pela regra, na ordem do nome', async () => {
+        const res = await get(`/admin/export/admins?rulesId=${regra}`);
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.headers['content-disposition']).toBe(`attachment; filename="administradores-${todayBr()}.csv"`);
+        expect(res.headers['x-export-count']).toBe('2');
+        expect(res.body).toBe(file(header, ana, bia));
+    });
+
+    it('busca pelo nome; o excluído não sai nem pelo id', async () => {
+        expect((await get('/admin/export/admins?search=caio admin')).body).toBe(
+            file(header, ['caio.ouro', 'CAIO ADMIN OURO', '', '', '44911118012', 'OUTRA', '01/03/2026 07:00']),
+        );
+        const res = await get(`/admin/export/admins?ids=${excluido}`);
+        expect(res.body).toBe(file(header));
+    });
+});

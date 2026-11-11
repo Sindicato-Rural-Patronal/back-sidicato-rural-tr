@@ -292,3 +292,57 @@ describe('teste de ouro: CSV padrão de propriedades', () => {
         expect(r.result!.csv).toBe(file(PROPERTIES_HEADER));
     });
 });
+
+// ── Administradores ──────────────────────────────────────────────────────────
+
+const ADMINS_HEADER = ['Usuário', 'Nome', 'E-mail', 'CPF', 'Telefone', 'Regra de acesso', 'Criado em'];
+
+const adminJoao = {
+    id: 'a1',
+    username: 'joao',
+    createdAt: d('2026-02-01T10:00:00.000Z'),
+    userData: { name: 'JOÃO DA SILVA',
+email: 'joao@test.com',
+cpf: '12345678909',
+phone: '44999990000' },
+    rules: { name: 'TOTAL' },
+};
+
+/** Fórmula no usuário e no telefone, aspas e ";" no nome e na regra, CPF incompleto. */
+const adminMaria = {
+    id: 'a2',
+    username: '=adm',
+    createdAt: d('2026-09-16T23:30:00.000Z'),
+    userData: { name: 'MARIA "M"',
+email: null,
+cpf: '123',
+phone: '+55 44 9999' },
+    rules: { name: 'SÓ CURSOS; LEITURA' },
+};
+
+const JOAO_ADMIN_ROW = ['joao', 'JOÃO DA SILVA', 'joao@test.com', '123.456.789-09', '44999990000', 'TOTAL', '01/02/2026 07:00'];
+const MARIA_ADMIN_ROW = [`'=adm`, 'MARIA ""M""', '', '123', `'+55 44 9999`, 'SÓ CURSOS; LEITURA', '16/09/2026 20:30'];
+
+describe('teste de ouro: CSV padrão de administradores', () => {
+    it('7 colunas, na ordem e no formato de hoje', async () => {
+        vi.mocked(repo.admins).mockResolvedValue([adminJoao, adminMaria] as never);
+        const r = await useCase().execute('admins', { rulesId: 'r1' });
+        expect(r.error).toBeUndefined();
+        expect(r.result!.csv).toBe(file(ADMINS_HEADER, JOAO_ADMIN_ROW, MARIA_ADMIN_ROW));
+        expect(r.result!.count).toBe(2);
+        expect(r.result!.filename).toBe('administradores-2026-09-17.csv');
+    });
+
+    it('um administrador pelo id: o nome da pessoa no nome do arquivo', async () => {
+        vi.mocked(repo.admins).mockResolvedValue([adminJoao] as never);
+        const r = await useCase().execute('admins', { ids: ['a1'] });
+        expect(r.result!.csv).toBe(file(ADMINS_HEADER, JOAO_ADMIN_ROW));
+        expect(r.result!.filename).toBe('administrador-joao-da-silva-2026-09-17.csv');
+    });
+
+    it('lista vazia: só o cabeçalho', async () => {
+        vi.mocked(repo.admins).mockResolvedValue([] as never);
+        const r = await useCase().execute('admins', { search: 'ninguém' });
+        expect(r.result!.csv).toBe(file(ADMINS_HEADER));
+    });
+});
