@@ -268,6 +268,12 @@ username: true } })
         }));
     }
 
+    async adminUsername(id: string): Promise<string | null> {
+        const admin = await this.prisma.userAdmin.findUnique({ where: { id },
+select: { username: true } });
+        return admin?.username ?? null;
+    }
+
     // Mesmos filtros da listagem de reservas (com ids, só esses).
     async roomBookings(filters: Parameters<ExportRepository['roomBookings']>[0]): Promise<RoomBookingExportRow[]> {
         const rows = await this.prisma.roomBooking.findMany({

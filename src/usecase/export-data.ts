@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import type {
     AdminExportRow,
-    AuditLogExportRow,
-    AuditLogFilters,
     CompanyExportRow,
     ExportAddress,
     ExportRepository,
@@ -20,9 +18,6 @@ import {
     label,
 } from '../lib/export-labels.js';
 import { todayInBrazil } from '../lib/quote-products.js';
-import { describeAuditAction } from '../lib/audit-sentence.js';
-import { formatChanges } from '../lib/audit-diff.js';
-import { describeUserAgent } from '../lib/user-agent.js';
 import { EXPORT_DATASETS, type ExportDataset } from './export/datasets.js';
 import { day, empty, idList, text } from './export/filters.js';
 import { formatCep, formatCnpj, formatCpf, propertyLine, slug, ymd } from './export/format.js';
@@ -46,15 +41,6 @@ export { EXPORT_DATASETS, type ExportDataset, type ExportResult };
 const schemas = {
     // O relatorio e sempre o retrato completo: nao aceita filtro nem selecao.
     cadastros: z.object({}),
-    'audit-logs': z.object({
-        action: z.preprocess(empty, z.enum(['create', 'edit', 'delete', 'export', 'login', 'login_failed']).optional()),
-        entity: text,
-        actorId: text,
-        ip: text,
-        from: day,
-        to: day,
-        q: text,
-    }),
     'room-bookings': z.object({
         ids: idList,
         from: day,
@@ -155,32 +141,6 @@ value: a => a.userData.phone },
 value: a => a.rules.name },
     { header: 'Criado em',
 value: a => csvDateTime(a.createdAt) },
-];
-
-const auditColumns: CsvColumn<AuditLogExportRow>[] = [
-    { header: 'Data e hora',
-value: a => csvDateTime(a.createdAt) },
-    { header: 'Quem',
-value: a => a.actorName },
-    // Mesma frase da tela de auditoria, sem o nome (que vai em "Alvo").
-    { header: 'Ação',
-value: a => describeAuditAction({ ...a,
-targetLabel: null }) },
-    { header: 'Área',
-value: a => a.entity },
-    { header: 'Alvo',
-value: a => a.targetLabel },
-    { header: 'Caminho',
-value: a => a.path },
-    { header: 'IP',
-value: a => a.ip },
-    { header: 'Local',
-value: a => a.location },
-    { header: 'Aparelho',
-value: a => (a.userAgent ? describeUserAgent(a.userAgent) : null) },
-    // "campo: antes → depois; …"
-    { header: 'Alterações',
-value: a => formatChanges(a.changes) },
 ];
 
 // Horários da reserva saem como gravados (relógio de Brasília com Z, igual ao curso).
@@ -296,11 +256,6 @@ body: csvBody(adminColumns, administradores) },
                 const count = pessoas.length + associados.length + empresas.length + administradores.length;
                 return { csv,
 count };
-            }
-            case 'audit-logs': {
-                const rows = await this.repo.auditLogs(q as AuditLogFilters);
-                return { csv: toCsv(auditColumns, rows),
-count: rows.length };
             }
             case 'room-bookings': {
                 // Dias do filtro → período [from 00:00, to + 1 dia 00:00) no relógio gravado.

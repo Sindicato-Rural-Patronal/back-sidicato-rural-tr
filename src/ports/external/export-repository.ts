@@ -303,7 +303,10 @@ name: string
 }[]>;
     contactMessages(filters: ContactMessageFilters & ExportSelection & ExportTake): Promise<ContactMessageExportRow[]>;
     unimed(filters: { search?: string } & ExportSelection & ExportTake): Promise<UnimedExportRow[]>;
+    /** As linhas da trilha, das mais recentes; no máximo 20.000 (`AUDIT_EXPORT_LIMIT` do adapter). */
     auditLogs(filters: AuditLogFilters): Promise<AuditLogExportRow[]>;
+    /** Usuário de um administrador (mesmo excluído), para o filtro "Quem" em palavras; null se não existe. */
+    adminUsername(id: string): Promise<string | null>;
     /** Reservas de sala: período (from inclusivo, to exclusivo), sala, tipo, busca ou ids. */
     roomBookings(filters: RoomBookingFilters): Promise<RoomBookingExportRow[]>;
     /** Registra a exportação na trilha de auditoria. */

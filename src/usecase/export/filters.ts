@@ -27,6 +27,29 @@ export const idList = z.preprocess(
         .optional(),
 );
 
+/** "2026-01-31" → "31/01/2026". */
+const brDay = (ymd: string) => `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}/${ymd.slice(0, 4)}`;
+
+/**
+ * O período de um filtro de dias (AAAA-MM-DD) em palavras: "Período:
+ * 01/01/2026 a 31/01/2026", "Dia: 05/10/2026" (início = fim), "De: …" ou
+ * "Até: …" (só uma ponta). Sem nenhuma, nada.
+ */
+export function describePeriod(from: string | undefined, to: string | undefined): ExportFilterDescription[] {
+    if (from && to) {
+        return from === to
+            ? [{ nome: 'Dia',
+valor: brDay(from) }]
+            : [{ nome: 'Período',
+valor: `${brDay(from)} a ${brDay(to)}` }];
+    }
+    if (from) return [{ nome: 'De',
+valor: brDay(from) }];
+    if (to) return [{ nome: 'Até',
+valor: brDay(to) }];
+    return [];
+}
+
 /**
  * Os filtros em palavras, na ordem de `labels`: texto como veio, sim/não,
  * enum pelo rótulo (`enums`). Filtro sem rótulo não aparece.
