@@ -463,7 +463,8 @@ valor: 'Sim' },
 orderBy: { createdAt: 'desc' } });
         expect(log).toMatchObject({ path: '/admin/export/cadastros',
 details: null });
-        expect(log!.targetLabel).toMatch(/^Relatório de cadastros: \d+ registros \(todos\)$/);
+        // Contagem com milhar (SR-112): aqui passa de 20.000, por causa do teste do limite.
+        expect(log!.targetLabel).toMatch(/^Relatório de cadastros: \d{1,3}(\.\d{3})* registros \(todos\)$/);
         const list = await get('/admin/audit-logs?action=export&limit=1');
         expect((list.json() as { data: { details: unknown }[] }).data[0].details).toBeNull();
     });

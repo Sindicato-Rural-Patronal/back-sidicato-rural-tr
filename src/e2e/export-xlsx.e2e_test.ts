@@ -256,7 +256,7 @@ describe('relatório de cadastros em Excel', () => {
         const log = await lastExport();
         expect(log).toMatchObject({ path: '/admin/export/cadastros',
 details: null });
-        expect(log!.targetLabel).toMatch(/^Relatório de cadastros: \d+ registros \(todos\) · Excel$/);
+        expect(log!.targetLabel).toMatch(/^Relatório de cadastros: \d{1,3}(\.\d{3})* registros \(todos\) · Excel$/);
         expect(res.headers['x-export-count']).toBe(String(sheets.slice(0, 4).reduce((n, s) => n + s.rows.length - 1, 0)));
     });
 
