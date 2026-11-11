@@ -144,6 +144,9 @@ cpf: string | null
 
 export type PropertyExportRow = ExportProperty & {
     createdAt: Date;
+    /** O dono: uma pessoa ou uma empresa (o outro é null). */
+    userDataId: string | null;
+    companyId: string | null;
     userData: {
  name: string;
 cpf: string | null;
@@ -288,7 +291,7 @@ export interface ExportRepository {
     people(filters: UserListFilters & ExportSelection & ExportTake): Promise<PersonExportRow[]>;
     companies(filters: CompanyListFilters & ExportSelection & ExportTake): Promise<CompanyExportRow[]>;
     /** `ownerIds`: propriedades dessas pessoas/empresas. */
-    properties(filters: ExportSelection & { ownerIds?: string[] }): Promise<PropertyExportRow[]>;
+    properties(filters: ExportSelection & ExportTake & { ownerIds?: string[] }): Promise<PropertyExportRow[]>;
     admins(filters: UserAdminListFilters & ExportSelection): Promise<AdminExportRow[]>;
     courses(filters: CourseListFilters & ExportSelection): Promise<CourseExportRow[]>;
     /** `courseIds`: inscrições desses cursos; sem nada, de todos. `confirmed: true`: só as confirmadas. */

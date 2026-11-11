@@ -8,7 +8,6 @@ import type {
     CourseExportRow,
     ExportAddress,
     ExportRepository,
-    PropertyExportRow,
     RoomBookingExportRow,
     UnimedExportRow,
 } from '../ports/external/export-repository.js';
@@ -49,8 +48,6 @@ export { EXPORT_DATASETS, type ExportDataset, type ExportResult };
 // ── Leitura da query (conjuntos do caminho antigo) ───────────────────────────
 
 const schemas = {
-    properties: z.object({ ids: idList,
-ownerIds: idList }),
     // O relatorio e sempre o retrato completo: nao aceita filtro nem selecao.
     cadastros: z.object({}),
     admins: z.object({ ids: idList,
@@ -158,28 +155,6 @@ value: c => c.notes },
 value: c => csvDateTime(c.createdAt) },
     { header: 'Atualizada em',
 value: c => csvDateTime(c.updatedAt) },
-];
-
-const propertyColumns: CsvColumn<PropertyExportRow>[] = [
-    { header: 'Propriedade',
-value: p => p.name },
-    { header: 'Matrícula',
-value: p => p.registration },
-    { header: 'Dono',
-value: p => (p.userData ? 'Pessoa' : 'Empresa') },
-    { header: 'Nome do dono',
-value: p => p.userData?.name ?? (p.company ? p.company.tradeName || p.company.name : '') },
-    { header: 'CPF/CNPJ',
-value: p => (p.userData ? formatCpf(p.userData.cpf) : formatCnpj(p.company?.cnpj ?? null)) },
-    {
-        header: 'Principal',
-        value: p => (p.userData ?? p.company)?.primaryPropertyId === p.id,
-    },
-    ...addressColumns<PropertyExportRow>('', p => p.address),
-    { header: 'Observações do endereço',
-value: p => p.address?.notes },
-    { header: 'Cadastrada em',
-value: p => csvDateTime(p.createdAt) },
 ];
 
 const adminColumns: CsvColumn<AdminExportRow>[] = [
@@ -441,15 +416,6 @@ body: csvBody(adminColumns, administradores) },
                 const count = pessoas.length + associados.length + empresas.length + administradores.length;
                 return { csv,
 count };
-            }
-            case 'properties': {
-                const rows = await this.repo.properties(q as {
- ids?: string[];
-ownerIds?: string[] 
-});
-                return { csv: toCsv(propertyColumns, rows),
-count: rows.length,
-firstName: rows[0]?.name };
             }
             case 'admins': {
                 const rows = await this.repo.admins(q);

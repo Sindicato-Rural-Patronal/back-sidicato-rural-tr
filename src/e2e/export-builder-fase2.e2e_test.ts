@@ -176,3 +176,61 @@ valor: 'Pública' }],
         expect(bad.json()).toEqual({ error: 'Campo desconhecido: cpf.' });
     });
 });
+
+describe('propriedades', () => {
+    beforeAll(async () => {
+        const address = await prisma.address.create({
+            data: { type: 'RURAL',
+road: 'ESTRADA BOIADEIRA',
+km: '12',
+city: 'TERRA ROXA',
+state: 'PR',
+zipCode: '85990000' },
+        });
+        const dono = await prisma.userData.create({ data: { name: 'DONO MONTADOR',
+cpf: '52998224725',
+phone: '44911117001' } });
+        await prisma.property.create({ data: { name: 'SITIO MONTADOR',
+userDataId: dono.id,
+addressId: address.id } });
+        await prisma.property.create({ data: { name: 'FAZENDA DA AGRO',
+companyId: ids.agro,
+addressId: address.id } });
+        ids.dono = dono.id;
+    });
+
+    it('catálogo: 200, padrão de 21 colunas e só o Padrão', async () => {
+        const res = await get('/admin/export/properties/catalog');
+        expect(res.statusCode, res.body).toBe(200);
+        const catalog = res.json() as Catalog;
+        expect(catalog).toMatchObject({ dataset: 'properties',
+title: 'Propriedades',
+modelos: [],
+filterLabels: { ownerIds: 'Donos' } });
+        expect(catalog.padrao).toHaveLength(21);
+    });
+
+    it('campos escolhidos, PDF com os donos pelo nome e a auditoria', async () => {
+        const csv = await post('/admin/export/properties', { ownerIds: [ids.dono, ids.agro],
+fields: ['name', 'ownerName', 'ownerDocument'] });
+        expect(csv.statusCode, csv.body).toBe(200);
+        expect(rows(csv.body)).toEqual([
+            ['Propriedade', 'Nome do dono', 'CPF/CNPJ'],
+            ['SITIO MONTADOR', 'DONO MONTADOR', '529.982.247-25'],
+            ['FAZENDA DA AGRO', 'AGRO MONTADOR', '11.222.333/0001-81'],
+        ]);
+        expect((await lastExport())!.details).toMatchObject({ campos: ['Propriedade', 'Nome do dono', 'CPF/CNPJ'],
+escopo: 'com filtros',
+linhas: 2 });
+
+        const pdf = await post('/admin/export/properties', { ownerIds: [ids.dono],
+fields: ['ordinal', 'name', 'addressLine'],
+format: 'pdf' });
+        expect(pdf.statusCode, pdf.body).toBe(200);
+        expect(pdf.json()).toMatchObject({
+            title: 'Propriedades',
+            filters: 'Dono: DONO MONTADOR',
+            rows: [['1', 'SITIO MONTADOR', 'ESTRADA BOIADEIRA - km 12 - TERRA ROXA/PR - 85990-000']],
+        });
+    });
+});

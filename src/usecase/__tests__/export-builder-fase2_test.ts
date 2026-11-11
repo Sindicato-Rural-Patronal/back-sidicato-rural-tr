@@ -173,3 +173,103 @@ valor: '1 registro' }],
         expect(cnpj.result!.auditLabel).toBe('Empresas: 1 registro (todos) · CSV');
     });
 });
+
+// ── Propriedades ─────────────────────────────────────────────────────────────
+
+function property(overrides: Record<string, unknown> = {}) {
+    return {
+        id: 'pr1',
+        name: 'SITIO',
+        registration: '99',
+        createdAt: new Date('2026-01-02T15:30:00.000Z'),
+        address: {
+            type: 'RURAL',
+street: null,
+number: null,
+complement: null,
+neighborhood: null,
+localityName: 'AGUA DO SOL',
+            road: 'ESTRADA BOIADEIRA',
+km: '12',
+lot: null,
+section: null,
+city: 'TERRA ROXA',
+state: 'PR',
+zipCode: '85990000',
+            notes: null,
+        },
+        userDataId: 'u1',
+        companyId: null,
+        userData: { name: 'JOÃO',
+cpf: '12345678909',
+primaryPropertyId: 'pr1' },
+        company: null,
+        ...overrides,
+    };
+}
+
+const agroProperty = property({
+    id: 'pr2',
+    name: 'SEDE',
+    userDataId: null,
+    companyId: 'c1',
+    userData: null,
+    company: { name: 'AGRO LTDA',
+tradeName: 'AGRO',
+cnpj: '11222333000181',
+primaryPropertyId: null },
+});
+
+describe('propriedades no montador', () => {
+    it('catálogo: padrão de 21 colunas, só o modelo Padrão, CPF/CNPJ e endereço pessoais', () => {
+        const source = EXPORT_SOURCES.properties;
+        expect(source.padrao).toHaveLength(21);
+        expect(source.modelos).toEqual([]);
+        expect(groupsOf('properties')).toEqual(['Propriedade', 'Dono', 'Endereço', 'Sistema', 'Relatório']);
+        expect(source.fields.filter(f => f.permission)).toEqual([]);
+        const privacy = new Map(source.fields.map(f => [f.key, f.privacy]));
+        for (const key of ['ownerDocument', 'addressStreet', 'addressCity', 'addressLine', 'addressNotes']) {
+            expect(privacy.get(key), key).toBe('pessoal');
+        }
+        expect(privacy.get('ownerName')).toBe('comum');
+    });
+
+    it('campos escolhidos: o documento de cada dono com a máscara dele e o endereço numa linha', async () => {
+        vi.mocked(repo.properties).mockResolvedValue([property(), agroProperty] as never);
+        const r = await useCase().execute('properties', { ownerIds: 'u1,c1',
+fields: 'name,ownerName,ownerDocument,addressLine' });
+        expect(parse(r.result!.csv)).toEqual([
+            ['Propriedade', 'Nome do dono', 'CPF/CNPJ', 'Endereço numa linha'],
+            ['SITIO', 'JOÃO', '123.456.789-09', 'ESTRADA BOIADEIRA - AGUA DO SOL, km 12 - TERRA ROXA/PR - 85990-000'],
+            ['SEDE', 'AGRO', '11.222.333/0001-81', 'ESTRADA BOIADEIRA - AGUA DO SOL, km 12 - TERRA ROXA/PR - 85990-000'],
+        ]);
+        expect(repo.properties).toHaveBeenCalledWith({ ids: undefined,
+ownerIds: ['u1', 'c1'],
+take: 20001 });
+        expect(r.result!.auditLabel).toBe('Propriedades: 2 registros (com filtros) · CSV · com CPF/CNPJ, Endereço numa linha');
+    });
+
+    it('filtro em palavras: os donos pelo nome; dono sem linha ou mais de 3 → a quantidade', async () => {
+        vi.mocked(repo.properties).mockResolvedValue([property(), agroProperty] as never);
+        const two = await useCase().execute('properties', { ownerIds: ['u1', 'c1'],
+fields: ['name'],
+format: 'pdf' });
+        expect(two.result!.pdf).toMatchObject({ title: 'Propriedades',
+filters: 'Donos: JOÃO, AGRO',
+modelo: null });
+        const one = await useCase().execute('properties', { ownerIds: ['u1'],
+fields: ['name'],
+format: 'pdf' });
+        expect(one.result!.pdf!.filters).toBe('Dono: JOÃO');
+        const missing = await useCase().execute('properties', { ownerIds: ['u1', 'sem-propriedade'],
+fields: ['name'],
+format: 'pdf' });
+        expect(missing.result!.pdf!.filters).toBe('Donos: 2');
+        const many = await useCase().execute('properties', { ownerIds: 'a,b,c,d',
+fields: ['name'],
+format: 'pdf' });
+        expect(many.result!.pdf!.filters).toBe('Donos: 4');
+        expect(many.result!.auditDetails!.filtros).toEqual([{ nome: 'Donos',
+valor: '4' }]);
+    });
+});

@@ -96,7 +96,7 @@ cpf: true } } },
         });
     }
 
-    properties({ ids, ownerIds }: Parameters<ExportRepository['properties']>[0]): Promise<PropertyExportRow[]> {
+    properties({ ids, ownerIds, take }: Parameters<ExportRepository['properties']>[0]): Promise<PropertyExportRow[]> {
         return this.prisma.property.findMany({
             where: {
                 isDeleted: false,
@@ -113,6 +113,7 @@ cpf: true } } },
                 ],
             },
             orderBy: [{ createdAt: 'asc' }],
+            ...(take && { take }),
             include: {
                 address: true,
                 userData: { select: { name: true,
