@@ -25,6 +25,7 @@ const repo = {
     auditLogs: vi.fn(),
     adminUsername: vi.fn(),
     roomBookings: vi.fn(),
+    roomName: vi.fn(),
     logExport: vi.fn(),
 } as unknown as ExportRepository;
 
@@ -217,5 +218,110 @@ valor: 'Exportações' }],
         expect(csv.result!.count).toBe(2001);
         expect(csv.result!.filename).toBe('auditoria-2026-09-17.csv');
         expect(vi.mocked(repo.auditLogs).mock.calls[1][0]).not.toHaveProperty('ids');
+    });
+});
+
+// ── Reservas de sala ─────────────────────────────────────────────────────────
+
+function booking(overrides: Record<string, unknown> = {}) {
+    return {
+        id: 'b1',
+        type: 'EVENT',
+        title: 'Palestra de manejo',
+        description: '=interno',
+        publicOnSite: true,
+        publicDescription: 'Aberta ao público',
+        roomId: 'r1',
+        roomName: 'AUDITORIO',
+        startTime: new Date('2026-10-05T08:00:00.000Z'),
+        endTime: new Date('2026-10-05T12:00:00.000Z'),
+        responsible: null,
+        responsibleName: 'MARIA DIGITADA',
+        seriesId: null,
+        ...overrides,
+    };
+}
+
+describe('reservas de sala no montador', () => {
+    it('catálogo: grupos, padrão de 8 colunas, só o modelo Padrão; o responsável é pessoal', () => {
+        const source = EXPORT_SOURCES['room-bookings'];
+        expect(source.padrao).toEqual(['type', 'title', 'room', 'startTime', 'endTime', 'responsible', 'description', 'series']);
+        expect(groupsOf('room-bookings')).toEqual(['Reserva', 'Quando e onde', 'Responsável', 'No site', 'Relatório']);
+        expect(keysOf('room-bookings')).toEqual(expect.arrayContaining(['publicOnSite', 'publicDescription', 'ordinal', 'signature']));
+        expect(source.padrao).not.toContain('publicOnSite');
+        expect(source.modelos).toEqual([]);
+        expect(source.fields.filter(f => f.permission)).toEqual([]);
+        const personal = source.fields.filter(f => f.privacy !== 'comum').map(f => f.key);
+        expect(personal).toEqual(['responsible']);
+
+        const catalog = new GetExportCatalogUseCase().execute('room-bookings', can('READ_COURSE')).catalog!;
+        expect(catalog).toMatchObject({
+            dataset: 'room-bookings',
+            title: 'Reservas de sala',
+            filterLabels: { from: 'De',
+to: 'Até',
+roomId: 'Sala',
+type: 'Tipo',
+search: 'Busca' },
+        });
+    });
+
+    it('campos escolhidos: horário de parede, o site e o Nº de ordem; o limite de linhas chega ao repositório', async () => {
+        vi.mocked(repo.roomBookings).mockResolvedValue([booking()] as never);
+        const r = await useCase().execute('room-bookings', { fields: ['ordinal', 'title', 'startTime', 'publicOnSite', 'publicDescription', 'description'] });
+        expect(r.error).toBeUndefined();
+        expect(parse(r.result!.csv)).toEqual([
+            ['Nº de ordem', 'Título', 'Início', 'No site', 'Texto no site', 'Descrição'],
+            ['1', 'Palestra de manejo', '05/10/2026 08:00', 'Sim', 'Aberta ao público', `'=interno`],
+        ]);
+        expect(repo.roomBookings).toHaveBeenCalledWith(expect.objectContaining({ take: 20001 }));
+    });
+
+    it('PDF: período, sala (das linhas), tipo e busca em palavras; fórmula crua no PDF', async () => {
+        vi.mocked(repo.roomBookings).mockResolvedValue([booking()] as never);
+        const r = await useCase().execute('room-bookings', {
+            fields: ['title', 'room', 'responsible', 'description'],
+            format: 'pdf',
+            from: '2026-10-05',
+            to: '2026-10-11',
+            roomId: 'r1',
+            type: 'EVENT',
+            search: 'manejo',
+        });
+        expect(r.result!.pdf).toMatchObject({
+            title: 'Reservas de sala',
+            filename: 'reservas-de-sala-2026-09-17.pdf',
+            filters: 'Período: 05/10/2026 a 11/10/2026 · Sala: AUDITORIO · Tipo: Evento · Busca: manejo',
+            modelo: null,
+            rows: [['Palestra de manejo', 'AUDITORIO', 'MARIA DIGITADA', '=interno']],
+        });
+        expect(repo.roomName).not.toHaveBeenCalled();
+    });
+
+    it('sala sem nenhuma reserva: o nome pelo id; a Agenda de um dia só', async () => {
+        vi.mocked(repo.roomBookings).mockResolvedValue([] as never);
+        vi.mocked(repo.roomName).mockResolvedValue('SALA 1' as never);
+        const r = await useCase().execute('room-bookings', { format: 'pdf',
+from: '2026-10-05',
+to: '2026-10-05',
+roomId: 'r2' });
+        expect(r.result!.pdf!.filters).toBe('Dia: 05/10/2026 · Sala: SALA 1');
+        expect(repo.roomName).toHaveBeenCalledWith('r2');
+    });
+
+    it('auditoria: o alvo cita o responsável; uma reserva só sai pelo título', async () => {
+        vi.mocked(repo.roomBookings).mockResolvedValue([booking()] as never);
+        const padrao = await useCase().execute('room-bookings', { ids: ['b1'] });
+        expect(padrao.result!.auditLabel).toBe('Reservas de sala: Palestra de manejo · CSV · com Responsável');
+        expect(padrao.result!.filename).toBe('reserva-palestra-de-manejo-2026-09-17.csv');
+        expect(padrao.result!.auditDetails).toMatchObject({ modelo: 'Padrão (como hoje)',
+escopo: 'seleção',
+linhas: 1 });
+        const semResponsavel = await useCase().execute('room-bookings', { fields: 'title,room',
+from: '2026-10-05',
+to: '2026-10-11' });
+        expect(semResponsavel.result!.auditLabel).toBe('Reservas de sala: 1 registro (com filtros) · CSV');
+        expect(semResponsavel.result!.auditDetails!.filtros).toEqual([{ nome: 'Período',
+valor: '05/10/2026 a 11/10/2026' }]);
     });
 });

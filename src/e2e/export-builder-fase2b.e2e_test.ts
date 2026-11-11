@@ -181,3 +181,98 @@ linhas: 2 });
         expect(bad.json()).toEqual({ error: 'Campo desconhecido: senha.' });
     });
 });
+
+describe('reservas de sala', () => {
+    let salaId: string;
+
+    beforeAll(async () => {
+        const sala = await prisma.room.create({ data: { name: 'SALA MONTADOR',
+description: 'x',
+maxCapacity: 10 } });
+        const ana = await prisma.userData.create({ data: { name: 'ANA RESPONSAVEL',
+phone: '44911117101' } });
+        await prisma.roomBooking.create({
+            data: {
+                type: 'EVENT',
+                title: 'Dia de campo',
+                description: 'Levar lanche',
+                publicOnSite: true,
+                publicDescription: 'Venha conhecer',
+                roomId: sala.id,
+                startTime: new Date('2026-10-05T08:00:00.000Z'),
+                endTime: new Date('2026-10-05T17:00:00.000Z'),
+                responsibleUserDataId: ana.id,
+            },
+        });
+        await prisma.roomBooking.create({
+            data: {
+                type: 'MEETING',
+                title: 'Reunião mensal',
+                roomId: sala.id,
+                startTime: new Date('2026-10-06T19:00:00.000Z'),
+                endTime: new Date('2026-10-06T21:00:00.000Z'),
+            },
+        });
+        salaId = sala.id;
+    });
+
+    it('catálogo: 200 com READ_COURSE, padrão de 8 colunas e só o Padrão; sem READ_COURSE, 403', async () => {
+        const courseOnly = await adminWith('so.cursos.reservas', ['READ_COURSE']);
+        const res = await get('/admin/export/room-bookings/catalog', courseOnly);
+        expect(res.statusCode, res.body).toBe(200);
+        const catalog = res.json() as Catalog;
+        expect(catalog).toMatchObject({ dataset: 'room-bookings',
+title: 'Reservas de sala',
+modelos: [] });
+        expect(catalog.padrao).toHaveLength(8);
+        expect(catalog.groups.map(g => g.name)).toEqual(['Reserva', 'Quando e onde', 'Responsável', 'No site', 'Relatório']);
+        expect(catalog.groups.flatMap(g => g.fields).find(f => f.key === 'responsible')).toMatchObject({ privacy: 'pessoal',
+allowed: true });
+
+        const userOnly = await adminWith('so.usuarios.reservas', ['READ_USER']);
+        expect((await get('/admin/export/room-bookings/catalog', userOnly)).statusCode).toBe(403);
+    });
+
+    it('campos escolhidos com o período e a sala da Agenda, o PDF e a auditoria', async () => {
+        const csv = await get(`/admin/export/room-bookings?from=2026-10-05&to=2026-10-11&roomId=${salaId}&fields=ordinal,title,startTime,publicOnSite,responsible`);
+        expect(csv.statusCode, csv.body).toBe(200);
+        expect(rows(csv.body)).toEqual([
+            ['Nº de ordem', 'Título', 'Início', 'No site', 'Responsável'],
+            ['1', 'Dia de campo', '05/10/2026 08:00', 'Sim', 'ANA RESPONSAVEL'],
+            ['2', 'Reunião mensal', '06/10/2026 19:00', 'Não', ''],
+        ]);
+        expect((await lastExport())!.targetLabel).toBe('Reservas de sala: 2 registros (com filtros) · CSV · com Responsável');
+
+        const pdf = await post('/admin/export/room-bookings', {
+            fields: ['title', 'room'],
+            format: 'pdf',
+            from: '2026-10-05',
+            to: '2026-10-05',
+            roomId: salaId,
+            type: 'EVENT',
+        });
+        expect(pdf.statusCode, pdf.body).toBe(200);
+        expect(pdf.json()).toMatchObject({
+            title: 'Reservas de sala',
+            filename: `reservas-de-sala-${today()}.pdf`,
+            count: 1,
+            filters: 'Dia: 05/10/2026 · Sala: SALA MONTADOR · Tipo: Evento',
+            rows: [['Dia de campo', 'SALA MONTADOR']],
+        });
+        const log = await lastExport();
+        expect(log).toMatchObject({ path: '/admin/export/room-bookings',
+targetLabel: 'Reservas de sala: 1 registro (com filtros) · PDF' });
+        expect(log!.details).toMatchObject({
+            formato: 'pdf',
+            campos: ['Título', 'Sala'],
+            filtros: [
+                { nome: 'Dia',
+valor: '05/10/2026' },
+                { nome: 'Sala',
+valor: 'SALA MONTADOR' },
+                { nome: 'Tipo',
+valor: 'Evento' },
+            ],
+        });
+    });
+});

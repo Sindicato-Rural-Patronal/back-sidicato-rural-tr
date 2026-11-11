@@ -308,7 +308,9 @@ name: string
     /** Usuário de um administrador (mesmo excluído), para o filtro "Quem" em palavras; null se não existe. */
     adminUsername(id: string): Promise<string | null>;
     /** Reservas de sala: período (from inclusivo, to exclusivo), sala, tipo, busca ou ids. */
-    roomBookings(filters: RoomBookingFilters): Promise<RoomBookingExportRow[]>;
+    roomBookings(filters: RoomBookingFilters & ExportTake): Promise<RoomBookingExportRow[]>;
+    /** Nome da sala (mesmo excluída), para o filtro "Sala" em palavras; null se não existe. */
+    roomName(id: string): Promise<string | null>;
     /** Registra a exportação na trilha de auditoria. */
     logExport(entry: {
         actorId: string;

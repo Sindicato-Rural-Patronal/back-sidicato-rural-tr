@@ -275,13 +275,20 @@ select: { username: true } });
     }
 
     // Mesmos filtros da listagem de reservas (com ids, só esses).
-    async roomBookings(filters: Parameters<ExportRepository['roomBookings']>[0]): Promise<RoomBookingExportRow[]> {
+    async roomBookings({ take, ...filters }: Parameters<ExportRepository['roomBookings']>[0]): Promise<RoomBookingExportRow[]> {
         const rows = await this.prisma.roomBooking.findMany({
             where: buildRoomBookingWhere(filters),
             select: roomBookingSelect,
             orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
+            ...(take && { take }),
         });
         return rows.map(toRoomBookingItem);
+    }
+
+    async roomName(id: string): Promise<string | null> {
+        const room = await this.prisma.room.findUnique({ where: { id },
+select: { name: true } });
+        return room?.name ?? null;
     }
 
     // O local do IP é preenchido depois da resposta (http/audit-hooks.ts).

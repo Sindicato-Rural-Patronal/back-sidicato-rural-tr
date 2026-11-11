@@ -188,10 +188,11 @@ confirmed: true,
     });
 
     it('conjunto sem montador → 404; sem permissão do conjunto → 403; sem token → 401; desconhecido → 400', async () => {
-        // Cursos passaram ao montador na fase 2 (SR-100); as reservas de sala ainda não.
-        const bookings = await get('/admin/export/room-bookings/catalog');
-        expect(bookings.statusCode).toBe(404);
-        expect(bookings.json()).toEqual({ error: 'Este conjunto ainda não tem o montador.' });
+        // Todas as listas passaram ao montador na fase 2 (SR-100 e SR-102); o
+        // relatório de cadastros, um retrato fixo de quatro conjuntos, não tem.
+        const cadastros = await get('/admin/export/cadastros/catalog');
+        expect(cadastros.statusCode).toBe(404);
+        expect(cadastros.json()).toEqual({ error: 'Este conjunto ainda não tem o montador.' });
         expect((await get('/admin/export/people/catalog', courseOnly)).statusCode).toBe(403);
         expect((await get('/admin/export/people/catalog', '')).statusCode).toBe(401);
         expect((await get('/admin/export/senhas/catalog')).statusCode).toBe(400);
@@ -308,11 +309,11 @@ describe('erros e limites', () => {
 
     it('fields ou PDF num conjunto sem montador → 400', async () => {
         for (const query of ['fields=name', 'format=pdf']) {
-            const res = await get(`/admin/export/room-bookings?${query}`);
+            const res = await get(`/admin/export/cadastros?${query}`);
             expect(res.statusCode).toBe(400);
             expect(res.json()).toEqual({ error: 'Este conjunto ainda não tem o montador.' });
         }
-        expect((await get('/admin/export/room-bookings?format=csv')).statusCode).toBe(200);
+        expect((await get('/admin/export/cadastros?format=csv')).statusCode).toBe(200);
     });
 
     it('PDF com mais de 2.000 linhas → 400; a planilha com as mesmas linhas sai', async () => {
@@ -457,12 +458,12 @@ valor: 'Sim' },
     });
 
     it('conjunto ainda sem montador: linha como antes, sem detalhes', async () => {
-        await get('/admin/export/room-bookings');
+        await get('/admin/export/cadastros');
         const log = await prisma.auditLog.findFirst({ where: { method: 'EXPORT' },
 orderBy: { createdAt: 'desc' } });
-        expect(log).toMatchObject({ path: '/admin/export/room-bookings',
-targetLabel: 'Reservas de sala: 0 registros (todos)',
+        expect(log).toMatchObject({ path: '/admin/export/cadastros',
 details: null });
+        expect(log!.targetLabel).toMatch(/^Relatório de cadastros: \d+ registros \(todos\)$/);
         const list = await get('/admin/audit-logs?action=export&limit=1');
         expect((list.json() as { data: { details: unknown }[] }).data[0].details).toBeNull();
     });

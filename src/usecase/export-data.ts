@@ -4,22 +4,19 @@ import type {
     CompanyExportRow,
     ExportAddress,
     ExportRepository,
-    RoomBookingExportRow,
 } from '../ports/external/export-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import {
-    csvBody, csvDateTime, csvList, csvWallClock, toCsv, toCsvSections,
+    csvBody, csvDateTime, csvList, toCsvSections,
     type CsvColumn,
 } from '../lib/csv.js';
 import {
     ADDRESS_TYPE_LABEL,
-    BOOKING_TYPE_LABEL,
     COMPANY_TYPE_LABEL,
     label,
 } from '../lib/export-labels.js';
 import { todayInBrazil } from '../lib/quote-products.js';
 import { EXPORT_DATASETS, type ExportDataset } from './export/datasets.js';
-import { day, empty, idList, text } from './export/filters.js';
 import { formatCep, formatCnpj, formatCpf, propertyLine, slug, ymd } from './export/format.js';
 import { NO_BUILDER_MESSAGE, sourceOf } from './export/catalog/index.js';
 import type { EngineDataset } from './export/catalog/types.js';
@@ -41,14 +38,6 @@ export { EXPORT_DATASETS, type ExportDataset, type ExportResult };
 const schemas = {
     // O relatorio e sempre o retrato completo: nao aceita filtro nem selecao.
     cadastros: z.object({}),
-    'room-bookings': z.object({
-        ids: idList,
-        from: day,
-        to: day,
-        roomId: text,
-        type: z.preprocess(empty, z.enum(['EVENT', 'MEETING'], { message: 'Filtro inválido' }).optional()),
-        search: text,
-    }),
 } satisfies Record<Exclude<ExportDataset, EngineDataset>, z.ZodTypeAny>;
 
 type LegacyDataset = keyof typeof schemas;
@@ -141,26 +130,6 @@ value: a => a.userData.phone },
 value: a => a.rules.name },
     { header: 'Criado em',
 value: a => csvDateTime(a.createdAt) },
-];
-
-// Horários da reserva saem como gravados (relógio de Brasília com Z, igual ao curso).
-const roomBookingColumns: CsvColumn<RoomBookingExportRow>[] = [
-    { header: 'Tipo',
-value: b => label(BOOKING_TYPE_LABEL, b.type) },
-    { header: 'Título',
-value: b => b.title },
-    { header: 'Sala',
-value: b => b.roomName },
-    { header: 'Início',
-value: b => csvWallClock(b.startTime) },
-    { header: 'Término',
-value: b => csvWallClock(b.endTime) },
-    { header: 'Responsável',
-value: b => b.responsible?.name ?? b.responsibleName },
-    { header: 'Descrição',
-value: b => b.description },
-    { header: 'Série',
-value: b => !!b.seriesId },
 ];
 
 // ── Caso de uso ──────────────────────────────────────────────────────────────
@@ -256,25 +225,6 @@ body: csvBody(adminColumns, administradores) },
                 const count = pessoas.length + associados.length + empresas.length + administradores.length;
                 return { csv,
 count };
-            }
-            case 'room-bookings': {
-                // Dias do filtro → período [from 00:00, to + 1 dia 00:00) no relógio gravado.
-                const { from, to, ...rest } = q as {
- from?: string;
-to?: string;
-roomId?: string;
-type?: 'EVENT' | 'MEETING';
-search?: string;
-ids?: string[] 
-};
-                const rows = await this.repo.roomBookings({
-                    ...rest,
-                    from: from ? new Date(`${from}T00:00:00.000Z`) : undefined,
-                    to: to ? new Date(new Date(`${to}T00:00:00.000Z`).getTime() + 24 * 60 * 60 * 1000) : undefined,
-                });
-                return { csv: toCsv(roomBookingColumns, rows),
-count: rows.length,
-firstName: rows[0]?.title };
             }
         }
     }
