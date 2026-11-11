@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { EducationLevel, Ethnicity, Gender } from '../../../generated/prisma/enums.js';
 import type { PersonExportRow } from '../../../ports/external/export-repository.js';
-import { EDUCATION_LABEL, ETHNICITY_LABEL, GENDER_LABEL } from '../../../lib/export-labels.js';
+import { EDUCATION_LABEL, ETHNICITY_LABEL, GENDER_LABEL, MEMBER_TYPE_LABEL } from '../../../lib/export-labels.js';
 import { bool, describeByLabels, enumOf, idList, text } from '../filters.js';
 import { personFields, reportFields } from './person-fields.js';
 import type { ExportSource } from './types.js';
@@ -52,9 +52,12 @@ export const peopleSource: ExportSource<PersonExportRow, PeopleFilters> = {
     filters,
     filterLabels,
     // `activeMember: false` não filtra nada na lista (só o true filtra).
+    // Lista fixa sai pelo rótulo das telas ("Tipo de membro: Produtor rural");
+    // classificação e busca são texto livre e saem como digitadas.
     describeFilters: f =>
         describeByLabels({ ...f,
-activeMember: f.activeMember || undefined }, filterLabels, { gender: GENDER_LABEL,
+activeMember: f.activeMember || undefined }, filterLabels, { memberType: MEMBER_TYPE_LABEL,
+gender: GENDER_LABEL,
 ethnicity: ETHNICITY_LABEL,
 educationLevel: EDUCATION_LABEL }),
     fields: [...personFields<PersonExportRow>(p => p), ...reportFields<PersonExportRow>()],

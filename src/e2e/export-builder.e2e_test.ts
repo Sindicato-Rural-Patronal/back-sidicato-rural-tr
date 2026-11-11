@@ -409,6 +409,18 @@ linhas: 2 });
         expect((padrao!.details as { campos: string[] }).campos).toHaveLength(57);
     });
 
+    it('tipo de membro nos filtros sai pelo rótulo das telas, no PDF e nos detalhes', async () => {
+        const res = await post('/admin/export/people', { memberType: 'PRODUTOR RURAL',
+fields: ['name'],
+format: 'pdf' });
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({ filters: 'Tipo de membro: Produtor rural' });
+        const log = await prisma.auditLog.findFirst({ where: { method: 'EXPORT' },
+orderBy: { createdAt: 'desc' } });
+        expect((log!.details as { filtros: unknown }).filtros).toEqual([{ nome: 'Tipo de membro',
+valor: 'Produtor rural' }]);
+    });
+
     it('curso sem nenhuma linha: o filtro diz o nome do curso no PDF e nos detalhes', async () => {
         // Curso só deste teste, sem inscrição; sai no fim para não mudar as contagens dos outros.
         const { roomId } = await prisma.course.findUniqueOrThrow({ where: { id: ids.course },

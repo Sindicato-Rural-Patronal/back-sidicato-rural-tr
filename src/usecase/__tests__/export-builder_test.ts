@@ -9,6 +9,8 @@ import { REGISTRATION_FREE_PERSON_FIELDS } from '../export/catalog/registrations
 import { GetExportCatalogUseCase } from '../export/get-export-catalog.js';
 import { citedPersonalFields, type ExportActor } from '../export/engine.js';
 import { formatCns, formatPhone } from '../export/format.js';
+import { MEMBER_TYPE_LABEL } from '../../lib/export-labels.js';
+import { MEMBER_TYPES } from '../../lib/member-types.js';
 
 // Montador de relatórios (decisão 006): catálogo, campos escolhidos, formatos,
 // permissão por campo, limites e o texto da auditoria.
@@ -344,6 +346,42 @@ modelo: ' Meu modelo ' });
         const padrao = await useCase().execute('people', { format: 'pdf' });
         expect(padrao.result!.pdf!.modelo).toBe('Padrão (como hoje)');
         expect(padrao.result!.pdf!.columns).toHaveLength(57);
+    });
+
+    it('tipo de membro sai pelo rótulo das telas (PDF e auditoria); a coluna sai como gravada', async () => {
+        vi.mocked(repo.people).mockResolvedValue([person({ memberType: 'PRODUTOR RURAL' })] as never);
+        const r = await useCase().execute('people', {
+            fields: ['name', 'memberType'],
+            format: 'pdf',
+            memberType: 'PRODUTOR RURAL',
+            memberClassification: 'PEQUENO',
+            educationLevel: 'INCOMPLETE_PRIMARY',
+        });
+        expect(r.result!.pdf!.filters).toBe(
+            'Tipo de membro: Produtor rural · Classificação: PEQUENO · Escolaridade: Fundamental incompleto',
+        );
+        expect(r.result!.auditDetails!.filtros).toEqual([
+            { nome: 'Tipo de membro',
+valor: 'Produtor rural' },
+            { nome: 'Classificação',
+valor: 'PEQUENO' },
+            { nome: 'Escolaridade',
+valor: 'Fundamental incompleto' },
+        ]);
+        expect(r.result!.pdf!.rows).toEqual([['JOÃO DA SILVA', 'PRODUTOR RURAL']]);
+    });
+
+    it('cada tipo de membro da lista fixa tem rótulo; valor fora da lista sai como veio', async () => {
+        vi.mocked(repo.people).mockResolvedValue([] as never);
+        const filtros = async (memberType: string) =>
+            (await useCase().execute('people', { fields: ['name'],
+format: 'pdf',
+memberType })).result!.pdf!.filters;
+        expect(await filtros('ALUNO')).toBe('Tipo de membro: Aluno');
+        expect(await filtros('TRABALHADOR RURAL ASSALARIADO')).toBe('Tipo de membro: Trabalhador rural assalariado');
+        expect(await filtros('TRABALHADOR RURAL AUTONOMO')).toBe('Tipo de membro: Trabalhador rural autônomo');
+        expect(await filtros('SOCIO')).toBe('Tipo de membro: SOCIO');
+        expect(Object.keys(MEMBER_TYPE_LABEL).sort()).toEqual([...MEMBER_TYPES].sort());
     });
 });
 
