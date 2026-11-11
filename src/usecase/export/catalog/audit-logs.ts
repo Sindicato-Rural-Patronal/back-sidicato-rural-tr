@@ -34,7 +34,8 @@ type AuditFilters = z.infer<typeof filters> & { ids?: never };
 
 const filterLabels = {
     action: 'Ação',
-    entity: 'Área',
+    // O nome do filtro na tela da Auditoria; a coluna continua "Área" (teste de ouro).
+    entity: 'Tipo',
     actorId: 'Quem',
     ip: 'IP',
     from: 'De',
@@ -184,7 +185,7 @@ value: a => formatChanges(a.changes) },
 const PADRAO = ['createdAt', 'actor', 'action', 'entity', 'target', 'path', 'ip', 'location', 'device', 'changes'];
 
 /**
- * "Ação: Exportações · Área: Usuário · Quem: bali · IP: … · Período: 01/01/2026
+ * "Ação: Exportações · Tipo: Usuário · Quem: bali · IP: … · Período: 01/01/2026
  * a 31/01/2026 · Busca: joão". Quem vem pelo usuário das linhas (filtradas por
  * ele, todas têm o mesmo); sem nenhuma linha, pelo id.
  */

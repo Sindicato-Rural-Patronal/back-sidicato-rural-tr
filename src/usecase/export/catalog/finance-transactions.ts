@@ -28,7 +28,9 @@ const filterLabels = {
     type: 'Tipo',
     categoryId: 'Categoria',
     accountId: 'Caixa',
-    method: 'Método',
+    // O nome do filtro na tela ("Forma") e do campo no formulário; a coluna
+    // continua "Método" (teste de ouro).
+    method: 'Forma de pagamento',
     search: 'Busca',
     orderBy: 'Ordem',
 };
@@ -211,8 +213,9 @@ const PADRAO = [
 
 /**
  * "Período: 01/01/2026 a 31/01/2026 · Tipo: Saída · Categoria: INSUMOS ·
- * Caixa: BANCO · Método: PIX · Busca: coop · Ordem: Nº". Categoria e caixa vêm
- * das linhas (filtradas por eles, todas têm o mesmo); sem nenhuma, pelo id.
+ * Caixa: BANCO · Forma de pagamento: PIX · Busca: coop · Ordem: Nº". Categoria
+ * e caixa vêm das linhas (filtradas por eles, todas têm o mesmo); sem nenhuma,
+ * pelo id.
  */
 async function describeFilters(f: FinanceFilters, rows: Row[], repo: ExportRepository): Promise<ExportFilterDescription[]> {
     const out: ExportFilterDescription[] = [...describePeriod(f.from && ymd(f.from), f.to && ymd(f.to))];

@@ -102,7 +102,9 @@ title: 'Auditoria' });
             privacy: 'comum',
             allowed: true,
         });
+        // O filtro "Tipo" da tela; a coluna continua "Área".
         expect(catalog.filterLabels).toMatchObject({ action: 'Ação',
+entity: 'Tipo',
 actorId: 'Quem',
 q: 'Busca' });
 
@@ -136,6 +138,7 @@ phone: '44911117001' } });
             format: 'pdf',
             modelo: 'resumida',
             action: 'export',
+            entity: 'Exportação',
             actorId: superAdminId,
             from: '2020-01-01',
             to: today(),
@@ -152,7 +155,7 @@ rows: string[][]
         expect(pdf).toMatchObject({
             title: 'Auditoria',
             filename: `auditoria-${today()}.pdf`,
-            filters: `Ação: Exportações · Quem: e2eadmin · Período: 01/01/2020 a ${today().split('-').reverse().join('/')}`,
+            filters: `Ação: Exportações · Tipo: Exportação · Quem: e2eadmin · Período: 01/01/2020 a ${today().split('-').reverse().join('/')}`,
             modelo: 'Resumida',
         });
         // A exportação de pessoas e a da auditoria do teste anterior, da mais recente.
@@ -170,6 +173,8 @@ rows: string[][]
 modelo: 'Resumida',
 campos: ['Data e hora', 'Quem', 'Ação', 'Alvo'],
 linhas: 2 });
+        expect((log!.details as { filtros: unknown[] }).filtros).toContainEqual({ nome: 'Tipo',
+valor: 'Exportação' });
     });
 
     it('o padrão cita IP, local e aparelho no alvo da auditoria; campo desconhecido → 400', async () => {
@@ -330,6 +335,8 @@ title: 'Lançamentos' });
         expect(catalog.padrao).toHaveLength(13);
         expect(catalog.modelos.map(m => m.id)).toEqual(['resumido']);
         expect(catalog.groups.map(g => g.name)).toEqual(['Lançamento', 'Valores', 'Favorecido', 'Nota de Empenho', 'Sistema', 'Relatório']);
+        // O filtro "Forma" da tela; a coluna continua "Método".
+        expect(catalog.filterLabels).toMatchObject({ method: 'Forma de pagamento' });
         expect(catalog.groups.flatMap(g => g.fields).find(f => f.key === 'payeeDocument')).toMatchObject({ privacy: 'pessoal',
 allowed: true });
 
