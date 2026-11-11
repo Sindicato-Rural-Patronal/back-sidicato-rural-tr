@@ -2,6 +2,8 @@
 // auditoria. Calculada na leitura a partir do que já é gravado (método, caminho,
 // entidade e rótulo do alvo), então vale também para as linhas antigas.
 
+import { BROWSER_DOCUMENTS, browserDocumentOfPath } from './browser-documents.js';
+
 type Gender = 'm' | 'f' | 'fp';
 
 /** Substantivo e gênero de cada entidade de `deriveAuditEntity` (+ "Exportação"). */
@@ -216,7 +218,9 @@ function exportFormat(details: unknown): string | null {
 /**
  * Frase da ação para o painel e a planilha. `targetLabel` null → frase sem o nome do alvo.
  * `details` (o que foi exportado) muda a frase da exportação em PDF, que não é
- * planilha, e a do Excel.
+ * planilha, e a do Excel. O documento montado no navegador (caminho
+ * `/admin/export/documents/<tipo>`) "gerou o documento"; sem o alvo, a frase
+ * diz qual documento.
  */
 export function describeAuditAction(entry: {
     method: string;
@@ -232,6 +236,9 @@ export function describeAuditAction(entry: {
             : 'Excluiu uma reserva de sala e as próximas da série';
     }
     if (entry.method === 'EXPORT') {
+        // Documento montado no navegador (SR-104): o tipo vem do caminho.
+        const document = browserDocumentOfPath(entry.path);
+        if (document) return `Gerou o documento ${q(label ?? BROWSER_DOCUMENTS[document].name)}`;
         const format = exportFormat(entry.details);
         if (format === 'pdf') return label ? `Exportou o relatório em PDF ${q(label)}` : 'Exportou um relatório em PDF';
         if (format === 'xlsx') return label ? `Exportou a planilha do Excel ${q(label)}` : 'Exportou uma planilha do Excel';
