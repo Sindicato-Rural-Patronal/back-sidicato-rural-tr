@@ -202,11 +202,12 @@ name: true },
         });
     }
 
-    contactMessages({ ids, ...filters }: Parameters<ExportRepository['contactMessages']>[0]): Promise<ContactMessageExportRow[]> {
+    contactMessages({ ids, take, ...filters }: Parameters<ExportRepository['contactMessages']>[0]): Promise<ContactMessageExportRow[]> {
         return this.prisma.contactMessage.findMany({
             where: byIds(ids) ? { ...byIds(ids),
 isDeleted: false } : buildContactMessageWhere(filters),
             orderBy: { createdAt: 'desc' },
+            ...(take && { take }),
         });
     }
 

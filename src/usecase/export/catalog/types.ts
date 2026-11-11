@@ -51,7 +51,8 @@ export type ExportFilterDescription = {
     valor: string;
 };
 
-export type EngineDataset = 'people' | 'registrations' | 'companies' | 'properties' | 'admins' | 'courses';
+export type EngineDataset =
+    | 'people' | 'registrations' | 'companies' | 'properties' | 'admins' | 'courses' | 'contact-messages';
 
 export type ExportSource<Row, Filters extends { ids?: string[] }> = {
     dataset: EngineDataset;

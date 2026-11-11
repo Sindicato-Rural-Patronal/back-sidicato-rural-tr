@@ -306,7 +306,7 @@ confirmed?: boolean
  id: string;
 name: string
 }[]>;
-    contactMessages(filters: ContactMessageFilters & ExportSelection): Promise<ContactMessageExportRow[]>;
+    contactMessages(filters: ContactMessageFilters & ExportSelection & ExportTake): Promise<ContactMessageExportRow[]>;
     unimed(filters: { search?: string } & ExportSelection): Promise<UnimedExportRow[]>;
     auditLogs(filters: AuditLogFilters): Promise<AuditLogExportRow[]>;
     /** Reservas de sala: período (from inclusivo, to exclusivo), sala, tipo, busca ou ids. */

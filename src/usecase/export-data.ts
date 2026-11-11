@@ -4,7 +4,6 @@ import type {
     AuditLogExportRow,
     AuditLogFilters,
     CompanyExportRow,
-    ContactMessageExportRow,
     ExportAddress,
     ExportRepository,
     RoomBookingExportRow,
@@ -26,7 +25,7 @@ import { describeAuditAction } from '../lib/audit-sentence.js';
 import { formatChanges } from '../lib/audit-diff.js';
 import { describeUserAgent } from '../lib/user-agent.js';
 import { EXPORT_DATASETS, type ExportDataset } from './export/datasets.js';
-import { bool, day, empty, idList, text } from './export/filters.js';
+import { day, empty, idList, text } from './export/filters.js';
 import { formatCep, formatCnpj, formatCpf, propertyLine, slug, ymd } from './export/format.js';
 import { NO_BUILDER_MESSAGE, sourceOf } from './export/catalog/index.js';
 import type { EngineDataset } from './export/catalog/types.js';
@@ -48,9 +47,6 @@ export { EXPORT_DATASETS, type ExportDataset, type ExportResult };
 const schemas = {
     // O relatorio e sempre o retrato completo: nao aceita filtro nem selecao.
     cadastros: z.object({}),
-    'contact-messages': z.object({ ids: idList,
-search: text,
-read: bool }),
     unimed: z.object({ ids: idList,
 search: text }),
     'audit-logs': z.object({
@@ -162,23 +158,6 @@ value: a => a.userData.phone },
 value: a => a.rules.name },
     { header: 'Criado em',
 value: a => csvDateTime(a.createdAt) },
-];
-
-const contactMessageColumns: CsvColumn<ContactMessageExportRow>[] = [
-    { header: 'Recebida em',
-value: m => csvDateTime(m.createdAt) },
-    { header: 'Nome',
-value: m => m.name },
-    { header: 'E-mail',
-value: m => m.email },
-    { header: 'Telefone',
-value: m => m.phone },
-    { header: 'Assunto',
-value: m => m.subject },
-    { header: 'Mensagem',
-value: m => m.message },
-    { header: 'Lida',
-value: m => m.read },
 ];
 
 const unimedColumns: CsvColumn<UnimedExportRow>[] = [
@@ -363,12 +342,6 @@ body: csvBody(adminColumns, administradores) },
                 const count = pessoas.length + associados.length + empresas.length + administradores.length;
                 return { csv,
 count };
-            }
-            case 'contact-messages': {
-                const rows = await this.repo.contactMessages(q);
-                return { csv: toCsv(contactMessageColumns, rows),
-count: rows.length,
-firstName: rows[0]?.name };
             }
             case 'unimed': {
                 const rows = await this.repo.unimed(q);

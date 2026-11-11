@@ -483,3 +483,59 @@ format: 'pdf' });
         expect(proximos.result!.pdf!.filters).toBe('Aba: Próximos');
     });
 });
+
+// ── Mensagens de contato ─────────────────────────────────────────────────────
+
+const message = {
+    id: 'm1',
+    name: 'JOÃO',
+    email: 'joao@test.com',
+    phone: '44999990000',
+    subject: 'Curso',
+    message: '=HYPERLINK("x")',
+    read: false,
+    createdAt: new Date('2026-09-17T02:59:00.000Z'),
+};
+
+describe('mensagens de contato no montador', () => {
+    it('catálogo: padrão de 7 colunas, modelo Contato, a mensagem e o contato pessoais', () => {
+        const source = EXPORT_SOURCES['contact-messages'];
+        expect(source.padrao).toEqual(['receivedAt', 'name', 'email', 'phone', 'subject', 'message', 'read']);
+        expect(groupsOf('contact-messages')).toEqual(['Mensagem', 'Quem mandou', 'Relatório']);
+        expect(source.modelos).toEqual([{ id: 'contato',
+name: 'Contato',
+fields: ['name', 'email', 'phone'] }]);
+        const pessoais = source.fields.filter(f => f.privacy !== 'comum').map(f => f.key);
+        expect(pessoais).toEqual(['message', 'email', 'phone']);
+        expect(new GetExportCatalogUseCase().execute('contact-messages').catalog!.title).toBe('Mensagens de contato');
+    });
+
+    it('campos escolhidos: telefone com máscara; fórmula neutralizada no CSV e crua no PDF; lidas em palavras', async () => {
+        vi.mocked(repo.contactMessages).mockResolvedValue([message] as never);
+        const csv = await useCase().execute('contact-messages', { fields: 'name,phone,message',
+read: 'false',
+search: 'joão' });
+        expect(parse(csv.result!.csv)).toEqual([['Nome', 'Telefone', 'Mensagem'], ['JOÃO', '(44) 99999-0000', `'=HYPERLINK(""x"")`]]);
+        expect(repo.contactMessages).toHaveBeenCalledWith({ ids: undefined,
+search: 'joão',
+read: false,
+take: 20001 });
+        expect(csv.result!.auditLabel).toBe('Mensagens de contato: 1 registro (com filtros) · CSV · com Telefone, Mensagem');
+
+        const pdf = await useCase().execute('contact-messages', { fields: ['name', 'message'],
+format: 'pdf',
+read: 'true',
+modelo: 'contato' });
+        expect(pdf.result!.pdf).toMatchObject({
+            title: 'Mensagens de contato',
+            filename: 'mensagens-2026-09-17.pdf',
+            filters: 'Só lidas',
+            modelo: 'Contato',
+            rows: [['JOÃO', '=HYPERLINK("x")']],
+        });
+        const naoLidas = await useCase().execute('contact-messages', { fields: ['name'],
+format: 'pdf',
+read: false });
+        expect(naoLidas.result!.pdf!.filters).toBe('Só não lidas');
+    });
+});

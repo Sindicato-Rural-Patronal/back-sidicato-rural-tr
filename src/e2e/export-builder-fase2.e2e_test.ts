@@ -391,3 +391,53 @@ format: 'pdf',
         });
     });
 });
+
+describe('mensagens de contato', () => {
+    beforeAll(async () => {
+        await prisma.contactMessage.create({
+            data: { name: 'ANA MONTADOR',
+email: 'ana@montador.test',
+phone: '44999990000',
+message: 'Quero o curso',
+read: true },
+        });
+        await prisma.contactMessage.create({ data: { name: 'BIA MONTADOR',
+email: 'bia@montador.test',
+message: '=1+1' } });
+    });
+
+    it('catálogo: 200; sem READ_CONTACT, 403', async () => {
+        const res = await get('/admin/export/contact-messages/catalog');
+        expect(res.statusCode, res.body).toBe(200);
+        const catalog = res.json() as Catalog;
+        expect(catalog).toMatchObject({ title: 'Mensagens de contato',
+filterLabels: { search: 'Busca',
+read: 'Só lidas' } });
+        expect(catalog.padrao).toHaveLength(7);
+        const semContato = await adminWith('msg_cursos', ['READ_COURSE']);
+        expect((await get('/admin/export/contact-messages/catalog', semContato)).statusCode).toBe(403);
+    });
+
+    it('modelo Contato com o filtro de lidas, PDF e auditoria', async () => {
+        const csv = await post('/admin/export/contact-messages', { search: 'montador',
+read: true,
+fields: ['name', 'email', 'phone'],
+modelo: 'contato' });
+        expect(csv.statusCode, csv.body).toBe(200);
+        expect(rows(csv.body)).toEqual([['Nome', 'E-mail', 'Telefone'], ['ANA MONTADOR', 'ana@montador.test', '(44) 99999-0000']]);
+        const log = await lastExport();
+        expect(log!.targetLabel).toBe('Mensagens de contato: 1 registro (com filtros) · CSV · com E-mail, Telefone');
+        expect(log!.details).toMatchObject({ modelo: 'Contato',
+filtros: [{ nome: 'Busca',
+valor: 'montador' }, { nome: 'Só lidas',
+valor: 'Sim' }] });
+
+        const pdf = await post('/admin/export/contact-messages', { search: 'montador',
+read: false,
+fields: ['name', 'message'],
+format: 'pdf' });
+        expect(pdf.statusCode, pdf.body).toBe(200);
+        expect(pdf.json()).toMatchObject({ filters: 'Busca: montador · Só não lidas',
+rows: [['BIA MONTADOR', '=1+1']] });
+    });
+});
