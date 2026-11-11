@@ -498,3 +498,99 @@ read: 'false' });
         expect(r.result!.csv).toBe(file(MESSAGES_HEADER));
     });
 });
+
+// ── Unimed ───────────────────────────────────────────────────────────────────
+
+const UNIMED_HEADER = [
+    'Nome', 'CPF', 'Nascimento', 'Telefone', 'E-mail', 'Plano', 'Matrícula', 'CNS', 'Nome da mãe', 'Profissão', 'Empresa',
+    'Contratante', 'Tipo de movimento', 'Tipo de dependente', 'Grau de dependência', 'Titular', 'Data de adesão', 'Motivo',
+    'Observações', 'Cadastrado em',
+];
+
+/** O titular: tudo preenchido; o CNS só com dígitos sai como gravado. */
+const unimedJoao = {
+    id: 'u1',
+    dataAdesao: d('2020-03-01T00:00:00.000Z'),
+    tipoMovimento: 'INCLUSAO DE TITULAR',
+    tipoDependente: null,
+    grauDependencia: 'TITULAR',
+    cns: '123456789012345',
+    nomeMae: 'MARIA "MÃE"',
+    profissao: 'AGRICULTOR',
+    plano: 'ENFERMARIA',
+    matricula: '0001',
+    empresa: 'SINDICATO',
+    contratante: 'SINDICATO RURAL',
+    motivo: null,
+    obs: '=obs',
+    createdAt: d('2026-01-02T15:30:00.000Z'),
+    titularName: null,
+    userData: { name: 'JOÃO DA SILVA',
+cpf: '12345678909',
+birthDate: d('1980-05-10T00:00:00.000Z'),
+phone: '44999990000',
+email: 'joao@test.com' },
+};
+
+/** O dependente: CNS antigo com espaços, telefone com máscara, o titular pelo nome. */
+const unimedPedro = {
+    id: 'u2',
+    dataAdesao: null,
+    tipoMovimento: 'INCLUSAO DE DEPENDENTE',
+    tipoDependente: 'FILHO',
+    grauDependencia: 'FILHO(A)',
+    cns: '898 0012 3456 7890',
+    nomeMae: null,
+    profissao: null,
+    plano: null,
+    matricula: null,
+    empresa: null,
+    contratante: null,
+    motivo: '-',
+    obs: null,
+    createdAt: d('2026-09-16T23:30:00.000Z'),
+    titularName: 'JOÃO DA SILVA',
+    userData: { name: 'PEDRO',
+cpf: null,
+birthDate: null,
+phone: '(44) 9 8888-7777',
+email: null },
+};
+
+const JOAO_UNIMED_ROW = [
+    'JOÃO DA SILVA', '123.456.789-09', '10/05/1980', '44999990000', 'joao@test.com', 'ENFERMARIA', '0001', '123456789012345',
+    'MARIA ""MÃE""', 'AGRICULTOR', 'SINDICATO', 'SINDICATO RURAL', 'INCLUSAO DE TITULAR', '', 'TITULAR', '', '01/03/2020', '',
+    `'=obs`, '02/01/2026 12:30',
+];
+const PEDRO_UNIMED_ROW = [
+    'PEDRO', '', '', '(44) 9 8888-7777', '', '', '', '898 0012 3456 7890', '', '', '', '', 'INCLUSAO DE DEPENDENTE', 'FILHO',
+    'FILHO(A)', 'JOÃO DA SILVA', '', `'-`, '', '16/09/2026 20:30',
+];
+
+describe('teste de ouro: CSV padrão da Unimed', () => {
+    it('20 colunas, na ordem e no formato de hoje', async () => {
+        expect(UNIMED_HEADER).toHaveLength(20);
+        expect(JOAO_UNIMED_ROW).toHaveLength(20);
+        expect(PEDRO_UNIMED_ROW).toHaveLength(20);
+
+        vi.mocked(repo.unimed).mockResolvedValue([unimedJoao, unimedPedro] as never);
+        const r = await useCase().execute('unimed', { search: 'silva' });
+        expect(r.error).toBeUndefined();
+        expect(r.result!.csv).toBe(file(UNIMED_HEADER, JOAO_UNIMED_ROW, PEDRO_UNIMED_ROW));
+        expect(r.result!.count).toBe(2);
+        expect(r.result!.filename).toBe('unimed-2026-09-17.csv');
+    });
+
+    it('um beneficiário pelo id: o nome da pessoa no nome do arquivo', async () => {
+        vi.mocked(repo.unimed).mockResolvedValue([unimedPedro] as never);
+        const r = await useCase().execute('unimed', { ids: ['u2'] });
+        expect(r.result!.csv).toBe(file(UNIMED_HEADER, PEDRO_UNIMED_ROW));
+        expect(r.result!.filename).toBe('unimed-pedro-2026-09-17.csv');
+    });
+
+    it('lista vazia: só o cabeçalho', async () => {
+        vi.mocked(repo.unimed).mockResolvedValue([] as never);
+        const r = await useCase().execute('unimed', {});
+        expect(r.result!.csv).toBe(file(UNIMED_HEADER));
+    });
+});

@@ -501,3 +501,86 @@ createdAt: d('2026-09-19T15:30:00.000Z') },
         expect(one.body).toBe(file(header, joao));
     });
 });
+
+describe('teste de ouro pelo banco: Unimed', () => {
+    const header = [
+        'Nome', 'CPF', 'Nascimento', 'Telefone', 'E-mail', 'Plano', 'Matrícula', 'CNS', 'Nome da mãe', 'Profissão', 'Empresa',
+        'Contratante', 'Tipo de movimento', 'Tipo de dependente', 'Grau de dependência', 'Titular', 'Data de adesão', 'Motivo',
+        'Observações', 'Cadastrado em',
+    ];
+    let pedroUnimed: string;
+
+    beforeAll(async () => {
+        const joao = await prisma.userData.create({
+            data: {
+                name: 'JOAO UNIMED',
+                cpf: '39053344705',
+                birthDate: d('1980-05-10T00:00:00.000Z'),
+                phone: '44999990000',
+                email: 'joao@unimed.test',
+            },
+        });
+        const pedro = await prisma.userData.create({ data: { name: 'PEDRO UNIMED',
+phone: '(44) 9 8888-7777' } });
+        const excluido = await prisma.userData.create({ data: { name: 'EXCLUIDO UNIMED',
+phone: '44911118030' } });
+        await prisma.unimedBeneficiario.create({
+            data: {
+                userDataId: joao.id,
+                dataAdesao: d('2020-03-01T00:00:00.000Z'),
+                tipoMovimento: 'INCLUSAO DE TITULAR',
+                grauDependencia: 'TITULAR',
+                cns: '123456789012345',
+                nomeMae: 'MARIA "MÃE"',
+                profissao: 'AGRICULTOR',
+                plano: 'ENFERMARIA',
+                matricula: '0001',
+                empresa: 'SINDICATO',
+                contratante: 'SINDICATO RURAL',
+                obs: '=obs',
+                createdAt: d('2026-01-02T15:30:00.000Z'),
+            },
+        });
+        const dependente = await prisma.unimedBeneficiario.create({
+            data: {
+                userDataId: pedro.id,
+                tipoMovimento: 'INCLUSAO DE DEPENDENTE',
+                tipoDependente: 'FILHO',
+                grauDependencia: 'FILHO(A)',
+                cns: '898 0012 3456 7890',
+                titularId: joao.id,
+                motivo: 'NASCIMENTO',
+                createdAt: d('2026-09-16T23:30:00.000Z'),
+            },
+        });
+        // Cadastro excluído não sai.
+        await prisma.unimedBeneficiario.create({ data: { userDataId: excluido.id,
+plano: 'X',
+isDeleted: true } });
+        pedroUnimed = dependente.id;
+    });
+
+    const joao = [
+        'JOAO UNIMED', '390.533.447-05', '10/05/1980', '44999990000', 'joao@unimed.test', 'ENFERMARIA', '0001', '123456789012345',
+        'MARIA ""MÃE""', 'AGRICULTOR', 'SINDICATO', 'SINDICATO RURAL', 'INCLUSAO DE TITULAR', '', 'TITULAR', '', '01/03/2020', '',
+        `'=obs`, '02/01/2026 12:30',
+    ];
+    const pedro = [
+        'PEDRO UNIMED', '', '', '(44) 9 8888-7777', '', '', '', '898 0012 3456 7890', '', '', '', '', 'INCLUSAO DE DEPENDENTE',
+        'FILHO', 'FILHO(A)', 'JOAO UNIMED', '', 'NASCIMENTO', '', '16/09/2026 20:30',
+    ];
+
+    it('o CSV padrão inteiro, pela busca, na ordem do nome', async () => {
+        const res = await get('/admin/export/unimed?search=unimed');
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.headers['content-disposition']).toBe(`attachment; filename="unimed-${todayBr()}.csv"`);
+        expect(res.headers['x-export-count']).toBe('2');
+        expect(res.body).toBe(file(header, joao, pedro));
+    });
+
+    it('um beneficiário pelo id', async () => {
+        const res = await get(`/admin/export/unimed?ids=${pedroUnimed}`);
+        expect(res.headers['content-disposition']).toBe(`attachment; filename="unimed-pedro-unimed-${todayBr()}.csv"`);
+        expect(res.body).toBe(file(header, pedro));
+    });
+});
