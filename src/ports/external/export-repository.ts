@@ -286,7 +286,7 @@ export type RoomBookingExportRow = RoomBookingItem;
 
 export interface ExportRepository {
     people(filters: UserListFilters & ExportSelection & ExportTake): Promise<PersonExportRow[]>;
-    companies(filters: CompanyListFilters & ExportSelection): Promise<CompanyExportRow[]>;
+    companies(filters: CompanyListFilters & ExportSelection & ExportTake): Promise<CompanyExportRow[]>;
     /** `ownerIds`: propriedades dessas pessoas/empresas. */
     properties(filters: ExportSelection & { ownerIds?: string[] }): Promise<PropertyExportRow[]>;
     admins(filters: UserAdminListFilters & ExportSelection): Promise<AdminExportRow[]>;

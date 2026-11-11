@@ -32,27 +32,23 @@ import { EXPORT_DATASETS, type ExportDataset } from './export/datasets.js';
 import { bool, day, empty, idList, text } from './export/filters.js';
 import { formatCep, formatCnpj, formatCpf, propertyLine, slug, ymd } from './export/format.js';
 import { NO_BUILDER_MESSAGE, sourceOf } from './export/catalog/index.js';
+import type { EngineDataset } from './export/catalog/types.js';
 import { peopleSource } from './export/catalog/people.js';
 import {
     NO_EXTRA_PERMISSIONS, padraoCsvBody, runSourceExport,
     type ExportActor, type ExportResult,
 } from './export/engine.js';
 
-// Exportação de dados (`/admin/export/:dataset`). `people` e `registrations`
-// já passaram para o montador de relatórios (`usecase/export/`, decisão 006);
-// os outros conjuntos continuam aqui, com as colunas fixas, até a fase 2.
+// Exportação de dados (`/admin/export/:dataset`). As fontes de
+// `export/catalog/index.ts` já passaram para o montador de relatórios
+// (`usecase/export/`, decisão 006); as outras continuam aqui, com as colunas
+// fixas, até a parte B da fase 2.
 
 export { EXPORT_DATASETS, type ExportDataset, type ExportResult };
 
 // ── Leitura da query (conjuntos do caminho antigo) ───────────────────────────
 
 const schemas = {
-    companies: z.object({
-        ids: idList,
-        search: text,
-        type: z.preprocess(empty, z.enum(['PRIVATE', 'PUBLIC']).optional()),
-        isPartner: bool,
-    }),
     properties: z.object({ ids: idList,
 ownerIds: idList }),
     // O relatorio e sempre o retrato completo: nao aceita filtro nem selecao.
@@ -87,7 +83,7 @@ search: text }),
         type: z.preprocess(empty, z.enum(['EVENT', 'MEETING'], { message: 'Filtro inválido' }).optional()),
         search: text,
     }),
-} satisfies Record<Exclude<ExportDataset, 'people' | 'registrations'>, z.ZodTypeAny>;
+} satisfies Record<Exclude<ExportDataset, EngineDataset>, z.ZodTypeAny>;
 
 type LegacyDataset = keyof typeof schemas;
 
@@ -121,6 +117,9 @@ function addressColumns<T>(prefix: string, get: (row: T) => ExportAddress | null
 
 // ── Colunas de cada conjunto ─────────────────────────────────────────────────
 
+// As colunas de empresas e de administradores ficam aqui só para o relatório de
+// cadastros, que passa para o motor por dentro na parte B da fase 2. A
+// exportação de cada uma já sai pelo montador (`export/catalog/`).
 const companyColumns: CsvColumn<CompanyExportRow>[] = [
     { header: 'Razão social',
 value: c => c.name },
@@ -352,9 +351,9 @@ value: b => !!b.seriesId },
 // ── Caso de uso ──────────────────────────────────────────────────────────────
 
 // Exportação de um conjunto de dados: com `ids` exporta só os selecionados
-// (um ou vários); sem, tudo o que bate com os filtros da listagem. `people` e
-// `registrations` vão para o montador (campos, formato e permissão por campo);
-// os outros saem em CSV com as colunas fixas.
+// (um ou vários); sem, tudo o que bate com os filtros da listagem. As fontes
+// do montador (`export/catalog/index.ts`) saem pelo motor (campos, formato e
+// permissão por campo); as outras saem em CSV com as colunas fixas.
 export class ExportDataUseCase {
     constructor(
         private readonly repo: ExportRepository,
@@ -442,12 +441,6 @@ body: csvBody(adminColumns, administradores) },
                 const count = pessoas.length + associados.length + empresas.length + administradores.length;
                 return { csv,
 count };
-            }
-            case 'companies': {
-                const rows = await this.repo.companies(q);
-                return { csv: toCsv(companyColumns, rows),
-count: rows.length,
-firstName: rows[0] && (rows[0].tradeName || rows[0].name) };
             }
             case 'properties': {
                 const rows = await this.repo.properties(q as {

@@ -77,11 +77,12 @@ isDeleted: false } : buildUserListWhere(filters),
         });
     }
 
-    companies({ ids, ...filters }: Parameters<ExportRepository['companies']>[0]): Promise<CompanyExportRow[]> {
+    companies({ ids, take, ...filters }: Parameters<ExportRepository['companies']>[0]): Promise<CompanyExportRow[]> {
         return this.prisma.company.findMany({
             where: byIds(ids) ? { ...byIds(ids),
 isDeleted: false } : buildCompanyListWhere(filters),
             orderBy: { name: 'asc' },
+            ...(take && { take }),
             include: {
                 address: true,
                 members: {
