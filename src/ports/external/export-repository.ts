@@ -337,5 +337,7 @@ account: string | null
         userAgent: string | null;
         /** O que foi exportado (montador de relatórios); null no relatório de cadastros. */
         details?: ExportAuditLogDetails | null;
+        /** O status que a rota responde; sem ele, 200 (o da exportação). O documento do navegador responde 204. */
+        statusCode?: number;
     }): Promise<{ id: string }>;
 }

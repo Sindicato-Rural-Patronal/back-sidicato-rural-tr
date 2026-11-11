@@ -83,7 +83,8 @@ linhas: 12 }, courseOnly);
             path: '/admin/export/documents/lista-presenca',
             entity: 'Exportação',
             targetLabel: 'Lista de presença: HORTA · 12 registros · com CPF',
-            statusCode: 200,
+            // O status que a rota respondeu (SR-112).
+            statusCode: 204,
         });
         expect(log!.userAgent).toContain('Chrome');
         expect(log!.ip).toBeTruthy();
@@ -106,10 +107,13 @@ linhas: 12 }, courseOnly);
         const [row] = (res.json() as {
  data: {
  summary: string;
-details: unknown 
-}[] 
+details: unknown;
+statusCode: number
+}[]
 }).data;
         expect(row.summary).toBe('Gerou o documento "Lista de presença: HORTA · 12 registros · com CPF"');
+        // O "Detalhe técnico" da tela mostra este status.
+        expect(row.statusCode).toBe(204);
         expect(row.details).toMatchObject({ formato: 'pdf',
 modelo: 'Lista de presença' });
 

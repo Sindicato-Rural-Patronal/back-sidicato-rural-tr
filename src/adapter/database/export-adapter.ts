@@ -316,14 +316,14 @@ account: account?.name ?? null };
     }
 
     // O local do IP é preenchido depois da resposta (http/audit-hooks.ts).
-    async logExport({ actorId, path, targetLabel, ip, userAgent, details }: Parameters<ExportRepository['logExport']>[0]): Promise<{ id: string }> {
+    async logExport({ actorId, path, targetLabel, ip, userAgent, details, statusCode }: Parameters<ExportRepository['logExport']>[0]): Promise<{ id: string }> {
         return this.prisma.auditLog.create({
             data: { actorId,
 method: 'EXPORT',
 path,
 entity: 'Exportação',
 targetLabel,
-statusCode: 200,
+statusCode: statusCode ?? 200,
 ip,
 userAgent,
 ...(details && { details: details as unknown as InputJsonValue }) },

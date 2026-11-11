@@ -23,6 +23,9 @@ import {
 
 const builderDatasets = Object.keys(EXPORT_SOURCES).join(', ');
 
+/** O que `POST /admin/export/documents/:kind` responde, e o que a linha dele grava. */
+const DOCUMENT_STATUS = 204;
+
 // Parâmetros do montador (decisão 006, item 3). Os tipos aqui são frouxos de
 // propósito: quem confere e responde com a mensagem em português é o use case.
 const builderParams = {
@@ -337,13 +340,15 @@ type: 'null' },
             const r = logDocument.execute(req.params.kind, req.body);
             if (r.error || !r.log) return reply.status(errorToStatus(r.error)).send({ error: r.error?.message });
             // Aqui a linha é o serviço: se não gravar, o erro sobe (500), e o painel sabe.
+            // A linha grava o status que a rota responde (204), como o hook geral faz.
             const logged = await repo.logExport({
                 actorId: adminOf(req).id,
                 ...r.log,
                 ...requestContext(req),
+                statusCode: DOCUMENT_STATUS,
             });
             fillAuditLocationLater(req, logged.id);
-            return reply.status(204).send();
+            return reply.status(DOCUMENT_STATUS).send();
         },
     );
 }
