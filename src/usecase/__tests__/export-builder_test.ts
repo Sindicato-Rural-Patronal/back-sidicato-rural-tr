@@ -21,6 +21,7 @@ const repo = {
     registrations: vi.fn(),
     courseNames: vi.fn(),
     courses: vi.fn(),
+    roomBookings: vi.fn(),
     logExport: vi.fn(),
 } as unknown as ExportRepository;
 
@@ -243,8 +244,9 @@ reason: null,
         expect(withUser.catalog!.groups.flatMap(g => g.fields).every(f => f.allowed)).toBe(true);
     });
 
+    // Cursos passaram ao montador na fase 2 (SR-100); as reservas de sala ainda não.
     it('conjunto sem montador → 404 com a mensagem combinada', () => {
-        const r = new GetExportCatalogUseCase().execute('courses', can('READ_COURSE'));
+        const r = new GetExportCatalogUseCase().execute('room-bookings', can('READ_COURSE'));
         expect(r.error).toBeInstanceOf(NotFoundError);
         expect(r.error!.message).toBe('Este conjunto ainda não tem o montador.');
     });
@@ -438,16 +440,16 @@ format: 'pdf' });
     });
 
     it('conjunto sem montador: fields ou PDF → 400; CSV sem fields continua igual', async () => {
-        vi.mocked(repo.courses).mockResolvedValue([] as never);
+        vi.mocked(repo.roomBookings).mockResolvedValue([] as never);
         for (const input of [{ fields: 'name' }, { format: 'pdf' }]) {
-            const r = await useCase().execute('courses', input);
+            const r = await useCase().execute('room-bookings', input);
             expect(r.error!.message).toBe(NO_BUILDER_MESSAGE);
         }
-        expect((await useCase().execute('courses', { format: 'xlsx' })).error!.message).toBe('Formato inválido: use csv ou pdf.');
-        const ok = await useCase().execute('courses', { format: 'csv' });
+        expect((await useCase().execute('room-bookings', { format: 'xlsx' })).error!.message).toBe('Formato inválido: use csv ou pdf.');
+        const ok = await useCase().execute('room-bookings', { format: 'csv' });
         expect(ok.result).toMatchObject({ format: 'csv',
 auditDetails: null,
-auditLabel: 'Cursos: 0 registros (todos)' });
+auditLabel: 'Reservas de sala: 0 registros (todos)' });
     });
 });
 

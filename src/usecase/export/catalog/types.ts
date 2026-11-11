@@ -51,7 +51,7 @@ export type ExportFilterDescription = {
     valor: string;
 };
 
-export type EngineDataset = 'people' | 'registrations' | 'companies' | 'properties' | 'admins';
+export type EngineDataset = 'people' | 'registrations' | 'companies' | 'properties' | 'admins' | 'courses';
 
 export type ExportSource<Row, Filters extends { ids?: string[] }> = {
     dataset: EngineDataset;
@@ -70,8 +70,11 @@ export type ExportSource<Row, Filters extends { ids?: string[] }> = {
     padrao: string[];
     /** Modelos de fábrica (fora o Padrão). */
     modelos: ExportModelo[];
-    /** `take`: o limite de linhas + 1, para saber se passou. */
-    query: (repo: ExportRepository, filters: Filters, take: number) => Promise<Row[]>;
+    /**
+     * `take`: o limite de linhas + 1, para saber se passou. `now`: o relógio do
+     * pedido (os cursos cortam a aba "Armazenados" pelo dia de hoje).
+     */
+    query: (repo: ExportRepository, filters: Filters, take: number, ctx: { now: Date }) => Promise<Row[]>;
     /** Nome do registro, para o arquivo de um registro só. */
     firstName: (row: Row) => string | undefined;
 };

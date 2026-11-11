@@ -163,7 +163,7 @@ export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClien
 | companies | search, type, isPartner | READ_USER |
 | properties | ownerIds (pessoas/empresas) | READ_USER |
 | admins | search, rulesId | READ_USER_ADMIN |
-| courses | search, status | READ_COURSE |
+| courses | search, status, view (upcoming = Próximos, stored = Armazenados), year (1990–2100): os mesmos da lista de cursos | READ_COURSE |
 | registrations | courseIds, confirmed | READ_COURSE |
 | contact-messages | search, read | READ_CONTACT |
 | unimed | search | READ_USER |

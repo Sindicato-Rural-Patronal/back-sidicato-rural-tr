@@ -5,7 +5,6 @@ import type {
     AuditLogFilters,
     CompanyExportRow,
     ContactMessageExportRow,
-    CourseExportRow,
     ExportAddress,
     ExportRepository,
     RoomBookingExportRow,
@@ -13,14 +12,13 @@ import type {
 } from '../ports/external/export-repository.js';
 import { ValidationError } from '../errors/validation.js';
 import {
-    csvBody, csvDate, csvDateTime, csvList, csvMoney, csvWallClock, toCsv, toCsvSections,
+    csvBody, csvDate, csvDateTime, csvList, csvWallClock, toCsv, toCsvSections,
     type CsvColumn,
 } from '../lib/csv.js';
 import {
     ADDRESS_TYPE_LABEL,
     BOOKING_TYPE_LABEL,
     COMPANY_TYPE_LABEL,
-    COURSE_STATUS_LABEL,
     label,
 } from '../lib/export-labels.js';
 import { todayInBrazil } from '../lib/quote-products.js';
@@ -50,11 +48,6 @@ export { EXPORT_DATASETS, type ExportDataset, type ExportResult };
 const schemas = {
     // O relatorio e sempre o retrato completo: nao aceita filtro nem selecao.
     cadastros: z.object({}),
-    courses: z.object({
-        ids: idList,
-        search: text,
-        status: z.preprocess(empty, z.enum(['PUBLIC', 'PRIVATE', 'UNPUBLISHED', 'IN_PROGRESS', 'COMPLETED']).optional()),
-    }),
     'contact-messages': z.object({ ids: idList,
 search: text,
 read: bool }),
@@ -169,49 +162,6 @@ value: a => a.userData.phone },
 value: a => a.rules.name },
     { header: 'Criado em',
 value: a => csvDateTime(a.createdAt) },
-];
-
-const courseColumns: CsvColumn<CourseExportRow>[] = [
-    { header: 'Curso',
-value: c => c.name },
-    { header: 'Nº do evento',
-value: c => c.eventNumber },
-    { header: 'Status',
-value: c => label(COURSE_STATUS_LABEL, c.status) },
-    { header: 'Início',
-value: c => csvWallClock(c.startTime) },
-    { header: 'Término',
-value: c => csvWallClock(c.endTime) },
-    { header: 'Inscrições até',
-value: c => csvWallClock(c.registrationDeadline) },
-    { header: 'Sala',
-value: c => c.room.name },
-    { header: 'Capacidade da sala',
-value: c => c.room.maxCapacity },
-    {
-        header: 'Instrutores',
-        value: c => csvList(c.instructors.map(i => (i.title ? `${i.instructor.userData.name} (${i.title})` : i.instructor.userData.name))),
-    },
-    { header: 'Carga horária (h)',
-value: c => c.workloadHours },
-    { header: 'Valor (R$)',
-value: c => csvMoney(c.price) },
-    { header: 'Mínimo de alunos',
-value: c => c.minStudents },
-    { header: 'Inscritos',
-value: c => c.courseUserRegistration.length },
-    { header: 'Confirmados',
-value: c => c.courseUserRegistration.filter(r => r.confirmed).length },
-    { header: 'Pré-inscritos',
-value: c => c.preEnrolled },
-    { header: 'Lista de espera',
-value: c => c.waitlist },
-    { header: 'Descrição',
-value: c => c.description },
-    { header: 'Observações',
-value: c => c.observations },
-    { header: 'Criado em',
-value: c => csvDateTime(c.createdAt) },
 ];
 
 const contactMessageColumns: CsvColumn<ContactMessageExportRow>[] = [
@@ -413,12 +363,6 @@ body: csvBody(adminColumns, administradores) },
                 const count = pessoas.length + associados.length + empresas.length + administradores.length;
                 return { csv,
 count };
-            }
-            case 'courses': {
-                const rows = await this.repo.courses(q);
-                return { csv: toCsv(courseColumns, rows),
-count: rows.length,
-firstName: rows[0]?.name };
             }
             case 'contact-messages': {
                 const rows = await this.repo.contactMessages(q);

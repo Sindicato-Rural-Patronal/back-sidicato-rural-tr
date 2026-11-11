@@ -368,3 +368,118 @@ format: 'pdf' });
         expect(empty.result!.auditLabel).toBe('Administradores: 0 registros (com filtros) · PDF');
     });
 });
+
+// ── Cursos ───────────────────────────────────────────────────────────────────
+
+function course(overrides: Record<string, unknown> = {}) {
+    return {
+        id: 'c1',
+        name: 'HORTA',
+        description: 'x',
+        eventNumber: '2026/15',
+        status: 'COMPLETED',
+        startTime: new Date('2026-09-10T08:00:00.000Z'),
+        endTime: new Date('2026-09-10T12:00:00.000Z'),
+        registrationDeadline: null,
+        workloadHours: 4,
+        price: 0,
+        minStudents: 0,
+        preEnrolled: 0,
+        waitlist: 0,
+        observations: null,
+        createdAt: new Date('2026-09-01T12:00:00.000Z'),
+        room: { name: 'AUDITORIO',
+maxCapacity: 50 },
+        instructors: [{ title: null,
+instructor: { userData: { name: 'PEDRO' } } }],
+        courseUserRegistration: [],
+        ...overrides,
+    };
+}
+
+describe('cursos no montador', () => {
+    it('catálogo: padrão de 19 colunas, modelo Calendário, filtros de aba e ano, nada pessoal', () => {
+        const source = EXPORT_SOURCES.courses;
+        expect(source.padrao).toHaveLength(19);
+        expect(groupsOf('courses')).toEqual(['Curso', 'Datas', 'Sala', 'Vagas e inscrições', 'Sistema', 'Relatório']);
+        expect(source.modelos).toEqual([
+            { id: 'calendario',
+name: 'Calendário',
+fields: ['name', 'startTime', 'endTime', 'room', 'instructors'] },
+        ]);
+        expect(source.fields.filter(f => f.privacy !== 'comum')).toEqual([]);
+        expect(source.filterLabels).toEqual({ view: 'Aba',
+search: 'Busca',
+year: 'Ano',
+status: 'Status' });
+    });
+
+    it('aba e ano chegam ao repositório como na lista: Armazenados corta no dia de hoje e vem do mais recente', async () => {
+        vi.mocked(repo.courses).mockResolvedValue([] as never);
+        // Hoje é 17/09/2026 em Brasília: o corte é amanhã, 00:00 (horário de parede).
+        const tomorrow = new Date('2026-09-18T00:00:00.000Z');
+
+        await useCase().execute('courses', { view: 'stored',
+year: '2026',
+search: 'horta' });
+        expect(repo.courses).toHaveBeenLastCalledWith({
+            ids: undefined,
+search: 'horta',
+status: undefined,
+year: 2026,
+startsBefore: tomorrow,
+order: 'desc',
+take: 20001,
+        });
+
+        await useCase().execute('courses', { view: 'upcoming',
+year: 2027 });
+        expect(repo.courses).toHaveBeenLastCalledWith(expect.objectContaining({ startsFrom: tomorrow,
+year: 2027,
+order: 'asc' }));
+
+        // Sem aba, como sempre: sem corte de data e do início mais cedo.
+        await useCase().execute('courses', {});
+        const last = vi.mocked(repo.courses).mock.calls.at(-1)![0];
+        expect(last).toMatchObject({ order: 'asc' });
+        expect(last).not.toHaveProperty('startsFrom');
+        expect(last).not.toHaveProperty('startsBefore');
+    });
+
+    it('aba ou ano inválidos → 400, sem consultar', async () => {
+        for (const [input, message] of [
+            [{ view: 'todos' }, 'Filtro inválido'],
+            [{ year: '20x6' }, 'Ano inválido: use de 1990 a 2100'],
+            [{ year: '1500' }, 'Ano inválido: use de 1990 a 2100'],
+            [{ year: 2026.5 }, 'Ano inválido: use de 1990 a 2100'],
+        ] as const) {
+            const r = await useCase().execute('courses', input);
+            expect(r.error!.message, JSON.stringify(input)).toBe(message);
+        }
+        expect(repo.courses).not.toHaveBeenCalled();
+    });
+
+    it('PDF: aba, busca, ano e status em palavras; o modelo Calendário', async () => {
+        vi.mocked(repo.courses).mockResolvedValue([course()] as never);
+        const r = await useCase().execute('courses', {
+            view: 'stored',
+search: 'horta',
+year: '2026',
+status: 'COMPLETED',
+            fields: ['name', 'startTime', 'endTime', 'room', 'instructors'],
+modelo: 'calendario',
+format: 'pdf',
+        });
+        expect(r.result!.pdf).toMatchObject({
+            title: 'Cursos',
+            filters: 'Aba: Armazenados · Busca: horta · Ano: 2026 · Status: Concluído',
+            modelo: 'Calendário',
+            rows: [['HORTA', '10/09/2026 08:00', '10/09/2026 12:00', 'AUDITORIO', 'PEDRO']],
+        });
+        expect(r.result!.auditLabel).toBe('Cursos: 1 registro (com filtros) · PDF');
+        const proximos = await useCase().execute('courses', { view: 'upcoming',
+fields: ['name'],
+format: 'pdf' });
+        expect(proximos.result!.pdf!.filters).toBe('Aba: Próximos');
+    });
+});

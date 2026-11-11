@@ -291,7 +291,8 @@ export interface ExportRepository {
     admins(filters: UserAdminListFilters & ExportSelection & ExportTake): Promise<AdminExportRow[]>;
     /** Nome da regra de acesso, para o filtro em palavras; null se não existe. */
     ruleName(id: string): Promise<string | null>;
-    courses(filters: CourseListFilters & ExportSelection): Promise<CourseExportRow[]>;
+    /** `order`: pelo início, do mais cedo (`asc`, o padrão) ou do mais recente (`desc`, a aba Armazenados). */
+    courses(filters: CourseListFilters & ExportSelection & ExportTake & { order?: 'asc' | 'desc' }): Promise<CourseExportRow[]>;
     /** `courseIds`: inscrições desses cursos; sem nada, de todos. `confirmed: true`: só as confirmadas. */
     registrations(filters: ExportSelection & ExportTake & {
  courseIds?: string[];

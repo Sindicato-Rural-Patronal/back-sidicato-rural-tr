@@ -298,3 +298,96 @@ fields: ['username', 'cpf', 'rg'] });
 valor: 'RULE_so_admins' }]);
     });
 });
+
+describe('cursos: aba e ano, como na lista', () => {
+    beforeAll(async () => {
+        const room = await prisma.room.create({ data: { name: 'SALA MONTADOR',
+description: 'x',
+maxCapacity: 10 } });
+        const curso = (name: string, start: string) =>
+            prisma.course.create({
+                data: { name,
+description: 'x',
+roomId: room.id,
+startTime: new Date(start),
+endTime: new Date(start.replace('T08', 'T12')) },
+            });
+        await curso('Montador 2020', '2020-05-10T08:00:00.000Z');
+        await curso('Montador 2021', '2021-03-01T08:00:00.000Z');
+        await curso('Montador 2032', '2032-01-01T08:00:00.000Z');
+    });
+
+    const names = async (query: string) => {
+        const res = await get(`/admin/export/courses?search=montador&fields=name&${query}`);
+        expect(res.statusCode, res.body).toBe(200);
+        return rows(res.body).slice(1).map(r => r[0]);
+    };
+
+    it('catálogo: 200, com os filtros de aba e ano', async () => {
+        const res = await get('/admin/export/courses/catalog');
+        expect(res.statusCode, res.body).toBe(200);
+        const catalog = res.json() as Catalog;
+        expect(catalog.filterLabels).toEqual({ view: 'Aba',
+search: 'Busca',
+year: 'Ano',
+status: 'Status' });
+        expect(catalog.modelos.map(m => m.id)).toEqual(['calendario']);
+        expect(catalog.padrao).toHaveLength(19);
+    });
+
+    it('Próximos, Armazenados (do mais recente) e o ano saem como a lista os mostra', async () => {
+        expect(await names('')).toEqual(['Montador 2020', 'Montador 2021', 'Montador 2032']);
+        expect(await names('view=upcoming')).toEqual(['Montador 2032']);
+        expect(await names('view=stored')).toEqual(['Montador 2021', 'Montador 2020']);
+        expect(await names('view=stored&year=2020')).toEqual(['Montador 2020']);
+        expect(await names('year=2032')).toEqual(['Montador 2032']);
+
+        // A mesma lista que a tela mostra na aba.
+        const list = await get('/admin/courses?search=montador&view=stored&limit=100');
+        expect((list.json() as { data: { title: string }[] }).data.map(c => c.title)).toEqual(['Montador 2021', 'Montador 2020']);
+    });
+
+    it('o padrão também respeita a aba; aba ou ano inválidos → 400', async () => {
+        const res = await post('/admin/export/courses', { search: 'montador',
+view: 'upcoming',
+year: 2032 });
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.headers['x-export-count']).toBe('1');
+        expect(rows(res.body)[0]).toHaveLength(19);
+        const log = await lastExport();
+        expect(log!.targetLabel).toBe('Cursos: 1 registro (com filtros) · CSV');
+        expect((log!.details as { filtros: unknown }).filtros).toEqual([
+            { nome: 'Aba',
+valor: 'Próximos' },
+            { nome: 'Busca',
+valor: 'montador' },
+            { nome: 'Ano',
+valor: '2032' },
+        ]);
+
+        expect((await get('/admin/export/courses?view=todos')).json()).toEqual({ error: 'Filtro inválido' });
+        const year = await get('/admin/export/courses?year=1500');
+        expect(year.statusCode).toBe(400);
+        expect(year.json()).toEqual({ error: 'Ano inválido: use de 1990 a 2100' });
+    });
+
+    it('PDF com o modelo Calendário', async () => {
+        const res = await post('/admin/export/courses', {
+            search: 'montador',
+view: 'stored',
+fields: ['name', 'startTime', 'endTime', 'room', 'instructors'],
+modelo: 'calendario',
+format: 'pdf',
+        });
+        expect(res.statusCode, res.body).toBe(200);
+        expect(res.json()).toMatchObject({
+            title: 'Cursos',
+            filters: 'Aba: Armazenados · Busca: montador',
+            modelo: 'Calendário',
+            rows: [
+                ['Montador 2021', '01/03/2021 08:00', '01/03/2021 12:00', 'SALA MONTADOR', ''],
+                ['Montador 2020', '10/05/2020 08:00', '10/05/2020 12:00', 'SALA MONTADOR', ''],
+            ],
+        });
+    });
+});

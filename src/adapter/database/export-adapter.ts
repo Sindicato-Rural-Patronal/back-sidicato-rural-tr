@@ -147,11 +147,12 @@ select: { name: true } });
         return rule?.name ?? null;
     }
 
-    courses({ ids, ...filters }: Parameters<ExportRepository['courses']>[0]): Promise<CourseExportRow[]> {
+    courses({ ids, take, order, ...filters }: Parameters<ExportRepository['courses']>[0]): Promise<CourseExportRow[]> {
         return this.prisma.course.findMany({
             where: byIds(ids) ? { ...byIds(ids),
 isDeleted: false } : buildCourseListWhere(filters),
-            orderBy: { startTime: 'asc' },
+            orderBy: { startTime: order ?? 'asc' },
+            ...(take && { take }),
             include: {
                 room: { select: { name: true,
 maxCapacity: true } },

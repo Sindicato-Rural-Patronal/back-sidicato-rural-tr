@@ -280,7 +280,7 @@ now: Date
         return { error: new ForbiddenError(`Sem permissão para exportar: ${denied.map(f => f.label).join(', ')}.`) };
     }
 
-    const rows: unknown[] = await source.query(repo, filters, EXPORT_LIMITS.rows + 1);
+    const rows: unknown[] = await source.query(repo, filters, EXPORT_LIMITS.rows + 1, { now });
     if (rows.length > EXPORT_LIMITS.rows) {
         return { error: new ValidationError('O relatório passa de 20.000 linhas. Use um filtro para diminuir.') };
     }
