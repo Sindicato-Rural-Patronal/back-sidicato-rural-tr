@@ -4,6 +4,9 @@
 export function deriveAuditEntity(path: string): string {
     const p = path.toLowerCase().split('?')[0];
     if (p.startsWith('/auth/')) return 'Login';
+    // Primeiro: o conjunto vai no caminho (/admin/report-templates/registrations/…)
+    // e cairia em Inscrição, Empresa, Curso…
+    if (p.startsWith('/admin/report-templates/')) return 'Modelo de relatório';
     if (p.includes('/finance/categories')) return 'Categoria financeira';
     if (p.includes('/finance/accounts')) return 'Caixa';
     if (p.includes('/finance/transfers')) return 'Transferência';

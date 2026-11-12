@@ -347,11 +347,43 @@ model AuditLog {
   location    String?
   // Campos alterados: [{ field, before, after }] (lib/audit-diff.ts).
   changes     Json?
+  // Exportação: { formato, modelo, campos, escopo, filtros, linhas } (decisão
+  // 006). Só nas exportações do montador de relatórios; o resto fica null.
+  details     Json?
   createdAt   DateTime @default(now())
 
   @@index([createdAt])
   @@index([actorId])
   @@index([ip])
+}
+
+// Modelo de relatório salvo pela equipe (decisão 006, fase 3, SR-114): as
+// colunas montadas no montador de relatórios, para a equipe toda reaproveitar.
+// É da equipe, não de uma pessoa (decisão do usuário em 11/11): não tem dono.
+// Nome único por conjunto entre os ativos, sem diferenciar maiúsculas, pelo
+// índice parcial "ReportTemplate_dataset_name_active_key" da migração
+// 20261111150000_report_template (não dá para escrever aqui); ele também atende
+// a listagem (conjunto + ativos).
+model ReportTemplate {
+  id          String    @id @default(uuid())
+  // Conjunto do montador: "people", "registrations"… (EXPORT_SOURCES).
+  dataset     String
+  name        String
+  // Chaves do catálogo, na ordem das colunas. Chave que sai do catálogo fica
+  // aqui e é avisada na listagem (missingFields).
+  fields      String[]
+  // Formato preferido: csv | pdf | xlsx; null = sem preferência.
+  format      String?
+  // Só em "registrations": o modelo liga "Só confirmadas". null nos outros.
+  confirmed   Boolean?
+  // UserAdmin.id de quem criou e de quem mudou por último (inclusive quem
+  // excluiu). Histórico, sem FK, como FinancialTransaction.createdBy.
+  createdById String
+  updatedById String?
+  isDeleted   Boolean   @default(false)
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 // Convite para criar um admin: o gestor escolhe a pessoa (userData) + a regra e

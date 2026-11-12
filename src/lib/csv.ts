@@ -14,12 +14,20 @@ function neutralizeFormula(text: string): string {
     return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
 }
 
-function cellText(value: CsvValue): string {
+/**
+ * O texto da célula como aparece na planilha, mas sem o apóstrofo contra
+ * fórmula: serve para o PDF, que não executa nada (decisão 006).
+ */
+export function cellDisplay(value: CsvValue): string {
     if (value == null) return '';
     if (value instanceof Date) return csvDate(value);
     if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
     if (typeof value === 'number') return String(value).replace('.', ',');
-    return neutralizeFormula(value);
+    return value;
+}
+
+function cellText(value: CsvValue): string {
+    return typeof value === 'string' ? neutralizeFormula(value) : cellDisplay(value);
 }
 
 function quote(text: string): string {

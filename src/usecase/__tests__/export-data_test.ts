@@ -176,7 +176,7 @@ gender: '' });
 
         expect(r.result).toMatchObject({ count: 1,
 filename: 'pessoas-2026-09-17.csv',
-auditLabel: 'Pessoas: 1 registro (com filtros)' });
+auditLabel: 'Pessoas: 1 registro (com filtros) · CSV · com CPF, RG, Órgão emissor, Emissão do RG, CNH e mais 29' });
     });
 
     it('um registro pelo id: nome no arquivo e na auditoria', async () => {
@@ -184,7 +184,7 @@ auditLabel: 'Pessoas: 1 registro (com filtros)' });
         const r = await new ExportDataUseCase(repo, now).execute('people', { ids: 'p1' });
         expect(repo.people).toHaveBeenCalledWith(expect.objectContaining({ ids: ['p1'] }));
         expect(r.result).toMatchObject({ filename: 'pessoa-joao-da-silva-2026-09-17.csv',
-auditLabel: 'Pessoas: JOÃO DA SILVA' });
+auditLabel: 'Pessoas: JOÃO DA SILVA · CSV · com CPF, RG, Órgão emissor, Emissão do RG, CNH e mais 29' });
     });
 
     it('seleção de vários ids e lista vazia só com cabeçalho', async () => {
@@ -192,7 +192,9 @@ auditLabel: 'Pessoas: JOÃO DA SILVA' });
         const r = await new ExportDataUseCase(repo, now).execute('companies', { ids: 'a, b ,,c' });
         expect(repo.companies).toHaveBeenCalledWith(expect.objectContaining({ ids: ['a', 'b', 'c'] }));
         expect(parse(r.result!.csv)).toHaveLength(1);
-        expect(r.result!.auditLabel).toBe('Empresas: 0 registros (seleção)');
+        // Empresas saem pelo montador (SR-100): o alvo diz o formato e os campos
+        // pessoais, mas com 0 linhas nenhum dado saiu e ele não cita nada (SR-112).
+        expect(r.result!.auditLabel).toBe('Empresas: 0 registros (seleção) · CSV');
     });
 
     it('filtro inválido é 400', async () => {
@@ -215,6 +217,31 @@ actorName: 'bali' },
         expect(repo.auditLogs).toHaveBeenCalledWith(expect.objectContaining({ action: 'export' }));
         const [, row] = parse(r.result!.csv);
         expect(row).toEqual(['17/09/2026 10:00', 'bali', 'Exportou uma planilha', 'Exportação', 'Pessoas: 3 registros (todos)', '/admin/export/people', '', '', '', '']);
+    });
+
+    it('auditoria: a exportação em PDF sai como relatório na coluna Ação; a em CSV, como planilha', async () => {
+        const line = (id: string, formato: string, targetLabel: string) => ({ id,
+method: 'EXPORT',
+path: '/admin/export/people',
+entity: 'Exportação',
+targetLabel,
+createdAt: new Date('2026-09-17T13:00:00.000Z'),
+actorName: 'bali',
+details: { formato,
+modelo: null,
+campos: ['Nome'],
+escopo: 'todos',
+filtros: [],
+linhas: 3 } });
+        vi.mocked(repo.auditLogs).mockResolvedValue([
+            line('1', 'pdf', 'Pessoas: 3 registros (todos) · PDF'),
+            line('2', 'csv', 'Pessoas: 3 registros (todos) · CSV'),
+        ] as never);
+        const r = await new ExportDataUseCase(repo, now).execute('audit-logs', { action: 'export' });
+        const [header, pdf, csv] = parse(r.result!.csv);
+        const acao = header.indexOf('Ação');
+        expect(pdf[acao]).toBe('Exportou um relatório em PDF');
+        expect(csv[acao]).toBe('Exportou uma planilha');
     });
 
     it('auditoria traz IP, local, aparelho e o que mudou', async () => {

@@ -209,7 +209,7 @@ total };
     }
 
     async listTransactionsForExport(
-        filters: Omit<FinanceTransactionFilters, 'skip' | 'take'>,
+        { take, ...filters }: Omit<FinanceTransactionFilters, 'skip' | 'take'> & { take?: number },
     ): Promise<FinanceTransactionWithCategory[]> {
         return this.prisma.financialTransaction.findMany({
             where: await this.buildWhere(filters),
@@ -220,6 +220,7 @@ total };
 orderBy: { createdAt: 'asc' } },
             },
             orderBy: transactionOrder(filters.orderBy),
+            ...(take && { take }),
         });
     }
 

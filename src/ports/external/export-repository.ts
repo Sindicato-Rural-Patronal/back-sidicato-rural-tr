@@ -4,6 +4,7 @@ import type { CourseListFilters } from './course-repository.js';
 import type { UserAdminListFilters } from './user-admin-repository.js';
 import type { ContactMessageFilters } from './contact-message-repository.js';
 import type { RoomBookingFilters, RoomBookingItem } from './room-booking-repository.js';
+import type { FinanceTransactionFilters, FinanceTransactionWithCategory } from './finance-repository.js';
 
 // Exportação de dados do painel. Cada método aceita os filtros da listagem
 // correspondente OU uma lista de ids (seleção / um registro só). Sem paginação.
@@ -22,6 +23,9 @@ export type AuditLogFilters = {
 
 /** Quando `ids` vem preenchido, os filtros são ignorados. */
 export type ExportSelection = { ids?: string[] };
+
+/** No máximo `take` linhas (o montador pede o limite + 1 para saber se passou). */
+export type ExportTake = { take?: number };
 
 export type ExportAddress = {
     type: string;
@@ -85,11 +89,13 @@ export type PersonExportRow = {
     createdAt: Date;
     updatedAt: Date;
     properties: ExportProperty[];
+    /** Vínculos com empresas ativas, pelo nome da empresa. */
     companyMemberships: {
  title: string;
 company: {
  name: string;
-tradeName: string | null 
+tradeName: string | null;
+isPartner: boolean 
 } 
 }[];
     relations: {
@@ -139,6 +145,9 @@ cpf: string | null
 
 export type PropertyExportRow = ExportProperty & {
     createdAt: Date;
+    /** O dono: uma pessoa ou uma empresa (o outro é null). */
+    userDataId: string | null;
+    companyId: string | null;
     userData: {
  name: string;
 cpf: string | null;
@@ -156,12 +165,8 @@ export type AdminExportRow = {
     id: string;
     username: string;
     createdAt: Date;
-    userData: {
- name: string;
-email: string | null;
-cpf: string | null;
-phone: string 
-};
+    /** A pessoa inteira (os campos de pessoa do montador). */
+    userData: PersonExportRow;
     rules: { name: string };
 };
 
@@ -204,23 +209,8 @@ export type RegistrationExportRow = {
 eventNumber: string | null;
 startTime: Date 
 };
-    userData: {
-        name: string;
-        cpf: string | null;
-        email: string | null;
-        phone: string;
-        birthDate: Date | null;
-        memberStatus: string | null;
-        membershipValidUntil: Date | null;
-        boardPosition: string | null;
-        publicContact: { title: string | null } | null;
-        companyMemberships: {
- company: {
- name: string;
-tradeName: string | null 
-} 
-}[];
-    };
+    /** A pessoa inteira (os campos de pessoa do montador). */
+    userData: PersonExportRow;
 };
 
 export type ContactMessageExportRow = {
@@ -251,13 +241,8 @@ export type UnimedExportRow = {
     obs: string | null;
     createdAt: Date;
     titularName: string | null;
-    userData: {
- name: string;
-cpf: string | null;
-birthDate: Date | null;
-phone: string;
-email: string | null
-};
+    /** A pessoa inteira (os campos de pessoa do montador). */
+    userData: PersonExportRow;
 };
 
 export type AuditLogExportRow = {
@@ -271,27 +256,78 @@ export type AuditLogExportRow = {
     location: string | null;
     /** [{ field, before, after }] (lib/audit-diff.ts) ou null. */
     changes: unknown;
+    /** O que foi exportado (`ExportAuditLogDetails`) ou null: o PDF muda a frase da coluna "Ação". */
+    details: unknown;
     createdAt: Date;
     actorName: string;
+};
+
+/** `AuditLog.details` de uma exportação (decisão 006): o que saiu. */
+export type ExportAuditLogDetails = {
+    formato: 'csv' | 'pdf' | 'xlsx';
+    modelo: string | null;
+    /** Rótulos, na ordem das colunas. */
+    campos: string[];
+    escopo: 'seleção' | 'com filtros' | 'todos';
+    filtros: {
+ nome: string;
+valor: string 
+}[];
+    linhas: number;
 };
 
 /** Reserva de sala (evento/reunião), mesmo formato da listagem. */
 export type RoomBookingExportRow = RoomBookingItem;
 
+/** Lançamento do Financeiro, como a lista o lê (com categoria, caixa e comprovantes). */
+export type FinanceTransactionExportRow = FinanceTransactionWithCategory;
+
+/** Os filtros e a ordem da lista de lançamentos (`to` já no fim do dia). */
+export type FinanceTransactionExportFilters = Omit<FinanceTransactionFilters, 'skip' | 'take'>;
+
 export interface ExportRepository {
-    people(filters: UserListFilters & ExportSelection): Promise<PersonExportRow[]>;
-    companies(filters: CompanyListFilters & ExportSelection): Promise<CompanyExportRow[]>;
+    people(filters: UserListFilters & ExportSelection & ExportTake): Promise<PersonExportRow[]>;
+    companies(filters: CompanyListFilters & ExportSelection & ExportTake): Promise<CompanyExportRow[]>;
     /** `ownerIds`: propriedades dessas pessoas/empresas. */
-    properties(filters: ExportSelection & { ownerIds?: string[] }): Promise<PropertyExportRow[]>;
-    admins(filters: UserAdminListFilters & ExportSelection): Promise<AdminExportRow[]>;
-    courses(filters: CourseListFilters & ExportSelection): Promise<CourseExportRow[]>;
-    /** `courseIds`: inscrições desses cursos; sem nada, de todos. */
-    registrations(filters: ExportSelection & { courseIds?: string[] }): Promise<RegistrationExportRow[]>;
-    contactMessages(filters: ContactMessageFilters & ExportSelection): Promise<ContactMessageExportRow[]>;
-    unimed(filters: { search?: string } & ExportSelection): Promise<UnimedExportRow[]>;
+    properties(filters: ExportSelection & ExportTake & { ownerIds?: string[] }): Promise<PropertyExportRow[]>;
+    admins(filters: UserAdminListFilters & ExportSelection & ExportTake): Promise<AdminExportRow[]>;
+    /** Nome da regra de acesso, para o filtro em palavras; null se não existe. */
+    ruleName(id: string): Promise<string | null>;
+    /** `order`: pelo início, do mais cedo (`asc`, o padrão) ou do mais recente (`desc`, a aba Armazenados). */
+    courses(filters: CourseListFilters & ExportSelection & ExportTake & { order?: 'asc' | 'desc' }): Promise<CourseExportRow[]>;
+    /** `courseIds`: inscrições desses cursos; sem nada, de todos. `confirmed: true`: só as confirmadas. */
+    registrations(filters: ExportSelection & ExportTake & {
+ courseIds?: string[];
+confirmed?: boolean
+}): Promise<RegistrationExportRow[]>;
+    /**
+     * Nome dos cursos não excluídos desses ids, na ordem das inscrições (início, depois nome).
+     * Dá o nome do filtro "Curso" quando o curso não deu nenhuma linha.
+     */
+    courseNames(ids: string[]): Promise<{
+ id: string;
+name: string
+}[]>;
+    contactMessages(filters: ContactMessageFilters & ExportSelection & ExportTake): Promise<ContactMessageExportRow[]>;
+    unimed(filters: { search?: string } & ExportSelection & ExportTake): Promise<UnimedExportRow[]>;
+    /** As linhas da trilha, das mais recentes; no máximo 20.000 (`AUDIT_EXPORT_LIMIT` do adapter). */
     auditLogs(filters: AuditLogFilters): Promise<AuditLogExportRow[]>;
+    /** Usuário de um administrador (mesmo excluído), para o filtro "Quem" em palavras; null se não existe. */
+    adminUsername(id: string): Promise<string | null>;
     /** Reservas de sala: período (from inclusivo, to exclusivo), sala, tipo, busca ou ids. */
-    roomBookings(filters: RoomBookingFilters): Promise<RoomBookingExportRow[]>;
+    roomBookings(filters: RoomBookingFilters & ExportTake): Promise<RoomBookingExportRow[]>;
+    /** Nome da sala (mesmo excluída), para o filtro "Sala" em palavras; null se não existe. */
+    roomName(id: string): Promise<string | null>;
+    /** Lançamentos do Financeiro: os mesmos filtros, busca e ordem da lista (`orderBy`). */
+    financeTransactions(filters: FinanceTransactionExportFilters & ExportTake): Promise<FinanceTransactionExportRow[]>;
+    /** Nome da categoria e do caixa (mesmo excluídos), para os filtros em palavras; null se não existe. */
+    financeNames(ids: {
+ categoryId?: string;
+accountId?: string 
+}): Promise<{
+ category: string | null;
+account: string | null 
+}>;
     /** Registra a exportação na trilha de auditoria. */
     logExport(entry: {
         actorId: string;
@@ -299,5 +335,9 @@ export interface ExportRepository {
         targetLabel: string;
         ip: string | null;
         userAgent: string | null;
+        /** O que foi exportado (montador de relatórios); null no relatório de cadastros. */
+        details?: ExportAuditLogDetails | null;
+        /** O status que a rota responde; sem ele, 200 (o da exportação). O documento do navegador responde 204. */
+        statusCode?: number;
     }): Promise<{ id: string }>;
 }

@@ -1,4 +1,5 @@
 import type { PrismaClient } from '../../generated/prisma/client.js';
+import type { InputJsonValue } from '../../generated/prisma/internal/prismaNamespace.js';
 import type {
     AdminExportRow,
     AuditLogExportRow,
@@ -6,12 +7,15 @@ import type {
     ContactMessageExportRow,
     CourseExportRow,
     ExportRepository,
+    FinanceTransactionExportRow,
     PersonExportRow,
     PropertyExportRow,
     RegistrationExportRow,
     RoomBookingExportRow,
     UnimedExportRow,
 } from '../../ports/external/export-repository.js';
+import type { FinanceRepository } from '../../ports/external/finance-repository.js';
+import { createFinanceAdapter } from './finance-adapter.js';
 import {
     buildAdminListWhere,
     buildAuditLogWhere,
@@ -38,43 +42,55 @@ const propertyInclude = {
     orderBy: { createdAt: 'asc' as const },
 };
 
-class ExportAdapter implements ExportRepository {
-    constructor(private prisma: PrismaClient) {}
+// A pessoa inteira, como a exportação de pessoas e os campos de pessoa do
+// montador de relatórios (decisão 006) precisam. As inscrições usam o mesmo.
+const personInclude = {
+    properties: propertyInclude,
+    companyMemberships: {
+        where: { company: { isDeleted: false } },
+        include: { company: { select: { name: true,
+tradeName: true,
+isPartner: true } } },
+        orderBy: { company: { name: 'asc' as const } },
+    },
+    relations: {
+        where: { isDeleted: false,
+target: { isDeleted: false } },
+        include: { target: { select: { name: true } } },
+    },
+    userAdmin: { select: { username: true,
+isDeleted: true } },
+    userInstructor: { select: { id: true } },
+    unimed: { select: { plano: true,
+isDeleted: true } },
+    publicContact: { select: { title: true } },
+    _count: { select: { courseUserRegistration: { where: { isDeleted: false } } } },
+};
 
-    people({ ids, ...filters }: Parameters<ExportRepository['people']>[0]): Promise<PersonExportRow[]> {
+class ExportAdapter implements ExportRepository {
+    /** A busca dos lançamentos (empenho por SQL, Nº) mora no adapter do Financeiro: um lugar só. */
+    private readonly finance: FinanceRepository;
+
+    constructor(private prisma: PrismaClient) {
+        this.finance = createFinanceAdapter(prisma);
+    }
+
+    people({ ids, take, ...filters }: Parameters<ExportRepository['people']>[0]): Promise<PersonExportRow[]> {
         return this.prisma.userData.findMany({
             where: byIds(ids) ? { ...byIds(ids),
 isDeleted: false } : buildUserListWhere(filters),
             orderBy: { name: 'asc' },
-            include: {
-                properties: propertyInclude,
-                companyMemberships: {
-                    where: { company: { isDeleted: false } },
-                    include: { company: { select: { name: true,
-tradeName: true } } },
-                    orderBy: { company: { name: 'asc' } },
-                },
-                relations: {
-                    where: { isDeleted: false,
-target: { isDeleted: false } },
-                    include: { target: { select: { name: true } } },
-                },
-                userAdmin: { select: { username: true,
-isDeleted: true } },
-                userInstructor: { select: { id: true } },
-                unimed: { select: { plano: true,
-isDeleted: true } },
-                publicContact: { select: { title: true } },
-                _count: { select: { courseUserRegistration: { where: { isDeleted: false } } } },
-            },
+            ...(take && { take }),
+            include: personInclude,
         });
     }
 
-    companies({ ids, ...filters }: Parameters<ExportRepository['companies']>[0]): Promise<CompanyExportRow[]> {
+    companies({ ids, take, ...filters }: Parameters<ExportRepository['companies']>[0]): Promise<CompanyExportRow[]> {
         return this.prisma.company.findMany({
             where: byIds(ids) ? { ...byIds(ids),
 isDeleted: false } : buildCompanyListWhere(filters),
             orderBy: { name: 'asc' },
+            ...(take && { take }),
             include: {
                 address: true,
                 members: {
@@ -88,7 +104,7 @@ cpf: true } } },
         });
     }
 
-    properties({ ids, ownerIds }: Parameters<ExportRepository['properties']>[0]): Promise<PropertyExportRow[]> {
+    properties({ ids, ownerIds, take }: Parameters<ExportRepository['properties']>[0]): Promise<PropertyExportRow[]> {
         return this.prisma.property.findMany({
             where: {
                 isDeleted: false,
@@ -105,6 +121,7 @@ cpf: true } } },
                 ],
             },
             orderBy: [{ createdAt: 'asc' }],
+            ...(take && { take }),
             include: {
                 address: true,
                 userData: { select: { name: true,
@@ -118,26 +135,32 @@ primaryPropertyId: true } },
         });
     }
 
-    admins({ ids, ...filters }: Parameters<ExportRepository['admins']>[0]): Promise<AdminExportRow[]> {
+    admins({ ids, take, ...filters }: Parameters<ExportRepository['admins']>[0]): Promise<AdminExportRow[]> {
         return this.prisma.userAdmin.findMany({
             where: byIds(ids) ? { ...byIds(ids),
 isDeleted: false } : buildAdminListWhere(filters),
             orderBy: { userData: { name: 'asc' } },
+            ...(take && { take }),
             include: {
-                userData: { select: { name: true,
-email: true,
-cpf: true,
-phone: true } },
+                // A pessoa inteira: os campos de pessoa do montador.
+                userData: { include: personInclude },
                 rules: { select: { name: true } },
             },
         });
     }
 
-    courses({ ids, ...filters }: Parameters<ExportRepository['courses']>[0]): Promise<CourseExportRow[]> {
+    async ruleName(id: string): Promise<string | null> {
+        const rule = await this.prisma.rule.findUnique({ where: { id },
+select: { name: true } });
+        return rule?.name ?? null;
+    }
+
+    courses({ ids, take, order, ...filters }: Parameters<ExportRepository['courses']>[0]): Promise<CourseExportRow[]> {
         return this.prisma.course.findMany({
             where: byIds(ids) ? { ...byIds(ids),
 isDeleted: false } : buildCourseListWhere(filters),
-            orderBy: { startTime: 'asc' },
+            orderBy: { startTime: order ?? 'asc' },
+            ...(take && { take }),
             include: {
                 room: { select: { name: true,
 maxCapacity: true } },
@@ -151,63 +174,59 @@ select: { confirmed: true } },
         });
     }
 
-    registrations({ ids, courseIds }: Parameters<ExportRepository['registrations']>[0]): Promise<RegistrationExportRow[]> {
+    registrations({ ids, courseIds, confirmed, take }: Parameters<ExportRepository['registrations']>[0]): Promise<RegistrationExportRow[]> {
         return this.prisma.courseUserRegistration.findMany({
             where: {
                 isDeleted: false,
                 course: { isDeleted: false },
                 ...(byIds(ids) ?? {}),
                 ...(courseIds?.length && { courseId: { in: courseIds } }),
+                ...(confirmed === true && { confirmed: true }),
             },
             orderBy: [{ course: { startTime: 'asc' } }, { userData: { name: 'asc' } }],
+            ...(take && { take }),
             include: {
                 ficha: { select: { id: true } },
                 course: { select: { name: true,
 eventNumber: true,
 startTime: true } },
-                userData: {
-                    select: {
-                        name: true,
-                        cpf: true,
-                        email: true,
-                        phone: true,
-                        birthDate: true,
-                        memberStatus: true,
-                        membershipValidUntil: true,
-                        boardPosition: true,
-                        publicContact: { select: { title: true } },
-                        companyMemberships: {
-                            where: { company: { isPartner: true,
-isDeleted: false } },
-                            select: { company: { select: { name: true,
-tradeName: true } } },
-                        },
-                    },
-                },
+                userData: { include: personInclude },
             },
         });
     }
 
-    contactMessages({ ids, ...filters }: Parameters<ExportRepository['contactMessages']>[0]): Promise<ContactMessageExportRow[]> {
+    // Mesma ordem das inscrições (início do curso, depois o nome).
+    courseNames(ids: string[]): Promise<{
+ id: string;
+name: string
+}[]> {
+        if (!ids.length) return Promise.resolve([]);
+        return this.prisma.course.findMany({
+            where: { id: { in: ids },
+isDeleted: false },
+            orderBy: [{ startTime: 'asc' }, { name: 'asc' }],
+            select: { id: true,
+name: true },
+        });
+    }
+
+    contactMessages({ ids, take, ...filters }: Parameters<ExportRepository['contactMessages']>[0]): Promise<ContactMessageExportRow[]> {
         return this.prisma.contactMessage.findMany({
             where: byIds(ids) ? { ...byIds(ids),
 isDeleted: false } : buildContactMessageWhere(filters),
             orderBy: { createdAt: 'desc' },
+            ...(take && { take }),
         });
     }
 
-    async unimed({ ids, search }: Parameters<ExportRepository['unimed']>[0]): Promise<UnimedExportRow[]> {
+    async unimed({ ids, search, take }: Parameters<ExportRepository['unimed']>[0]): Promise<UnimedExportRow[]> {
         const rows = await this.prisma.unimedBeneficiario.findMany({
             where: byIds(ids) ? { ...byIds(ids),
 isDeleted: false } : buildUnimedListWhere(search),
             orderBy: { userData: { name: 'asc' } },
-            include: {
-                userData: { select: { name: true,
-cpf: true,
-birthDate: true,
-phone: true,
-email: true } },
-            },
+            ...(take && { take }),
+            // A pessoa inteira: os campos de pessoa do montador.
+            include: { userData: { include: personInclude } },
         });
         // `filter(Boolean)` nao tira o null do TIPO: sem isto o null ia parar
         // dentro do `in` da consulta seguinte.
@@ -257,27 +276,57 @@ username: true } })
         }));
     }
 
+    async adminUsername(id: string): Promise<string | null> {
+        const admin = await this.prisma.userAdmin.findUnique({ where: { id },
+select: { username: true } });
+        return admin?.username ?? null;
+    }
+
     // Mesmos filtros da listagem de reservas (com ids, só esses).
-    async roomBookings(filters: Parameters<ExportRepository['roomBookings']>[0]): Promise<RoomBookingExportRow[]> {
+    async roomBookings({ take, ...filters }: Parameters<ExportRepository['roomBookings']>[0]): Promise<RoomBookingExportRow[]> {
         const rows = await this.prisma.roomBooking.findMany({
             where: buildRoomBookingWhere(filters),
             select: roomBookingSelect,
             orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
+            ...(take && { take }),
         });
         return rows.map(toRoomBookingItem);
     }
 
+    async roomName(id: string): Promise<string | null> {
+        const room = await this.prisma.room.findUnique({ where: { id },
+select: { name: true } });
+        return room?.name ?? null;
+    }
+
+    // Os mesmos filtros, busca e ordem da lista de lançamentos.
+    financeTransactions(filters: Parameters<ExportRepository['financeTransactions']>[0]): Promise<FinanceTransactionExportRow[]> {
+        return this.finance.listTransactionsForExport(filters);
+    }
+
+    async financeNames({ categoryId, accountId }: Parameters<ExportRepository['financeNames']>[0]) {
+        const [category, account] = await Promise.all([
+            categoryId ? this.prisma.financialCategory.findUnique({ where: { id: categoryId },
+select: { name: true } }) : null,
+            accountId ? this.prisma.financialAccount.findUnique({ where: { id: accountId },
+select: { name: true } }) : null,
+        ]);
+        return { category: category?.name ?? null,
+account: account?.name ?? null };
+    }
+
     // O local do IP é preenchido depois da resposta (http/audit-hooks.ts).
-    async logExport({ actorId, path, targetLabel, ip, userAgent }: Parameters<ExportRepository['logExport']>[0]): Promise<{ id: string }> {
+    async logExport({ actorId, path, targetLabel, ip, userAgent, details, statusCode }: Parameters<ExportRepository['logExport']>[0]): Promise<{ id: string }> {
         return this.prisma.auditLog.create({
             data: { actorId,
 method: 'EXPORT',
 path,
 entity: 'Exportação',
 targetLabel,
-statusCode: 200,
+statusCode: statusCode ?? 200,
 ip,
-userAgent },
+userAgent,
+...(details && { details: details as unknown as InputJsonValue }) },
             select: { id: true },
         });
     }

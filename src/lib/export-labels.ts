@@ -1,6 +1,8 @@
 // Rótulos em português dos enums, para as planilhas exportadas. Os mesmos
 // textos das telas do painel (front: lib/user-form-options.ts).
 
+import type { MEMBER_TYPES } from './member-types.js';
+
 export const GENDER_LABEL: Record<string, string> = {
     MALE: 'Masculino',
     FEMALE: 'Feminino',
@@ -32,6 +34,19 @@ export const MARITAL_STATUS_LABEL: Record<string, string> = {
     DIVORCED: 'Divorciado(a)',
     WIDOWED: 'Viúvo(a)',
     DOMESTIC_PARTNERSHIP: 'União estável',
+};
+
+/**
+ * Tipo de membro: o valor gravado é maiúsculo e sem acento ("PRODUTOR RURAL");
+ * o rótulo é o das telas (front: lib/member-types.ts). Por ora só no filtro
+ * em palavras (PDF e auditoria): a coluna sai como gravada, congelada pelo
+ * teste de ouro do CSV.
+ */
+export const MEMBER_TYPE_LABEL: Record<(typeof MEMBER_TYPES)[number], string> = {
+    ALUNO: 'Aluno',
+    'PRODUTOR RURAL': 'Produtor rural',
+    'TRABALHADOR RURAL ASSALARIADO': 'Trabalhador rural assalariado',
+    'TRABALHADOR RURAL AUTONOMO': 'Trabalhador rural autônomo',
 };
 
 export const MEMBER_STATUS_LABEL: Record<string, string> = {

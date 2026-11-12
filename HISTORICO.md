@@ -2,6 +2,15 @@
 
 O que mudou e por quê. As regras que valem hoje estão no `CLAUDE.md`. Este arquivo serve para entender de onde veio uma regra ou um dado estranho no banco. As entradas mais novas ficam no topo.
 
+## 11/11/2026: SR-088, montador de relatórios, fase 1 (decisão 006)
+
+- **O pedido.** O cliente queria relatórios com campos escolhidos ("só nome e CPF", "nome e e-mail"). Em vez de um relatório fixo por combinação, as listas exportáveis passam a ser dinâmicas: quem exporta escolhe os campos e a ordem. Na fase 1, pessoas e inscrições; as outras fontes continuam no `export-data.ts` até a fase 2.
+- **Teste de ouro antes de mexer.** O CSV padrão de pessoas e inscrições foi congelado byte a byte (unitário e pelo banco) num commit só dele, antes da refatoração. Sem `fields` sai o mesmo arquivo de antes. O fixture unitário de inscrições ganhou o formato novo do adapter (todos os vínculos com empresa, com `isPartner`); as linhas esperadas não mudaram.
+- **Telefone.** A decisão aceitava o telefone com máscara no padrão, como exceção nomeada. Ficou de fora: sem `fields` o telefone sai como gravado; a máscara só vale quando o relatório é montado (com `fields`). Assim o "CSV de hoje" não muda em nada.
+- **Inscrições leem a pessoa inteira.** Antes o adapter trazia só os campos da planilha e só os vínculos com empresas parceiras, sem ordem definida. Agora traz a pessoa com o mesmo `include` de pessoas (vínculos pelo nome da empresa), e a coluna "Empresa parceira" filtra as parceiras. Quem tem mais de uma parceira pode ver a ordem delas mudar (antes era a do banco).
+- **Permissão cruzada.** Quem só tem `READ_COURSE` já exportava nome, CPF, e-mail, telefone, nascimento, idade, associado em dia, empresa parceira, cargo e contato público das inscrições. O resto da pessoa, agora disponível no montador, pede também `READ_USER`.
+- **Auditoria.** A migration `20261111120000_audit_log_export_details` só acrescenta `AuditLog.details` (JSONB, aceita null): nenhuma linha existente muda. O alvo da exportação de pessoas e inscrições passou a dizer o formato e citar os campos pessoais ("… · CSV · com CPF, RG, …"), inclusive no CSV padrão.
+
 ## 30/10/2026: SR-069, o P2002 do adapter-pg e o índice violado
 
 - **O problema.** Com o `@prisma/adapter-pg` o P2002 vem sem `meta.target`; o nome do índice está em `meta.driverAdapterError.cause.constraint.index`. O `uniqueViolationFields` (usado no `register-full`) só lia o `meta.target`, então devolvia sempre `[]` e o código caía no "senão": todo P2002 virava "CPF já cadastrado".

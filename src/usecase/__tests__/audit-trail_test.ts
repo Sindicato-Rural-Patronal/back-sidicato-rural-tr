@@ -122,6 +122,40 @@ targetLabel: 'Pessoas: 3 registros' }))
             .toBe('Exportou a planilha "Pessoas: 3 registros"');
     });
 
+    it('exportação em PDF (details.formato) é relatório, não planilha; o CSV segue planilha', () => {
+        const exp = (targetLabel: string | null, details: unknown) =>
+            describeAuditAction({ method: 'EXPORT',
+path: '/admin/export/people',
+entity: 'Exportação',
+targetLabel,
+details });
+        const pdf = { formato: 'pdf',
+modelo: null,
+campos: ['Nome'],
+escopo: 'todos',
+filtros: [],
+linhas: 4 };
+        expect(exp('Pessoas: 4 registros (com filtros) · PDF · com CPF', pdf))
+            .toBe('Exportou o relatório em PDF "Pessoas: 4 registros (com filtros) · PDF · com CPF"');
+        expect(exp(null, pdf)).toBe('Exportou um relatório em PDF');
+        expect(exp('Pessoas: 4 registros (todos) · CSV', { ...pdf,
+formato: 'csv' })).toBe('Exportou a planilha "Pessoas: 4 registros (todos) · CSV"');
+        // Excel (SR-104): a planilha do Excel.
+        expect(exp('Pessoas: 4 registros (todos) · Excel', { ...pdf,
+formato: 'xlsx' })).toBe('Exportou a planilha do Excel "Pessoas: 4 registros (todos) · Excel"');
+        expect(exp(null, { ...pdf,
+formato: 'xlsx' })).toBe('Exportou uma planilha do Excel');
+        // Linhas antigas e fontes sem montador: sem details.
+        expect(exp(null, null)).toBe('Exportou uma planilha');
+        expect(exp(null, [])).toBe('Exportou uma planilha');
+        // `details` só conta na exportação.
+        expect(describeAuditAction({ method: 'POST',
+path: '/admin/galleries',
+entity: 'Galeria',
+targetLabel: null,
+details: pdf })).toBe('Criou uma galeria');
+    });
+
     it('entidade desconhecida (linha antiga) usa o nome em minúsculas', () => {
         expect(describeAuditAction({ method: 'DELETE',
 path: '/x',
@@ -147,6 +181,36 @@ describe('auditoria: fechamento do mês (SR-054)', () => {
         expect(shouldLookupTargetLabel('POST', '/admin/finance/closings')).toBe(true);
         expect(shouldLookupTargetLabel('DELETE', `/admin/finance/closings/${ID}`)).toBe(true);
         expect(shouldSnapshot('DELETE', `/admin/finance/closings/${ID}`)).toBe(true);
+    });
+});
+
+describe('auditoria: modelo de relatório da equipe (SR-114)', () => {
+    it('entidade própria, mesmo com o conjunto no caminho (registrations, companies, courses…)', () => {
+        for (const dataset of ['people', 'registrations', 'companies', 'courses', 'contact-messages', 'unimed', 'finance-transactions']) {
+            expect(deriveAuditEntity(`/admin/report-templates/${dataset}`), dataset).toBe('Modelo de relatório');
+            expect(deriveAuditEntity(`/admin/report-templates/${dataset}/${ID}`), dataset).toBe('Modelo de relatório');
+        }
+        expect(AUDIT_ENTITY_NOUNS['Modelo de relatório']).toEqual({ noun: 'modelo de relatório',
+g: 'm' });
+        expect(skipAudit('/admin/report-templates/people')).toBe(false);
+    });
+
+    it('frases de criar, editar e excluir', () => {
+        expect(sentence('POST', '/admin/report-templates/people', 'Pessoas: Só os nomes'))
+            .toBe('Criou o modelo de relatório "Pessoas: Só os nomes"');
+        expect(sentence('PATCH', `/admin/report-templates/registrations/${ID}`, 'Inscrições: Equipe (antes equipe)'))
+            .toBe('Editou o modelo de relatório "Inscrições: Equipe (antes equipe)"');
+        expect(sentence('DELETE', `/admin/report-templates/people/${ID}`, 'Pessoas: Só os nomes'))
+            .toBe('Excluiu o modelo de relatório "Pessoas: Só os nomes"');
+        expect(sentence('DELETE', `/admin/report-templates/people/${ID}`)).toBe('Excluiu um modelo de relatório');
+    });
+
+    it('editar e excluir guardam o que mudou; criar e listar não', () => {
+        expect(shouldSnapshot('PATCH', `/admin/report-templates/people/${ID}`)).toBe(true);
+        expect(shouldSnapshot('DELETE', `/admin/report-templates/finance-transactions/${ID}`)).toBe(true);
+        expect(shouldSnapshot('POST', '/admin/report-templates/people')).toBe(false);
+        expect(shouldSnapshot('PATCH', '/admin/report-templates/people')).toBe(false);
+        expect(shouldSnapshot('PATCH', `/admin/report-templates/people/${ID}/outra`)).toBe(false);
     });
 });
 

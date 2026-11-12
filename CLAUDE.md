@@ -51,12 +51,14 @@ src/
     router/                um plugin Fastify por módulo (schema Swagger + handler)
     controllers/           leem a request, checam permissão, chamam o use case
     lib/                   route-auth.ts (acesso por rota), require-permission.ts (errorToStatus), public-rate-limit.ts, swagger-schemas.ts,
-                           request-parsing.ts (parser de JSON, opções do Ajv, limites dos números)
+                           request-parsing.ts (parser de JSON, opções do Ajv, limites dos números),
+                           export-reply.ts (resposta, auditoria e limite das exportações)
   usecase/                 regras de negócio (sem Fastify; Prisma só pelos ports)
+    export/                montador de relatórios (decisão 006): catálogo de campos por fonte, motor e modelos da equipe
   ports/external/          interfaces dos repositórios
   adapter/database/        implementações Prisma dos ports; list-filters.ts; prisma-errors.ts
   adapter/storage/         Supabase Storage (createStorageAdapter)
-  lib/                     utilitários puros (datas, CPF, CSV, auditoria, imagens, listas fixas…)
+  lib/                     utilitários puros (datas, CPF, CSV, Excel, auditoria, imagens, listas fixas…)
   errors/                  erros tipados
   scripts/                 scripts avulsos (seed local, normalização antiga)
   e2e/                     testes E2E + helpers
@@ -78,10 +80,10 @@ Exceções conhecidas à regra "Prisma só no adapter":
 1. *Antes de excluir*, barra só o que ainda está vivo e vai acontecer: sala presa por curso/reserva que não terminou, regra presa por administrador ativo. Registro já excluído ou coisa que já passou nunca barra.
 2. *Ao excluir*, o que só existe por causa do registro cai junto, na mesma transação. Ex.: excluir pessoa leva login, convite não usado, inscrições ativas, escala de instrutor, Unimed, propriedades, relações, contato público e vínculos com empresas.
 
-Nada disso é apagado de verdade; só sai das telas. Têm `isDeleted`: UserAdmin, UserData, UserInstructor, CourseInstructor, course, CoursePhoto, room, RoomBooking, News, courseUserRegistration, Property, Banner, ContactMessage, UserRelation, UnimedBeneficiario, Company e os modelos de categoria, caixa, lançamento, recorrência e forma de pagamento do financeiro. Todos esses têm `isDeleted` + `deletedAt`.
+Nada disso é apagado de verdade; só sai das telas. Têm `isDeleted`: UserAdmin, UserData, UserInstructor, CourseInstructor, course, CoursePhoto, room, RoomBooking, News, courseUserRegistration, Property, Banner, ContactMessage, UserRelation, UnimedBeneficiario, Company, ReportTemplate e os modelos de categoria, caixa, lançamento, recorrência e forma de pagamento do financeiro. Todos esses têm `isDeleted` + `deletedAt`.
 
 **Valor único + soft-delete.** Um `@unique` cheio conta as linhas excluídas e prende o valor para sempre. Há duas saídas:
-- **Índice parcial** `WHERE "isDeleted" = false`, quando o valor deve voltar a ficar livre: CPF de pessoa, inscrição ativa no curso, `UserAdmin.username`, nome da sala, CNPJ de empresa. Vai na migration (não dá para escrever no schema).
+- **Índice parcial** `WHERE "isDeleted" = false`, quando o valor deve voltar a ficar livre: CPF de pessoa, inscrição ativa no curso, `UserAdmin.username`, nome da sala, CNPJ de empresa, nome do modelo de relatório da equipe (por conjunto, sem diferenciar maiúsculas). Vai na migration (não dá para escrever no schema).
 - **Upsert que revive a linha**, quando é o mesmo registro voltando: `UnimedBeneficiario` por pessoa, `UserInstructor`, `CourseInstructor` por (instrutor, curso), forma de pagamento por nome.
 
 Conferência de conflito em use case enxerga só os ativos; sem uma das duas saídas o `create` estoura P2002.
@@ -120,7 +122,7 @@ Conferência de conflito em use case enxerga só os ativos; sem uma das duas sa�
 - `publicRoute()`: qualquer um.
 - `loggedIn()`: qualquer admin com login válido ("Minha conta", o sino, o Painel Geral, `/auth/refresh`, CEP).
 - `requires('X', 'Y')`: todas as permissões listadas (a junção de cadastros pede duas).
-- `requiresFrom(req => [...] | null)`: calculada por params/query, nunca pelo corpo; `null` = só o login. Só a exportação usa (`cadastros` pede duas).
+- `requiresFrom(req => [...] | null)`: calculada por params/query, nunca pelo corpo; `null` = só o login. Só a exportação usa (`cadastros` pede duas), o registro dos documentos do navegador (a permissão do `:kind`) e os modelos de relatório da equipe (a do conjunto, `datasetPermissions`).
 
 Um hook `onRequest`, num plugin que envolve todos os routers (`registerRouters`), confere antes de ler o corpo. As respostas são as mesmas em todas as rotas:
 - sem token ou token inválido → 401 `{ error: "Unauthorized" }`; admin excluído/sem regra → 401 `{ error: "Admin not found" }`; sem a permissão → 403 `{ error: "Forbidden" }`;
@@ -159,6 +161,8 @@ O teste de inventário (`http/__tests__/route-auth-inventory_test.ts`) monta tod
 - **Global:** 600/min. O IP real vem do proxy por `trustProxy` em `index.ts`; a decisão 002 da Arquitetura trata da topologia.
 - **Login e refresh:** 10 a cada 5 min.
 - **`PATCH /admin/me`:** 10 a cada 5 min.
+- **Exportação** (`GET`/`POST /admin/export/:dataset` e `GET /admin/finance/transactions/export`): 30/min, cada rota e método contando separado. O excesso responde 429 `{ error: "Muitas exportações seguidas. Aguarde um minuto e tente de novo." }`. O catálogo não tem limite próprio.
+- **Documentos do navegador** (`POST /admin/export/documents/:kind`): 30/min, contando à parte das exportações → 429 `{ error: "Muitos documentos seguidos. Aguarde um minuto e tente de novo." }`.
 - **Rotas públicas** (`http/lib/public-rate-limit.ts`): inscrição (`register-by-cpf`, `register-full`) e `POST /contacts/message` com 10/min; `POST /users/lookup-cpf` com 20/min.
 - Cada rota conta separado. O excesso nas rotas públicas responde 429 `{ error: "Muitas tentativas seguidas. Aguarde um minuto e tente de novo." }`; no login, a mensagem padrão do plugin.
 - **Por CPF** (`lib/cpf-attempt-limiter.ts`, na memória do processo): 5 erros na última hora para o mesmo CPF, somando a consulta, o `register-by-cpf` e o `register-full`, → 429 "Muitas tentativas com este CPF. Aguarde uma hora ou procure o Sindicato.", até com o par certo. Conta erro também para CPF sem cadastro, para o 429 não revelar quem tem. Ver Inscrições.
@@ -657,42 +661,156 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 - **Produtos:** não se cria nem exclui cotação; os produtos são fixos.
 - **No painel:** a unidade trocada só vai junto do "Salvar cotações", e preço mais de 20% diferente do último pede confirmação.
 
-### Exportação CSV (`export-router.ts`, `usecase/export-data.ts`, `adapter/database/export-adapter.ts`)
+### Exportação e montador de relatórios (`export-router.ts`, `http/lib/export-reply.ts`, `usecase/export-data.ts`, `usecase/export/`, `adapter/database/export-adapter.ts`)
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
-| `GET` · `POST` | `/admin/export/:dataset` | CSV (`;`, BOM, tudo entre aspas, fórmula neutralizada com `'`); POST recebe os parâmetros no corpo (listas como array) | por conjunto |
+| `GET` · `POST` | `/admin/export/:dataset` | CSV (`;`, BOM, tudo entre aspas, fórmula neutralizada com `'`), com `format=xlsx` a planilha do Excel ou, com `format=pdf`, o JSON do PDF; POST recebe os parâmetros no corpo (listas como array); 30/min por IP | por conjunto |
+| `GET` | `/admin/export/:dataset/catalog` | catálogo do montador (abaixo); conjunto sem montador → 404 "Este conjunto ainda não tem o montador." | por conjunto |
+| `POST` | `/admin/export/documents/:kind` | registra na auditoria um PDF montado no navegador → 204 (ver Auditoria, "Documentos montados no navegador"); 30/min por IP | por documento |
+| `GET` · `POST` | `/admin/report-templates/:dataset` | modelos de relatório da equipe do conjunto: listar → 200 · salvar → 201 (ver "Modelos da equipe", abaixo) | por conjunto (salvar: e os campos) |
+| `PATCH` · `DELETE` | `/admin/report-templates/:dataset/:id` | renomear ou mudar → 200 · excluir (soft) → 204 | por conjunto e os campos do modelo |
 
-| Conjunto | Permissão | Filtros |
-|---|---|---|
-| `people` | `READ_USER` | os da lista de pessoas |
-| `companies` | `READ_USER` | search, type, isPartner |
-| `properties` | `READ_USER` | ownerIds |
-| `unimed` | `READ_USER` | search |
-| `admins` | `READ_USER_ADMIN` | search, rulesId |
-| `cadastros` | `READ_USER_ADMIN` **e** `READ_USER` (`alsoRequires`) | nenhum (pessoas, empresas, propriedades e administradores num arquivo) |
-| `courses` | `READ_COURSE` | search, status |
-| `registrations` | `READ_COURSE` | courseIds |
-| `room-bookings` | `READ_COURSE` | from, to, roomId, type, search |
-| `contact-messages` | `READ_CONTACT` | search, read |
-| `audit-logs` | `READ_AUDIT` | os da auditoria; no máximo 20.000 linhas mais recentes |
+| Conjunto | Permissão | Filtros | Montador |
+|---|---|---|---|
+| `people` | `READ_USER` | os da lista de pessoas | sim |
+| `registrations` | `READ_COURSE` | courseIds, `confirmed` (true = só as confirmadas) | sim |
+| `companies` | `READ_USER` | search, type, isPartner | sim |
+| `properties` | `READ_USER` | ownerIds | sim |
+| `unimed` | `READ_USER` | search | sim |
+| `admins` | `READ_USER_ADMIN` | search, rulesId | sim |
+| `cadastros` | `READ_USER_ADMIN` **e** `READ_USER` (`alsoRequires`) | nenhum: o retrato completo, com filtro e seleção ignorados (quatro seções num arquivo: pessoas físicas, associados em dia, pessoas jurídicas e administradores) | não (catálogo 404; `fields` e PDF 400). Desde a SR-102 as seções são o padrão de `people`, `companies` e `admins` do motor (`usecase/export/cadastros.ts`), byte a byte como antes; a linha da auditoria segue "Relatório de cadastros: N registros (todos)", sem `details`. Com `format=xlsx` (SR-104, sem `fields`): uma aba por seção (Pessoas físicas, Associados em dia, Pessoas jurídicas, Administradores) e a aba "Sobre" com as contagens; o alvo termina em " · Excel" |
+| `courses` | `READ_COURSE` | search, status, `view`, `year` (os da lista de cursos) | sim |
+| `room-bookings` | `READ_COURSE` | from, to (AAAA-MM-DD), roomId, type, search (os da Agenda) | sim |
+| `contact-messages` | `READ_CONTACT` | search, read | sim |
+| `audit-logs` | `READ_AUDIT` | action, entity, actorId, ip, from, to, q (os da tela da Auditoria); sem `ids`; no máximo as 20.000 linhas mais recentes | sim |
+| `finance-transactions` | `READ_FINANCE` | from, to, type, categoryId, accountId, method, search e `orderBy` (os da lista de lançamentos, ver Financeiro); sem `ids` | sim |
 
-- **`ids`:** exporta só esses registros; lista vazia → 400. Sem `ids`, vale o mesmo filtro da listagem.
-- **Headers:** `Content-Disposition` (`pessoas-AAAA-MM-DD.csv`, ou `pessoa-<nome>-…` para um registro) e `X-Export-Count`.
+- **`ids`:** exporta só esses registros; lista vazia → 400 "Nenhum registro selecionado"; mais de 5000 → 400 "Selecione no máximo 5000 registros". Sem `ids`, vale o mesmo filtro da listagem.
+- **Headers:** `X-Export-Count` sempre; no CSV e no Excel, também `Content-Disposition` (`pessoas-AAAA-MM-DD.csv` ou `.xlsx`, ou `pessoa-<nome>-…` para um registro).
 - **Datas:** horário de curso e de reserva sai como gravado (`csvWallClock`); "criado em" sai no horário de Brasília (`csvDateTime`).
-- **Auditoria:** cada exportação grava um `AuditLog` `method: 'EXPORT'` (entity "Exportação"). O hook geral ignora `/admin/export/*`.
+- **Auditoria:** cada exportação grava um `AuditLog` `method: 'EXPORT'` (entity "Exportação"), inclusive o CSV do Financeiro pela rota antiga (com `path` `/admin/finance/transactions/export`, desde a SR-102). O hook geral ignora `/admin/export/*`. A resposta e a linha saem de `replyWithExport` (`http/lib/export-reply.ts`), o mesmo para as duas rotas. Nos conjuntos com montador, o `targetLabel` diz o formato (CSV, PDF ou Excel) e cita os campos pessoais e sensíveis, documentos primeiro, até 5 ("Pessoas: 123 registros (com filtros) · PDF · com CPF, Nascimento e mais 2"): a busca da Auditoria por "CPF" acha quem exportou CPF. **Com 0 linhas o alvo não cita campo nenhum** ("Empresas: 0 registros (seleção) · CSV", SR-112): nenhum dado pessoal saiu; os campos escolhidos continuam em `details.campos`. Erro não deixa linha.
+- **Contagens com milhar** (SR-112, `milhar`/`registros` de `usecase/export/format.ts`): o texto diz "1.234 registros", como as telas, no alvo (exportações, relatório de cadastros e documentos do navegador), na "Seleção: 1.234 registros" (PDF e `details.filtros`), nas quantidades "Cursos: 1.001" e "Donos: 1.500" e no "Linhas: 1.234" da coluna "Detalhes da exportação". `details.linhas` e `X-Export-Count` continuam número. Ano, Nº e o resto não passam por isso.
+
+**Montador de relatórios** (decisão 006: fase 1 em `people` e `registrations`; fase 2, parte A, em `companies`, `properties`, `admins`, `courses`, `contact-messages` e `unimed`; parte B, em `audit-logs`, `room-bookings` e na fonte nova `finance-transactions`). O back é o único lugar que define colunas, formatos e permissões; o front lê o catálogo. Toda lista exportável tem montador: as fontes estão em `usecase/export/catalog/index.ts`. Só o relatório de cadastros não tem (`usecase/export/cadastros.ts`). O caminho antigo, com colunas fixas, não existe mais (SR-102): `usecase/export-data.ts` é só a entrada (`ExportDataUseCase`), que manda cada conjunto para o motor (`usecase/export/engine.ts`) ou para o relatório de cadastros.
+
+Parâmetros (query no GET, corpo no POST), além dos filtros do conjunto:
+
+| Parâmetro | Regra |
+|---|---|
+| `fields` | chaves do catálogo **na ordem das colunas** (GET `a,b,c`; POST array); de 1 a 80, sem repetir. **Ausente = o padrão de hoje, byte a byte** (teste de ouro) |
+| `format` | `csv` (padrão), `xlsx` ou `pdf` |
+| `modelo` | id ou nome do modelo usado (até 64). Só vai para a auditoria e o cabeçalho do PDF; o id de fábrica vira o nome ("nome-cpf" → "Nome e CPF") |
+| `confirmed` | só em `registrations`: true = só as inscrições confirmadas |
+
+- **CSV:** como sempre. Com `fields`, o telefone e o CNS saem com máscara ("(44) 99999-8888", "123 4567 8901 2345", para o Excel não virar "4,5E+10"); **sem `fields` eles saem como gravados**, como sempre saíram. É a única diferença entre "sem `fields`" e "`fields` = o padrão".
+- **Excel** (`format=xlsx`, SR-104): `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `Content-Disposition` com `.xlsx` e `X-Export-Count`; o mesmo limite do CSV (20.000). Gerado no back sem biblioteca (`lib/xlsx.ts`: OOXML mínimo num ZIP do `node:zlib`; o `write-excel-file` levou 10 s e 330 MB em 20.000 × 80, este 1,5 s). Não use o `xlsx` (SheetJS) do npm.
+  - **Aba dos dados** (o título do conjunto, ex.: "Pessoas"): linha 1 = cabeçalho em negrito e preso (`pane` frozen), uma coluna por campo, largura pelo maior entre o cabeçalho e o conteúdo (de 8 a 60 caracteres; `blank` pelo menos 30). Sem linhas acima do cabeçalho, para ordenar, filtrar e montar tabela dinâmica direto.
+  - **Aba "Sobre":** Relatório, Gerado em (Brasília), Registros, Escopo ("Selecionados", "Todos com os filtros", "Todos"), Filtros (só com filtro), Modelo (só com modelo) e Campos.
+  - **Célula pelo tipo do catálogo** (`usecase/export/xlsx.ts`): `number` → número; `money` → número com `"R$" #,##0.00`; `date` → data dd/mm/aaaa; `datetime` → data e hora no horário de Brasília; `wallclock` → data e hora como gravada; `blank` → vazia; o resto (`text`, `list`, `boolean` "Sim/Não", `cpf`, `cnpj`, `cep`, `phone`, `cns`) → **texto**, com o mesmo conteúdo do CSV (sem `fields`, telefone e CNS como gravados). Data antes de 01/03/1900 vai como texto; texto acima de 32.767 caracteres é cortado (limite do Excel).
+  - **Fórmula:** toda célula de texto é `inlineStr` com o formato "@", nunca `<f>`, e sem o `'` do CSV: "=HYPERLINK(…)", "+55 44…", "@SUM(…)" e "-1+1" aparecem como escritos e não executam. Caractere de controle que o XML não aceita é tirado.
+  - A rota antiga do Financeiro (`GET /admin/finance/transactions/export`) continua só CSV.
+  - Testes: `lib/__tests__/xlsx_test.ts`, `usecase/__tests__/export-xlsx_test.ts` e `e2e/export-xlsx.e2e_test.ts`, que abrem o arquivo com o leitor de teste `lib/__tests__/xlsx-reader.ts` (descompacta, confere o CRC e lê as células).
+- **PDF:** `application/json` `{ title, filename (….pdf), count, filters, modelo, columns: [{ key, label, type, weight }], rows: string[][] }`. `filters` = os filtros em palavras ("Busca: silva · Só associados em dia"; "Seleção: 8 registros"; "" sem filtro); `modelo` = o nome, "Padrão (como hoje)" sem `fields`, ou null; `weight` = largura relativa; as células chegam formatadas como no CSV, **sem** o `'` contra fórmula (PDF não executa nada).
+- **Filtro de lista fixa em palavras** (PDF e `details.filtros`): sai pelo rótulo das telas, não pelo valor gravado: "Sexo: Masculino", "Etnia: Parda", "Escolaridade: Fundamental incompleto", "Tipo de membro: Produtor rural" (`lib/export-labels.ts`; tipo de membro desde a SR-095). Valor fora da lista sai como veio. Busca e classificação são texto livre e saem como digitadas. A coluna "Tipo de membro" continua saindo como gravada ("PRODUTOR RURAL"), no CSV e no PDF.
+- **Filtro de cursos em palavras** (PDF e `details.filtros`): até 3 cursos sai pelo nome, "Curso: HORTA" ou "Cursos: HORTA, CURSO B", também quando o curso não deu nenhuma linha (ex.: "Só confirmadas" sem nenhuma confirmada; o nome vem pelo id, `courseNames` do port, SR-093). Mais de 3, curso não achado ou dois com o mesmo nome → a quantidade, "Cursos: 4".
+- **Erros 400:** "Escolha pelo menos um campo.", "Campo desconhecido: <chave>.", "Campo repetido: <rótulo>.", "No máximo 80 campos por relatório.", "Formato inválido: use csv, pdf ou xlsx.", "Parâmetro inválido: modelo" (mais de 64), "O relatório passa de 20.000 linhas. Use um filtro para diminuir.", "O PDF aceita até 2.000 linhas. Baixe a planilha ou use um filtro.". `fields` ou `format=pdf` num conjunto sem montador → 400 "Este conjunto ainda não tem o montador.".
+- **Erro 403 por campo** (`ForbiddenError` no use case, porque depende do pedido): "Sem permissão para exportar: RG, Endereço: Cidade.". Continua o 403 `Forbidden` da rota quando falta a permissão do conjunto.
+- **Limites:** 20.000 linhas no CSV e no Excel (o adapter lê no máximo 20.001), 2.000 no PDF, 80 campos, 5000 `ids`, 30 exportações por minuto por IP.
+
+**Catálogo** (`GET /admin/export/:dataset/catalog`, `usecase/export/get-export-catalog.ts`):
+`{ dataset, title, groups: [{ name, fields: [{ key, label, type, privacy, allowed, reason }] }], padrao: string[], modelos: [{ id, name, fields, confirmed? }], filterLabels: { filtro: nome }, limits: { rows, pdfRows, fields } }`.
+- `type`: `text`, `number`, `money`, `boolean`, `list`, `date` (dd/mm/aaaa), `datetime` (Brasília), `wallclock` (como gravado), `cpf`, `cnpj`, `cep`, `phone`, `cns` (com máscara), `blank` (coluna em branco). O tipo formata; o campo só devolve o valor cru.
+- `privacy`: `comum`, `pessoal` ou `sensivel`. É informação (etiqueta no montador e texto da auditoria), não bloqueio.
+- Campo que pede permissão além da do conjunto vem com `allowed: false` e `reason` "Pede a permissão Visualizar usuários"; o montador o mostra desligado.
+- `padrao` são as colunas de hoje; `modelos` são os de fábrica (o Padrão não está na lista). `confirmed: true` só no "Lista de presença" das inscrições.
+- Grupos de `people`, na ordem: Identificação, Documentos, Contato, Endereço, Associado, Vínculos, Sistema, Relatório. Em `registrations`, "Inscrição" vem antes. Em `companies`: Empresa, Contato, Sede, Vínculos, Parceria, Sistema, Relatório. Em `properties`: Propriedade, Dono, Endereço, Sistema, Relatório. Em `admins`, "Acesso" vem antes dos grupos da pessoa. Em `courses`: Curso, Datas, Sala, Vagas e inscrições, Sistema, Relatório. Em `contact-messages`: Mensagem, Quem mandou, Relatório. Em `audit-logs`: Registro, De onde veio, Detalhes, Relatório. Em `room-bookings`: Reserva, Quando e onde, Responsável, No site, Relatório. Em `finance-transactions`: Lançamento, Valores, Favorecido, Nota de Empenho, Sistema, Relatório. Em `unimed`, "Plano Unimed", "Documentos" (matrícula e CNS, junto com os da pessoa), "Titular e dependência" e "Ficha da Unimed" vêm antes dos grupos da pessoa.
+
+**Campos** (`usecase/export/catalog/`; pessoa em `person-fields.ts`, escritos uma vez e reaproveitados com `from`):
+- **Pessoa:** `name`, `nickname`, `birthDate`, `age` (Idade), `gender`, `maritalStatus`, `nationality`, `birthPlace`, `ethnicity`, `educationLevel`, `specialNeeds` · documentos `cpf`, `rg`, `rgIssuer`, `rgIssuedAt`, `driverLicense`, `driverLicenseCategory`, `cadPro` · contato `email`, `phone`, `phone2`, `phone3` · endereço da propriedade principal `primaryProperty`, `addressType`, `addressStreet`, `addressNumber`, `addressComplement`, `addressNeighborhood`, `addressLocality`, `addressRoad`, `addressKm`, `addressLot`, `addressSection`, `addressCity`, `addressState`, `addressZipCode`, `addressLine` (Endereço numa linha), `properties` (Todas as propriedades) · associado `memberType`, `memberClassification`, `functionalCategory`, `familyIncome`, `memberStatus`, `activeMember`, `memberSince`, `membershipValidUntil`, `memberNotesNumber`, `memberNotes`, `boardMember`, `boardPosition` · vínculos `companies`, `partnerCompanies` (Empresa parceira), `relations`, `instructor`, `adminUsername`, `unimedPlan`, `publicContact`, `registrationsCount` · sistema `createdAt`, `updatedAt`.
+- **Inscrição:** `course`, `eventNumber`, `courseStart`, `confirmed`, `attendance` (Presença), `hasFicha`, `registeredAt` (Inscrito em), mais os de pessoa.
+- **Empresa** (`companies`): `name` (Razão social), `tradeName`, `cnpj`, `stateRegistration`, `type` · contato `email`, `phone`, `phone2`, `phone3`, `website` · sede `addressType` … `addressZipCode` (as mesmas chaves do endereço da pessoa, com o rótulo "Sede: …") e `addressLine` (Sede numa linha) · `members` (Pessoas vinculadas), `properties` · `isPartner`, `partnerUrl` · `notes`, `createdAt`, `updatedAt`. Pessoais: o contato (e-mail e telefones) e as pessoas vinculadas; a empresa em si é `comum`. Filtros em palavras: "Tipo: Pública", "Só parceiras" (false: "Só não parceiras").
+- **Propriedade** (`properties`): `name` (Propriedade), `registration`, `isPrimary` (Principal) · dono `ownerKind` (Dono: Pessoa/Empresa), `ownerName`, `ownerDocument` (CPF/CNPJ: uma coluna só, já com a máscara do documento do dono) · endereço `addressType` … `addressZipCode` (rótulos sem prefixo, "Rua", "CEP"), `addressLine`, `addressNotes` · `createdAt`. Pessoais: o CPF/CNPJ do dono e o endereço. Filtro em palavras: "Dono: JOÃO" ou "Donos: JOÃO, AGRO" pelos nomes das linhas; mais de 3 donos, ou dono sem nenhuma propriedade, → "Donos: 4".
+- **Administrador** (`admins`): `username` (Usuário), `rule` (Regra de acesso), `adminCreatedAt` (Criado em: o do acesso ao painel), mais os de pessoa, sem `adminUsername` (repetiria o Usuário). Filtro em palavras: "Regra de acesso: SECRETARIA" (o nome vem das linhas ou, sem linha, pelo id: `ruleName` do port).
+- **Curso** (`courses`): `name` (Curso), `eventNumber`, `status`, `instructors`, `description`, `observations` · `startTime`, `endTime`, `registrationDeadline` (horário de parede), `workloadHours` · `room`, `roomCapacity` · `price`, `minStudents`, `enrolled` (Inscritos), `confirmedCount` (Confirmados), `preEnrolled`, `waitlist` · `createdAt`. Nada pessoal. **Filtros `view` e `year`** (SR-100), os mesmos de `GET /admin/courses`: `view=upcoming` (Próximos) ou `stored` (Armazenados, do início mais recente para o mais antigo, como a aba), cortados pelo dia de hoje em Brasília (`viewFilters`); `year` de 1990 a 2100. Sem `view`, a ordem de sempre (do início mais cedo). Aba inválida → 400 "Filtro inválido"; ano inválido → 400 "Ano inválido: use de 1990 a 2100". Em palavras: "Aba: Armazenados · Busca: horta · Ano: 2026 · Status: Concluído".
+- **Mensagem de contato** (`contact-messages`): `receivedAt` (Recebida em), `subject`, `message`, `read` (Lida) · quem mandou `name`, `email`, `phone`. Pessoais: o e-mail, o telefone e o texto da mensagem (texto livre). Filtros em palavras: "Só lidas" (false: "Só não lidas").
+- **Unimed** (`unimed`): `plano`, `dataAdesao`, `tipoMovimento`, `motivo`, `obs` (Observações), `unimedCreatedAt` (Cadastrado em: o do cadastro na Unimed) · `matricula`, `cns` · `titular`, `tipoDependente`, `grauDependencia` · `nomeMae`, `profissao`, `empresa`, `contratante`, mais os de pessoa, todos só com `READ_USER`. Sem `unimedPlan` (repetiria o Plano); rótulos de pessoa trocados nesta fonte para não colidir (a chave não muda): `memberNotes` "Observações do associado", `createdAt` "Pessoa cadastrada em", `updatedAt` "Pessoa atualizada em". Privacidade: `plano` e `cns` sensíveis (saúde), `nomeMae` e `matricula` pessoais. `personFields` aceita `exclude` e `labels` para isso.
+- **Auditoria** (`audit-logs`, SR-102): `createdAt` (Data e hora), `actor` (Quem), `action` (Ação: a frase da tela, sem o alvo), `entity` (Área), `target` (Alvo), `path` (Caminho) · de onde veio `ip`, `location` (Local), `device` (Aparelho) · `changes` (Alterações) e `exportDetails` (**Detalhes da exportação**: o `details` numa célula, "Formato: PDF; Modelo: Nome e CPF; Campos: Nome, CPF; Escopo: com filtros; Filtros: Busca: silva; Linhas: 3", vazia nas outras linhas; campo novo, **fora do padrão**). Pessoais: IP, local e aparelho. Filtros em palavras: "Ação: Exportações" (os nomes do filtro da tela), "Tipo: Usuário" (o nome do filtro na tela, desde a SR-107; a coluna continua "Área"), "Quem: bali" (o usuário vem das linhas ou, sem linha, pelo id: `adminUsername` do port), "IP: …", "Período: 01/01/2026 a 31/01/2026" ("Dia: …" quando início = fim; "De: …"/"Até: …" com uma ponta só) e "Busca: …". Sem seleção (`ids` é ignorado). O adapter lê no máximo as 20.000 linhas mais recentes (`AUDIT_EXPORT_LIMIT`), então a auditoria nunca dá o 400 de "passa de 20.000 linhas"; o PDF continua com o limite de 2.000.
+- **Reserva de sala** (`room-bookings`, SR-102): `type` (Tipo: Evento/Reunião), `title`, `description` (Descrição: a observação interna), `series` (Série) · `room` (Sala), `startTime`, `endTime` (horário de parede) · `responsible` (Responsável: a pessoa cadastrada ou, sem ela, o nome digitado) · no site `publicOnSite` (No site), `publicDescription` (Texto no site). Pessoal: o responsável. Os cursos não entram, como sempre. Filtros em palavras: o período ("Período: 05/10/2026 a 11/10/2026", "Dia: …", "De: …", "Até: …"), "Sala: AUDITORIO" (o nome vem das linhas ou, sem linha, pelo id: `roomName` do port), "Tipo: Evento" e "Busca: …".
+- **Lançamento do Financeiro** (`finance-transactions`, SR-102, fonte nova): o padrão são as 13 colunas de `GET /admin/finance/transactions/export`, byte a byte: `number` (Nº), `date`, `type` (Entrada/Saída/Nota), `account` (Caixa), `category`, `description`, `payeeName` (Nome / Razão social: a razão social do empenho ou, sem ela, o nome fantasia), `payeeDocument` (CNPJ / CPF, **como digitado na nota**, sem máscara, como sempre saiu), `previousNumber` (Nº anterior), `method`, `recurring`, `amount` (Valor (R$)), `notes`. Fora do padrão: `transfer` (Transferência), `discount` (Desconto (R$), do `descontoCents`), os dados da Nota de Empenho `payeeCompanyName` (Razão social), `payeeTradeName`, `payeeStateRegistration`, `payeePhone` (com máscara), `payeeAddress`, `payeeNeighborhood`, `payeeCity`, `payeeState`, `payeeZipCode` (com máscara), `invoiceNumber` (Nota fiscal), `bank`, `bankAgency`, `bankAccount`, `checkNumber` (Cheque), e `attachments` (Comprovantes: quantos), `createdAt` (Lançado em). Pessoais: o CNPJ/CPF, a inscrição estadual, o telefone, o endereço e o banco do favorecido; o nome é `comum`. Os filtros são o `financeFiltersSchema` da lista, com a mesma mensagem: filtro inválido → 400 "Parâmetro inválido: <campo>" (`filterMessage` da fonte); `to` inclui o dia inteiro. A consulta é a da lista (`listTransactionsForExport` do adapter do Financeiro, que o adapter de exportação chama), com o `take` do motor. `orderBy` só ordena: não faz a exportação ser "com filtros" (`sortKeys`). Filtros em palavras: o período, "Tipo: Saída", "Categoria: INSUMOS" e "Caixa: BANCO" (das linhas ou, sem linha, pelo id: `financeNames` do port), "Forma de pagamento: …" (o filtro "Forma" da tela, desde a SR-107; a coluna continua "Método"), "Busca: …" e "Ordem: Nº" (a ordem por data, a de sempre, não aparece). O arquivo é `lancamentos-AAAA-MM-DD.csv`.
+- **Todo relatório:** `ordinal` (Nº de ordem: 1, 2, 3…) e `signature` (Assinatura, em branco e larga).
+- **Largura no PDF (`weight`):** a do campo ou, sem ela, a do tipo (`TYPE_WEIGHT` em `engine.ts`; texto 2, número e sim/não 1). Campos curtos têm a sua (SR-093): `ordinal` 1,5 (o rótulo "Nº de ordem" cabe numa linha na Lista de presença e em até 8 colunas), `addressState` 1, `addressNumber`/`addressKm`/`addressLot`/`addressSection` 1,25 e `confirmed` 1,25. Mudar largura não mexe no CSV.
+- **Permissão por campo em `registrations`:** os campos de pessoa que já saíam (`name`, `cpf`, `email`, `phone`, `birthDate`, `age`, `activeMember`, `partnerCompanies`, `boardPosition`, `publicContact`) pedem só `READ_COURSE`; o resto da pessoa pede também `READ_USER`. **Em `admins`**, a mesma regra: `name`, `email`, `cpf` e `phone` (os de hoje) pedem só `READ_USER_ADMIN`; o resto da pessoa pede também `READ_USER`. Em `people`, `companies`, `properties` e `unimed`, tudo sai com `READ_USER`.
+- **Modelos de fábrica:** `people`: `nome-cpf`, `nome-email`, `contato` (nome, telefones, e-mail, cidade), `lista-presenca` (Nº, nome, CPF, assinatura), `endereco-correspondencia` (nome, rua, número, complemento, bairro, cidade, UF, CEP), `associados` (nome, CPF, situação, desde, até, telefone). `registrations`: `nome-cpf`, `nome-email`, `contato` (nome, telefone, e-mail), `lista-presenca` (com `confirmed: true`). `companies`: `razao-social-cnpj`, `contato` (razão social, nome fantasia, telefones, e-mail, cidade da sede). `properties`: só o Padrão. `admins`: `contato` (nome, telefone, e-mail). `courses`: `calendario` (curso, início, término, sala, instrutores). `contact-messages`: `contato` (nome, e-mail, telefone). `unimed`: `nome-cpf-plano`. `audit-logs`: `resumida` (data e hora, quem, ação, alvo). `room-bookings`: só o Padrão. `finance-transactions`: `resumido` (Nº, data, descrição, nome / razão social, valor).
+- **Regra:** coluna exportável nova = um campo no catálogo, que aparece sozinho no montador, no CSV e no PDF. **A chave é contrato: nunca se renomeia nem se reaproveita.** O `export-builder_test.ts` confere chaves e rótulos únicos, e que o padrão e os modelos só usam chaves do catálogo sem permissão a mais. O padrão de cada fonte fica congelado pelo teste de ouro (`export-golden_test.ts` e `export-golden.e2e_test.ts`; as fontes da fase 2 em `export-golden-fase2_test.ts` e `export-golden-fase2.e2e_test.ts`, as da parte B, o CSV da rota antiga do Financeiro e o relatório de cadastros em `export-golden-fase2b_test.ts` e `export-golden-fase2b.e2e_test.ts`), escrito antes de a fonte sair do caminho antigo. Os testes do montador das fontes da parte B estão em `export-builder-fase2b_test.ts` e `export-builder-fase2b.e2e_test.ts`.
+- **Inscrições, administradores e Unimed leem a pessoa inteira** (o mesmo `include` de `people`, `personInclude` no adapter): os vínculos com empresa vêm todos, pelo nome da empresa, e "Empresa parceira" filtra as parceiras.
+
+**Modelos da equipe** (decisão 006, fase 3, SR-114; `usecase/export/report-templates.ts`, `http/router/report-template-router.ts`, tabela `ReportTemplate`). Os modelos que a equipe salva no montador. São **da equipe toda**, não de uma pessoa (decisão do usuário em 11/11). Os de fábrica continuam no catálogo; os da equipe têm rota própria, e não um grupo no catálogo, porque o catálogo é fixo (o painel o guarda por muito tempo) e os modelos mudam a cada salvar.
+- **Caminho** fora de `/admin/export/` (como a decisão pede): lá o hook geral da auditoria não grava nada e vale o limite de 30 exportações por minuto.
+- **O modelo** (resposta de todas as rotas): `{ id, dataset, name, fields: string[], missingFields: string[], format, confirmed, createdAt, updatedAt, createdBy: { id, username }, updatedBy: { id, username } | null }`.
+  - `fields`: só as chaves que ainda existem no catálogo, na ordem das colunas. `missingFields`: as gravadas que **saíram do catálogo** (`[]` quando nenhuma), para o montador avisar. A linha gravada não muda.
+  - Campo que quem lista **não pode exportar** vem em `fields` do mesmo jeito: o catálogo diz quais (`allowed: false`), e o montador os tira e avisa.
+  - `format`: `csv`, `pdf`, `xlsx` ou null (sem preferência). `confirmed`: só em `registrations` ("Só confirmadas"; ao criar, ausente = false), null nos outros.
+  - `createdBy`/`updatedBy`: o usuário do painel (`username`, null se o admin não for achado); `updatedBy` é null enquanto ninguém mudou. Quem exclui também fica em `updatedById`.
+- **Rotas:**
+  - `GET /admin/report-templates/:dataset` → 200 com a lista (array), pelo nome; sem modelo, `[]`.
+  - `POST /admin/report-templates/:dataset` `{ name, fields, format?, confirmed? }` → 201 com o modelo.
+  - `PATCH /admin/report-templates/:dataset/:id` `{ name?, fields?, format?, confirmed? }` → 200 com o modelo. Muda só o que vier; `format: null` tira a preferência.
+  - `DELETE /admin/report-templates/:dataset/:id` → 204, soft-delete: o modelo sai da lista e o nome fica livre de novo.
+- **Validação.** O `name` perde os espaços das pontas, os do meio são juntados e caractere de controle vira espaço; depois tem de ter de 1 a 64 caracteres (o limite do `modelo` da exportação, que leva o nome). Os campos passam pela mesma leitura da exportação.
+  - 400: "Informe o nome do modelo.", "O nome do modelo pode ter até 64 caracteres.", "Escolha pelo menos um campo.", "No máximo 80 campos por relatório.", "Campo desconhecido: <chave>.", "Campo repetido: <rótulo>.", "Formato inválido: use csv, pdf ou xlsx.", "Nada para alterar." (PATCH sem nada a mudar; `confirmed` fora de `registrations` é ignorado). Conjunto desconhecido → 400 do schema.
+  - 404: "Este conjunto ainda não tem o montador." (`cadastros`, como o catálogo); "Modelo não encontrado." (inexistente, excluído ou de outro conjunto).
+  - 409: "Já existe um modelo da equipe com esse nome." (no mesmo conjunto, entre os ativos, sem diferenciar maiúsculas; dois pedidos ao mesmo tempo, o índice parcial segura e a resposta é a mesma); "Já existe um modelo de fábrica com esse nome." (nome ou id de um modelo de fábrica do conjunto, ou o Padrão: a exportação troca o id de fábrica pelo nome, e o `modelo` da auditoria ficaria ambíguo); "Este relatório já tem 100 modelos da equipe. Exclua um antes de salvar outro." (só ao criar; a lista não é paginada).
+- **Permissão.**
+  - Ver, usar e salvar: a permissão de exportar o conjunto (`requiresFrom`, a mesma da exportação). Sem ela, 403 `Forbidden`.
+  - Salvar, e mudar os campos, pede também poder exportar **todos** os campos do modelo. Senão, 403 "Sem permissão para exportar: RG, Endereço: Cidade.", como na exportação.
+  - Mudar (até só renomear) e excluir pedem poder exportar todos os campos do modelo **como ele está**. Senão, 403 "Este modelo tem campos que você não pode exportar: RG.". Quem tem menos permissão não desfaz o modelo de quem tem mais, a mesma ideia do anti-escalonamento das regras. Campo que saiu do catálogo não conta.
+  - Hoje só `registrations` e `admins` têm campos com permissão própria; nos outros conjuntos, a do conjunto basta.
+- **Exportar com um modelo da equipe:** o painel manda as chaves em `fields` e o **nome** em `modelo`. O nome vai para o cabeçalho do PDF, para a aba "Sobre" do Excel e para `details.modelo`. Não há rota nova de exportação.
+- Testes: `usecase/__tests__/report-templates_test.ts` e `e2e/report-templates.e2e_test.ts`.
 
 ### Auditoria (`audit-router.ts`, `http/audit-hooks.ts`)
 | Método | Path | O que faz | Auth |
 |---|---|---|---|
-| `GET` | `/admin/audit-logs` | paginada; filtros `action` (create, edit, delete, export, login, login_failed), `entity`, `actorId`, `ip`, `from`, `to`, `q`; cada linha traz `summary`, `ip`, `location`, `device`, `userAgent`, `changes` | `READ_AUDIT` |
+| `GET` | `/admin/audit-logs` | paginada; filtros `action` (create, edit, delete, export, login, login_failed), `entity`, `actorId`, `ip`, `from`, `to`, `q` (no `targetLabel` e no caminho); cada linha traz `summary`, `ip`, `location`, `device`, `userAgent`, `changes`, `details` | `READ_AUDIT` |
 | `GET` | `/admin/audit-settings` | `{ retentionDays, options, oldestAt, total }` | `READ_AUDIT` |
 | `PATCH` | `/admin/audit-settings` | `{ retentionDays }` (0 = para sempre, ou 30–3650); limpa na hora → `deleted` | `UPDATE_AUDIT` |
 
 **O que é gravado:**
 - O hook grava toda mutação com sucesso: método, caminho, `entity` (`deriveAuditEntity`) e `targetLabel` (nome do alvo).
-- Fica fora (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (que grava a própria linha), `/admin/notifications/read`, `/users/lookup-cpf` (consulta, não grava) e `/auth/login` (que tem registro próprio).
+- Fica fora (`skipAudit` em `lib/audit-entity.ts`): `/auth/refresh`, `/invites/*`, `/admin/export/*` (que grava a própria linha, inclusive a dos documentos do navegador), `/admin/notifications/read`, `/users/lookup-cpf` (consulta, não grava) e `/auth/login` (que tem registro próprio).
+- **A rota pode decidir** (`skipAuditLine` e `setAuditLabel`, em `http/audit-hooks.ts`): chamada que não mudou nada não deixa linha, e a que mudou diz o que fez no `targetLabel`. Quem usa: `POST /admin/finance/recurrences/generate` (ver Financeiro) e os modelos de relatório da equipe (abaixo).
+
+**Modelos de relatório da equipe** (SR-114, ver Exportação, "Modelos da equipe"). Criar, mudar e excluir entram pelo hook geral; listar e pedido com erro não deixam linha.
+- **Entidade "Modelo de relatório"**: `deriveAuditEntity` a reconhece antes de todas, porque o conjunto vai no caminho (`/admin/report-templates/registrations/…` cairia em Inscrição, `…/companies` em Empresa).
+- **Alvo** (`setAuditLabel` na rota): "<relatório>: <nome>", ex.: "Pessoas: Só os nomes". Ao renomear, com o nome antigo: "Pessoas: Telefones da equipe (antes Contatos)".
+- **Frases:** `Criou o modelo de relatório "Pessoas: Só os nomes"`, `Editou o modelo de relatório "…"`, `Excluiu o modelo de relatório "…"`.
+- **O que mudou** (`changes`, no PATCH e no DELETE): `name`, `fields` (pelos rótulos do catálogo, "Nome, CPF"; a chave, se saiu dele), `format` ("CSV", "PDF", "Excel") e, nas inscrições, `onlyConfirmed`. Na planilha, "Nome", "Campos", "Formato" e "Só confirmadas" (`AUDIT_FIELD_LABELS`). A leitura de antes e depois é `reportTemplateAuditSnapshot`, ligada em `lib/audit-snapshot.ts` por padrão de caminho, porque o conjunto varia.
 
 **Login:** 2xx → `LOGIN`; 401 → `LOGIN_FAILED`; 429 → `LOGIN_BLOCKED`; `targetLabel` = usuário digitado. A senha nunca é lida.
+
+**Documentos montados no navegador** (SR-104, decisão 006, item 7.5; `lib/browser-documents.ts`, `usecase/export/browser-document.ts`, rota em `export-router.ts`). Os PDFs que o painel desenha sozinho não passam pela API; para ficarem na trilha, o painel chama, **ao gerar o documento**, `POST /admin/export/documents/:kind`. Não é barreira (quem tem a permissão lê os dados de outro jeito), é trilha.
+- **`:kind`** (lista fechada; **o tipo é contrato**, não se renomeia), com o nome e a permissão do documento:
+
+  | kind | documento | permissão | dados citados no alvo |
+  |---|---|---|---|
+  | `lista-presenca` | Lista de presença | `READ_COURSE` | CPF |
+  | `ficha-inscricao` | Ficha de inscrição (uma ou todas) | `READ_COURSE` e `READ_USER` | CPF, Nascimento, Telefone, E-mail, Endereço, Etnia, Renda familiar |
+  | `agenda` | Agenda (Painel Geral › Imprimir) | `READ_COURSE` | Responsável |
+  | `financeiro` | Relatório do Financeiro ("Baixar PDF") | `READ_FINANCE` | — |
+  | `relatorio-despesas` | Relatório de despesas | `READ_FINANCE` | — |
+  | `nota-empenho` | Nota de Empenho | `READ_FINANCE` | CNPJ / CPF, Endereço, Telefone, Banco |
+  | `recibo` | Recibo | `READ_FINANCE` | — |
+  | `unimed-ficha` | Ficha da Unimed | `READ_USER` | CPF, RG, CNS, Nascimento, Nome da mãe, Plano |
+  | `unimed-termo-adesao` | Termo de adesão da Unimed | `READ_USER` | CPF, RG, Endereço, Plano |
+  | `unimed-contrato` | Contrato da Unimed | `READ_USER` | CPF, RG, Telefone, Plano |
+  | `relatorio-cadastros` | Relatório de cadastros em PDF (montado do CSV de `/admin/export/cadastros`) | `READ_USER_ADMIN` e `READ_USER` | CPF, RG, Nascimento, Telefone, Endereço, Etnia |
+- **Corpo** (JSON): `linhas` (obrigatório, inteiro de 0 a 100.000: quantos registros o documento tem); `alvo` (opcional, até 120: o que o documento cobre em palavras, ex.: o curso, a pessoa, o período, "Nº 123 · COOP LTDA"); `ids` (opcional, 1 a 1000 textos de até 64: os registros do documento, ex.: o curso, as inscrições, o lançamento, o beneficiário); `escopo` (opcional: `seleção`, `com filtros` ou `todos`; sem ele, `seleção` com `ids`, senão `todos`).
+- **Resposta:** 204, sem corpo. Erros: tipo desconhecido → 400 `Valor não aceito em "kind".` (antes da permissão, como o conjunto desconhecido da exportação); corpo inválido → 400 do Ajv (`Informe o campo "linhas".`, `Valor menor que o mínimo em "linhas": 0.`, `Lista curta demais em "ids": mínimo de 1 itens.`, `Texto longo demais em "alvo": máximo de 120 caracteres.`, `Valor não aceito em "escopo".`); sem a permissão do documento → 403 `Forbidden`; sem token → 401; 30/min por IP → 429. Erro não deixa linha; falha ao gravar a linha → 500 (aqui a linha é o serviço).
+- **A linha:** `method: 'EXPORT'`, `entity: 'Exportação'`, `path: '/admin/export/documents/<kind>'` (o hook geral não grava outra), `statusCode: 204` (o que a rota responde, como o hook grava nas outras rotas; até a SR-112 gravava 200; as exportações gravam 200), IP, aparelho e local como nas outras. `targetLabel` = "<documento>[: <alvo>] · N registro(s)[ · com <dados citados, até 5, depois "e mais N">]", ex.: "Lista de presença: HORTA · 12 registros · com CPF"; com `linhas` 0 não cita nada ("Agenda: 05/10/2026 a 11/10/2026 · 0 registros", SR-112). `details` no formato da exportação, sem campos: `{ formato: 'pdf', modelo: <nome do documento>, campos: [], escopo, filtros: [], linhas, documento: <kind>, alvo?, ids? }`. Entra no filtro "Exportações" (`action=export`) e na busca pelo alvo.
+- **Frase:** `Gerou o documento "Lista de presença: HORTA · 12 registros · com CPF"`; sem o alvo (coluna "Ação" da planilha da auditoria), `Gerou o documento "Lista de presença"`. "Detalhes da exportação": "Formato: PDF; Modelo: Lista de presença; Escopo: seleção; Linhas: 12".
+- Testes: `usecase/__tests__/browser-document_test.ts` e `e2e/export-documents.e2e_test.ts`.
+
+**O que foi exportado** (`details`, decisão 006): nas exportações das fontes com montador de relatórios (com ou sem `fields`), `{ formato: 'csv'|'pdf'|'xlsx', modelo: string|null, campos: [rótulos, na ordem], escopo: 'seleção'|'com filtros'|'todos', filtros: [{ nome, valor }], linhas }`. Nas outras linhas (e no relatório de cadastros, que não tem montador), `null`. O painel mostra no bloco "O que foi exportado" da linha; a planilha da auditoria tem o campo "Detalhes da exportação" (fora do padrão) com o mesmo conteúdo numa célula.
 
 **De onde veio:**
 - `ip`, `userAgent` (até 300 caracteres) e `location` "Cidade, UF, País".
@@ -706,6 +824,7 @@ Eventos e reuniões que ocupam as salas, além dos cursos.
 
 **Frase** (`summary`, `lib/audit-sentence.ts`):
 - Rota especial por método + caminho (`SPECIAL`); as demais viram verbo + entidade com artigo pelo gênero.
+- **Exportação:** em CSV, `Exportou a planilha "Pessoas: 3 registros (todos) · CSV"`; com `details.formato` `pdf` (SR-093), `Exportou o relatório em PDF "Pessoas: 4 registros (com filtros) · PDF · com CPF"`; com `xlsx` (SR-104), `Exportou a planilha do Excel "Pessoas: 3 registros (todos) · Excel"`. Linha antiga ou fonte sem montador (`details` null) segue planilha. A coluna "Ação" da planilha da auditoria usa a mesma frase sem o alvo: "Exportou uma planilha", "Exportou uma planilha do Excel" ou "Exportou um relatório em PDF"; a coluna "Detalhes da exportação" diz "Formato: Excel".
 - Entidade nova → `AUDIT_ENTITY_NOUNS` e o filtro "Tipo" do painel.
 
 **Retenção** (`usecase/audit-retention.ts`, `adapter/database/audit-cleanup.ts`):
@@ -762,13 +881,13 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 | `GET` | `/admin/finance/transactions/next-number` | `{ next }`: o próximo Nº automático (o maior + 1, contando excluídos). Só informativo, não reserva | `READ_FINANCE` |
 | `POST` | `/admin/finance/transactions` | criar lançamento, com `number?` → 201 (a linha, com o `number`); número em uso → 409; mês fechado → 409 | `CREATE_FINANCE` |
 | `PATCH` · `DELETE` | `/admin/finance/transactions/:id` | editar (aceita `number`) → `{ message, transaction }` (a linha como ficou) · excluir (soft) → 204; número em uso → 409; mês fechado → 409 | `UPDATE_` · `DELETE_FINANCE` |
-| `GET` | `/admin/finance/transactions/export` | CSV dos lançamentos filtrados, na ordem de `orderBy`. "Nº" é a primeira coluna (vazia sem número); depois de "Descrição": "Nome / Razão social" (razão social do empenho, ou o nome fantasia se ela estiver vazia), "CNPJ / CPF" e "Nº anterior" (`empenho.numero`) | `READ_FINANCE` |
+| `GET` | `/admin/finance/transactions/export` | **De saída.** CSV dos lançamentos filtrados, na ordem de `orderBy`. "Nº" é a primeira coluna (vazia sem número); depois de "Descrição": "Nome / Razão social" (razão social do empenho, ou o nome fantasia se ela estiver vazia), "CNPJ / CPF" e "Nº anterior" (`empenho.numero`). Desde a SR-102 é o padrão da fonte `finance-transactions` do montador, pelo mesmo motor (ver Exportação): mesma planilha byte a byte e o mesmo arquivo `lancamentos.csv`, mas agora **fica na auditoria**, tem o limite de 20.000 linhas (400 acima) e de 30 por minuto (429). `fields`, `format` e `modelo` são ignorados. O substituto é `GET`/`POST /admin/export/finance-transactions`; esta rota sai num commit seguinte, depois que o painel trocar (decisão 006, item 8) | `READ_FINANCE` |
 | `POST` | `/admin/finance/transfers` | transferência entre caixas → 201 `{ message, transactions: [saída, entrada] }`, com dois números seguidos; mês fechado na origem ou no destino → 409 | `CREATE_FINANCE` |
 | `POST` | `/admin/finance/transactions/:id/attachments` | comprovante (multipart: PDF, JPG, PNG, WEBP até 15 MB) → 201 `{ id, filename, mimeType, size, createdAt }` | `UPDATE_FINANCE` |
 | `GET` · `DELETE` | `/admin/finance/attachments/:attachmentId` | baixar (inline) · apagar de verdade | `READ_FINANCE` · `UPDATE_FINANCE` |
 | `GET` | `/admin/finance/summary?from&to` | resumo (abaixo) | `READ_FINANCE` |
 | `GET` · `POST` · `PATCH` · `DELETE` | `/admin/finance/recurrences[/:id]` | molde do lançamento mensal | `READ_` · `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
-| `POST` | `/admin/finance/recurrences/generate` | gera o que falta até o mês atual, pulando mês fechado → `{ created }` | `CREATE_FINANCE` |
+| `POST` | `/admin/finance/recurrences/generate` | gera o que falta até o mês atual, pulando mês fechado → `{ created }`. Só deixa linha na Auditoria se gerou algo (abaixo) | `CREATE_FINANCE` |
 | `GET` · `POST` · `PATCH` · `DELETE` | `/admin/finance/payment-methods[/:id]` | formas de pagamento | `READ_` · `CREATE_` · `UPDATE_` · `DELETE_FINANCE` |
 | `GET` | `/admin/finance/closings[?accountId&year]` · `/admin/finance/closings/preview?accountId&month` | fechamentos `[{ id, accountId, month, expectedBalanceCents, countedBalanceCents, differenceCents, notes, closedAt, closedByAdminId }]` · prévia do mês | `READ_FINANCE` |
 | `POST` | `/admin/finance/closings` | fechar o mês `{ accountId, month, countedBalanceCents, notes? }` → 201 (o fechamento); já fechado → 409 | `CREATE_FINANCE` |
@@ -824,6 +943,7 @@ Valores sempre em **centavos** (`Int` > 0). Lançamento sem `type` = "só nota":
 **Recorrência** (`FinanceRecurringTransaction`):
 - Meses são `"AAAA-MM"` (`startMonth`, `endMonth?`, `lastGeneratedMonth?`). `dayOfMonth` vai de 1 a 31; no mês mais curto, vale o último dia.
 - A geração roda quando a tela abre e é idempotente (unique `(recurringId, recurringMonth)`), com teto de 120 meses por rodada.
+- **Auditoria da geração** (SR-079): como a tela chama a rota toda vez que abre, `created: 0` não grava linha nenhuma (antes saía "Criou um registro" a cada abertura) e também não escreve no banco. Com `created > 0`, a linha é `Gerou 4 lançamentos recorrentes (INTERNET (2), LUZ (2))` (uma recorrência só: `Gerou 3 lançamentos recorrentes (ALUGUEL)`); o texto vem de `generatedAuditLabel`, e o use case devolve `generated` (por recorrência) além de `created`, que o controller não repassa na resposta. A entidade segue "Outro".
 - Só o P2002 desse índice quer dizer "mês já gerado" (`isRecurrenceMonthTaken`, pelo índice em `uniqueViolationTarget`). Colisão de Nº, ou outro erro, sobe como erro (409 genérico do `apiErrorHandler`). A tentativa que falha não gasta número.
 - Pausar é `PATCH { active: false }`. **Reativar** (`active: true` numa pausada) pula os meses da pausa: o use case põe `lastGeneratedMonth` no mês anterior ao atual, e ela volta a lançar a partir do mês atual. Pausar e reativar no mesmo mês não pula nada. Os lançamentos já gerados não mudam. `lastGeneratedMonth` nunca vem do corpo.
 - **Mês fechado** no caixa da recorrência não recebe lançamento. A geração segue para os meses seguintes, mas o marcador para antes do mês fechado: as próximas rodadas voltam a tentar esse mês e lançam quando ele for reaberto.
@@ -877,7 +997,8 @@ Nomes como estão no `prisma/schema.prisma` (alguns em minúsculas). Detalhe de 
 | `SiteSetting` | key, value |
 | `MarketQuote` | id, label (único), value (texto pronto), priceCents, unit, period, variation, referenceDate, isActive, order |
 | `MarketQuoteHistory` | id, marketQuoteId, value, numeric, referenceDate, period — único por produto, dia e período |
-| `AuditLog` | id, actorId (sem FK), method (POST/PATCH/PUT/DELETE/EXPORT/LOGIN/LOGIN_FAILED/LOGIN_BLOCKED), path, entity, targetLabel, statusCode, ip, userAgent, location, changes (Json), createdAt |
+| `AuditLog` | id, actorId (sem FK), method (POST/PATCH/PUT/DELETE/EXPORT/LOGIN/LOGIN_FAILED/LOGIN_BLOCKED), path, entity, targetLabel, statusCode, ip, userAgent, location, changes (Json), details (Json?, o que foi exportado), createdAt |
+| `ReportTemplate` | modelo de relatório da equipe (SR-114): id, dataset, name (único por conjunto entre os ativos, sem diferenciar maiúsculas: índice parcial), fields (String[], chaves do catálogo na ordem das colunas), format? (csv/pdf/xlsx), confirmed? (só inscrições), createdById e updatedById? (UserAdmin.id, sem FK), isDeleted — sem dono: é da equipe |
 | `Notification` / `NotificationRead` | evento: id, type, title, body, link, permission, entityId · leitura: notificationId (cascade), adminId, readAt — única por (evento, admin) |
 | `FinancialCategory` | id, name, type, color, active, order, isDeleted |
 | `FinancialAccount` | id, name, color, active, order, isDeleted |
@@ -911,7 +1032,7 @@ Todos recebem o `PrismaClient` e implementam o port de mesmo nome em `src/ports/
 - `createAddressAdapter`, `createAdminInviteAdapter`, `createBannerAdapter`, `createCompanyAdapter`, `createContactMessageAdapter`, `createConvenioAdapter`;
 - `createCourseAdapter`, `createDashboardAdapter`, `createExportAdapter`, `createFinanceAdapter`, `createGalleryAdapter`, `createInstructorAdapter`;
 - `createMarketQuoteAdapter`, `createNewsAdapter`, `createNotificationAdapter` e `createNotificationPublisher` (os dois em `notification-adapter.ts`), `createPendingNotificationsAdapter`;
-- `createPropertyAdapter`, `createPublicContactAdapter`, `createRegistrationAdapter`, `createRoomAdapter`, `createRoomBookingAdapter`, `createRuleAdapter`;
+- `createPropertyAdapter`, `createPublicContactAdapter`, `createRegistrationAdapter`, `createReportTemplateAdapter`, `createRoomAdapter`, `createRoomBookingAdapter`, `createRuleAdapter`;
 - `createSiteSettingsAdapter`, `createUnimedAdapter`, `createUserAdminAdapter`, `createUserDataAdapter` (`user-data.ts`), `createUserMergeAdapter` e `createUserRelationAdapter`.
 
 Storage: `createStorageAdapter()` (`adapter/storage/factory.ts`) devolve o `SupabaseStorageAdapter`, que lê `SUPABASE_URL` e `SUPABASE_SECRET_KEY`.

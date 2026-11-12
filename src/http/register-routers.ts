@@ -28,6 +28,7 @@ import { companyRouter } from './router/company-router.js';
 import { galleryRouter } from './router/gallery-router.js';
 import { publicContactRouter } from './router/public-contact-router.js';
 import { exportRouter } from './router/export-router.js';
+import { reportTemplateRouter } from './router/report-template-router.js';
 import { notificationRouter } from './router/notification-router.js';
 import { healthRouter } from './router/health-router.js';
 import { createUserAdminAdapter } from '../adapter/database/user-admin-adapter.js';
@@ -74,6 +75,7 @@ export function registerRouters(app: FastifyInstance, prisma: PrismaClient, inve
         api.register(galleryRouter, prisma);
         api.register(publicContactRouter, prisma);
         api.register(exportRouter, prisma);
+        api.register(reportTemplateRouter, prisma);
         api.register(notificationRouter, prisma);
         api.register(healthRouter);
     }, { inventory });

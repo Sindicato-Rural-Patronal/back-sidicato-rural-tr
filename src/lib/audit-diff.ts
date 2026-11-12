@@ -166,6 +166,10 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
     category: 'Categoria',
     account: 'Caixa',
     notes: 'Observações',
+    // Modelo de relatório da equipe (SR-114).
+    fields: 'Campos',
+    format: 'Formato',
+    onlyConfirmed: 'Só confirmadas',
 };
 
 const show = (value: unknown): string => (value === null || value === undefined || value === '' ? '(vazio)' : String(value));

@@ -2,6 +2,8 @@
 // auditoria. Calculada na leitura a partir do que já é gravado (método, caminho,
 // entidade e rótulo do alvo), então vale também para as linhas antigas.
 
+import { BROWSER_DOCUMENTS, browserDocumentOfPath } from './browser-documents.js';
+
 type Gender = 'm' | 'f' | 'fp';
 
 /** Substantivo e gênero de cada entidade de `deriveAuditEntity` (+ "Exportação"). */
@@ -55,6 +57,8 @@ g: 'm' },
 g: 'm' },
     'Mensagem': { noun: 'mensagem',
 g: 'f' },
+    'Modelo de relatório': { noun: 'modelo de relatório',
+g: 'm' },
     'Notícia': { noun: 'notícia',
 g: 'f' },
     'Propriedade': { noun: 'propriedade',
@@ -173,6 +177,9 @@ const SPECIAL: Record<string, Sentence> = {
     'POST /news/:id/banner': fixed('Trocou a imagem da notícia'),
     'POST /news/:id/image': fixed('Enviou imagem para a notícia'),
     'POST /admin/convenios/:id/logo': fixed('Trocou o logo do convênio'),
+    // Rótulo: "4 lançamentos recorrentes (INTERNET (2), LUZ (2))" (generatedAuditLabel).
+    // Sem nada a gerar a rota nem grava linha; a frase sem rótulo é de linhas antigas.
+    'POST /admin/finance/recurrences/generate': l => (l ? `Gerou ${l}` : 'Gerou lançamentos recorrentes'),
     'POST /admin/finance/transactions/:id/attachments': fixed('Anexou comprovante ao lançamento'),
     // Rótulo do fechamento: "10/2026 · BANCO" (closingAuditLabel).
     'POST /admin/finance/closings': fixed('Fechou o mês de um caixa', 'Fechou o mês'),
@@ -203,18 +210,40 @@ export function auditRouteKey(method: string, path: string): string {
     return `${method.toUpperCase()} ${normalized}`;
 }
 
-/** Frase da ação para o painel e a planilha. `targetLabel` null → frase sem o nome do alvo. */
+/** O formato gravado em `details` pela exportação do montador ('csv' | 'pdf' | 'xlsx'); null nas outras linhas. */
+function exportFormat(details: unknown): string | null {
+    if (!details || typeof details !== 'object' || Array.isArray(details)) return null;
+    const formato = (details as { formato?: unknown }).formato;
+    return typeof formato === 'string' ? formato : null;
+}
+
+/**
+ * Frase da ação para o painel e a planilha. `targetLabel` null → frase sem o nome do alvo.
+ * `details` (o que foi exportado) muda a frase da exportação em PDF, que não é
+ * planilha, e a do Excel. O documento montado no navegador (caminho
+ * `/admin/export/documents/<tipo>`) "gerou o documento"; sem o alvo, a frase
+ * diz qual documento.
+ */
 export function describeAuditAction(entry: {
     method: string;
     path: string;
     entity: string;
     targetLabel: string | null;
+    details?: unknown;
 }): string {
     const label = entry.targetLabel?.trim() || null;
     if (roomBookingScopeFuture(entry.method, entry.path)) {
         return label
             ? `Excluiu a reserva de sala ${q(label)} e as próximas da série`
             : 'Excluiu uma reserva de sala e as próximas da série';
+    }
+    if (entry.method === 'EXPORT') {
+        // Documento montado no navegador (SR-104): o tipo vem do caminho.
+        const document = browserDocumentOfPath(entry.path);
+        if (document) return `Gerou o documento ${q(label ?? BROWSER_DOCUMENTS[document].name)}`;
+        const format = exportFormat(entry.details);
+        if (format === 'pdf') return label ? `Exportou o relatório em PDF ${q(label)}` : 'Exportou um relatório em PDF';
+        if (format === 'xlsx') return label ? `Exportou a planilha do Excel ${q(label)}` : 'Exportou uma planilha do Excel';
     }
     const special = SPECIAL[auditRouteKey(entry.method, entry.path)];
     if (special) return special(label);

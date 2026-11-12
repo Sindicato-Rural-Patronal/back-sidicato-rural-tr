@@ -13,10 +13,11 @@ import type { UpdateFinanceTransactionUseCase } from '../../usecase/update-finan
 import type { DeleteFinanceTransactionUseCase } from '../../usecase/delete-finance-transaction.js';
 import type { CreateFinanceTransferUseCase } from '../../usecase/create-finance-transfer.js';
 import type { FinanceSummaryUseCase } from '../../usecase/finance-summary.js';
-import type { ExportFinanceTransactionsUseCase } from '../../usecase/export-finance-transactions.js';
 import type { UploadFinanceAttachmentUseCase } from '../../usecase/upload-finance-attachment.js';
 import type { GetFinanceAttachmentUseCase } from '../../usecase/get-finance-attachment.js';
 import type { DeleteFinanceAttachmentUseCase } from '../../usecase/delete-finance-attachment.js';
+import { generatedAuditLabel } from '../../usecase/finance-recurrences.js';
+import { setAuditLabel, skipAuditLine } from '../audit-hooks.js';
 import type {
     ListFinanceRecurrencesUseCase,
     CreateFinanceRecurrenceUseCase,
@@ -58,7 +59,6 @@ export class FinanceController {
         private readonly deleteTransaction: DeleteFinanceTransactionUseCase,
         private readonly createTransfer: CreateFinanceTransferUseCase,
         private readonly summaryUseCase: FinanceSummaryUseCase,
-        private readonly exportUseCase: ExportFinanceTransactionsUseCase,
         private readonly uploadAttachmentUseCase: UploadFinanceAttachmentUseCase,
         private readonly getAttachmentUseCase: GetFinanceAttachmentUseCase,
         private readonly deleteAttachmentUseCase: DeleteFinanceAttachmentUseCase,
@@ -134,14 +134,6 @@ export class FinanceController {
     // Só informativo: o próximo Nº automático, sem reservar.
     async getNextNumber(_request: FastifyRequest, reply: FastifyReply) {
         return reply.send(await this.nextNumber.execute());
-    }
-
-    async exportTransactions(request: FastifyRequest, reply: FastifyReply) {
-        const csv = await this.exportUseCase.execute(request.query);
-        reply.header('Content-Type', 'text/csv; charset=utf-8');
-        reply.header('Content-Disposition', 'attachment; filename="lancamentos.csv"');
-        // toCsv já inclui o BOM (acentos no Excel).
-        return reply.send(csv);
     }
 
     async postTransaction(request: FastifyRequest, reply: FastifyReply) {
@@ -234,8 +226,13 @@ transaction: res.transaction });
     }
 
     // Chamado quando a tela do Financeiro abre: cria os lançamentos que faltam.
+    // Só entra na auditoria quando gerou alguma coisa: aberta sem nada a gerar, não deixa linha.
     async postGenerateRecurrences(request: FastifyRequest, reply: FastifyReply) {
-        return reply.send(await this.generateRecurrences.execute());
+        const { created, generated } = await this.generateRecurrences.execute();
+        const label = generatedAuditLabel(generated);
+        if (label) setAuditLabel(request, label);
+        else skipAuditLine(request);
+        return reply.send({ created });
     }
 
     // ── Formas de pagamento ─────────────────────────────────────────────────

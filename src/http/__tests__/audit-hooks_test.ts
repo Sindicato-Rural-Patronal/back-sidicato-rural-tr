@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fastify, { type FastifyInstance } from 'fastify';
 import rateLimit from '@fastify/rate-limit';
 import jwt from 'jsonwebtoken';
-import { registerAuditHooks, fillAuditLocationLater } from '../audit-hooks.js';
+import { registerAuditHooks, fillAuditLocationLater, skipAuditLine, setAuditLabel } from '../audit-hooks.js';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 
 // Hooks da auditoria num app mínimo, com um prisma falso (sem banco).
@@ -79,6 +79,12 @@ hook: 'preValidation' } } }, async (req, reply) => {
         const { password } = req.body as { password: string };
         if (password !== 'senha-certa') return reply.status(401).send({ error: 'Invalid credentials' });
         return { token: token() };
+    });
+    app.post('/admin/finance/recurrences/generate', async req => {
+        const gerou = (req.body as { gerou?: boolean } | null)?.gerou;
+        if (gerou) setAuditLabel(req, '2 lançamentos recorrentes (ALUGUEL)');
+        else skipAuditLine(req);
+        return { created: gerou ? 2 : 0 };
     });
     app.get('/admin/export/people', async (req, reply) => {
         fillAuditLocationLater(req, 'log-1');
@@ -221,5 +227,32 @@ location: null });
         await new Promise(r => setTimeout(r, 50));
         expect(prisma.auditLog.create).toHaveBeenCalledTimes(3);
         expect(JSON.stringify(prisma.auditLog.create.mock.calls)).not.toContain('errada');
+    });
+});
+
+describe('auditoria: a rota decide se a chamada vira linha', () => {
+    const gerar = (gerou: boolean) =>
+        app.inject({
+            method: 'POST',
+            url: '/admin/finance/recurrences/generate',
+            headers: { authorization: `Bearer ${token()}` },
+            payload: { gerou },
+        });
+
+    it('rota que pede para pular não grava linha', async () => {
+        expect((await gerar(false)).statusCode).toBe(200);
+        await new Promise(r => setTimeout(r, 50));
+        expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('rota que informa o rótulo grava a linha com ele', async () => {
+        expect((await gerar(true)).statusCode).toBe(200);
+        const row = await loggedRow();
+        expect(row).toMatchObject({
+            method: 'POST',
+            path: '/admin/finance/recurrences/generate',
+            targetLabel: '2 lançamentos recorrentes (ALUGUEL)',
+            statusCode: 200,
+        });
     });
 });
