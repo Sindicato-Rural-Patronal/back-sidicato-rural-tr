@@ -132,7 +132,7 @@ deletedAt: null } });
 describe('CSV', () => {
     async function csv(query = ''): Promise<string[][]> {
         const res = await app.inject({ method: 'GET',
-url: `/admin/finance/transactions/export${query}`,
+url: `/admin/export/finance-transactions${query}`,
 headers: bearer(token) });
         expect(res.statusCode, res.body).toBe(200);
         return res.body.replace(/^﻿/, '').trim().split('\r\n').map(l => l.slice(1, -1).split('";"'));
@@ -207,7 +207,7 @@ describe('busca por CNPJ / CPF do fornecedor', () => {
         });
         const res = await app.inject({
             method: 'GET',
-            url: '/admin/finance/transactions/export?search=98765432000155',
+            url: '/admin/export/finance-transactions?search=98765432000155',
             headers: bearer(token),
         });
         expect(res.statusCode, res.body).toBe(200);

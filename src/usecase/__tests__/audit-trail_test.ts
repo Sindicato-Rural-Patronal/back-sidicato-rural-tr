@@ -122,6 +122,18 @@ targetLabel: 'Pessoas: 3 registros' }))
             .toBe('Exportou a planilha "Pessoas: 3 registros"');
     });
 
+    it('linha antiga do CSV do Financeiro (rota apagada na SR-119) continua com a mesma frase', () => {
+        // A produção tem linhas gravadas com o caminho antigo; não mudam nem somem da tela.
+        const antiga = { method: 'EXPORT',
+path: '/admin/finance/transactions/export',
+entity: 'Exportação',
+targetLabel: 'Lançamentos: 12 registros (todos) · CSV · com CNPJ / CPF',
+details: null };
+        expect(describeAuditAction(antiga)).toBe('Exportou a planilha "Lançamentos: 12 registros (todos) · CSV · com CNPJ / CPF"');
+        expect(describeAuditAction({ ...antiga,
+targetLabel: null })).toBe('Exportou uma planilha');
+    });
+
     it('exportação em PDF (details.formato) é relatório, não planilha; o CSV segue planilha', () => {
         const exp = (targetLabel: string | null, details: unknown) =>
             describeAuditAction({ method: 'EXPORT',

@@ -9,8 +9,9 @@ import { adminOf } from './route-auth.js';
 
 // Resposta de uma exportação (decisão 006): roda o motor, grava a linha EXPORT
 // na auditoria e devolve o CSV, o .xlsx ou o JSON do PDF. Usada por
-// `/admin/export/:dataset` e pela rota antiga do CSV do Financeiro
-// (`GET /admin/finance/transactions/export`), que passa pelo mesmo motor.
+// `/admin/export/:dataset`. A rota antiga do CSV do Financeiro
+// (`GET /admin/finance/transactions/export`) também passava por aqui; foi
+// apagada na SR-119, e o CSV sai por `/admin/export/finance-transactions`.
 
 /** Exportações por minuto por IP (decisão 006, item 7.4): uma conta invadida não baixa tudo em laço. */
 export const EXPORT_RATE_LIMIT = 30;
@@ -53,10 +54,6 @@ export async function replyWithExport(
         repo: ExportRepository;
         dataset: ExportDataset;
         input: unknown;
-        /** O caminho gravado na auditoria; o padrão é `/admin/export/<dataset>`. */
-        path?: string;
-        /** Nome do arquivo CSV no lugar do que o motor dá (a rota antiga do Financeiro mantém o dela). */
-        filename?: string;
     },
 ) {
     const admin = adminOf(req);
@@ -67,7 +64,7 @@ export async function replyWithExport(
     try {
         const logged = await opts.repo.logExport({
             actorId: admin.id,
-            path: opts.path ?? `/admin/export/${opts.dataset}`,
+            path: `/admin/export/${opts.dataset}`,
             targetLabel: r.result.auditLabel,
             details: r.result.auditDetails,
             ...requestContext(req),
@@ -89,6 +86,6 @@ export async function replyWithExport(
     }
     return reply
         .header('Content-Type', 'text/csv; charset=utf-8')
-        .header('Content-Disposition', `attachment; filename="${opts.filename ?? r.result.filename}"`)
+        .header('Content-Disposition', `attachment; filename="${r.result.filename}"`)
         .send(r.result.csv);
 }

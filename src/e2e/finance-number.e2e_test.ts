@@ -929,7 +929,7 @@ description: 'ZETA' });
     });
 
     it('CSV: "Nº" primeiro, "Nº anterior" depois do CNPJ / CPF, na ordem pedida', async () => {
-        const res = await call('GET', '/admin/finance/transactions/export?orderBy=number');
+        const res = await call('GET', '/admin/export/finance-transactions?orderBy=number');
         expect(res.statusCode, res.body).toBe(200);
         const lines = res.body
             .replace(/^﻿/, '')
