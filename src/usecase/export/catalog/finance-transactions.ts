@@ -7,8 +7,8 @@ import type { ExportField, ExportFilterDescription, ExportSource } from './types
 
 // Fonte `finance-transactions`: os lançamentos do Financeiro (permissão
 // READ_FINANCE), com os mesmos filtros, busca e ordem (`orderBy`) da lista e
-// de `GET /admin/finance/transactions/export`. O padrão são as 13 colunas
-// daquela planilha, byte a byte (teste de ouro). Passando pelo motor, a
+// da rota antiga `GET /admin/finance/transactions/export` (apagada na SR-119).
+// O padrão são as 13 colunas daquela planilha, byte a byte (teste de ouro). Passando pelo motor, a
 // exportação do Financeiro fica na auditoria, como as outras.
 //
 // Pessoal é o que identifica o favorecido da Nota de Empenho quando ele é

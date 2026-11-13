@@ -354,8 +354,8 @@ search: 'reunião' });
 
 // O CSV saía por `GET /admin/finance/transactions/export`
 // (`ExportFinanceTransactionsUseCase`), fora de /admin/export. Desde a SR-102,
-// aquela rota e a fonte `finance-transactions` saem pelo motor: a planilha é o
-// padrão da fonte. As linhas esperadas abaixo não mudaram com a troca.
+// aquela rota e a fonte `finance-transactions` saíam pelo motor: a planilha é o
+// padrão da fonte. A rota foi apagada na SR-119. As linhas esperadas abaixo não mudaram com a troca.
 async function financeCsv(rows: object[], query: object = {}): Promise<string> {
     vi.mocked(repo.financeTransactions).mockResolvedValue(rows as never);
     const r = await useCase().execute('finance-transactions', query);

@@ -46,8 +46,8 @@ single: 'auditoria' },
 title: 'Reservas de sala',
 file: 'reservas-de-sala',
 single: 'reserva' },
-    // Lançamentos do Financeiro (SR-102). Até o front trocar, a planilha também
-    // sai por `GET /admin/finance/transactions/export`, que passa pelo motor.
+    // Lançamentos do Financeiro (SR-102). A planilha saía também pela rota antiga
+    // `GET /admin/finance/transactions/export`, apagada na SR-119.
     'finance-transactions': { permission: 'READ_FINANCE',
 title: 'Lançamentos',
 file: 'lancamentos',

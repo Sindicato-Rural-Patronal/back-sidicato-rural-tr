@@ -4,8 +4,8 @@ import { empenhoName } from '../export/catalog/finance-transactions.js';
 import type { ExportRepository } from '../../ports/external/export-repository.js';
 
 // O CSV dos lançamentos (SR-039, SR-064). Desde a SR-102 ele é o padrão da
-// fonte `finance-transactions` do montador de relatórios, que também atende a
-// rota antiga `GET /admin/finance/transactions/export`. O byte a byte está no
+// fonte `finance-transactions` do montador de relatórios (a rota antiga
+// `GET /admin/finance/transactions/export` foi apagada na SR-119). O byte a byte está no
 // teste de ouro (`export-golden-fase2b_test.ts`).
 
 const row = (over: object) => ({

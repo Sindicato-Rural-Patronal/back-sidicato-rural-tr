@@ -233,13 +233,6 @@ formula: false });
 targetLabel: 'Lançamentos: 1 registro (todos) · Excel · com CNPJ / CPF' });
         expect((log!.details as { formato: string }).formato).toBe('xlsx');
     });
-
-    it('a rota antiga continua só CSV (ignora format)', async () => {
-        const res = await get('/admin/finance/transactions/export?format=xlsx');
-        expect(res.statusCode, res.body).toBe(200);
-        expect(res.headers['content-type']).toBe('text/csv; charset=utf-8');
-        expect(res.headers['content-disposition']).toBe('attachment; filename="lancamentos.csv"');
-    });
 });
 
 describe('relatório de cadastros em Excel', () => {

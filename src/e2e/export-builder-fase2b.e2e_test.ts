@@ -345,12 +345,11 @@ allowed: true });
         expect((await get('/admin/export/finance-transactions', userOnly)).statusCode).toBe(403);
     });
 
-    it('sem fields, a mesma planilha da rota do Financeiro, agora na auditoria', async () => {
+    it('sem fields, o padrão de 13 colunas (o byte a byte está no teste de ouro), na auditoria', async () => {
         for (const query of ['', '?orderBy=number', `?categoryId=${categoria}`, '?search=jose', '?from=2026-05-11&to=2026-05-11']) {
             const motor = await get(`/admin/export/finance-transactions${query}`);
-            const antiga = await get(`/admin/finance/transactions/export${query}`);
             expect(motor.statusCode, motor.body).toBe(200);
-            expect(motor.body, query).toBe(antiga.body);
+            expect(rows(motor.body)[0], query).toHaveLength(13);
             expect(motor.headers['content-disposition']).toBe(`attachment; filename="lancamentos-${today()}.csv"`);
         }
         const log = await prisma.auditLog.findFirst({ where: { method: 'EXPORT',
@@ -392,17 +391,18 @@ linhas: 1 });
     });
 });
 
-describe('rota antiga do CSV do Financeiro (GET /admin/finance/transactions/export)', () => {
-    it('passa pelo motor: mesma planilha, nome de sempre, e agora fica na auditoria', async () => {
-        const res = await get('/admin/finance/transactions/export?orderBy=number&search=semente');
+describe('CSV padrão dos lançamentos (GET /admin/export/finance-transactions)', () => {
+    it('sem fields: as 13 colunas de sempre, o nome do arquivo com a data e a linha na auditoria', async () => {
+        const res = await get('/admin/export/finance-transactions?orderBy=number&search=semente');
         expect(res.statusCode, res.body).toBe(200);
-        expect(res.headers['content-disposition']).toBe('attachment; filename="lancamentos.csv"');
+        expect(res.headers['content-disposition']).toBe(`attachment; filename="lancamentos-${today()}.csv"`);
         expect(res.headers['x-export-count']).toBe('1');
+        expect(rows(res.body)[0]).toHaveLength(13);
         expect(rows(res.body)[1].slice(0, 6)).toEqual(['10', '10/05/2026', 'Saída', 'BANCO MONTADOR', 'INSUMOS MONTADOR', 'Compra de semente']);
 
         const log = await lastExport();
         expect(log).toMatchObject({
-            path: '/admin/finance/transactions/export',
+            path: '/admin/export/finance-transactions',
             entity: 'Exportação',
             targetLabel: 'Lançamentos: 1 registro (com filtros) · CSV · com CNPJ / CPF',
         });
@@ -422,22 +422,23 @@ valor: 'Nº' }],
         );
     });
 
-    it('ignora fields, format e modelo: sai sempre o padrão em CSV', async () => {
-        const res = await get('/admin/finance/transactions/export?fields=number&format=pdf&modelo=resumido');
-        expect(res.statusCode, res.body).toBe(200);
-        expect(res.headers['content-type']).toBe('text/csv; charset=utf-8');
-        expect(rows(res.body)[0]).toHaveLength(13);
-        expect((await lastExport())!.details).toMatchObject({ formato: 'csv',
-modelo: 'Padrão (como hoje)' });
-    });
-
     it('sem READ_FINANCE → 403 e nenhuma linha; erro de filtro também não deixa linha', async () => {
         const userOnly = await adminWith('so.usuarios.csv.financeiro', ['READ_USER']);
         const before = await prisma.auditLog.count({ where: { method: 'EXPORT' } });
-        expect((await get('/admin/finance/transactions/export', userOnly)).statusCode).toBe(403);
-        const bad = await get('/admin/finance/transactions/export?from=ontem');
+        expect((await get('/admin/export/finance-transactions', userOnly)).statusCode).toBe(403);
+        const bad = await get('/admin/export/finance-transactions?from=ontem');
         expect(bad.statusCode).toBe(400);
         expect(bad.json()).toEqual({ error: 'Parâmetro inválido: from' });
+        expect(await prisma.auditLog.count({ where: { method: 'EXPORT' } })).toBe(before);
+    });
+});
+
+describe('rota antiga do CSV do Financeiro, apagada na SR-119', () => {
+    it('GET /admin/finance/transactions/export → 404, com e sem token válido, e nenhuma linha na auditoria', async () => {
+        const before = await prisma.auditLog.count({ where: { method: 'EXPORT' } });
+        expect((await get('/admin/finance/transactions/export')).statusCode).toBe(404);
+        expect((await get('/admin/finance/transactions/export', '')).statusCode).toBe(404);
+        expect((await get('/admin/finance/transactions/export?orderBy=number', 'token-invalido')).statusCode).toBe(404);
         expect(await prisma.auditLog.count({ where: { method: 'EXPORT' } })).toBe(before);
     });
 });

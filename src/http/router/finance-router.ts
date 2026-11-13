@@ -15,10 +15,6 @@ import { UpdateFinanceTransactionUseCase } from '../../usecase/update-finance-tr
 import { DeleteFinanceTransactionUseCase } from '../../usecase/delete-finance-transaction.js';
 import { CreateFinanceTransferUseCase } from '../../usecase/create-finance-transfer.js';
 import { FinanceSummaryUseCase } from '../../usecase/finance-summary.js';
-import { createExportAdapter } from '../../adapter/database/export-adapter.js';
-import { ExportDataUseCase } from '../../usecase/export-data.js';
-import { EXPORT_LIMITS } from '../../usecase/export/engine.js';
-import { EXPORT_RATE_LIMIT, exportRateLimit, replyWithExport } from '../lib/export-reply.js';
 import { UploadFinanceAttachmentUseCase } from '../../usecase/upload-finance-attachment.js';
 import { GetFinanceAttachmentUseCase } from '../../usecase/get-finance-attachment.js';
 import { DeleteFinanceAttachmentUseCase } from '../../usecase/delete-finance-attachment.js';
@@ -241,9 +237,6 @@ example: 'PIX' },
 
 export async function financeRouter(fastify: FastifyInstance, prisma: PrismaClient) {
     const repo = createFinanceAdapter(prisma);
-    // O CSV dos lançamentos sai pelo motor de exportação (fonte `finance-transactions`).
-    const exportRepo = createExportAdapter(prisma);
-    const exportData = new ExportDataUseCase(exportRepo);
 
     const controller = new FinanceController(
         new ListFinanceCategoriesUseCase(repo),
@@ -544,51 +537,6 @@ example: 128 } } },
             },
         },
         (req: FastifyRequest, res: FastifyReply) => controller.getNextNumber(req, res),
-    );
-
-    fastify.get(
-        '/admin/finance/transactions/export',
-        {
-            config: { auth: requires('READ_FINANCE'),
-...exportRateLimit },
-            schema: {
-                tags,
-                summary: 'Export transactions as CSV',
-                description: `CSV (;) dos lançamentos que batem com os filtros (from, to, type, categoryId, accountId, method, search), na ordem de orderBy. ${SEARCH_DOC} ${ORDER_DOC} A primeira coluna é "Nº" (vazia sem número). Depois da Descrição vêm "Nome / Razão social" (a razão social do empenho ou, sem ela, o nome fantasia), "CNPJ / CPF" e "Nº anterior" (o empenho.numero).
-
-**De saída** (decisão 006, SR-102): é o padrão da fonte \`finance-transactions\` do montador de relatórios, pelo mesmo motor, e fica na auditoria (linha EXPORT com este caminho). O arquivo continua \`lancamentos.csv\`; \`fields\`, \`format\` e \`modelo\` são ignorados aqui. Use \`GET|POST /admin/export/finance-transactions\`, que aceita os mesmos filtros e o montador; esta rota sai num commit seguinte, depois que o painel trocar. Limites: ${EXPORT_LIMITS.rows} linhas (400 acima disso) e ${EXPORT_RATE_LIMIT} por minuto por IP (429).`,
-                querystring: {
-                    type: 'object',
-                    properties: {
-                        from: { type: 'string' },
-                        to: { type: 'string' },
-                        type: { type: 'string',
-enum: ['IN', 'OUT'] },
-                        categoryId: { type: 'string' },
-                        accountId: { type: 'string' },
-                        method: { type: 'string' },
-                        search: { type: 'string' },
-                        orderBy: orderByQuery,
-                    },
-                },
-                response: { 400: errorResponse,
-401: errorResponse,
-403: errorResponse,
-429: errorResponse },
-            },
-        },
-        (req: FastifyRequest, res: FastifyReply) => {
-            // Sempre o padrão em CSV: o montador fica em /admin/export/finance-transactions.
-            const { fields: _fields, format: _format, modelo: _modelo, ...query } = (req.query ?? {}) as Record<string, unknown>;
-            return replyWithExport(req, res, {
-                exportData,
-                repo: exportRepo,
-                dataset: 'finance-transactions',
-                input: query,
-                path: '/admin/finance/transactions/export',
-                filename: 'lancamentos.csv',
-            });
-        },
     );
 
     fastify.post(

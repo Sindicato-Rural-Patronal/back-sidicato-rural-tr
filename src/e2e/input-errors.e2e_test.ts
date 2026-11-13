@@ -204,7 +204,7 @@ describe('4. data que o Postgres não aceita', () => {
     it('filtros da lista, do CSV e do resumo → 400 "Parâmetro inválido"', async () => {
         for (const url of [
             '/admin/finance/transactions?from=0000-01-01',
-            '/admin/finance/transactions/export?to=-005000-01-01',
+            '/admin/export/finance-transactions?to=-005000-01-01',
             '/admin/finance/summary?from=0000-01-01',
         ]) {
             const res = await call('GET', url);

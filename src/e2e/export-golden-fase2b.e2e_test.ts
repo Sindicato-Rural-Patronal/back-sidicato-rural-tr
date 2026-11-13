@@ -11,6 +11,10 @@ import { createTestPrisma, cleanDatabase, seedSuperAdmin, loginAndGetToken, bear
 // bloco foi escrito ANTES de a fonte dele sair do caminho antigo.
 //
 // Só a data no nome do arquivo depende do dia em que o teste roda.
+//
+// O CSV dos lançamentos era chamado por `GET /admin/finance/transactions/export`
+// (apagada na SR-119); o esperado byte a byte é o mesmo, só o caminho e o nome
+// do arquivo (`lancamentos-AAAA-MM-DD.csv`) mudaram.
 
 let app: FastifyInstance;
 let prisma: PrismaClient;
@@ -334,7 +338,7 @@ sala: sala.id });
     });
 });
 
-describe('teste de ouro pelo banco: CSV dos lançamentos (GET /admin/finance/transactions/export)', () => {
+describe('teste de ouro pelo banco: CSV dos lançamentos (GET /admin/export/finance-transactions)', () => {
     const header = [
         'Nº', 'Data', 'Tipo', 'Caixa', 'Categoria', 'Descrição', 'Nome / Razão social', 'CNPJ / CPF', 'Nº anterior', 'Método',
         'Recorrente', 'Valor (R$)', 'Observações',
@@ -439,13 +443,13 @@ caixa: caixa.id });
         '7', '31/01/2026', 'Entrada', 'CAIXA', 'MENSALIDADES', 'Mensalidade', 'MECANICA DO ZE', '52998224725', '', '', 'Sim', '0,05', '',
     ];
 
-    const csv = (query = '') => get(`/admin/finance/transactions/export${query}`);
+    const csv = (query = '') => get(`/admin/export/finance-transactions${query}`);
 
-    it('o CSV inteiro, da data mais nova para a mais antiga, com o nome de arquivo de sempre', async () => {
+    it('o CSV inteiro, da data mais nova para a mais antiga, com a data no nome do arquivo', async () => {
         const res = await csv();
         expect(res.statusCode, res.body).toBe(200);
         expect(res.headers['content-type']).toBe('text/csv; charset=utf-8');
-        expect(res.headers['content-disposition']).toBe('attachment; filename="lancamentos.csv"');
+        expect(res.headers['content-disposition']).toBe(`attachment; filename="lancamentos-${todayBr()}.csv"`);
         expect(res.body).toBe(file(header, frete, adubo, nota, mensalidade));
     });
 
@@ -465,13 +469,13 @@ caixa: caixa.id });
         expect((await csv('?search=529.982.247-25')).body).toBe(file(header, mensalidade));
     });
 
-    it('filtro inválido → 400: o schema da rota barra tipo e ordem; o resto, "Parâmetro inválido: <campo>"', async () => {
+    it('filtro inválido → 400 "Parâmetro inválido: <campo>" (na rota antiga, o schema dela barrava tipo e ordem com "Valor não aceito")', async () => {
         for (const [query, error] of [
             ['?from=ontem', 'Parâmetro inválido: from'],
             ['?to=0000-01-01', 'Parâmetro inválido: to'],
             [`?categoryId=${encodeURIComponent('não-é-uuid')}`, 'Parâmetro inválido: categoryId'],
-            ['?type=NOTA', 'Valor não aceito em "type".'],
-            ['?orderBy=valor', 'Valor não aceito em "orderBy".'],
+            ['?type=NOTA', 'Parâmetro inválido: type'],
+            ['?orderBy=valor', 'Parâmetro inválido: orderBy'],
         ]) {
             const res = await csv(query);
             expect(res.statusCode, query).toBe(400);

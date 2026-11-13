@@ -450,7 +450,7 @@ accountId: otherAccountId,
         // O CSV respeita o mesmo filtro.
         const csv = await app.inject({
             method: 'GET',
-            url: '/admin/finance/transactions/export?method=PIX',
+            url: '/admin/export/finance-transactions?method=PIX',
             headers: bearer(token),
         });
         expect(csv.statusCode).toBe(200);
