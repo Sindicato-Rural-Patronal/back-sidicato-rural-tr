@@ -106,7 +106,7 @@ export type ExportResult = {
     filename: string;
     /** Texto para a trilha de auditoria. */
     auditLabel: string;
-    /** Detalhes para a trilha (null no relatório de cadastros, que não tem montador). */
+    /** Detalhes para a trilha (null no relatório de cadastros, que não tem montador, salvo com `pdfDoNavegador`). */
     auditDetails: ExportAuditDetails | null;
 };
 
@@ -136,6 +136,21 @@ export function readFieldKeys(value: unknown): string[] | undefined | Error {
     if (!keys.length) return new ValidationError('Escolha pelo menos um campo.');
     if (keys.length > EXPORT_LIMITS.fields) return new ValidationError('No máximo 80 campos por relatório.');
     return keys;
+}
+
+export const PDF_DO_NAVEGADOR_MESSAGE = 'pdfDoNavegador só vale para o CSV.';
+
+/**
+ * `pdfDoNavegador` (SR-125): o painel monta o PDF no navegador a partir do CSV e
+ * avisa por aqui, para a auditoria dizer PDF. A resposta não muda. Só boolean
+ * (no GET, "true"/"false"); só com o CSV.
+ */
+export function readPdfDoNavegador(value: unknown, format: ExportFormat): boolean | Error {
+    if (value === undefined || value === null) return false;
+    const v = value === 'true' ? true : value === 'false' ? false : value;
+    if (typeof v !== 'boolean') return new ValidationError('Parâmetro inválido: pdfDoNavegador');
+    if (v && format !== 'csv') return new ValidationError(PDF_DO_NAVEGADOR_MESSAGE);
+    return v;
 }
 
 function readModelo(value: unknown): string | null | Error {
@@ -308,6 +323,8 @@ now: Date
 
     const format = readFormat(body.format);
     if (format instanceof Error) return { error: format };
+    const pdfDoNavegador = readPdfDoNavegador(body.pdfDoNavegador, format);
+    if (pdfDoNavegador instanceof Error) return { error: pdfDoNavegador };
     const keys = readFieldKeys(body.fields);
     if (keys instanceof Error) return { error: keys };
     const modelo = readModelo(body.modelo);
@@ -355,9 +372,11 @@ valor: registros(filters.ids.length) }]
         ? `${meta.title}: ${firstName}`
         : `${meta.title}: ${registros(count)} (${scope})`;
     const cited = count > 0 ? citedPersonalFields(fields) : '';
-    const auditLabel = [head, FORMAT_LABEL[format], ...(cited ? [`com ${cited}`] : [])].join(' · ');
+    // PDF montado no navegador a partir do CSV: a resposta é o CSV, a trilha diz PDF.
+    const auditFormat: ExportFormat = pdfDoNavegador ? 'pdf' : format;
+    const auditLabel = [head, FORMAT_LABEL[auditFormat], ...(cited ? [`com ${cited}`] : [])].join(' · ');
     const auditDetails: ExportAuditDetails = {
-        formato: format,
+        formato: auditFormat,
         modelo: modeloText,
         campos: fields.map(f => f.label),
         escopo: scope,

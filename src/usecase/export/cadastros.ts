@@ -9,7 +9,7 @@ import { NO_BUILDER_MESSAGE } from './catalog/index.js';
 import { adminsSource } from './catalog/admins.js';
 import { companiesSource } from './catalog/companies.js';
 import { peopleSource } from './catalog/people.js';
-import { FORMAT_LABEL, FORMAT_MESSAGE, padraoCsvBody, padraoXlsxSheet, type ExportResult } from './engine.js';
+import { FORMAT_LABEL, FORMAT_MESSAGE, padraoCsvBody, readPdfDoNavegador, padraoXlsxSheet, type ExportResult } from './engine.js';
 import { registros, ymd } from './format.js';
 import { aboutSheet, brasiliaWallClock } from './xlsx.js';
 
@@ -24,7 +24,8 @@ import { aboutSheet, brasiliaWallClock } from './xlsx.js';
 // Desde a SR-102 as quatro seções são o padrão das fontes do motor (`people`,
 // `companies` e `admins`), byte a byte como as colunas antigas de
 // export-data.ts (teste de ouro). A linha da auditoria continua a de sempre,
-// sem `details`.
+// sem `details`. Exceção (SR-125): com `pdfDoNavegador: true` (o painel monta o
+// PDF a partir deste CSV) a resposta é a mesma, e a linha diz PDF.
 
 // O relatório é sempre o retrato completo: filtro e seleção são ignorados.
 const schema = z.object({});
@@ -44,6 +45,8 @@ result?: ExportResult
     const body = (query ?? {}) as Record<string, unknown>;
     const format = body.format == null || body.format === '' ? 'csv' : String(body.format).trim().toLowerCase();
     if (format !== 'csv' && format !== 'pdf' && format !== 'xlsx') return { error: new ValidationError(FORMAT_MESSAGE) };
+    const pdfDoNavegador = readPdfDoNavegador(body.pdfDoNavegador, format);
+    if (pdfDoNavegador instanceof Error) return { error: pdfDoNavegador };
     if (format === 'pdf' || body.fields != null) return { error: new ValidationError(NO_BUILDER_MESSAGE) };
 
     const [pessoas, associados, empresas, administradores] = await Promise.all([
@@ -112,8 +115,17 @@ body: padraoCsvBody(adminsSource, administradores, now) },
             csv,
             count,
             filename: `${base}.csv`,
-            auditLabel,
-            auditDetails: null,
+            // PDF montado no navegador a partir deste CSV (SR-125): o arquivo é o
+            // mesmo; só a trilha diz PDF (e ganha `details`, que aqui era null).
+            auditLabel: pdfDoNavegador ? `${auditLabel} · ${FORMAT_LABEL.pdf}` : auditLabel,
+            auditDetails: pdfDoNavegador
+                ? { formato: 'pdf',
+modelo: null,
+campos: [],
+escopo: 'todos',
+filtros: [],
+linhas: count }
+                : null,
         },
     };
 }
