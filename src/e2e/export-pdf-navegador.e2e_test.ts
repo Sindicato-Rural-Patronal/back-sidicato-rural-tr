@@ -155,9 +155,10 @@ pdfDoNavegador: true });
         for (const dataset of ['people', 'cadastros']) {
             const res = await post(`/admin/export/${dataset}`, { pdfDoNavegador: 'talvez' });
             expect(res.statusCode, res.body).toBe(400);
-            expect(res.json().error).toEqual(expect.any(String));
+            expect(res.json().error).toBe('Valor inválido em "pdfDoNavegador": esperado verdadeiro ou falso.');
             const viaGet = await get(`/admin/export/${dataset}?pdfDoNavegador=talvez`);
             expect(viaGet.statusCode).toBe(400);
+            expect(viaGet.json().error).toBe('Valor inválido em "pdfDoNavegador": esperado verdadeiro ou falso.');
         }
         expect(await exportLines()).toHaveLength(0);
     });

@@ -41,7 +41,7 @@ description: 'Id ou nome do modelo usado (até 64). Só vai para a auditoria e o
     confirmed: { type: 'boolean',
 description: 'Só em `registrations`: true = só as inscrições confirmadas.' },
     pdfDoNavegador: { type: 'boolean',
-description: 'true = o painel vai montar um PDF a partir deste CSV. A resposta não muda (o mesmo CSV, com os mesmos cabeçalhos); só a Auditoria grava "Exportou o relatório em PDF" e `details.formato` `pdf`. Em todos os conjuntos, inclusive `cadastros`. Só com `format=csv`: com `xlsx` ou `pdf` → 400 "pdfDoNavegador só vale para o CSV.". Não boolean → 400 "Parâmetro inválido: pdfDoNavegador". Ausente ou false = como sempre.' },
+description: 'true = o painel vai montar um PDF a partir deste CSV. A resposta não muda (o mesmo CSV, com os mesmos cabeçalhos); só a Auditoria grava "Exportou o relatório em PDF" e `details.formato` `pdf`. Em todos os conjuntos, inclusive `cadastros`. Só com `format=csv`: com `xlsx` ou `pdf` → 400 "pdfDoNavegador só vale para o CSV.". Não boolean → 400 `Valor inválido em "pdfDoNavegador": esperado verdadeiro ou falso.` (mensagem do schema). Ausente ou false = como sempre.' },
 };
 
 const pdfResponse = {
@@ -153,7 +153,7 @@ export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClien
 - \`modelo\`: id ou nome do modelo (só para a auditoria e o PDF). \`confirmed\` (inscrições): só as confirmadas.
 - \`pdfDoNavegador\` (boolean, só com \`format=csv\`, em todos os conjuntos, inclusive \`cadastros\`): o painel monta o PDF no navegador a partir deste CSV. **A resposta é a mesma** (CSV, mesmos cabeçalhos); a Auditoria grava "Exportou o relatório em PDF" e \`details.formato\` \`pdf\`, em vez de planilha CSV.
 - Limites: ${EXPORT_LIMITS.rows} linhas, ${EXPORT_LIMITS.pdfRows} no PDF, ${EXPORT_LIMITS.fields} campos.
-- Erros 400: "Escolha pelo menos um campo.", "Campo desconhecido: <chave>.", "Campo repetido: <rótulo>.", "No máximo 80 campos por relatório.", "Formato inválido: use csv, pdf ou xlsx.", "pdfDoNavegador só vale para o CSV." (com xlsx ou pdf), "Parâmetro inválido: pdfDoNavegador", "O relatório passa de 20.000 linhas. Use um filtro para diminuir.", "O PDF aceita até 2.000 linhas. Baixe a planilha ou use um filtro.", "${NO_BUILDER_MESSAGE}" (fields ou PDF num conjunto sem montador).
+- Erros 400: "Escolha pelo menos um campo.", "Campo desconhecido: <chave>.", "Campo repetido: <rótulo>.", "No máximo 80 campos por relatório.", "Formato inválido: use csv, pdf ou xlsx.", "pdfDoNavegador só vale para o CSV." (com xlsx ou pdf), \`Valor inválido em "pdfDoNavegador": esperado verdadeiro ou falso.\` (não boolean), "O relatório passa de 20.000 linhas. Use um filtro para diminuir.", "O PDF aceita até 2.000 linhas. Baixe a planilha ou use um filtro.", "${NO_BUILDER_MESSAGE}" (fields ou PDF num conjunto sem montador).
 - Erro 403 por campo: "Sem permissão para exportar: RG, Endereço: Rua." (em \`registrations\` e \`admins\`, os campos da pessoa além dos que já saíam pedem também READ_USER; o catálogo os mostra com \`allowed: false\`).
 - ${EXPORT_RATE_LIMIT} exportações por minuto por IP → 429 "${EXPORT_RATE_LIMIT_MESSAGE}".
 
