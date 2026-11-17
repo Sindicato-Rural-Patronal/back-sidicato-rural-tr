@@ -71,6 +71,22 @@ nullable: true },
         rows: { type: 'array',
 items: { type: 'array',
 items: { type: 'string' } } },
+        // Só nos Lançamentos (SR-131), quando o campo `amount` (Valor) está nas colunas e o arquivo tem entrada ou saída; senão ausente.
+        totais: {
+            type: 'array',
+            description: 'Totais para desenhar depois da tabela, na mesma regra da tela de Lançamentos (sem as transferências entre caixas): "Total de entradas" e/ou "Total de saídas", só dos tipos que aparecem no arquivo. Ausente quando não se aplica.',
+            items: {
+                type: 'object',
+                properties: {
+                    rotulo: { type: 'string',
+example: 'Total de entradas' },
+                    valor: { type: 'string',
+example: 'R$ 1.234,56' },
+                },
+            },
+        },
+        notaDosTotais: { type: 'string',
+description: 'Presente quando o arquivo tem alguma perna de transferência: "Transferências entre caixas não entram nos totais.".' },
     },
 };
 
@@ -148,8 +164,8 @@ export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClien
 
 **Montador de relatórios** (decisão 006; hoje em ${builderDatasets}; o catálogo está em \`GET /admin/export/:dataset/catalog\`):
 - \`fields\`: chaves do catálogo na ordem das colunas. **Sem \`fields\` sai exatamente o CSV de hoje** (o modelo padrão). Com \`fields\`, telefone e CNS saem com máscara.
-- \`format\`: \`csv\`, \`xlsx\` ou \`pdf\` (JSON \`{ title, filename, count, filters, modelo, columns, rows }\`).
-- **Excel (\`xlsx\`):** \`${XLSX_CONTENT_TYPE}\`, \`Content-Disposition\` com \`.xlsx\` e \`X-Export-Count\`. A primeira aba tem os dados, com o cabeçalho preso e largura nas colunas; a aba "Sobre" tem o título, a data, o total, o escopo, os filtros, o modelo e os campos. O tipo do campo decide a célula: texto (telefone, CPF, CNS, CEP, listas, Sim/Não) é sempre texto, nunca fórmula; dinheiro é número com o formato "R$ #.##0,00"; data e data e hora são datas (dd/mm/aaaa e dd/mm/aaaa hh:mm; "criado em" no horário de Brasília). Mesmo limite do CSV. O relatório de cadastros também sai em \`xlsx\`, uma aba por seção.
+- \`format\`: \`csv\`, \`xlsx\` ou \`pdf\` (JSON \`{ title, filename, count, filters, modelo, columns, rows }\`; nos Lançamentos, com o campo \`amount\` nas colunas, também \`totais: [{ rotulo, valor }]\` e, havendo transferência, \`notaDosTotais\`).
+- **Excel (\`xlsx\`):** \`${XLSX_CONTENT_TYPE}\`, \`Content-Disposition\` com \`.xlsx\` e \`X-Export-Count\`. A primeira aba tem os dados, com o cabeçalho preso e largura nas colunas; a aba "Sobre" tem o título, a data, o total, o escopo, os filtros, o modelo e os campos. O tipo do campo decide a célula: texto (telefone, CPF, CNS, CEP, listas, Sim/Não) é sempre texto, nunca fórmula; dinheiro é número com o formato "R$ #.##0,00"; data e data e hora são datas (dd/mm/aaaa e dd/mm/aaaa hh:mm; "criado em" no horário de Brasília). Mesmo limite do CSV. **Totais (só nos Lançamentos, com \`amount\` nas colunas):** depois dos dados, uma linha em branco e "Total de entradas" e/ou "Total de saídas" (valor em moeda na coluna do Valor), sem as transferências entre caixas (com a nota, se houver); os mesmos totais na aba "Sobre". O CSV não tem totais. O relatório de cadastros também sai em \`xlsx\`, uma aba por seção.
 - \`modelo\`: id ou nome do modelo (só para a auditoria e o PDF). \`confirmed\` (inscrições): só as confirmadas.
 - \`pdfDoNavegador\` (boolean, só com \`format=csv\`, em todos os conjuntos, inclusive \`cadastros\`): o painel monta o PDF no navegador a partir deste CSV. **A resposta é a mesma** (CSV, mesmos cabeçalhos); a Auditoria grava "Exportou o relatório em PDF" e \`details.formato\` \`pdf\`, em vez de planilha CSV.
 - Limites: ${EXPORT_LIMITS.rows} linhas, ${EXPORT_LIMITS.pdfRows} no PDF, ${EXPORT_LIMITS.fields} campos.

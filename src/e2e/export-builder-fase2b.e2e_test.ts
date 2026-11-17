@@ -333,7 +333,7 @@ descontoCents: 500 },
         expect(catalog).toMatchObject({ dataset: 'finance-transactions',
 title: 'Lançamentos' });
         expect(catalog.padrao).toHaveLength(13);
-        expect(catalog.modelos.map(m => m.id)).toEqual(['resumido']);
+        expect(catalog.modelos.map(m => m.id)).toEqual(['resumido', 'contabilidade']);
         expect(catalog.groups.map(g => g.name)).toEqual(['Lançamento', 'Valores', 'Favorecido', 'Nota de Empenho', 'Sistema', 'Relatório']);
         // O filtro "Forma" da tela; a coluna continua "Método".
         expect(catalog.filterLabels).toMatchObject({ method: 'Forma de pagamento' });

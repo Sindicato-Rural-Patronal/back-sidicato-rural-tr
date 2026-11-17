@@ -3,7 +3,7 @@ import { endOfDay, financeFiltersSchema } from '../../list-finance-transactions.
 import { describePeriod } from '../filters.js';
 import { ymd } from '../format.js';
 import { reportFields } from './person-fields.js';
-import type { ExportField, ExportFilterDescription, ExportSource } from './types.js';
+import type { ExportField, ExportFilterDescription, ExportSource, ExportTotals } from './types.js';
 
 // Fonte `finance-transactions`: os lançamentos do Financeiro (permissão
 // READ_FINANCE), com os mesmos filtros, busca e ordem (`orderBy`) da lista e
@@ -211,6 +211,42 @@ const PADRAO = [
     'recurring', 'amount', 'notes',
 ];
 
+export const TRANSFER_NOTE = 'Transferências entre caixas não entram nos totais.';
+
+/**
+ * Os totais do relatório (SR-131), com a regra da tela de Lançamentos
+ * (`sumTransactions`): soma por tipo, sem as transferências entre caixas e sem
+ * os "só nota" (sem tipo). Saem as linhas dos tipos que aparecem no arquivo (os
+ * dois quando ele mistura) e, se tem alguma perna de transferência, a nota.
+ * Centavos inteiros, nunca float.
+ */
+export function financeExportTotals(rows: Row[]): ExportTotals | null {
+    let inCents = 0;
+    let outCents = 0;
+    let hasIn = false;
+    let hasOut = false;
+    let hasTransfer = false;
+    for (const t of rows) {
+        if (t.transferId) hasTransfer = true;
+        if (t.type === 'IN') {
+            hasIn = true;
+            if (!t.transferId) inCents += t.amountCents;
+        } else if (t.type === 'OUT') {
+            hasOut = true;
+            if (!t.transferId) outCents += t.amountCents;
+        }
+    }
+    const lines = [
+        ...(hasIn ? [{ label: 'Total de entradas',
+cents: inCents }] : []),
+        ...(hasOut ? [{ label: 'Total de saídas',
+cents: outCents }] : []),
+    ];
+    if (!lines.length && !hasTransfer) return null;
+    return hasTransfer ? { lines,
+note: TRANSFER_NOTE } : { lines };
+}
+
 /**
  * "Período: 01/01/2026 a 31/01/2026 · Tipo: Saída · Categoria: INSUMOS ·
  * Caixa: BANCO · Forma de pagamento: PIX · Busca: coop · Ordem: Nº". Categoria
@@ -252,9 +288,17 @@ export const financeTransactionsSource: ExportSource<Row, FinanceFilters> = {
     describeFilters,
     fields: [...financeFields, ...reportFields<Row>()],
     padrao: PADRAO,
-    modelos: [{ id: 'resumido',
+    modelos: [
+        { id: 'resumido',
 name: 'Resumido',
-fields: ['number', 'date', 'description', 'payeeName', 'amount'] }],
+fields: ['number', 'date', 'description', 'payeeName', 'amount'] },
+        // Para a contabilidade (SR-131). Não filtra: quem quer só receitas filtra "Entradas" na tela.
+        { id: 'contabilidade',
+name: 'Contabilidade',
+fields: ['number', 'date', 'payeeName', 'payeeDocument', 'description', 'category', 'method', 'amount'] },
+    ],
+    totals: { key: 'amount',
+compute: financeExportTotals },
     // `to` é um dia: inclui o dia inteiro, como a lista.
     query: (repo, { from, to, ...rest }, take) => repo.financeTransactions({ ...rest,
 from,

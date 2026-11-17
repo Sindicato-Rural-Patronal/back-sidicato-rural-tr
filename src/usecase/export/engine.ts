@@ -9,10 +9,10 @@ import {
 import { todayInBrazil } from '../../lib/quote-products.js';
 import { buildXlsx, type XlsxCell } from '../../lib/xlsx.js';
 import { EXPORT_DATASETS } from './datasets.js';
-import { formatCep, formatCnpj, formatCns, formatCpf, formatPhone, registros, slug, ymd } from './format.js';
+import { formatCep, formatCnpj, formatCns, formatCpf, formatPhone, registros, reais, slug, ymd } from './format.js';
 import type { AnyExportSource } from './catalog/index.js';
 import type { ExportField, ExportFieldType, ExportFilterDescription } from './catalog/types.js';
-import { SCOPE_WORDS, aboutSheet, brasiliaWallClock, dataSheet, xlsxCell } from './xlsx.js';
+import { SCOPE_WORDS, aboutSheet, brasiliaWallClock, dataSheet, withTotals, xlsxCell } from './xlsx.js';
 
 // O motor do montador de relatórios (decisão 006): lê o pedido (`fields`,
 // `format`, `modelo`), resolve os campos do catálogo, confere permissões e
@@ -87,6 +87,16 @@ export type ExportPdf = {
     modelo: string | null;
     columns: ExportPdfColumn[];
     rows: string[][];
+    /**
+     * Totais para o front desenhar depois da tabela (SR-131), só quando a fonte
+     * tem totais e o campo do valor está nos `fields`. Ausente quando não se aplica.
+     */
+    totais?: {
+ rotulo: string;
+valor: string 
+}[];
+    /** A nota que explica os totais ("Transferências entre caixas não entram nos totais."). */
+    notaDosTotais?: string;
 };
 
 /** `AuditLog.details` de uma exportação (decisão 006, item 7.2). */
@@ -384,6 +394,13 @@ valor: registros(filters.ids.length) }]
         linhas: count,
     };
 
+    // Totais (SR-131): só no Excel e no PDF do montador (com `fields`; sem eles
+    // o padrão de hoje não muda) e só com o campo do valor nas colunas.
+    const totalsSpec = source.totals;
+    const totals = totalsSpec && format !== 'csv' && !legacy && fields.some(f => f.key === totalsSpec.key)
+        ? totalsSpec.compute(rows)
+        : null;
+
     const common = { format,
 count,
 filename,
@@ -395,9 +412,18 @@ csv: toCsv(csvColumns(fields, today, legacy), indexed(rows)) } };
     }
     if (format === 'xlsx') {
         const filtersLine = filtersText(filtros);
+        const data = dataSheet(meta.title, fields, rows, (f, row, index) => fieldXlsxCell(f, row, { today,
+index }, legacy));
+        const aboutTotals: [string, XlsxCell][] = totals
+            ? [
+                ...totals.lines.map(l => [l.label, { kind: 'money',
+value: l.cents / 100 }] as [string, XlsxCell]),
+                ...(totals.note ? [['Observação', { kind: 'text',
+value: totals.note }] as [string, XlsxCell]] : []),
+            ]
+            : [];
         const xlsx = buildXlsx([
-            dataSheet(meta.title, fields, rows, (f, row, index) => fieldXlsxCell(f, row, { today,
-index }, legacy)),
+            totals && totalsSpec ? withTotals(data, fields, totalsSpec.key, totals) : data,
             aboutSheet([
                 ['Relatório', { kind: 'text',
 value: meta.title }],
@@ -405,6 +431,7 @@ value: meta.title }],
 value: brasiliaWallClock(now) }],
                 ['Registros', { kind: 'number',
 value: count }],
+                ...aboutTotals,
                 ['Escopo', { kind: 'text',
 value: SCOPE_WORDS[scope] ?? scope }],
                 ...(filtersLine ? [['Filtros', { kind: 'text',
@@ -432,6 +459,9 @@ weight: f.weight ?? TYPE_WEIGHT[f.type] })),
         rows: rows.map((row, i) =>
             fields.map(f => cellDisplay(cellValue(f.type, f.value(row, { today,
 index: i + 1 }), legacy)))),
+        ...(totals?.lines.length ? { totais: totals.lines.map(l => ({ rotulo: l.label,
+valor: reais(l.cents) })) } : {}),
+        ...(totals?.note ? { notaDosTotais: totals.note } : {}),
     };
     return { result: { ...common,
 csv: '',
