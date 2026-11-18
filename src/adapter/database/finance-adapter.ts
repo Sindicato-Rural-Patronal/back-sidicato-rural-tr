@@ -571,6 +571,7 @@ outCents: 0 };
         if (filters.type) where.type = filters.type;
         if (filters.categoryId) where.categoryId = filters.categoryId;
         if (filters.accountId) where.accountId = filters.accountId;
+        if (filters.excludeTransfers) where.transferId = null;
         if (filters.from || filters.to) {
             where.date = {
                 ...(filters.from ? { gte: filters.from } : {}),

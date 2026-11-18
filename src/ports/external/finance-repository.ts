@@ -130,6 +130,8 @@ export type FinanceTransactionFilters = {
     search?: string;
     /** Ordem: `date` (padrão) ou `number`, os dois do mais novo para o mais antigo. */
     orderBy?: 'date' | 'number';
+    /** Sem as pernas de transferência entre caixas (`transferId` nulo): a lista, o total e os totais. */
+    excludeTransfers?: boolean;
     skip: number;
     take: number;
 };

@@ -1,6 +1,6 @@
 import { csvMoney } from '../../lib/csv.js';
 import type { XlsxCell, XlsxSheet } from '../../lib/xlsx.js';
-import type { ExportField, ExportFieldType } from './catalog/types.js';
+import type { ExportField, ExportFieldType, ExportTotals } from './catalog/types.js';
 
 // O montador em Excel (.xlsx, SR-104): o tipo do campo no catálogo decide a
 // célula. Texto continua texto (telefone, CPF, CNS e CEP nunca viram número),
@@ -116,6 +116,44 @@ export function dataSheet<Row>(
         widths: fields.map((f, col) => columnWidth(f.label, f.type, table.map(r => r[col]))),
         rows: table,
     };
+}
+
+/**
+ * Os totais depois da última linha de dados (SR-131): uma linha em branco, uma
+ * linha por total (rótulo na primeira coluna e o valor, em moeda, na coluna de
+ * `key`; se ela é a primeira, o rótulo vai na segunda) e a nota numa linha só
+ * de texto. Não mexe nos dados nem no cabeçalho; só alarga a coluna do rótulo
+ * (quando o valor vem logo ao lado) e a do valor, para nada ficar cortado.
+ */
+export function withTotals<Row>(sheet: XlsxSheet, fields: ExportField<Row>[], key: string, totals: ExportTotals): XlsxSheet {
+    const valueCol = fields.findIndex(f => f.key === key);
+    if (valueCol < 0) return sheet;
+    const labelCol = valueCol === 0 ? 1 : 0;
+    const at = (col: number, cell: XlsxCell): XlsxCell[] => {
+        const row: XlsxCell[] = Array.from({ length: col + 1 }, () => null);
+        row[col] = cell;
+        return row;
+    };
+    const extra: XlsxCell[][] = [[]];
+    const widths = [...sheet.widths];
+    for (const line of totals.lines) {
+        const row = at(valueCol, { kind: 'money',
+value: line.cents / 100 });
+        while (row.length <= labelCol) row.push(null);
+        row[labelCol] = { kind: 'text',
+value: line.label,
+bold: true };
+        extra.push(row);
+        if (labelCol + 1 === valueCol) widths[labelCol] = Math.max(widths[labelCol] ?? 0, line.label.length + 4);
+    }
+    if (totals.note) extra.push(at(labelCol, { kind: 'text',
+value: totals.note }));
+    while (widths.length <= labelCol) widths.push(MIN_WIDTH);
+    const rows = [...sheet.rows, ...extra];
+    widths[valueCol] = columnWidth(fields[valueCol].label, fields[valueCol].type, rows.map(r => r[valueCol] ?? null));
+    return { ...sheet,
+widths,
+rows };
 }
 
 /** "Sobre": o que é a planilha, em pares rótulo e valor. */

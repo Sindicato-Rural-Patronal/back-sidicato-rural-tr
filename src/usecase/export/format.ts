@@ -73,6 +73,13 @@ export function registros(n: number): string {
     return `${milhar(n)} registro${n === 1 ? '' : 's'}`;
 }
 
+/** Centavos inteiros em reais, sem float: 123456 → "R$ 1.234,56"; -50 → "-R$ 0,50". */
+export function reais(cents: number): string {
+    const abs = Math.abs(cents);
+    const value = `${milhar(Math.floor(abs / 100))},${String(abs % 100).padStart(2, '0')}`;
+    return `${cents < 0 ? '-' : ''}R$ ${value}`;
+}
+
 export function ymd(d: Date): string {
     return d.toISOString().slice(0, 10);
 }

@@ -468,7 +468,7 @@ properties: { id: { type: 'string' } } },
             schema: {
                 tags,
                 summary: 'List financial transactions',
-                description: `Paginado, com filtros: from, to, type, categoryId, accountId, method, search e orderBy. ${SEARCH_DOC} ${ORDER_DOC} \`totals\` soma entradas e saídas de todos os lançamentos filtrados (sem transferências entre caixas nem "só nota").`,
+                description: `Paginado, com filtros: from, to, type, categoryId, accountId, method, search, orderBy e excludeTransfers. ${SEARCH_DOC} ${ORDER_DOC} \`excludeTransfers\` (\`true\`/\`false\`; outro valor → 400): \`true\` tira as duas pernas das transferências entre caixas da lista, do \`total\` e dos \`totals\`; \`false\` ou ausente não muda nada. \`totals\` soma entradas e saídas de todos os lançamentos filtrados (sem transferências entre caixas nem "só nota").`,
                 querystring: {
                     type: 'object',
                     properties: {
@@ -489,6 +489,8 @@ enum: ['IN', 'OUT'] },
 example: 'PIX' },
                         search: { type: 'string' },
                         orderBy: orderByQuery,
+                        excludeTransfers: { type: 'string',
+example: 'true' },
                     },
                 },
                 response: {

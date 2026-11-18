@@ -51,6 +51,18 @@ export type ExportFilterDescription = {
     valor: string;
 };
 
+/** Uma linha de total do relatório: o rótulo e o valor em centavos inteiros. */
+export type ExportTotalsLine = {
+    label: string;
+    cents: number;
+};
+
+/** Os totais de um relatório (SR-131): as linhas e, se for o caso, a nota que as explica. */
+export type ExportTotals = {
+    lines: ExportTotalsLine[];
+    note?: string;
+};
+
 export type EngineDataset =
     | 'people' | 'registrations' | 'companies' | 'properties' | 'admins' | 'courses' | 'contact-messages' | 'unimed'
     | 'audit-logs' | 'room-bookings' | 'finance-transactions';
@@ -87,6 +99,15 @@ export type ExportSource<Row, Filters extends { ids?: string[] }> = {
  path: PropertyKey[];
 message: string 
 }) => string;
+    /**
+     * Totais no Excel e no JSON do PDF (SR-131), só quando o campo `key` (um
+     * valor em reais) está entre os `fields`. `compute` soma as linhas que
+     * saíram, em centavos inteiros; null = sem totais. O CSV não tem totais.
+     */
+    totals?: {
+        key: string;
+        compute: (rows: Row[]) => ExportTotals | null;
+    };
     /** Parâmetros que só ordenam as linhas: não fazem a exportação ser "com filtros". */
     sortKeys?: string[];
 };
