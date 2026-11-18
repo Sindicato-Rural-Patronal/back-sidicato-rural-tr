@@ -805,6 +805,7 @@ Testes do `pdfDoNavegador` (SR-125): `usecase/__tests__/export-pdf-navegador_tes
   | `agenda` | Agenda (Painel Geral › Imprimir) | `READ_COURSE` | Responsável |
   | `financeiro` | Relatório do Financeiro ("Baixar PDF") | `READ_FINANCE` | — |
   | `relatorio-despesas` | Relatório de despesas | `READ_FINANCE` | — |
+  | `relatorio-receitas` | Relatório de receitas (Visão geral do Financeiro; lista quem pagou) | `READ_FINANCE` | CNPJ / CPF |
   | `nota-empenho` | Nota de Empenho | `READ_FINANCE` | CNPJ / CPF, Endereço, Telefone, Banco |
   | `recibo` | Recibo | `READ_FINANCE` | — |
   | `unimed-ficha` | Ficha da Unimed | `READ_USER` | CPF, RG, CNS, Nascimento, Nome da mãe, Plano |
