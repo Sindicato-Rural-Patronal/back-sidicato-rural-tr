@@ -40,6 +40,7 @@ function memoryRepo() {
             const row: ReportTemplateModel = {
                 id: randomUUID(),
                 ...data,
+                filters: data.filters as ReportTemplateModel['filters'],
                 updatedById: null,
                 isDeleted: false,
                 deletedAt: null,
@@ -198,6 +199,7 @@ name: 'Corrida',
 fields: ['name'],
 format: null,
 confirmed: null,
+filters: null,
 createdById: 'x' });
         const r = await useCase.create('people', { name: 'corrida',
 fields: ['name'] }, maria);
@@ -223,6 +225,7 @@ name: `M${i}`,
 fields: ['name'],
 format: null,
 confirmed: null,
+filters: null,
 createdById: 'x' });
         }
         const r = await useCase.create('people', { name: 'Mais um',
@@ -273,6 +276,7 @@ name: 'Antigo',
 fields: ['name', 'campoQueSaiu', 'cpf'],
 format: 'csv',
 confirmed: null,
+filters: null,
 createdById: 'admin-maria' });
         const [t] = (await useCase.list('people')).templates!;
         expect(t.fields).toEqual(['name', 'cpf']);
@@ -411,6 +415,7 @@ name: 'Velho',
 fields: ['name', 'campoQueSaiu'],
 format: null,
 confirmed: false,
+filters: null,
 createdById: 'x' });
         expect((await useCase.remove('registrations', row.id, joana)).error).toBeUndefined();
     });

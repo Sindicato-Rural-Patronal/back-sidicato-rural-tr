@@ -376,6 +376,10 @@ model ReportTemplate {
   format      String?
   // Só em "registrations": o modelo liga "Só confirmadas". null nos outros.
   confirmed   Boolean?
+  // Visões da tela (decisão 007): os filtros que a visão liga, só nas fontes
+  // com visões (finance-transactions). null = não guarda filtros (aplica só
+  // as colunas), como os modelos salvos antes da SR-149.
+  filters     Json?
   // UserAdmin.id de quem criou e de quem mudou por último (inclusive quem
   // excluiu). Histórico, sem FK, como FinancialTransaction.createdBy.
   createdById String

@@ -7,6 +7,7 @@ import { EXPORT_LIMITS } from '../../usecase/export/engine.js';
 import {
     ReportTemplatesUseCase, TEMPLATE_LIMITS, TEMPLATE_MESSAGES,
 } from '../../usecase/export/report-templates.js';
+import { VISAO_MESSAGES, VISAO_PERIODOS, sourceHasVisoes } from '../../usecase/export/visoes.js';
 import { setAuditLabel } from '../audit-hooks.js';
 import { errorToStatus } from '../lib/require-permission.js';
 import { adminOf, requiresFrom } from '../lib/route-auth.js';
@@ -24,6 +25,7 @@ const str = { type: 'string' };
 const nstr = { type: 'string',
 nullable: true };
 const builderDatasets = Object.keys(EXPORT_SOURCES).join(', ');
+const VISOES_DATASETS = Object.entries(EXPORT_SOURCES).filter(([, s]) => sourceHasVisoes(s)).map(([d]) => d).join(', ');
 
 const datasetProp = { type: 'string',
 enum: Object.keys(EXPORT_DATASETS) };
@@ -56,6 +58,10 @@ items: str },
         // Só em registrations ("Só confirmadas"); null nos outros.
         confirmed: { type: 'boolean',
 nullable: true },
+        // Visões da lista (decisão 007; só finance-transactions): os filtros que a visão liga. null = nenhum.
+        filters: { type: 'object',
+nullable: true,
+additionalProperties: true },
         createdAt: { type: 'string',
 format: 'date-time' },
         updatedAt: { type: 'string',
@@ -79,10 +85,15 @@ nullable: true,
 description: 'Formato preferido: `csv`, `pdf` ou `xlsx`; null (ou ausente ao criar) = sem preferência.' },
     confirmed: { type: 'boolean',
 description: 'Só em `registrations`: o modelo liga "Só confirmadas" (ao criar, ausente = false). Ignorado nos outros conjuntos.' },
+    // Sem tipo de propósito: quem confere e responde em português é o use case.
+    filters: {
+        description: `Só nos conjuntos com visões (decisão 007; hoje ${VISOES_DATASETS}): os filtros que a visão liga. Chaves: os filtros da lista menos from, to, search e ids, mais \`periodo\` (${VISAO_PERIODOS.join(', ')}). Valor null ou "" (e false nos de sim/não) não é guardado; sem nenhum ligado, fica null. Os valores passam pelo schema da lista. Até 2 KB. No PATCH, null tira os filtros. Nos outros conjuntos → 400 "${VISAO_MESSAGES.notSupported}" (null é ignorado). Erro → 400 "Filtro inválido na visão: <campo>." ou "${VISAO_MESSAGES.tooBig}".`,
+    },
 };
 
 const errors = `- Conjunto sem montador (hoje só ${builderDatasets} têm) → 404 "${NO_BUILDER_MESSAGE}"; conjunto desconhecido → 400.
-- Mesma permissão da exportação do conjunto (READ_USER em people, READ_COURSE em registrations…).`;
+- Mesma permissão da exportação do conjunto (READ_USER em people, READ_COURSE em registrations…).
+- Nos conjuntos com visões (${VISOES_DATASETS}), o modelo da equipe é a **visão da lista** (decisão 007): guarda também \`filters\`; os 409 de nome dizem "${TEMPLATE_MESSAGES.visaoNameTaken}" e "${TEMPLATE_MESSAGES.visaoFactoryName}" (os nomes e ids das visões de fábrica também contam); a auditoria diz "Criou a visão "Lançamentos: …"" (entidade "Visão da lista") e \`changes.filters\` traz os filtros em palavras.`;
 
 type Params = { dataset: ExportDataset };
 type IdParams = Params & { id: string };

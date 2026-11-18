@@ -177,6 +177,41 @@ const transactionResponse = {
     additionalProperties: true,
 };
 
+// A linha da lista: o lançamento e, com `fields` (decisão 007), as células.
+const transactionListItem = {
+    type: 'object',
+    properties: {
+        ...transactionProperties,
+        cells: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Só com `fields`: o texto de cada coluna, na ordem de `columns`, formatado como no PDF da exportação ("" = vazio).',
+        },
+    },
+    additionalProperties: true,
+};
+
+// Só com `fields`: as colunas pedidas, na ordem.
+const listColumns = {
+    type: 'array',
+    description: 'Só com `fields`: as colunas pedidas, na ordem, com o tipo, a largura relativa (a do PDF) e a privacidade do catálogo.',
+    items: {
+        type: 'object',
+        properties: {
+            key: { type: 'string',
+example: 'payeeDocument' },
+            label: { type: 'string',
+example: 'CNPJ / CPF' },
+            type: { type: 'string',
+example: 'text' },
+            weight: { type: 'number',
+example: 2 },
+            privacy: { type: 'string',
+enum: ['comum', 'pessoal', 'sensivel'] },
+        },
+    },
+};
+
 // Recorrência: molde do lançamento que se repete todo mês. Meses em "AAAA-MM".
 const recurrenceBody = {
     type: 'object',
@@ -468,7 +503,9 @@ properties: { id: { type: 'string' } } },
             schema: {
                 tags,
                 summary: 'List financial transactions',
-                description: `Paginado, com filtros: from, to, type, categoryId, accountId, method, search, orderBy e excludeTransfers. ${SEARCH_DOC} ${ORDER_DOC} \`excludeTransfers\` (\`true\`/\`false\`; outro valor → 400): \`true\` tira as duas pernas das transferências entre caixas da lista, do \`total\` e dos \`totals\`; \`false\` ou ausente não muda nada. \`totals\` soma entradas e saídas de todos os lançamentos filtrados (sem transferências entre caixas nem "só nota").`,
+                description: `Paginado, com filtros: from, to, type, categoryId, accountId, method, search, orderBy e excludeTransfers. ${SEARCH_DOC} ${ORDER_DOC} \`excludeTransfers\` (\`true\`/\`false\`; outro valor → 400): \`true\` tira as duas pernas das transferências entre caixas da lista, do \`total\` e dos \`totals\`; \`false\` ou ausente não muda nada. \`totals\` soma entradas e saídas de todos os lançamentos filtrados (sem transferências entre caixas nem "só nota").
+
+**Colunas do catálogo** (decisão 007, visões da tela): \`fields\` = chaves do catálogo de \`finance-transactions\` (\`GET /admin/export/finance-transactions/catalog\`) separadas por vírgula, na ordem das colunas, de 1 a 80, sem repetir. Com \`fields\`, a resposta ganha \`columns\` e cada linha ganha \`cells\`: os textos formatados como no PDF da exportação (mesmo catálogo e mesma função de célula; sem o apóstrofo contra fórmula; vazio = ""). O \`ordinal\` (Nº de ordem) começa em (page − 1) × limit + 1. Sem \`fields\`, a resposta é exatamente a de antes. Erros 400: "Escolha pelo menos um campo.", "Campo desconhecido: <chave>.", "Campo repetido: <rótulo>.", "No máximo 80 campos por relatório."; 403 "Sem permissão para exportar: …" (campo com permissão própria; hoje nenhum). Ver a lista não grava linha na auditoria.`,
                 querystring: {
                     type: 'object',
                     properties: {
@@ -491,15 +528,19 @@ example: 'PIX' },
                         orderBy: orderByQuery,
                         excludeTransfers: { type: 'string',
 example: 'true' },
+                        fields: { type: 'string',
+example: 'number,date,payeeDocument,amount',
+description: 'Chaves do catálogo, na ordem das colunas (decisão 007). Com elas, `columns` e `cells`.' },
                     },
                 },
                 response: {
                     200: {
                         type: 'object',
                         properties: {
-                            // Lançamento com categoria, caixa, empenho e comprovantes: vai inteiro.
+                            // Lançamento com categoria, caixa, empenho e comprovantes: vai inteiro (e `cells`, com `fields`).
                             data: { type: 'array',
-items: transactionResponse },
+items: transactionListItem },
+                            columns: listColumns,
                             total: { type: 'integer' },
                             page: { type: 'integer' },
                             limit: { type: 'integer' },
@@ -513,6 +554,7 @@ items: transactionResponse },
                             },
                         },
                     },
+                    400: errorResponse,
                     401: errorResponse,
                     403: errorResponse,
                 },

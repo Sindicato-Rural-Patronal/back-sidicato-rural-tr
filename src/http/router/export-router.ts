@@ -38,6 +38,8 @@ const builderParams = {
 description: '`csv` (padrão), `xlsx` (planilha do Excel, gerada aqui, com o mesmo limite do CSV) ou `pdf` (devolve o JSON para o painel desenhar o PDF). PDF só nos conjuntos com montador; `xlsx` também no relatório de cadastros, sem `fields` (uma aba por seção).' },
     modelo: { type: 'string',
 description: 'Id ou nome do modelo usado (até 64). Só vai para a auditoria e o cabeçalho do PDF.' },
+    visao: { type: 'string',
+description: 'Nome (ou id de fábrica) da visão da tela que gerou a exportação (decisão 007; até 64), no lugar de `modelo`: o JSON do PDF traz `visao` (e `modelo: null`), a aba "Sobre" do Excel diz "Visão" e a auditoria guarda o nome em `details.modelo`. Com `modelo` e `visao` juntos → 400 "Use modelo ou visao, não os dois.". Ausente = como sempre.' },
     confirmed: { type: 'boolean',
 description: 'Só em `registrations`: true = só as inscrições confirmadas.' },
     pdfDoNavegador: { type: 'boolean',
@@ -54,6 +56,8 @@ const pdfResponse = {
         filters: { type: 'string' },
         modelo: { type: 'string',
 nullable: true },
+        // Só quando o pedido trouxe `visao` (decisão 007): o cabeçalho diz "Visão: <nome>".
+        visao: { type: 'string' },
         columns: {
             type: 'array',
             items: {
@@ -137,6 +141,23 @@ items: { type: 'string' } },
                 },
             },
         },
+        // Só nas fontes cuja lista tem visões (decisão 007; hoje finance-transactions). A primeira é a Padrão.
+        visoes: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    id: { type: 'string' },
+                    name: { type: 'string' },
+                    fields: { type: 'array',
+items: { type: 'string' } },
+                    // Os filtros que a visão liga (periodo relativo: mes-atual, mes-passado, ano-atual, ultimos-12-meses); null = nenhum.
+                    filters: { type: 'object',
+nullable: true,
+additionalProperties: true },
+                },
+            },
+        },
         filterLabels: { type: 'object',
 additionalProperties: { type: 'string' } },
         limits: {
@@ -166,7 +187,7 @@ export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClien
 - \`fields\`: chaves do catálogo na ordem das colunas. **Sem \`fields\` sai exatamente o CSV de hoje** (o modelo padrão). Com \`fields\`, telefone e CNS saem com máscara.
 - \`format\`: \`csv\`, \`xlsx\` ou \`pdf\` (JSON \`{ title, filename, count, filters, modelo, columns, rows }\`; nos Lançamentos, com o campo \`amount\` nas colunas, também \`totais: [{ rotulo, valor }]\` e, havendo transferência, \`notaDosTotais\`).
 - **Excel (\`xlsx\`):** \`${XLSX_CONTENT_TYPE}\`, \`Content-Disposition\` com \`.xlsx\` e \`X-Export-Count\`. A primeira aba tem os dados, com o cabeçalho preso e largura nas colunas; a aba "Sobre" tem o título, a data, o total, o escopo, os filtros, o modelo e os campos. O tipo do campo decide a célula: texto (telefone, CPF, CNS, CEP, listas, Sim/Não) é sempre texto, nunca fórmula; dinheiro é número com o formato "R$ #.##0,00"; data e data e hora são datas (dd/mm/aaaa e dd/mm/aaaa hh:mm; "criado em" no horário de Brasília). Mesmo limite do CSV. **Totais (só nos Lançamentos, com \`amount\` nas colunas):** depois dos dados, uma linha em branco e "Total de entradas" e/ou "Total de saídas" (valor em moeda na coluna do Valor), sem as transferências entre caixas (com a nota, se houver); os mesmos totais na aba "Sobre". O CSV não tem totais. O relatório de cadastros também sai em \`xlsx\`, uma aba por seção.
-- \`modelo\`: id ou nome do modelo (só para a auditoria e o PDF). \`confirmed\` (inscrições): só as confirmadas.
+- \`modelo\`: id ou nome do modelo (só para a auditoria e o PDF). \`visao\` (decisão 007): o nome da visão da tela, no lugar de \`modelo\`; o PDF traz \`visao\` e a aba "Sobre" diz "Visão". \`confirmed\` (inscrições): só as confirmadas.
 - \`pdfDoNavegador\` (boolean, só com \`format=csv\`, em todos os conjuntos, inclusive \`cadastros\`): o painel monta o PDF no navegador a partir deste CSV. **A resposta é a mesma** (CSV, mesmos cabeçalhos); a Auditoria grava "Exportou o relatório em PDF" e \`details.formato\` \`pdf\`, em vez de planilha CSV.
 - Limites: ${EXPORT_LIMITS.rows} linhas, ${EXPORT_LIMITS.pdfRows} no PDF, ${EXPORT_LIMITS.fields} campos.
 - Erros 400: "Escolha pelo menos um campo.", "Campo desconhecido: <chave>.", "Campo repetido: <rótulo>.", "No máximo 80 campos por relatório.", "Formato inválido: use csv, pdf ou xlsx.", "pdfDoNavegador só vale para o CSV." (com xlsx ou pdf), \`Valor inválido em "pdfDoNavegador": esperado verdadeiro ou falso.\` (não boolean), "O relatório passa de 20.000 linhas. Use um filtro para diminuir.", "O PDF aceita até 2.000 linhas. Baixe a planilha ou use um filtro.", "${NO_BUILDER_MESSAGE}" (fields ou PDF num conjunto sem montador).
@@ -271,6 +292,7 @@ schema: schema('POST') },
 
 - O campo sem permissão vem com \`allowed: false\` e o motivo em \`reason\` ("Pede a permissão Visualizar usuários"): o montador mostra desligado.
 - Conjunto sem montador (hoje só ${builderDatasets} têm) → 404 "${NO_BUILDER_MESSAGE}".
+- \`visoes\` (decisão 007, só em finance-transactions; ausente nas outras): as visões de fábrica da lista, \`{ id, name, fields, filters }\`, a primeira é a Padrão (\`padrao-tela\`). \`filters\` são os filtros que a visão liga (\`periodo\` relativo: mes-atual, mes-passado, ano-atual ou ultimos-12-meses); null = não mexe nos filtros da tela.
 - Mesma permissão da exportação do conjunto.`,
                 params: datasetParams,
                 response: {

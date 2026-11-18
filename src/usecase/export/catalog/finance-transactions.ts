@@ -1,5 +1,5 @@
 import type { FinanceTransactionExportRow, ExportRepository } from '../../../ports/external/export-repository.js';
-import { endOfDay, financeFiltersSchema } from '../../list-finance-transactions.js';
+import { endOfDay, financeFiltersSchema } from '../../finance-filters.js';
 import { describePeriod } from '../filters.js';
 import { ymd } from '../format.js';
 import { reportFields } from './person-fields.js';
@@ -300,6 +300,30 @@ fields: ['number', 'date', 'description', 'payeeName', 'amount'] },
         { id: 'contabilidade',
 name: 'Contabilidade',
 fields: ['number', 'date', 'type', 'payeeName', 'payeeDocument', 'description', 'category', 'method', 'amount'] },
+    ],
+    // Visões de fábrica da tela de Lançamentos (decisão 007). A primeira é a
+    // Padrão (as 8 colunas que a tabela sempre teve). Só a Contabilidade liga
+    // filtros: Entradas, sem transferências entre caixas, mês passado.
+    visoes: [
+        { id: 'padrao-tela',
+name: 'Padrão',
+fields: ['number', 'date', 'description', 'payeeName', 'category', 'account', 'method', 'amount'],
+filters: null },
+        { id: 'contabilidade',
+name: 'Contabilidade',
+fields: ['number', 'date', 'type', 'payeeName', 'payeeDocument', 'description', 'category', 'method', 'amount'],
+filters: { type: 'IN',
+excludeTransfers: true,
+periodo: 'mes-passado' } },
+        // As 13 colunas da planilha de sempre: o CSV sai igual, byte a byte, ao sem `fields`.
+        { id: 'completa',
+name: 'Completa (como a planilha de antes)',
+fields: [...PADRAO],
+filters: null },
+        { id: 'resumida',
+name: 'Resumida',
+fields: ['number', 'date', 'description', 'payeeName', 'amount'],
+filters: null },
     ],
     totals: { key: 'amount',
 compute: financeExportTotals },

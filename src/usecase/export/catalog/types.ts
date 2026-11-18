@@ -45,6 +45,18 @@ export type ExportModelo = {
     confirmed?: boolean;
 };
 
+/**
+ * Visão de fábrica da tela (decisão 007): colunas, na ordem, e os filtros que
+ * ela liga (as chaves dos filtros da fonte, menos from/to/search/ids, mais
+ * `periodo` relativo). `filters: null` = não mexe nos filtros da tela.
+ */
+export type ExportVisao = {
+    id: string;
+    name: string;
+    fields: string[];
+    filters: Record<string, unknown> | null;
+};
+
 /** Um filtro em palavras, para o PDF e a auditoria. */
 export type ExportFilterDescription = {
     nome: string;
@@ -110,4 +122,10 @@ message: string
     };
     /** Parâmetros que só ordenam as linhas: não fazem a exportação ser "com filtros". */
     sortKeys?: string[];
+    /**
+     * Visões de fábrica da lista (decisão 007), a primeira é a Padrão. Só as
+     * fontes cuja lista tem visões (hoje, `finance-transactions`); só elas
+     * guardam `filters` nos modelos da equipe.
+     */
+    visoes?: ExportVisao[];
 };
