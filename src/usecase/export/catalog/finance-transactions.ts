@@ -33,6 +33,8 @@ const filterLabels = {
     method: 'Forma de pagamento',
     search: 'Busca',
     orderBy: 'Ordem',
+    // Filtro de sim/não: a linha "Filtros:" traz só o nome (`filtersText`).
+    excludeTransfers: 'Sem transferências entre caixas',
 };
 
 const TYPE_LABEL = { IN: 'Entrada',
@@ -275,6 +277,8 @@ valor: account ?? f.accountId });
 valor: f.method });
     if (f.search) out.push({ nome: filterLabels.search,
 valor: f.search });
+    if (f.excludeTransfers) out.push({ nome: filterLabels.excludeTransfers,
+valor: 'Sim' });
     // A ordem por data é a de sempre; só a por Nº é dita.
     if (f.orderBy === 'number') out.push({ nome: filterLabels.orderBy,
 valor: 'Nº' });
@@ -292,10 +296,10 @@ export const financeTransactionsSource: ExportSource<Row, FinanceFilters> = {
         { id: 'resumido',
 name: 'Resumido',
 fields: ['number', 'date', 'description', 'payeeName', 'amount'] },
-        // Para a contabilidade (SR-131). Não filtra: quem quer só receitas filtra "Entradas" na tela.
+        // Para a contabilidade (SR-131; o Tipo desde a SR-135, para separar entrada de saída num arquivo misto). Não filtra: quem quer só receitas filtra "Entradas" na tela.
         { id: 'contabilidade',
 name: 'Contabilidade',
-fields: ['number', 'date', 'payeeName', 'payeeDocument', 'description', 'category', 'method', 'amount'] },
+fields: ['number', 'date', 'type', 'payeeName', 'payeeDocument', 'description', 'category', 'method', 'amount'] },
     ],
     totals: { key: 'amount',
 compute: financeExportTotals },

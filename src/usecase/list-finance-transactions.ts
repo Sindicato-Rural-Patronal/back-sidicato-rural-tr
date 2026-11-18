@@ -19,6 +19,15 @@ export const financeFiltersSchema = z.object({
     search: z.preprocess(v => (v === '' ? undefined : v), z.string().optional()),
     // Ordem: data (padrão, a de sempre) ou Nº, os dois do mais novo para o mais antigo.
     orderBy: z.preprocess(v => (v === '' ? undefined : v), z.enum(['date', 'number']).optional()),
+    // Sem as duas pernas das transferências entre caixas (SR-135). "true"/"false"
+    // na query, boolean no corpo; outro valor é erro. `false` vale como ausente:
+    // nada muda (nem o escopo "com filtros" da auditoria).
+    excludeTransfers: z
+        .preprocess(
+            v => (v === '' || v == null ? undefined : v === 'true' ? true : v === 'false' ? false : v),
+            z.boolean().optional(),
+        )
+        .transform(v => (v ? true : undefined)),
 });
 
 /** `to` costuma vir como data (00:00 UTC) — inclui o dia inteiro. */
@@ -76,6 +85,7 @@ export class ListFinanceTransactionsUseCase {
             method: q.method,
             search: q.search,
             orderBy: q.orderBy,
+            excludeTransfers: q.excludeTransfers,
         };
 
         const [{ items, total }, sums] = await Promise.all([

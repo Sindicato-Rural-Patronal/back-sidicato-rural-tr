@@ -20,7 +20,7 @@ url,
 headers: bearer(token),
 payload });
 
-const CONTABILIDADE = ['number', 'date', 'payeeName', 'payeeDocument', 'description', 'category', 'method', 'amount'];
+const CONTABILIDADE = ['number', 'date', 'type', 'payeeName', 'payeeDocument', 'description', 'category', 'method', 'amount'];
 
 beforeAll(async () => {
     prisma = createTestPrisma();
@@ -126,7 +126,7 @@ valor: 'R$ 102,64' }],
             notaDosTotais: 'Transferências entre caixas não entram nos totais.',
         });
         expect(pdf.columns.map((c: { label: string }) => c.label)).toEqual(
-            ['Nº', 'Data', 'Nome / Razão social', 'CNPJ / CPF', 'Descrição', 'Categoria', 'Método', 'Valor (R$)'],
+            ['Nº', 'Data', 'Tipo', 'Nome / Razão social', 'CNPJ / CPF', 'Descrição', 'Categoria', 'Método', 'Valor (R$)'],
         );
     });
 });
@@ -148,9 +148,9 @@ search: 'maio' });
         expect(dados.rows).toHaveLength(4);
         expect(dados.rows[2]).toEqual([]);
         expect(dados.rows[3][0]).toBe('Total de entradas');
-        expect(dados.cells.get('H4')).toMatchObject({ style: 3,
+        expect(dados.cells.get('I4')).toMatchObject({ style: 3,
 value: '100.05' });
-        expect(dados.cells.get('H2')!.style).toBe(3);
+        expect(dados.cells.get('I2')!.style).toBe(3);
         expect(sobre.rows.find(([k]) => k === 'Registros')).toEqual(['Registros', '1']);
         expect(sobre.rows.find(([k]) => k === 'Total de entradas')).toEqual(['Total de entradas', '100.05']);
         expect(sobre.rows.find(([k]) => k === 'Filtros')).toEqual(['Filtros', 'Tipo: Entrada · Busca: maio']);
@@ -161,8 +161,8 @@ value: '100.05' });
         expect(res.headers['x-export-count']).toBe('5');
         expect(dados.rows.slice(6)).toEqual([
             [],
-            ['Total de entradas', '', '', '', '', '', '', '102.64'],
-            ['Total de saídas', '', '', '', '', '', '', '40'],
+            ['Total de entradas', '', '', '', '', '', '', '', '102.64'],
+            ['Total de saídas', '', '', '', '', '', '', '', '40'],
             ['Transferências entre caixas não entram nos totais.'],
         ]);
         expect(sobre.rows.map(([k]) => k)).toEqual(

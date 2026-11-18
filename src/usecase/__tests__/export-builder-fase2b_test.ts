@@ -388,7 +388,7 @@ name: 'Resumido',
 fields: ['number', 'date', 'description', 'payeeName', 'amount'] },
             { id: 'contabilidade',
 name: 'Contabilidade',
-fields: ['number', 'date', 'payeeName', 'payeeDocument', 'description', 'category', 'method', 'amount'] },
+fields: ['number', 'date', 'type', 'payeeName', 'payeeDocument', 'description', 'category', 'method', 'amount'] },
         ]);
         expect(source.fields.filter(f => f.permission)).toEqual([]);
         const privacy = new Map(source.fields.map(f => [f.key, f.privacy]));

@@ -186,7 +186,7 @@ export async function exportRouter(fastify: FastifyInstance, prisma: PrismaClien
 | unimed | search | READ_USER |
 | room-bookings | from, to (AAAA-MM-DD), roomId, type (EVENT, MEETING), search | READ_COURSE |
 | audit-logs | action (create, edit, delete, export, login, login_failed), entity, actorId, ip, from, to (AAAA-MM-DD, dia em Brasília), q — no máximo ${AUDIT_EXPORT_LIMIT} linhas mais recentes; sem ids | READ_AUDIT |
-| finance-transactions | from, to (AAAA-MM-DD; to inclui o dia inteiro), type (IN, OUT), categoryId, accountId, method, search, orderBy (date, number): os da lista de lançamentos; sem ids. Filtro inválido → 400 "Parâmetro inválido: <campo>" | READ_FINANCE |
+| finance-transactions | from, to (AAAA-MM-DD; to inclui o dia inteiro), type (IN, OUT), categoryId, accountId, method, search, orderBy (date, number), \`excludeTransfers\` (true tira as duas pernas das transferências entre caixas; no arquivo some também a nota dos totais; a linha "Filtros:" diz "Sem transferências entre caixas"; false ou ausente não muda nada; outro valor → 400): os da lista de lançamentos; sem ids. Filtro inválido → 400 "Parâmetro inválido: <campo>" | READ_FINANCE |
 
 Cada exportação fica registrada na auditoria (ação "Exportou"), com o formato e os campos pessoais no alvo.`;
 

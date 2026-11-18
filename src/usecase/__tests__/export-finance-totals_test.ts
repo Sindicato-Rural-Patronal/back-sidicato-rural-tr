@@ -71,17 +71,17 @@ beforeEach(() => {
 });
 
 describe('modelo Contabilidade', () => {
-    it('está no catálogo, depois do Resumido, com as 8 colunas na ordem pedida', () => {
+    it('está no catálogo, depois do Resumido, com as 9 colunas na ordem pedida (com o Tipo, SR-135)', () => {
         const { modelos, fields } = EXPORT_SOURCES['finance-transactions'];
         expect(modelos.map(m => m.id)).toEqual(['resumido', 'contabilidade']);
         const contabilidade = modelos.find(m => m.id === 'contabilidade')!;
         expect(contabilidade).toEqual({
             id: 'contabilidade',
             name: 'Contabilidade',
-            fields: ['number', 'date', 'payeeName', 'payeeDocument', 'description', 'category', 'method', 'amount'],
+            fields: ['number', 'date', 'type', 'payeeName', 'payeeDocument', 'description', 'category', 'method', 'amount'],
         });
         const labels = contabilidade.fields.map(k => fields.find(f => f.key === k)!.label);
-        expect(labels).toEqual(['Nº', 'Data', 'Nome / Razão social', 'CNPJ / CPF', 'Descrição', 'Categoria', 'Forma de pagamento', 'Valor (R$)'].map(l => (l === 'Forma de pagamento' ? 'Método' : l)));
+        expect(labels).toEqual(['Nº', 'Data', 'Tipo', 'Nome / Razão social', 'CNPJ / CPF', 'Descrição', 'Categoria', 'Forma de pagamento', 'Valor (R$)'].map(l => (l === 'Forma de pagamento' ? 'Método' : l)));
     });
 
     it('o modelo não filtra: exportar com ele não manda nenhum filtro à consulta', async () => {
