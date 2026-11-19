@@ -6,6 +6,8 @@ export function deriveAuditEntity(path: string): string {
     if (p.startsWith('/auth/')) return 'Login';
     // Primeiro: o conjunto vai no caminho (/admin/report-templates/registrations/…)
     // e cairia em Inscrição, Empresa, Curso…
+    // Nos Lançamentos, o modelo da equipe é a visão da lista (decisão 007).
+    if (p.startsWith('/admin/report-templates/finance-transactions')) return 'Visão da lista';
     if (p.startsWith('/admin/report-templates/')) return 'Modelo de relatório';
     if (p.includes('/finance/categories')) return 'Categoria financeira';
     if (p.includes('/finance/accounts')) return 'Caixa';

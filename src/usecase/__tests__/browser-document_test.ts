@@ -16,13 +16,14 @@ const run = (kind: BrowserDocumentKind, body: unknown) => useCase.execute(kind, 
 describe('a lista de documentos', () => {
     it('os tipos fechados, com nome e a permissão do documento', () => {
         expect(BROWSER_DOCUMENT_KINDS).toEqual([
-            'lista-presenca', 'ficha-inscricao', 'agenda', 'financeiro', 'relatorio-despesas', 'nota-empenho', 'recibo',
+            'lista-presenca', 'ficha-inscricao', 'agenda', 'financeiro', 'relatorio-despesas', 'relatorio-receitas',
+            'nota-empenho', 'recibo',
             'unimed-ficha', 'unimed-termo-adesao', 'unimed-contrato', 'relatorio-cadastros',
         ]);
         expect(BROWSER_DOCUMENTS['lista-presenca'].permissions).toEqual(['READ_COURSE']);
         expect(BROWSER_DOCUMENTS['ficha-inscricao'].permissions).toEqual(['READ_COURSE', 'READ_USER']);
         expect(BROWSER_DOCUMENTS.agenda.permissions).toEqual(['READ_COURSE']);
-        for (const k of ['financeiro', 'relatorio-despesas', 'nota-empenho', 'recibo'] as const) {
+        for (const k of ['financeiro', 'relatorio-despesas', 'relatorio-receitas', 'nota-empenho', 'recibo'] as const) {
             expect(BROWSER_DOCUMENTS[k].permissions).toEqual(['READ_FINANCE']);
         }
         for (const k of ['unimed-ficha', 'unimed-termo-adesao', 'unimed-contrato'] as const) {

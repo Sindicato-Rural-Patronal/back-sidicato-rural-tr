@@ -53,7 +53,7 @@ export const PADRAO_MODELO_NAME = 'Padrão (como hoje)';
 const MODELO_MAX = 64;
 
 /** Largura relativa no PDF quando o campo não diz a sua. */
-const TYPE_WEIGHT: Record<ExportFieldType, number> = {
+export const TYPE_WEIGHT: Record<ExportFieldType, number> = {
     text: 2,
     number: 1,
     money: 1.5,
@@ -85,6 +85,12 @@ export type ExportPdf = {
     /** Filtros em palavras ("Busca: silva · Só associados em dia"); "" sem filtro. */
     filters: string;
     modelo: string | null;
+    /**
+     * O nome da visão (decisão 007), quando a exportação veio de uma visão da
+     * tela (`visao` no pedido): o cabeçalho diz "Visão: <nome>" e `modelo` vem
+     * null. Ausente nas outras.
+     */
+    visao?: string;
     columns: ExportPdfColumn[];
     rows: string[][];
     /**
@@ -163,12 +169,20 @@ export function readPdfDoNavegador(value: unknown, format: ExportFormat): boolea
     return v;
 }
 
-function readModelo(value: unknown): string | null | Error {
+function readModelo(value: unknown, param: 'modelo' | 'visao' = 'modelo'): string | null | Error {
     if (value === undefined || value === null) return null;
     const v = String(value).trim();
     if (!v) return null;
-    if (v.length > MODELO_MAX) return new ValidationError('Parâmetro inválido: modelo');
+    if (v.length > MODELO_MAX) return new ValidationError(`Parâmetro inválido: ${param}`);
     return v;
+}
+
+export const MODELO_E_VISAO_MESSAGE = 'Use modelo ou visao, não os dois.';
+
+/** O nome da visão para o arquivo e a auditoria: o id de uma visão de fábrica vira o nome. */
+function visaoName(source: AnyExportSource, visao: string | null): string | null {
+    if (!visao) return null;
+    return source.visoes?.find(v => v.id === visao)?.name ?? visao;
 }
 
 /** O nome do modelo para o PDF e a auditoria: o id de fábrica vira o nome. */
@@ -339,6 +353,10 @@ now: Date
     if (keys instanceof Error) return { error: keys };
     const modelo = readModelo(body.modelo);
     if (modelo instanceof Error) return { error: modelo };
+    // A visão da tela (decisão 007): o arquivo diz "Visão: <nome>" em vez de "Modelo:".
+    const visao = readModelo(body.visao, 'visao');
+    if (visao instanceof Error) return { error: visao };
+    if (modelo && visao) return { error: new ValidationError(MODELO_E_VISAO_MESSAGE) };
 
     const legacy = keys === undefined;
     const fields = resolveFields(source.fields, keys ?? source.padrao);
@@ -373,7 +391,9 @@ now: Date
         ? [{ nome: 'Seleção',
 valor: registros(filters.ids.length) }]
         : await source.describeFilters(filters, rows, repo);
-    const modeloText = modeloName(source, modelo, legacy);
+    const visaoText = visaoName(source, visao);
+    // Na auditoria (`details.modelo`), o nome da visão ocupa o lugar do modelo.
+    const modeloText = visaoText ?? modeloName(source, modelo, legacy);
 
     // Contagem com milhar, como a tela ("1.234 registros", SR-112). Com 0
     // linhas nenhum dado pessoal saiu: o alvo não cita campos (os escolhidos
@@ -436,7 +456,7 @@ value: count }],
 value: SCOPE_WORDS[scope] ?? scope }],
                 ...(filtersLine ? [['Filtros', { kind: 'text',
 value: filtersLine }] as [string, XlsxCell]] : []),
-                ...(modeloText ? [['Modelo', { kind: 'text',
+                ...(modeloText ? [[visaoText ? 'Visão' : 'Modelo', { kind: 'text',
 value: modeloText }] as [string, XlsxCell]] : []),
                 ['Campos', { kind: 'text',
 value: fields.map(f => f.label).join(', ') }],
@@ -451,7 +471,8 @@ xlsx } };
         filename,
         count,
         filters: filtersText(filtros),
-        modelo: modeloText,
+        modelo: visaoText ? null : modeloText,
+        ...(visaoText ? { visao: visaoText } : {}),
         columns: fields.map(f => ({ key: f.key,
 label: f.label,
 type: f.type,

@@ -101,6 +101,21 @@ linhas: 12 }, courseOnly);
         });
     });
 
+    it('relatório de receitas: a frase da auditoria cita o CNPJ / CPF (SR-139)', async () => {
+        const res = await send('relatorio-receitas', { alvo: 'Novembro/2026',
+linhas: 5,
+escopo: 'com filtros' }, financeOnly);
+        expect(res.statusCode, res.body).toBe(204);
+        const log = await lastExport();
+        expect(log).toMatchObject({ path: '/admin/export/documents/relatorio-receitas',
+targetLabel: 'Relatório de receitas: Novembro/2026 · 5 registros · com CNPJ / CPF',
+statusCode: 204 });
+        const list = await get('/admin/audit-logs?action=export&q=receitas');
+        expect(list.statusCode, list.body).toBe(200);
+        expect((list.json() as { data: { summary: string }[] }).data[0].summary)
+            .toBe('Gerou o documento "Relatório de receitas: Novembro/2026 · 5 registros · com CNPJ / CPF"');
+    });
+
     it('com 0 registros a linha não cita dado pessoal (SR-112)', async () => {
         const res = await send('agenda', { alvo: '05/10/2026 a 11/10/2026',
 linhas: 0,
@@ -144,6 +159,8 @@ modelo: 'Lista de presença' });
             ['unimed-ficha', courseOnly, 403],
             ['financeiro', financeOnly, 204],
             ['relatorio-despesas', financeOnly, 204],
+            ['relatorio-receitas', financeOnly, 204],
+            ['relatorio-receitas', courseOnly, 403],
             ['nota-empenho', financeOnly, 204],
             ['recibo', financeOnly, 204],
             ['lista-presenca', financeOnly, 403],

@@ -14,6 +14,7 @@ import {
     deniedFieldsError, readFieldKeys, readFormat, resolveFields,
     type ExportActor, type ExportFormat,
 } from './engine.js';
+import { readVisaoFilters, sourceHasVisoes } from './visoes.js';
 
 // Modelos de relatório salvos pela equipe (decisão 006, fase 3, SR-114).
 //
@@ -44,6 +45,9 @@ export const TEMPLATE_MESSAGES = {
     fieldsRequired: 'Escolha pelo menos um campo.',
     nothingToChange: 'Nada para alterar.',
     tooMany: `Este relatório já tem ${TEMPLATE_LIMITS.perDataset} modelos da equipe. Exclua um antes de salvar outro.`,
+    // Nas fontes com visões (decisão 007), o modelo da equipe é uma "visão" na tela.
+    visaoNameTaken: 'Já existe uma visão da equipe com esse nome.',
+    visaoFactoryName: 'Já existe uma visão de fábrica com esse nome.',
 } as const;
 
 /** Quem pede: o id vai para createdById/updatedById; as permissões, para os campos. */
@@ -68,6 +72,8 @@ export type ReportTemplateView = {
     format: string | null;
     /** Só em `registrations` ("Só confirmadas"); null nos outros. */
     confirmed: boolean | null;
+    /** Os filtros que a visão liga (decisão 007; só nas fontes com visões); null = nenhum. */
+    filters: Record<string, unknown> | null;
     createdAt: Date;
     updatedAt: Date;
     createdBy: TemplateAdminRef;
@@ -97,9 +103,16 @@ function readTemplateFormat(value: unknown): ExportFormat | null | undefined | E
 
 const sameName = (a: string, b: string) => a.toLocaleLowerCase('pt-BR') === b.toLocaleLowerCase('pt-BR');
 
-/** O nome é o de um modelo de fábrica (ou o id dele, ou o Padrão)? A exportação troca o id pelo nome. */
+/**
+ * O nome é o de um modelo de fábrica (ou o id dele, ou o Padrão), ou o de uma
+ * visão de fábrica (ou o id dela)? A exportação troca o id pelo nome.
+ */
 function isFactoryName(source: AnyExportSource, name: string): boolean {
-    const factory = [PADRAO_MODELO_ID, PADRAO_MODELO_NAME, ...source.modelos.flatMap(m => [m.id, m.name])];
+    const factory = [
+        PADRAO_MODELO_ID, PADRAO_MODELO_NAME,
+        ...source.modelos.flatMap(m => [m.id, m.name]),
+        ...(source.visoes ?? []).flatMap(v => [v.id, v.name]),
+    ];
     return factory.some(f => sameName(f, name));
 }
 
@@ -140,6 +153,8 @@ function readTemplateFields(source: AnyExportSource, value: unknown, actor: Expo
  */
 export function reportTemplateAuditSnapshot(
     template: Pick<ReportTemplateModel, 'dataset' | 'name' | 'fields' | 'format' | 'confirmed'>,
+    /** Os filtros da visão em palavras (`visaoFiltersText`); só vale nas fontes com visões. */
+    filtersText: string | null = null,
 ): Record<string, unknown> {
     const source = sourceOf(template.dataset as ExportDataset);
     const labelOf = new Map((source?.fields ?? []).map(f => [f.key, f.label]));
@@ -148,10 +163,17 @@ export function reportTemplateAuditSnapshot(
         fields: template.fields.map(k => labelOf.get(k) ?? k).join(', '),
         format: template.format ? (FORMAT_LABEL[template.format as ExportFormat] ?? template.format) : null,
         ...(template.dataset === 'registrations' && { onlyConfirmed: template.confirmed ?? false }),
+        ...(source && sourceHasVisoes(source) && { filters: filtersText }),
     };
 }
 
 type Outcome<T> = { error?: Error } & T;
+
+const nameTakenMessage = (source: AnyExportSource) =>
+    (sourceHasVisoes(source) ? TEMPLATE_MESSAGES.visaoNameTaken : TEMPLATE_MESSAGES.nameTaken);
+
+const isFiltersObject = (v: unknown): v is Record<string, unknown> =>
+    typeof v === 'object' && v !== null && !Array.isArray(v);
 
 export class ReportTemplatesUseCase {
     constructor(private readonly repo: ReportTemplateRepository) {}
@@ -183,6 +205,8 @@ auditLabel?: string
         if (fields instanceof Error) return { error: fields };
         const format = readTemplateFormat(body.format);
         if (format instanceof Error) return { error: format };
+        const filters = readVisaoFilters(source, body.filters);
+        if (filters instanceof Error) return { error: filters };
 
         const conflict = await this.nameConflict(source, dataset, name, null);
         if (conflict) return { error: conflict };
@@ -194,6 +218,7 @@ auditLabel?: string
                 fields,
                 format: format ?? null,
                 confirmed: dataset === 'registrations' ? body.confirmed === true : null,
+                filters: filters ?? null,
                 createdById: actor.id,
             });
             const [template] = await this.views(source, [created]);
@@ -201,7 +226,7 @@ auditLabel?: string
 auditLabel: auditLabelOf(dataset, name) };
         } catch (e) {
             // Outro pedido gravou o mesmo nome ao mesmo tempo: o índice parcial segura.
-            if (isPrismaUniqueViolation(e)) return { error: new ConflictError(TEMPLATE_MESSAGES.nameTaken) };
+            if (isPrismaUniqueViolation(e)) return { error: new ConflictError(nameTakenMessage(source)) };
             throw e;
         }
     }
@@ -238,6 +263,9 @@ auditLabel?: string
         if (format instanceof Error) return { error: format };
         if (format !== undefined) data.format = format;
         if (dataset === 'registrations' && typeof body.confirmed === 'boolean') data.confirmed = body.confirmed;
+        const filters = readVisaoFilters(source, body.filters);
+        if (filters instanceof Error) return { error: filters };
+        if (filters !== undefined) data.filters = filters;
         if (Object.keys(data).length === 1) return { error: new ValidationError(TEMPLATE_MESSAGES.nothingToChange) };
 
         if (data.name !== undefined) {
@@ -255,7 +283,7 @@ auditLabel?: string
             return { template,
 auditLabel: label };
         } catch (e) {
-            if (isPrismaUniqueViolation(e)) return { error: new ConflictError(TEMPLATE_MESSAGES.nameTaken) };
+            if (isPrismaUniqueViolation(e)) return { error: new ConflictError(nameTakenMessage(source)) };
             throw e;
         }
     }
@@ -279,9 +307,11 @@ auditLabel: label };
         name: string,
         selfId: string | null,
     ): Promise<Error | null> {
-        if (isFactoryName(source, name)) return new ConflictError(TEMPLATE_MESSAGES.factoryName);
+        if (isFactoryName(source, name)) {
+            return new ConflictError(sourceHasVisoes(source) ? TEMPLATE_MESSAGES.visaoFactoryName : TEMPLATE_MESSAGES.factoryName);
+        }
         const active = await this.repo.listActive(dataset);
-        if (active.some(t => t.id !== selfId && sameName(t.name, name))) return new ConflictError(TEMPLATE_MESSAGES.nameTaken);
+        if (active.some(t => t.id !== selfId && sameName(t.name, name))) return new ConflictError(nameTakenMessage(source));
         if (selfId === null && active.length >= TEMPLATE_LIMITS.perDataset) return new BusinessRuleError(TEMPLATE_MESSAGES.tooMany);
         return null;
     }
@@ -301,6 +331,7 @@ username: usernames.get(adminId) ?? null });
             missingFields: t.fields.filter(k => !known.has(k)),
             format: t.format,
             confirmed: t.confirmed,
+            filters: isFiltersObject(t.filters) ? t.filters : null,
             createdAt: t.createdAt,
             updatedAt: t.updatedAt,
             createdBy: ref(t.createdById),

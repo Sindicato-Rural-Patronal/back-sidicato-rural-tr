@@ -9,6 +9,8 @@ export type ReportTemplateCreate = {
     fields: string[];
     format: string | null;
     confirmed: boolean | null;
+    /** Os filtros que a visão guarda (decisão 007); null = nenhum. */
+    filters: Record<string, unknown> | null;
     createdById: string;
 };
 
@@ -18,6 +20,8 @@ export type ReportTemplateUpdate = {
     fields?: string[];
     format?: string | null;
     confirmed?: boolean | null;
+    /** null tira os filtros da visão. */
+    filters?: Record<string, unknown> | null;
     updatedById: string;
 };
 

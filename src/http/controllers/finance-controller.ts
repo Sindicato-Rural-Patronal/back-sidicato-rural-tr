@@ -38,6 +38,7 @@ import type {
     DeleteFinanceClosingUseCase,
 } from '../../usecase/finance-closings.js';
 import type { NextFinanceNumberUseCase } from '../../usecase/next-finance-number.js';
+import { ForbiddenError } from '../../errors/auth.js';
 import { errorToStatus } from '../lib/require-permission.js';
 import { adminOf } from '../lib/route-auth.js';
 
@@ -128,7 +129,13 @@ export class FinanceController {
 
     // ── Lançamentos ─────────────────────────────────────────────────────────
     async getTransactions(request: FastifyRequest, reply: FastifyReply) {
-        return reply.send(await this.listTransactions.execute(request.query));
+        // Com `fields` (decisão 007), a permissão de cada campo vem de quem pede.
+        try {
+            return reply.send(await this.listTransactions.execute(request.query, adminOf(request)));
+        } catch (e) {
+            if (e instanceof ForbiddenError) return reply.status(403).send({ error: e.message });
+            throw e;
+        }
     }
 
     // Só informativo: o próximo Nº automático, sem reservar.

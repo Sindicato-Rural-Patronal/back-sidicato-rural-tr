@@ -2,7 +2,7 @@ import type { Permission } from '../../generated/prisma/enums.js';
 import { NotFoundError } from '../../errors/not-found.js';
 import { EXPORT_DATASETS, type ExportDataset } from './datasets.js';
 import { NO_BUILDER_MESSAGE, sourceOf } from './catalog/index.js';
-import type { ExportFieldType, ExportModelo, ExportPrivacy } from './catalog/types.js';
+import type { ExportFieldType, ExportModelo, ExportPrivacy, ExportVisao } from './catalog/types.js';
 import { EXPORT_LIMITS, NO_EXTRA_PERMISSIONS, type ExportActor } from './engine.js';
 
 // O catálogo de uma fonte para o montador (decisão 006, item 3): os campos
@@ -37,6 +37,8 @@ fields: CatalogField[]
 }[];
     padrao: string[];
     modelos: ExportModelo[];
+    /** Visões de fábrica da lista (decisão 007); ausente nas fontes sem visões. */
+    visoes?: ExportVisao[];
     filterLabels: Record<string, string>;
     limits: {
  rows: number;
@@ -80,6 +82,11 @@ fields: [] };
                 padrao: [...source.padrao],
                 modelos: source.modelos.map(m => ({ ...m,
 fields: [...m.fields] })),
+                ...(source.visoes?.length && {
+                    visoes: source.visoes.map(v => ({ ...v,
+fields: [...v.fields],
+filters: v.filters ? { ...v.filters } : null })),
+                }),
                 filterLabels: { ...source.filterLabels },
                 limits: { ...EXPORT_LIMITS },
             },

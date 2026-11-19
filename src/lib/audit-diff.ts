@@ -170,6 +170,8 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
     fields: 'Campos',
     format: 'Formato',
     onlyConfirmed: 'Só confirmadas',
+    // Visão da lista (decisão 007): os filtros que ela liga, em palavras.
+    filters: 'Filtros',
 };
 
 const show = (value: unknown): string => (value === null || value === undefined || value === '' ? '(vazio)' : String(value));

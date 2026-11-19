@@ -3,6 +3,7 @@ import { deriveAuditEntity, loginAuditMethod, skipAudit } from '../../lib/audit-
 import { AUDIT_ENTITY_NOUNS, auditRouteKey, describeAuditAction } from '../../lib/audit-sentence.js';
 import { closingAuditLabel, loginUsername, shouldLookupTargetLabel } from '../../lib/audit-label.js';
 import { addressText, shouldSnapshot } from '../../lib/audit-snapshot.js';
+import { AUDIT_FIELD_LABELS } from '../../lib/audit-diff.js';
 
 const ID = '3f2b8c1e-4a5d-4e6f-8a9b-0c1d2e3f4a5b';
 const ID2 = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
@@ -198,13 +199,28 @@ describe('auditoria: fechamento do mês (SR-054)', () => {
 
 describe('auditoria: modelo de relatório da equipe (SR-114)', () => {
     it('entidade própria, mesmo com o conjunto no caminho (registrations, companies, courses…)', () => {
-        for (const dataset of ['people', 'registrations', 'companies', 'courses', 'contact-messages', 'unimed', 'finance-transactions']) {
+        for (const dataset of ['people', 'registrations', 'companies', 'courses', 'contact-messages', 'unimed']) {
             expect(deriveAuditEntity(`/admin/report-templates/${dataset}`), dataset).toBe('Modelo de relatório');
             expect(deriveAuditEntity(`/admin/report-templates/${dataset}/${ID}`), dataset).toBe('Modelo de relatório');
         }
         expect(AUDIT_ENTITY_NOUNS['Modelo de relatório']).toEqual({ noun: 'modelo de relatório',
 g: 'm' });
         expect(skipAudit('/admin/report-templates/people')).toBe(false);
+    });
+
+    it('nos Lançamentos, o modelo da equipe é a "Visão da lista" (decisão 007)', () => {
+        expect(deriveAuditEntity('/admin/report-templates/finance-transactions')).toBe('Visão da lista');
+        expect(deriveAuditEntity(`/admin/report-templates/finance-transactions/${ID}`)).toBe('Visão da lista');
+        expect(AUDIT_ENTITY_NOUNS['Visão da lista']).toEqual({ noun: 'visão',
+g: 'f' });
+        expect(sentence('POST', '/admin/report-templates/finance-transactions', 'Lançamentos: Contabilidade março'))
+            .toBe('Criou a visão "Lançamentos: Contabilidade março"');
+        expect(sentence('PATCH', `/admin/report-templates/finance-transactions/${ID}`, 'Lançamentos: Contabilidade'))
+            .toBe('Editou a visão "Lançamentos: Contabilidade"');
+        expect(sentence('DELETE', `/admin/report-templates/finance-transactions/${ID}`, 'Lançamentos: Contabilidade'))
+            .toBe('Excluiu a visão "Lançamentos: Contabilidade"');
+        expect(AUDIT_FIELD_LABELS.filters).toBe('Filtros');
+        expect(shouldSnapshot('PATCH', `/admin/report-templates/finance-transactions/${ID}`)).toBe(true);
     });
 
     it('frases de criar, editar e excluir', () => {

@@ -2,6 +2,10 @@ import type { PrismaClient } from '../generated/prisma/client.js';
 import { auditRouteKey } from './audit-sentence.js';
 import { SETTING_KEYS } from '../usecase/get-site-settings.js';
 import { reportTemplateAuditSnapshot } from '../usecase/export/report-templates.js';
+import { sourceOf } from '../usecase/export/catalog/index.js';
+import type { ExportDataset } from '../usecase/export/datasets.js';
+import { visaoFiltersText } from '../usecase/export/visoes.js';
+import { createExportAdapter } from '../adapter/database/export-adapter.js';
 
 // Leitura do registro alvo de uma edição/exclusão, antes e depois da ação, para
 // a auditoria guardar o que mudou (lib/audit-diff.ts). Só rotas que mexem em UM
@@ -262,11 +266,15 @@ size: true } }),
 
 // Modelo de relatório da equipe (SR-114): o conjunto vai no caminho
 // (/admin/report-templates/people/:id), então a chave não é fixa. Os campos
-// saem pelo rótulo do catálogo e o formato pelo nome.
+// saem pelo rótulo do catálogo e o formato pelo nome. Nas visões da lista
+// (decisão 007), os filtros saem em palavras, com a categoria e o caixa pelo nome.
 const REPORT_TEMPLATE_KEY = /^\/admin\/report-templates\/[^/]+\/:id$/;
 const reportTemplate: Snapshot = async (prisma, ids) => {
     const t = await prisma.reportTemplate.findUnique({ where: { id: ids[0] } });
-    return t ? reportTemplateAuditSnapshot(t) : null;
+    if (!t) return null;
+    const source = sourceOf(t.dataset as ExportDataset);
+    const words = source ? await visaoFiltersText(source, t.filters, createExportAdapter(prisma)) : null;
+    return reportTemplateAuditSnapshot(t, words);
 };
 
 function snapshotFor(method: string, path: string): Snapshot | null {
